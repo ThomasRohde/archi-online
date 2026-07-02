@@ -153,3 +153,159 @@ body {
   flex: 1;
   overflow: auto;
 }
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.file-status {
+  color: var(--text-dim);
+  padding-right: 6px;
+}
+
+/* Model tree */
+.model-tree {
+  flex: 1;
+  overflow: auto;
+  user-select: none;
+  outline: none;
+  padding: 2px 0;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  cursor: default;
+  border-radius: 3px;
+}
+
+.tree-row:hover {
+  background: #f0f4fa;
+}
+
+.tree-row.selected {
+  background: var(--selection);
+}
+
+.tree-row.drag-over {
+  outline: 1.5px solid var(--accent);
+  outline-offset: -1.5px;
+}
+
+.tree-row.renaming input {
+  font: inherit;
+  padding: 0 2px;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  outline: none;
+  min-width: 60px;
+}
+
+.tree-icon {
+  display: inline-flex;
+  width: 14px;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tree-chevron {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.tree-el-icon {
+  display: inline-block;
+  width: 11px;
+  height: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 2px;
+}
+
+.tree-rel-icon {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.tree-view-icon {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.tree-model-icon {
+  color: var(--accent);
+}
+
+.tree-label.dim {
+  color: #555;
+}
+
+/* Context menu */
+.ctx-root {
+  position: fixed;
+  z-index: 1000;
+}
+
+.ctx-menu {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+  min-width: 170px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.ctx-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.ctx-item:hover:not(.disabled) {
+  background: var(--accent-soft);
+}
+
+.ctx-item.disabled {
+  color: var(--text-dim);
+}
+
+.ctx-item.danger:hover {
+  background: #fde4e4;
+  color: #b02a2a;
+}
+
+.ctx-label {
+  flex: 1;
+}
+
+.ctx-arrow {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.ctx-icon {
+  display: inline-flex;
+  width: 14px;
+  justify-content: center;
+}
+
+.ctx-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 6px;
+}
+
+.ctx-submenu {
+  position: absolute;
+  left: 100%;
+  top: -5px;
+}

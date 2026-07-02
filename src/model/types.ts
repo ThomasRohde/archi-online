@@ -1,0 +1,227 @@
+import type { ElementType, RelationshipType } from './metamodel';
+
+export interface Property {
+  key: string;
+  value: string;
+}
+
+export interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Bendpoint stored Archi-style: offsets from the source and target anchor
+ * (figure centers) captured at edit time. Absolute position is computed at
+ * render time with GEF's weighted blend, matching desktop Archi.
+ */
+export interface Bendpoint {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
+export interface ArchimateElement {
+  id: string;
+  kind: 'element';
+  type: ElementType;
+  name: string;
+  documentation: string;
+  properties: Property[];
+  folderId: string;
+  /** Junction only. Archi stores type="or"; "and" is the default. */
+  junctionType?: 'and' | 'or';
+}
+
+export interface ArchimateRelationship {
+  id: string;
+  kind: 'relationship';
+  type: RelationshipType;
+  name: string;
+  documentation: string;
+  properties: Property[];
+  folderId: string;
+  sourceId: string;
+  targetId: string;
+  /** AccessRelationship: 0=write (default), 1=read, 2=none, 3=read/write */
+  accessType?: number;
+  /** InfluenceRelationship strength, e.g. "+", "++", "-" */
+  strength?: string;
+  /** AssociationRelationship directed flag */
+  directed?: boolean;
+}
+
+export type Concept = ArchimateElement | ArchimateRelationship;
+
+export type FolderType =
+  | 'strategy'
+  | 'business'
+  | 'application'
+  | 'technology'
+  | 'motivation'
+  | 'implementation_migration'
+  | 'other'
+  | 'relations'
+  | 'diagrams';
+
+export interface Folder {
+  id: string;
+  kind: 'folder';
+  name: string;
+  /** Set only on the fixed top-level folders. */
+  folderType?: FolderType;
+  documentation: string;
+  properties: Property[];
+  parentId: string | null;
+  folderIds: string[];
+  itemIds: string[];
+}
+
+export interface DiagramView {
+  id: string;
+  kind: 'view';
+  name: string;
+  documentation: string;
+  properties: Property[];
+  folderId: string;
+  viewpoint?: string;
+  /** Top-level diagram node ids in z-order (first = back). */
+  childIds: string[];
+  connectionRouterType?: number;
+}
+
+export interface DiagramNodeBase {
+  id: string;
+  viewId: string;
+  /** Parent node id, or the view id for top-level nodes. */
+  parentId: string;
+  /** Bounds relative to parent. */
+  bounds: Bounds;
+  childIds: string[];
+  sourceConnectionIds: string[];
+  targetConnectionIds: string[];
+  fillColor?: string;
+  lineColor?: string;
+  fontColor?: string;
+  font?: string;
+  /** Fill opacity 0-255 (Archi default 255). */
+  alpha?: number;
+  lineAlpha?: number;
+  /** SWT alignment: 1=left, 2=center, 4=right */
+  textAlignment?: number;
+  /** 0=top, 1=center, 2=bottom */
+  textPosition?: number;
+}
+
+export interface ElementNode extends DiagramNodeBase {
+  nodeType: 'element';
+  elementId: string;
+  /** Alternate figure (0=default, 1=alternate). */
+  figureType?: number;
+}
+
+export interface GroupNode extends DiagramNodeBase {
+  nodeType: 'group';
+  name: string;
+  documentation: string;
+  properties: Property[];
+  /** 0=tabbed (default), 1=rectangle */
+  borderType?: number;
+}
+
+export interface NoteNode extends DiagramNodeBase {
+  nodeType: 'note';
+  content: string;
+  properties: Property[];
+  /** 0=dog-ear (default), 1=rectangle, 2=none */
+  borderType?: number;
+}
+
+export interface RefNode extends DiagramNodeBase {
+  nodeType: 'ref';
+  refViewId: string;
+}
+
+export type DiagramNode = ElementNode | GroupNode | NoteNode | RefNode;
+
+export interface DiagramConnection {
+  id: string;
+  viewId: string;
+  connType: 'relationship' | 'plain';
+  /** Set when connType === 'relationship'. */
+  relationshipId?: string;
+  /** Diagram node ids (Archi also allows connection ends; not supported yet). */
+  sourceId: string;
+  targetId: string;
+  bendpoints: Bendpoint[];
+  lineColor?: string;
+  fontColor?: string;
+  font?: string;
+  lineWidth?: number;
+  /** 0=source, 1=middle (default), 2=target */
+  textPosition?: number;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  documentation: string;
+  properties: Property[];
+  version?: string;
+}
+
+/** The full persistent state of one open ArchiMate model (undo/redo tracked). */
+export interface ModelState {
+  info: ModelInfo;
+  folders: Record<string, Folder>;
+  /** Ordered top-level folder ids. */
+  rootFolderIds: string[];
+  elements: Record<string, ArchimateElement>;
+  relationships: Record<string, ArchimateRelationship>;
+  views: Record<string, DiagramView>;
+  nodes: Record<string, DiagramNode>;
+  connections: Record<string, DiagramConnection>;
+}
+
+export type ModelItem =
+  | ArchimateElement
+  | ArchimateRelationship
+  | DiagramView
+  | Folder;
+
+/** Look up any identifiable object in the model. */
+export function getItem(state: ModelState, id: string): ModelItem | DiagramNode | DiagramConnection | undefined {
+  return (
+    state.elements[id] ??
+    state.relationships[id] ??
+    state.views[id] ??
+    state.folders[id] ??
+    state.nodes[id] ??
+    state.connections[id]
+  );
+}
+
+export function getConcept(state: ModelState, id: string): Concept | undefined {
+  return state.elements[id] ?? state.relationships[id];
+}
+
+/** Absolute (view-space) bounds of a diagram node. */
+export function absoluteBounds(state: ModelState, nodeId: string): Bounds {
+  const node = state.nodes[nodeId];
+  if (!node) return { x: 0, y: 0, width: 0, height: 0 };
+  let { x, y } = node.bounds;
+  let parent = state.nodes[node.parentId];
+  while (parent) {
+    x += parent.bounds.x;
+    y += parent.bounds.y;
+    parent = state.nodes[parent.parentId];
+  }
+  return { x, y, width: node.bounds.width, height: node.bounds.height };
+}
+
+export function centerOf(b: Bounds): { x: number; y: number } {
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+}

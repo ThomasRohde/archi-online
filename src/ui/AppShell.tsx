@@ -1,4 +1,5 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { ContextMenuHost } from './ContextMenu';
 import { Toolbar } from './Toolbar';
 import { ModelTree } from './ModelTree';
 import { EditorArea } from './EditorArea';
@@ -8,6 +9,7 @@ import { ScriptPanel } from './ScriptPanel';
 export function AppShell() {
   return (
     <div className="app-shell">
+      <ContextMenuHost />
       <Toolbar />
       <PanelGroup direction="horizontal" className="app-main" autoSaveId="archi-h">
         <Panel defaultSize={18} minSize={10} className="panel">
