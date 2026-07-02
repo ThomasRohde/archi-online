@@ -231,6 +231,34 @@ export function setProperties(id: string, properties: Property[]): void {
   });
 }
 
+/** Type-specific relationship attributes (access type, influence strength, direction). */
+export function setRelationshipAttrs(
+  id: string,
+  attrs: { accessType?: number; strength?: string; directed?: boolean },
+): void {
+  transact('Change Relationship', (draft) => {
+    const rel = draft.relationships[id];
+    if (!rel) return;
+    if ('accessType' in attrs) rel.accessType = attrs.accessType === 0 ? undefined : attrs.accessType;
+    if ('strength' in attrs) rel.strength = attrs.strength === '' ? undefined : attrs.strength;
+    if ('directed' in attrs) rel.directed = attrs.directed ? true : undefined;
+  });
+}
+
+export function setJunctionType(id: string, junctionType: 'and' | 'or'): void {
+  transact('Change Junction', (draft) => {
+    const el = draft.elements[id];
+    if (el?.type === 'Junction') el.junctionType = junctionType;
+  });
+}
+
+export function setViewpoint(viewId: string, viewpoint: string): void {
+  transact('Change Viewpoint', (draft) => {
+    const view = draft.views[viewId];
+    if (view) view.viewpoint = viewpoint === '' ? undefined : viewpoint;
+  });
+}
+
 // ---------------------------------------------------------------- deletion
 
 function removeFromFolder(draft: ModelState, id: string): void {

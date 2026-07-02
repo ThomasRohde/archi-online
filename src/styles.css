@@ -437,6 +437,132 @@ body {
   margin: 3px 2px;
 }
 
+/* Properties panel */
+.prop-type {
+  padding: 6px 10px 2px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.prop-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.prop-tab {
+  font: inherit;
+  border: none;
+  background: transparent;
+  padding: 3px 8px;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+
+.prop-tab.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+}
+
+.prop-form {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prop-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.prop-row > label {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.prop-input {
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.prop-input:focus {
+  border-color: var(--accent);
+}
+
+.prop-doc {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.prop-hint {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-row input[type='color'] {
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+}
+
+.tb-btn.small {
+  padding: 1px 6px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+
+.prop-table {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prop-table-head,
+.prop-table-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 24px;
+  gap: 4px;
+  align-items: center;
+}
+
+.prop-table-head {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.add-prop {
+  align-self: flex-start;
+  border: 1px dashed var(--border);
+  margin-top: 4px;
+}
+
+.prop-row select {
+  font: inherit;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
 /* Direct edit overlay */
 .direct-edit {
   position: absolute;
