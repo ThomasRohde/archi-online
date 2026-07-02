@@ -1,6 +1,24 @@
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { createEmptyModel } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
 import { openModelFromDisk, saveModelToDisk } from '../persistence/files';
+
+const SHORTCUTS: [string, string][] = [
+  ['Ctrl+S / Ctrl+O', 'Save / open model'],
+  ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
+  ['Ctrl+C / Ctrl+V', 'Copy / paste diagram objects'],
+  ['Ctrl+A', 'Select all on view'],
+  ['Delete', 'Delete from view (canvas) or model (tree)'],
+  ['F2 or double-click', 'Rename'],
+  ['Arrows (+Shift)', 'Nudge selection by 1px (grid step)'],
+  ['Ctrl+wheel', 'Zoom canvas'],
+  ['Middle-drag / wheel', 'Pan / scroll canvas'],
+  ['Alt while dragging', 'Disable grid snap'],
+  ['Escape', 'Cancel tool / clear selection'],
+  ['Ctrl+Enter (editor)', 'Run script'],
+  ['Double-click bendpoint', 'Remove bendpoint'],
+];
 
 export function newModel(): void {
   if (useStore.getState().dirty && !confirm('Discard unsaved changes?')) return;
@@ -17,6 +35,7 @@ export function saveModel(saveAs = false): void {
 }
 
 export function Toolbar() {
+  const [showHelp, setShowHelp] = useState(false);
   const canUndo = useStore((s) => s.undoStack.length > 0);
   const canRedo = useStore((s) => s.redoStack.length > 0);
   const undoLabel = useStore((s) => s.undoStack[s.undoStack.length - 1]?.label);
@@ -73,6 +92,33 @@ export function Toolbar() {
       <span className="file-status">
         {hasModel ? `${modelName} — ${fileName ?? 'unsaved'}${dirty ? ' •' : ''}` : ''}
       </span>
+      <button className="tb-btn" title="Keyboard shortcuts" onClick={() => setShowHelp(true)}>
+        ?
+      </button>
+      {showHelp &&
+        createPortal(
+          <div className="modal-backdrop" onClick={() => setShowHelp(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-title">Keyboard shortcuts</div>
+              <table className="shortcut-table">
+                <tbody>
+                  {SHORTCUTS.map(([keys, desc]) => (
+                    <tr key={keys}>
+                      <td>
+                        <code>{keys}</code>
+                      </td>
+                      <td>{desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <button className="tb-btn small" onClick={() => setShowHelp(false)}>
+                Close
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

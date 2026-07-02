@@ -649,6 +649,80 @@ body {
   box-sizing: border-box;
 }
 
+/* Welcome + modal */
+.welcome {
+  text-align: center;
+}
+
+.welcome h2 {
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.welcome-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.welcome-btn {
+  font: inherit;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.welcome-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 480px;
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.modal-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.shortcut-table {
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.shortcut-table td {
+  padding: 3px 12px 3px 0;
+  vertical-align: top;
+}
+
+.shortcut-table code {
+  background: var(--header-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
 .zoom-indicator {
   position: absolute;
   right: 8px;
