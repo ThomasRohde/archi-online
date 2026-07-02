@@ -142,6 +142,76 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+}
+
+.script-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.script-header select {
+  font: inherit;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  max-width: 160px;
+}
+
+.run-btn {
+  color: #157a2f;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+
+.run-btn:hover:not(:disabled) {
+  background: #e2f5e8;
+}
+
+.script-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.script-editor {
+  flex: 3;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.monaco-host {
+  width: 100%;
+  height: 100%;
+}
+
+.script-console {
+  flex: 2;
+  min-width: 0;
+  overflow: auto;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  padding: 6px 8px;
+  background: #fcfcfc;
+}
+
+.console-entry {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 1px 0;
+}
+
+.console-entry.error {
+  color: #b02a2a;
+}
+
+.console-entry.warn {
+  color: #9a6700;
+}
+
+.console-entry.info {
+  color: var(--text-dim);
 }
 
 .model-tree {

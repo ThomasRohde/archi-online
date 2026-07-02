@@ -486,6 +486,7 @@ export function addElementNodeToView(
   elementId: string,
   parentId: string,
   bounds: Bounds,
+  autoConnect = true,
 ): string {
   const id = newId();
   transact('Add to View', (draft) => {
@@ -502,7 +503,9 @@ export function addElementNodeToView(
       elementId,
     };
     attachNode(draft, node);
-    addMissingConnections(draft, viewId, id);
+    // UI drops auto-connect existing relationships (Archi preference default);
+    // scripted view.add() does not (jArchi semantics)
+    if (autoConnect) addMissingConnections(draft, viewId, id);
   });
   return id;
 }
