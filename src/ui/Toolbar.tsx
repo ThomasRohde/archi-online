@@ -1,5 +1,20 @@
 import { createEmptyModel } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
+import { openModelFromDisk, saveModelToDisk } from '../persistence/files';
+
+export function newModel(): void {
+  if (useStore.getState().dirty && !confirm('Discard unsaved changes?')) return;
+  replaceModel(createEmptyModel('New ArchiMate Model'), null, false);
+}
+
+export function openModel(): void {
+  if (useStore.getState().dirty && !confirm('Discard unsaved changes?')) return;
+  void openModelFromDisk().catch((e) => alert('Could not open model: ' + e));
+}
+
+export function saveModel(saveAs = false): void {
+  void saveModelToDisk(saveAs).catch((e) => alert('Could not save model: ' + e));
+}
 
 export function Toolbar() {
   const canUndo = useStore((s) => s.undoStack.length > 0);
@@ -9,24 +24,33 @@ export function Toolbar() {
   const dirty = useStore((s) => s.dirty);
   const fileName = useStore((s) => s.fileName);
   const hasModel = useStore((s) => s.model !== null);
-
-  const onNew = () => {
-    if (useStore.getState().dirty && !confirm('Discard unsaved changes?')) return;
-    replaceModel(createEmptyModel('New ArchiMate Model'), null, false);
-  };
+  const modelName = useStore((s) => s.model?.info.name);
 
   return (
     <div className="toolbar">
       <span className="app-title">Archi Online</span>
       <div className="toolbar-sep" />
-      <button className="tb-btn" title="New model" onClick={onNew}>
+      <button className="tb-btn" title="New model (Ctrl+Alt+N)" onClick={newModel}>
         New
       </button>
-      <button className="tb-btn" title="Open model (coming soon)" disabled>
+      <button className="tb-btn" title="Open .archimate file (Ctrl+O)" onClick={openModel}>
         Open…
       </button>
-      <button className="tb-btn" title="Save model (coming soon)" disabled={!hasModel}>
+      <button
+        className="tb-btn"
+        title="Save model (Ctrl+S)"
+        disabled={!hasModel}
+        onClick={() => saveModel(false)}
+      >
         Save
+      </button>
+      <button
+        className="tb-btn"
+        title="Save model as…"
+        disabled={!hasModel}
+        onClick={() => saveModel(true)}
+      >
+        Save As…
       </button>
       <div className="toolbar-sep" />
       <button
@@ -47,7 +71,7 @@ export function Toolbar() {
       </button>
       <div className="toolbar-spacer" />
       <span className="file-status">
-        {hasModel ? (fileName ?? 'unsaved') + (dirty ? ' •' : '') : ''}
+        {hasModel ? `${modelName} — ${fileName ?? 'unsaved'}${dirty ? ' •' : ''}` : ''}
       </span>
     </div>
   );
