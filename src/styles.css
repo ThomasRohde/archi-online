@@ -1,0 +1,155 @@
+:root {
+  --bg: #f4f4f4;
+  --panel-bg: #ffffff;
+  --border: #d0d0d0;
+  --header-bg: #ececec;
+  --text: #1e1e1e;
+  --text-dim: #777;
+  --accent: #2a6cc4;
+  --accent-soft: #dce9f9;
+  --toolbar-bg: #fafafa;
+  --selection: #cfe3fa;
+  font-size: 13px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-main {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.app-title {
+  font-weight: 600;
+  margin-right: 8px;
+  color: var(--accent);
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 6px;
+}
+
+.tb-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+}
+
+.tb-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--border);
+}
+
+.tb-btn:disabled {
+  color: var(--text-dim);
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Panels */
+.panel {
+  background: var(--panel-bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-header {
+  padding: 5px 8px;
+  font-weight: 600;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.resize-handle-h {
+  width: 4px;
+  background: var(--bg);
+  cursor: col-resize;
+}
+
+.resize-handle-v {
+  height: 4px;
+  background: var(--bg);
+  cursor: row-resize;
+}
+
+.resize-handle-h:hover,
+.resize-handle-v:hover {
+  background: var(--accent-soft);
+}
+
+.empty-hint {
+  color: var(--text-dim);
+  padding: 12px;
+}
+
+/* Editor */
+.editor-area {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.editor-empty {
+  margin: auto;
+  color: var(--text-dim);
+}
+
+.script-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.model-tree {
+  flex: 1;
+  overflow: auto;
+}
+
+.properties-panel {
+  flex: 1;
+  overflow: auto;
+}
