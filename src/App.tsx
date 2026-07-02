@@ -6,6 +6,17 @@ import { openModel, saveModel } from './ui/Toolbar';
 
 let booted = false;
 
+if (import.meta.env.DEV) {
+  // dev/testing hook: load a model from XML text in the browser console
+  void import('./model/io/archimate-xml').then(({ parseArchimate }) => {
+    (window as unknown as Record<string, unknown>).__archiLoadXml = (xml: string) => {
+      import('./model/store').then(({ replaceModel }) =>
+        replaceModel(parseArchimate(xml), 'dev.archimate', false),
+      );
+    };
+  });
+}
+
 export function App() {
   useEffect(() => {
     if (!booted) {

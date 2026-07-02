@@ -309,3 +309,80 @@ body {
   left: 100%;
   top: -5px;
 }
+
+/* Editor tabs */
+.editor-tabs {
+  display: flex;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.editor-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 12px;
+  border-right: 1px solid var(--border);
+  cursor: default;
+  max-width: 200px;
+  white-space: nowrap;
+}
+
+.editor-tab.active {
+  background: var(--panel-bg);
+  border-bottom: 2px solid var(--accent);
+}
+
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  color: var(--text-dim);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+.tab-close:hover {
+  background: #d6dde6;
+  color: var(--text);
+}
+
+.editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* View editor canvas */
+.view-editor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.view-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.zoom-indicator {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 7px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
