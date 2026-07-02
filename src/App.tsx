@@ -15,6 +15,9 @@ if (import.meta.env.DEV) {
       );
     };
   });
+  void import('./model/store').then((store) => {
+    (window as unknown as Record<string, unknown>).__archiStore = store.useStore;
+  });
 }
 
 export function App() {

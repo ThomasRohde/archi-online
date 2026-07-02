@@ -1,5 +1,6 @@
 import { ViewEditor } from '../canvas/ViewEditor';
 import { closeView, useStore } from '../model/store';
+import { Palette } from './Palette';
 
 export function EditorArea() {
   const model = useStore((s) => s.model);
@@ -52,6 +53,7 @@ export function EditorArea() {
         })}
       </div>
       <div className="editor-body">
+        <Palette />
         {activeViewId && <ViewEditor key={activeViewId} viewId={activeViewId} />}
       </div>
     </div>

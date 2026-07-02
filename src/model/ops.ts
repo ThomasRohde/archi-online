@@ -607,6 +607,26 @@ export function addNoteToView(viewId: string, parentId: string, bounds: Bounds, 
   return id;
 }
 
+/** Drop a view from the tree onto a canvas: creates a diagram model reference. */
+export function addRefNodeToView(viewId: string, refViewId: string, parentId: string, bounds: Bounds): string {
+  const id = newId();
+  transact('Add View Reference', (draft) => {
+    if (!draft.views[refViewId]) return;
+    attachNode(draft, {
+      id,
+      viewId,
+      parentId,
+      bounds,
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'ref',
+      refViewId,
+    });
+  });
+  return id;
+}
+
 export function addGroupToView(viewId: string, parentId: string, bounds: Bounds, name = 'Group'): string {
   const id = newId();
   transact('Create Group', (draft) => {
@@ -626,6 +646,62 @@ export function addGroupToView(viewId: string, parentId: string, bounds: Bounds,
     attachNode(draft, node);
   });
   return id;
+}
+
+export interface MoveEntry {
+  id: string;
+  parentId: string;
+  bounds: Bounds;
+}
+
+/** Commit a drag: move and/or reparent several nodes in one undo step. */
+export function commitMove(entries: MoveEntry[]): void {
+  transact('Move', (draft) => {
+    for (const entry of entries) {
+      const node = draft.nodes[entry.id];
+      if (!node) continue;
+      if (node.parentId !== entry.parentId) {
+        if (entry.id === entry.parentId) continue;
+        let p: string | undefined = entry.parentId;
+        let cyclic = false;
+        while (p && draft.nodes[p]) {
+          if (p === entry.id) {
+            cyclic = true;
+            break;
+          }
+          p = draft.nodes[p]!.parentId;
+        }
+        if (cyclic) continue;
+        const oldParent = draft.nodes[node.parentId];
+        if (oldParent) oldParent.childIds = oldParent.childIds.filter((c) => c !== entry.id);
+        else {
+          const view = draft.views[node.viewId];
+          view.childIds = view.childIds.filter((c) => c !== entry.id);
+        }
+        node.parentId = entry.parentId;
+        if (entry.parentId === node.viewId) draft.views[node.viewId].childIds.push(entry.id);
+        else draft.nodes[entry.parentId].childIds.push(entry.id);
+      }
+      node.bounds = { ...entry.bounds };
+    }
+  });
+}
+
+/** Bring to front / send to back within the node's parent. */
+export function reorderNode(id: string, where: 'front' | 'back'): void {
+  transact(where === 'front' ? 'Bring to Front' : 'Send to Back', (draft) => {
+    const node = draft.nodes[id];
+    if (!node) return;
+    const list =
+      node.parentId === node.viewId
+        ? draft.views[node.viewId].childIds
+        : draft.nodes[node.parentId].childIds;
+    const i = list.indexOf(id);
+    if (i < 0) return;
+    list.splice(i, 1);
+    if (where === 'front') list.push(id);
+    else list.unshift(id);
+  });
 }
 
 export function moveNodes(moves: { id: string; x: number; y: number }[]): void {
