@@ -327,6 +327,18 @@ function AppearanceTab({ target }: { target: Target }) {
         fallback="#000000"
         onChange={(v) => apply({ fontColor: v })}
       />
+      {node?.nodeType === 'element' && (
+        <div className="prop-row">
+          <label>Figure</label>
+          <select
+            value={node.figureType ?? 0}
+            onChange={(e) => apply({ figureType: parseInt(e.target.value, 10) })}
+          >
+            <option value={0}>Default (box + icon)</option>
+            <option value={1}>ArchiMate notation shape</option>
+          </select>
+        </div>
+      )}
       {node && (
         <>
           <div className="prop-row">

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ICONS } from '../canvas/figures/icons';
+import { StandaloneIcon } from '../canvas/figures/icons';
 import {
   ELEMENT_TYPES,
   LAYERS,
@@ -155,10 +155,8 @@ export function Palette() {
                 tool={{ kind: 'create-element', type: d.type }}
                 title={`${d.label} (${label})`}
               >
-                <span className="pal-el" style={{ background: d.fill }}>
-                  <svg viewBox="0 0 16 16" width="15" height="15">
-                    <g color="#333">{ICONS[d.type]}</g>
-                  </svg>
+                <span className="pal-el" style={{ background: d.fill, color: '#333' }}>
+                  <StandaloneIcon type={d.type} size={15} />
                 </span>
               </ToolButton>
             ))}

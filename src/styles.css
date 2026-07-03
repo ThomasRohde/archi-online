@@ -318,11 +318,11 @@ body {
 }
 
 .tree-el-icon {
-  display: inline-block;
-  width: 11px;
-  height: 9px;
-  border: 1px solid rgba(0, 0, 0, 0.45);
-  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
 }
 
 .tree-rel-icon {

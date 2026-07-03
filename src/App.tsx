@@ -18,6 +18,13 @@ if (import.meta.env.DEV) {
   void import('./model/store').then((store) => {
     (window as unknown as Record<string, unknown>).__archiStore = store.useStore;
   });
+  void import('./scripting/runner').then(({ runScript }) => {
+    (window as unknown as Record<string, unknown>).__archiRunScript = (code: string) => {
+      const logs: string[] = [];
+      const res = runScript(code, (e) => logs.push(`${e.level}: ${e.text}`));
+      return { ...res, logs };
+    };
+  });
 }
 
 export function App() {

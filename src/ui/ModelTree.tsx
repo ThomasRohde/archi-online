@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { StandaloneIcon } from '../canvas/figures/icons';
 import {
   ELEMENT_TYPES,
   ELEMENT_TYPE_MAP,
@@ -31,11 +32,9 @@ const FOLDER_LAYERS: Record<string, Layer[]> = {
 function ElementIcon({ type }: { type: ElementType }) {
   const def = ELEMENT_TYPE_MAP[type];
   return (
-    <span
-      className="tree-el-icon"
-      style={{ background: def.fill, borderColor: '#92922c' }}
-      title={def.label}
-    />
+    <span className="tree-el-icon" style={{ color: '#5c5c5c' }} title={def.label}>
+      <StandaloneIcon type={type} size={13} />
+    </span>
   );
 }
 

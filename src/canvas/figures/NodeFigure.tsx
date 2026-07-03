@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { ELEMENT_TYPE_MAP, type ElementType } from '../../model/metamodel';
 import type { ArchimateElement, DiagramNode, DiagramView } from '../../model/types';
 import { parseFont } from '../geometry';
-import { ICONS } from './icons';
+import { ARCHI_ICONS, NodeIcon } from './icons';
 
 const DEFAULT_LINE = '#5c5c5c';
 
@@ -11,70 +11,127 @@ type ShapeKind =
   | 'rounded'
   | 'octagon'
   | 'banded'
+  | 'contract'
   | 'product'
   | 'artifact'
   | 'wavy'
+  | 'wavy-lined'
   | 'cloud'
   | 'ellipse'
   | 'junction'
-  | 'grouping';
+  | 'grouping'
+  | 'grouping-tab'
+  | 'cylinder'
+  | 'capsule'
+  | 'pennant'
+  | 'arrow'
+  | 'chevron-banner'
+  | 'lenses'
+  | 'circles'
+  | 'lollipop'
+  | 'parallelogram'
+  | 'box3d'
+  | 'component'
+  | 'pin';
 
-function shapeFor(type: ElementType): ShapeKind {
-  switch (type) {
-    case 'BusinessProcess':
-    case 'BusinessFunction':
-    case 'BusinessInteraction':
-    case 'BusinessEvent':
-    case 'BusinessService':
-    case 'ApplicationFunction':
-    case 'ApplicationInteraction':
-    case 'ApplicationProcess':
-    case 'ApplicationEvent':
-    case 'ApplicationService':
-    case 'TechnologyFunction':
-    case 'TechnologyProcess':
-    case 'TechnologyInteraction':
-    case 'TechnologyEvent':
-    case 'TechnologyService':
-    case 'ImplementationEvent':
-      return 'rounded';
-    case 'BusinessObject':
-    case 'DataObject':
-    case 'Contract':
-      return 'banded';
-    case 'Product':
-      return 'product';
-    case 'Artifact':
-      return 'artifact';
-    case 'Representation':
-    case 'Deliverable':
-      return 'wavy';
-    case 'Meaning':
-      return 'cloud';
-    case 'Value':
-      return 'ellipse';
-    case 'Junction':
-      return 'junction';
-    case 'Grouping':
-      return 'grouping';
-    case 'Stakeholder':
-    case 'Driver':
-    case 'Assessment':
-    case 'Goal':
-    case 'Outcome':
-    case 'Principle':
-    case 'Requirement':
-    case 'Constraint':
-      return 'octagon';
-    default:
-      return 'rect';
+const ROUNDED_TYPES = new Set<ElementType>([
+  'Capability',
+  'CourseOfAction',
+  'ValueStream',
+  'WorkPackage',
+  'BusinessProcess',
+  'BusinessFunction',
+  'BusinessInteraction',
+  'BusinessEvent',
+  'BusinessService',
+  'ApplicationFunction',
+  'ApplicationInteraction',
+  'ApplicationProcess',
+  'ApplicationEvent',
+  'ApplicationService',
+  'TechnologyFunction',
+  'TechnologyProcess',
+  'TechnologyInteraction',
+  'TechnologyEvent',
+  'TechnologyService',
+  'ImplementationEvent',
+]);
+
+const MOTIVATION_TYPES = new Set<ElementType>([
+  'Stakeholder',
+  'Driver',
+  'Assessment',
+  'Goal',
+  'Outcome',
+  'Principle',
+  'Requirement',
+  'Constraint',
+]);
+
+/** Alternate figures (Archi figureType 1): the classic ArchiMate notation shapes. */
+const ALT_SHAPES: Partial<Record<ElementType, ShapeKind>> = {
+  BusinessObject: 'banded',
+  DataObject: 'banded',
+  Contract: 'contract',
+  Product: 'product',
+  Deliverable: 'wavy',
+  Representation: 'wavy-lined',
+  Artifact: 'artifact',
+  Node: 'box3d',
+  BusinessRole: 'cylinder',
+  Stakeholder: 'cylinder',
+  BusinessService: 'capsule',
+  ApplicationService: 'capsule',
+  TechnologyService: 'capsule',
+  BusinessEvent: 'pennant',
+  ApplicationEvent: 'pennant',
+  TechnologyEvent: 'pennant',
+  ImplementationEvent: 'pennant',
+  BusinessProcess: 'arrow',
+  ApplicationProcess: 'arrow',
+  TechnologyProcess: 'arrow',
+  BusinessFunction: 'chevron-banner',
+  ApplicationFunction: 'chevron-banner',
+  TechnologyFunction: 'chevron-banner',
+  BusinessInteraction: 'lenses',
+  ApplicationInteraction: 'lenses',
+  TechnologyInteraction: 'lenses',
+  BusinessCollaboration: 'circles',
+  ApplicationCollaboration: 'circles',
+  TechnologyCollaboration: 'circles',
+  BusinessInterface: 'lollipop',
+  ApplicationInterface: 'lollipop',
+  TechnologyInterface: 'lollipop',
+  Requirement: 'parallelogram',
+  Constraint: 'parallelogram',
+  Meaning: 'cloud',
+  Value: 'ellipse',
+  Location: 'pin',
+  Grouping: 'grouping-tab',
+  ApplicationComponent: 'component',
+};
+
+/**
+ * Archi's figure semantics: figureType 0 (default) draws a plain/rounded box
+ * (octagon for motivation) with the corner icon; figureType 1 draws the classic
+ * notation shape without an icon.
+ */
+function shapeFor(type: ElementType, figureType: number): ShapeKind {
+  if (type === 'Junction') return 'junction';
+  if (figureType === 1) {
+    const alt = ALT_SHAPES[type];
+    if (alt) return alt;
   }
+  if (type === 'Grouping') return 'grouping';
+  if (MOTIVATION_TYPES.has(type)) return 'octagon';
+  if (ROUNDED_TYPES.has(type)) return 'rounded';
+  return 'rect';
 }
 
 function shapePath(kind: ShapeKind, w: number, h: number): ReactNode | null {
   switch (kind) {
     case 'octagon': {
-      const c = 12;
+      const c = 10; // Archi's FLANGE
       return (
         <polygon
           points={`${c},0 ${w - c},0 ${w},${c} ${w},${h - c} ${w - c},${h} ${c},${h} 0,${h - c} 0,${c}`}
@@ -82,6 +139,7 @@ function shapePath(kind: ShapeKind, w: number, h: number): ReactNode | null {
       );
     }
     case 'wavy':
+    case 'wavy-lined':
       return (
         <path
           d={`M0,0 H${w} V${h - 8} Q ${w * 0.75},${h - 16} ${w / 2},${h - 8} T 0,${h - 8} Z`}
@@ -100,6 +158,45 @@ function shapePath(kind: ShapeKind, w: number, h: number): ReactNode | null {
       );
     case 'ellipse':
       return <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} />;
+    case 'capsule':
+      return <rect width={w} height={h} rx={h / 2} ry={h / 2} />;
+    case 'pennant':
+      return (
+        <path
+          d={`M${h * 0.4},0 H${w - h / 2} A${h / 2} ${h / 2} 0 0 1 ${w - h / 2},${h} H${h * 0.4} A${h * 0.55} ${h * 0.55} 0 0 0 ${h * 0.4},0 Z`}
+        />
+      );
+    case 'arrow': {
+      const a = Math.min(h / 2, 30);
+      return (
+        <path d={`M0,${h * 0.15} H${w - a} V0 L${w},${h / 2} L${w - a},${h} V${h * 0.85} H0 Z`} />
+      );
+    }
+    case 'chevron-banner': {
+      const inset = Math.min(w * 0.15, 25);
+      return (
+        <polygon points={`0,${h * 0.15} ${w / 2},0 ${w},${h * 0.15} ${w},${h} ${w / 2},${h - inset} 0,${h}`} />
+      );
+    }
+    case 'parallelogram': {
+      const s = Math.min(w * 0.15, 25);
+      return <polygon points={`${s},0 ${w},0 ${w - s},${h} 0,${h}`} />;
+    }
+    case 'box3d': {
+      const f = 14;
+      return (
+        <g>
+          <path d={`M0,${f} L${f},0 H${w} V${h - f} L${w - f},${h} H0 Z`} />
+          <path d={`M0,${f} H${w - f} V${h} M${w - f},${f} L${w},0`} fill="none" />
+        </g>
+      );
+    }
+    case 'pin':
+      return (
+        <path
+          d={`M${w / 2},${h} C${w * 0.28},${h * 0.55} ${w * 0.22},${h * 0.45} ${w * 0.22},${h * 0.3} A${w * 0.28} ${h * 0.28} 0 1 1 ${w * 0.78},${h * 0.3} C${w * 0.78},${h * 0.45} ${w * 0.72},${h * 0.55} ${w / 2},${h} Z`}
+        />
+      );
     default:
       return null;
   }
@@ -159,16 +256,10 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
   }
 
   function icon(type: ElementType) {
-    const glyph = ICONS[type];
-    if (!glyph || w < 40) return null;
+    if (!ARCHI_ICONS[type] || w < 40) return null;
     return (
-      <g
-        transform={`translate(${w - 20}, 3)`}
-        color={stroke}
-        opacity={0.9}
-        style={{ pointerEvents: 'none' }}
-      >
-        {glyph}
+      <g color={stroke}>
+        <NodeIcon type={type} width={w} />
       </g>
     );
   }
@@ -261,7 +352,8 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
   // ---- element nodes -----------------------------------------------------
   const type = element?.type ?? 'BusinessActor';
   const def = ELEMENT_TYPE_MAP[type];
-  const kind = shapeFor(type);
+  const figureType = node.nodeType === 'element' ? (node.figureType ?? 0) : 0;
+  const kind = shapeFor(type, figureType);
   const fill = node.fillColor ?? def.fill;
   const common = {
     fill,
@@ -287,19 +379,20 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
     );
   }
 
+  const line = { fill: 'none' as const, stroke, strokeOpacity: lineAlpha };
+
   let body: ReactNode;
   switch (kind) {
     case 'rounded':
       body = <rect width={w} height={h} rx={10} ry={10} {...common} />;
       break;
     case 'banded':
+    case 'contract':
       body = (
         <g>
           <rect width={w} height={h} {...common} />
-          <line x1={0} y1={16} x2={w} y2={16} stroke={stroke} strokeOpacity={lineAlpha} />
-          {type === 'Contract' && (
-            <line x1={0} y1={h - 12} x2={w} y2={h - 12} stroke={stroke} strokeOpacity={lineAlpha} />
-          )}
+          <line x1={0} y1={16} x2={w} y2={16} {...line} />
+          {kind === 'contract' && <line x1={0} y1={h - 12} x2={w} y2={h - 12} {...line} />}
         </g>
       );
       break;
@@ -307,7 +400,7 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
       body = (
         <g>
           <rect width={w} height={h} {...common} />
-          <path d={`M0,14 H${w / 2} V0`} fill="none" stroke={stroke} strokeOpacity={lineAlpha} />
+          <path d={`M0,14 H${w / 2} V0`} {...line} />
         </g>
       );
       break;
@@ -316,41 +409,111 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
       body = (
         <g>
           <path d={`M0,0 H${w - d} L${w},${d} V${h} H0 Z`} {...common} />
-          <path d={`M${w - d},0 V${d} H${w}`} fill="none" stroke={stroke} strokeOpacity={lineAlpha} />
+          <path d={`M${w - d},0 V${d} H${w}`} {...line} />
         </g>
       );
       break;
     }
     case 'grouping':
+      body = <rect width={w} height={h} {...common} strokeDasharray="6 3" />;
+      break;
+    case 'grouping-tab':
+      body = (
+        <path
+          d={`M0,18 V0 H${Math.min(w / 2, 120)} V18 M0,18 V${h} H${w} V18`}
+          {...common}
+          strokeDasharray="6 3"
+        />
+      );
+      break;
+    case 'cylinder': {
+      const rx = Math.min(h / 3, 20);
       body = (
         <g>
           <path
-            d={`M0,18 V0 H${Math.min(w / 2, 120)} V18 M0,18 V${h} H${w} V18`}
+            d={`M${rx},0 H${w - rx} A${rx} ${h / 2} 0 0 1 ${w - rx},${h} H${rx} A${rx} ${h / 2} 0 0 1 ${rx},0 Z`}
             {...common}
-            strokeDasharray="6 3"
           />
+          <path d={`M${w - rx},0 A${rx} ${h / 2} 0 0 0 ${w - rx},${h}`} {...line} />
         </g>
       );
       break;
+    }
+    case 'lenses': {
+      const lw = w / 2 - 2;
+      body = (
+        <g>
+          <path d={`M${w / 2 - 2},0 A${lw} ${h / 2} 0 0 0 ${w / 2 - 2},${h} Z`} {...common} />
+          <path d={`M${w / 2 + 2},${h} A${lw} ${h / 2} 0 0 0 ${w / 2 + 2},0 Z`} {...common} />
+        </g>
+      );
+      break;
+    }
+    case 'circles': {
+      const r = Math.min(w / 3.2, h / 2.2);
+      body = (
+        <g>
+          <ellipse cx={w / 2 - r / 2} cy={h / 2} rx={r} ry={r} {...common} />
+          <ellipse cx={w / 2 + r / 2} cy={h / 2} rx={r} ry={r} {...common} />
+        </g>
+      );
+      break;
+    }
+    case 'lollipop': {
+      const r = Math.min(w / 4, h / 3);
+      body = (
+        <g>
+          <line x1={0} y1={h / 2} x2={w - 2 * r} y2={h / 2} {...line} />
+          <ellipse cx={w - r} cy={h / 2} rx={r} ry={r} {...common} />
+        </g>
+      );
+      break;
+    }
+    case 'component': {
+      const tabW = Math.min(24, w / 3);
+      const bodyX = tabW / 2;
+      body = (
+        <g>
+          <path
+            d={`M${bodyX},20 V0 H${w} V${h} H${bodyX} V32 M${bodyX},8 V14`}
+            {...common}
+          />
+          <rect x={0} y={8} width={tabW} height={6} {...common} />
+          <rect x={0} y={20} width={tabW} height={6} {...common} />
+        </g>
+      );
+      break;
+    }
     case 'octagon':
     case 'wavy':
+    case 'wavy-lined':
     case 'cloud':
     case 'ellipse':
-      body = <g {...common}>{shapePath(kind, w, h)}</g>;
+    case 'capsule':
+    case 'pennant':
+    case 'arrow':
+    case 'chevron-banner':
+    case 'parallelogram':
+    case 'box3d':
+    case 'pin':
+      body = (
+        <g {...common}>
+          {shapePath(kind, w, h)}
+          {kind === 'wavy-lined' && <line x1={0} y1={14} x2={w} y2={14} {...line} />}
+        </g>
+      );
       break;
     default:
       body = <rect width={w} height={h} {...common} />;
   }
 
-  const showIcon = kind !== 'cloud' && kind !== 'ellipse';
-  const banded = kind === 'banded' || kind === 'product';
+  // corner icons belong to the default figure; alternate figures are the notation
+  const showIcon = figureType !== 1 || !ALT_SHAPES[type];
   return (
     <g>
       {body}
       {showIcon && icon(type)}
-      {banded
-        ? label(element?.name ?? '', { inset: 0, vert: 'top', align: 'center' })
-        : label(element?.name ?? '')}
+      {label(element?.name ?? '')}
     </g>
   );
 }
