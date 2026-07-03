@@ -39,7 +39,9 @@ needed, and pushes.
 
 ## Publish From A GitHub Remote
 
-After the main repository has a GitHub `origin`, run:
+GitHub creates the backing wiki git repository only after the first wiki page
+has been created once in the GitHub web UI. If this is a new repository, open
+the Wiki tab, create a temporary first page, and then run:
 
 ```bash
 npm run docs:publish-wiki
@@ -47,6 +49,9 @@ npm run docs:publish-wiki
 
 The script derives the wiki remote from `origin`, clones the wiki repository
 into `.wiki-publish/`, copies pages, commits changes if needed, and pushes.
+
+If the command reports `Repository not found`, the GitHub Wiki has not been
+initialized yet. Create the first page in the web UI and rerun the command.
 
 The derived remote forms are:
 
@@ -68,10 +73,11 @@ npm run docs:publish-wiki -- --dry-run
 1. Follow the repository runbook in `docs/github-publication.md`.
 2. Push the main repository to GitHub.
 3. Enable the repository Wiki in GitHub settings if it is not already enabled.
-4. Run `npm run docs:check`.
-5. Run `npm run docs:publish-wiki -- --dry-run`.
-6. Run `npm run docs:publish-wiki`.
-7. Open the GitHub Wiki **Home** page and verify `_Sidebar.md` renders.
+4. Create the first wiki page once in the GitHub web UI.
+5. Run `npm run docs:check`.
+6. Run `npm run docs:publish-wiki -- --dry-run`.
+7. Run `npm run docs:publish-wiki`.
+8. Open the GitHub Wiki **Home** page and verify `_Sidebar.md` renders.
 
 ## Authentication
 

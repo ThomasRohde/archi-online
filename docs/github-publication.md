@@ -61,7 +61,9 @@ relationship matrix and icon geometry retain their attribution.
 
 ## Publish The Wiki
 
-After `origin` points to GitHub and the Wiki exists:
+GitHub does not create the backing `.wiki.git` repository until the first wiki
+page has been created once in the GitHub web UI. After that one-time
+initialization and after `origin` points to GitHub:
 
 ```bash
 npm run docs:check
@@ -69,7 +71,9 @@ npm run docs:publish-wiki -- --dry-run
 npm run docs:publish-wiki
 ```
 
-The source of truth remains `docs/wiki/` in this repository.
+The source of truth remains `docs/wiki/` in this repository. If the wiki remote
+returns `Repository not found`, open the repository Wiki tab in GitHub, create a
+temporary first page, and rerun the publish command.
 
 ## Deploy The App
 

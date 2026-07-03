@@ -71,8 +71,9 @@ filenames:
 - [Extension packages](docs/wiki/Extension-Packages.md)
 - [Publishing to GitHub Wiki](docs/wiki/Publishing-GitHub-Wiki.md)
 
-Run `npm run docs:check` before publishing docs. Once the repo is on GitHub,
-`npm run docs:publish-wiki` copies these pages to the repository wiki.
+Run `npm run docs:check` before publishing docs. Once the GitHub Wiki has been
+initialized with its first page, `npm run docs:publish-wiki` copies these pages
+to the repository wiki.
 
 ## GitHub Publication
 
