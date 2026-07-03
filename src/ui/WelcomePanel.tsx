@@ -1,12 +1,17 @@
 import { parseArchimate } from '../model/io/archimate-xml';
 import { addView } from '../model/ops';
 import { openView, replaceModel, useStore } from '../model/store';
+import { showAlertDialog } from './AppDialog';
 import { newModel, openModel } from './Toolbar';
 
 async function loadExample(): Promise<void> {
   const res = await fetch(import.meta.env.BASE_URL + 'examples/Archisurance.archimate');
   const model = parseArchimate(await res.text());
   replaceModel(model, 'Archisurance.archimate', false);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function WelcomePanel() {
@@ -29,15 +34,23 @@ export function WelcomePanel() {
               New view
             </button>
           )}
-          <button className="welcome-btn" onClick={newModel}>
+          <button className="welcome-btn" onClick={() => void newModel()}>
             New model
           </button>
-          <button className="welcome-btn" onClick={openModel}>
+          <button className="welcome-btn" onClick={() => void openModel()}>
             Open .archimate file…
           </button>
           <button
             className="welcome-btn"
-            onClick={() => void loadExample().catch((e) => alert('Could not load example: ' + e))}
+            onClick={() =>
+              void loadExample().catch((error) =>
+                showAlertDialog({
+                  title: 'Could not load example',
+                  message: errorMessage(error),
+                  intent: 'error',
+                }),
+              )
+            }
           >
             Load Archisurance example
           </button>

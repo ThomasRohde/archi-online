@@ -13,12 +13,16 @@ const PICKER_TYPES = [
   },
 ];
 
-function supportsFsAccess(): boolean {
+function supportsOpenFsAccess(): boolean {
   return typeof window !== 'undefined' && 'showOpenFilePicker' in window;
 }
 
+function supportsSaveFsAccess(): boolean {
+  return typeof window !== 'undefined' && 'showSaveFilePicker' in window;
+}
+
 export async function openModelFromDisk(): Promise<void> {
-  if (supportsFsAccess()) {
+  if (supportsOpenFsAccess()) {
     let handles: FileSystemFileHandle[];
     try {
       handles = await window.showOpenFilePicker({ types: PICKER_TYPES });
@@ -52,7 +56,7 @@ export async function saveModelToDisk(saveAs = false): Promise<void> {
   const xml = serializeArchimate(s.model);
   const suggested = s.fileName ?? sanitizeFileName(s.model.info.name) + '.archimate';
 
-  if (supportsFsAccess()) {
+  if (supportsSaveFsAccess()) {
     let handle = currentFileHandle;
     if (!handle || saveAs) {
       try {
@@ -60,25 +64,63 @@ export async function saveModelToDisk(saveAs = false): Promise<void> {
           suggestedName: suggested,
           types: PICKER_TYPES,
         });
-      } catch {
-        return; // user cancelled
+      } catch (error) {
+        if (isUserCancelledFileDialog(error)) return;
+        if (shouldDownloadAfterSaveError(error)) {
+          setCurrentFileHandle(null);
+          downloadModel(xml, suggested);
+          return;
+        }
+        throw error;
       }
       setCurrentFileHandle(handle);
     }
-    const writable = await handle.createWritable();
-    await writable.write(xml);
-    await writable.close();
-    useStore.setState({ dirty: false, fileName: handle.name });
+    try {
+      const writable = await handle.createWritable();
+      await writable.write(xml);
+      await writable.close();
+      useStore.setState({ dirty: false, fileName: handle.name });
+    } catch (error) {
+      if (shouldDownloadAfterSaveError(error)) {
+        setCurrentFileHandle(null);
+        downloadModel(xml, suggested);
+        return;
+      }
+      throw error;
+    }
   } else {
-    const blob = new Blob([xml], { type: 'application/xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = suggested;
-    a.click();
-    URL.revokeObjectURL(url);
-    useStore.setState({ dirty: false, fileName: suggested });
+    downloadModel(xml, suggested);
   }
+}
+
+function downloadModel(xml: string, fileName: string): void {
+  const blob = new Blob([xml], { type: 'application/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+  useStore.setState({ dirty: false, fileName });
+}
+
+function isUserCancelledFileDialog(error: unknown): boolean {
+  return domExceptionName(error) === 'AbortError';
+}
+
+function shouldDownloadAfterSaveError(error: unknown): boolean {
+  if (isUserCancelledFileDialog(error)) return false;
+  const name = domExceptionName(error);
+  if (name === 'SecurityError' || name === 'NotAllowedError') return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(blocked|denied|disallowed|permission|policy)\b/i.test(`${name} ${message}`);
+}
+
+function domExceptionName(error: unknown): string {
+  if (error && typeof error === 'object' && 'name' in error) {
+    return String((error as { name: unknown }).name);
+  }
+  return '';
 }
 
 function sanitizeFileName(name: string): string {

@@ -3,6 +3,7 @@ import { get, set } from 'idb-keyval';
 import { newId } from '../model/id';
 import { useStore } from '../model/store';
 import { runScript, type ConsoleEntry } from '../scripting/runner';
+import { showConfirmDialog, showPromptDialog } from './AppDialog';
 
 const MonacoEditor = lazy(() => import('./MonacoEditor'));
 
@@ -76,18 +77,36 @@ export function ScriptPanel() {
   };
 
   const addScript = () => {
-    const name = window.prompt('Script name', `script ${scripts.length + 1}`);
-    if (!name) return;
-    const s: Script = { id: newId(), name, code: '// ' + name + '\n' };
-    persist([...scripts, s]);
-    setCurrentId(s.id);
+    void (async () => {
+      const name = await showPromptDialog({
+        title: 'New script',
+        message: 'Name the script to add to this browser profile.',
+        defaultValue: `script ${scripts.length + 1}`,
+        confirmLabel: 'Create',
+      });
+      const scriptName = name?.trim();
+      if (!scriptName) return;
+      const s: Script = { id: newId(), name: scriptName, code: '// ' + scriptName + '\n' };
+      persist([...scripts, s]);
+      setCurrentId(s.id);
+    })();
   };
 
   const deleteScript = () => {
-    if (scripts.length <= 1 || !window.confirm(`Delete script "${current.name}"?`)) return;
-    const next = scripts.filter((s) => s.id !== current.id);
-    persist(next);
-    setCurrentId(next[0].id);
+    void (async () => {
+      if (scripts.length <= 1) return;
+      const confirmed = await showConfirmDialog({
+        title: 'Delete script?',
+        message: `Delete "${current.name}" from this browser profile?`,
+        confirmLabel: 'Delete',
+        cancelLabel: 'Keep script',
+        intent: 'danger',
+      });
+      if (!confirmed) return;
+      const next = scripts.filter((s) => s.id !== current.id);
+      persist(next);
+      setCurrentId(next[0].id);
+    })();
   };
 
   const exportScript = () => {

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { redo, undo, useStore } from './model/store';
 import { restoreAutosave, startAutosave } from './persistence/autosave';
+import { AppDialogHost } from './ui/AppDialog';
 import { AppShell } from './ui/AppShell';
 import { openModel, saveModel } from './ui/Toolbar';
 
@@ -45,10 +46,10 @@ export function App() {
       const key = e.key.toLowerCase();
       if (key === 's') {
         e.preventDefault();
-        saveModel(false);
+        void saveModel(false);
       } else if (key === 'o') {
         e.preventDefault();
-        openModel();
+        void openModel();
       } else if (!inText && key === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -69,5 +70,10 @@ export function App() {
     };
   }, []);
 
-  return <AppShell />;
+  return (
+    <>
+      <AppShell />
+      <AppDialogHost />
+    </>
+  );
 }

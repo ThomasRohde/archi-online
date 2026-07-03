@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { createEmptyModel } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
 import { openModelFromDisk, saveModelToDisk } from '../persistence/files';
+import { showAlertDialog, showConfirmDialog } from './AppDialog';
 import { showContextMenu, SEPARATOR, type MenuItem } from './ContextMenu';
 import { layoutBus } from './layout-bus';
 
@@ -24,18 +25,49 @@ const SHORTCUTS: [string, string][] = [
   ['Double-click bendpoint', 'Remove bendpoint'],
 ];
 
-export function newModel(): void {
-  if (useStore.getState().dirty && !confirm('Discard unsaved changes?')) return;
+async function confirmDiscardChanges(): Promise<boolean> {
+  if (!useStore.getState().dirty) return true;
+  return showConfirmDialog({
+    title: 'Discard unsaved changes?',
+    message: 'The current model has changes that have not been saved.',
+    confirmLabel: 'Discard',
+    cancelLabel: 'Keep editing',
+    intent: 'danger',
+  });
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export async function newModel(): Promise<void> {
+  if (!(await confirmDiscardChanges())) return;
   replaceModel(createEmptyModel('New ArchiMate Model'), null, false);
 }
 
-export function openModel(): void {
-  if (useStore.getState().dirty && !confirm('Discard unsaved changes?')) return;
-  void openModelFromDisk().catch((e) => alert('Could not open model: ' + e));
+export async function openModel(): Promise<void> {
+  if (!(await confirmDiscardChanges())) return;
+  try {
+    await openModelFromDisk();
+  } catch (error) {
+    await showAlertDialog({
+      title: 'Could not open model',
+      message: errorMessage(error),
+      intent: 'error',
+    });
+  }
 }
 
-export function saveModel(saveAs = false): void {
-  void saveModelToDisk(saveAs).catch((e) => alert('Could not save model: ' + e));
+export async function saveModel(saveAs = false): Promise<void> {
+  try {
+    await saveModelToDisk(saveAs);
+  } catch (error) {
+    await showAlertDialog({
+      title: 'Could not save model',
+      message: errorMessage(error),
+      intent: 'error',
+    });
+  }
 }
 
 export function Toolbar() {
@@ -53,10 +85,10 @@ export function Toolbar() {
     <div className="toolbar">
       <span className="app-title">Archi Online</span>
       <div className="toolbar-sep" />
-      <button className="tb-btn" title="New model (Ctrl+Alt+N)" onClick={newModel}>
+      <button className="tb-btn" title="New model (Ctrl+Alt+N)" onClick={() => void newModel()}>
         New
       </button>
-      <button className="tb-btn" title="Open .archimate file (Ctrl+O)" onClick={openModel}>
+      <button className="tb-btn" title="Open .archimate file (Ctrl+O)" onClick={() => void openModel()}>
         Open…
       </button>
       <button
