@@ -5,6 +5,7 @@ import {
   type DockviewApi,
   type DockviewReadyEvent,
 } from 'dockview-react';
+import { extensionRegistry } from '../extensions/registry';
 import { closeView, useStore } from '../model/store';
 import { registerLayoutBus } from './layout-bus';
 import {
@@ -106,6 +107,25 @@ export function DockLayout() {
           return;
         }
         TOOL_PANELS.find((t) => t.id === id)?.add(api);
+      },
+      showExtensionPanel(panelId: string) {
+        const dockId = `extension:${panelId}`;
+        const existing = api.getPanel(dockId);
+        if (existing) {
+          existing.api.setActive();
+          return;
+        }
+        const panel = extensionRegistry.getPanel(panelId);
+        if (!panel) return;
+        api.addPanel({
+          id: dockId,
+          component: 'extension-panel',
+          title: panel.title,
+          params: { panelId },
+          position: api.getPanel('extensions')
+            ? { referencePanel: 'extensions', direction: 'within' }
+            : centerPosition(api, dockId),
+        });
       },
       reset,
     });

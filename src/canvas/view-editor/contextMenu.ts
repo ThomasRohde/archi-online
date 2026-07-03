@@ -14,7 +14,13 @@ import {
   defaultTextStyle,
   type AppSettings,
 } from '../../settings/app-settings';
-import { SEPARATOR, showContextMenu, type MenuItem } from '../../ui/ContextMenu';
+import { extensionRegistry } from '../../extensions/registry';
+import {
+  extensionMenuItems,
+  SEPARATOR,
+  showContextMenu,
+  type MenuItem,
+} from '../../ui/ContextMenu';
 import { hasClipboard, pasteNodes } from '../clipboard';
 import type { Point } from '../geometry';
 
@@ -47,7 +53,7 @@ export function showEmptyCanvasContextMenu({
   zoomTo: (zoom: number) => void;
   fitToView: () => void;
 }) {
-  showContextMenu(clientX, clientY, [
+  const items: MenuItem[] = [
     {
       label: 'Paste (Ctrl+V)',
       disabled: !hasClipboard(),
@@ -104,12 +110,24 @@ export function showEmptyCanvasContextMenu({
     { label: 'Zoom Out (Ctrl+-)', onClick: () => zoomBy(1 / settings.buttonZoomFactor) },
     { label: 'Zoom 100% (Ctrl+0)', onClick: () => zoomTo(1) },
     { label: 'Fit to Window (Home)', onClick: fitToView },
-  ]);
+  ];
+  const extensionItems = extensionMenuItems('view.context');
+  showContextMenu(
+    clientX,
+    clientY,
+    extensionItems.length > 0 ? [...items, SEPARATOR, ...extensionItems] : items,
+  );
+  void extensionRegistry.emitEvent('view.contextMenu', {
+    x: clientX,
+    y: clientY,
+    viewId,
+  });
 }
 
 export function showViewObjectContextMenu({
   clientX,
   clientY,
+  viewId,
   id,
   ids,
   model,
@@ -117,6 +135,7 @@ export function showViewObjectContextMenu({
 }: {
   clientX: number;
   clientY: number;
+  viewId: string;
   id: string;
   ids: string[];
   model: ModelState;
@@ -159,5 +178,17 @@ export function showViewObjectContextMenu({
       onClick: () => deleteItems(conceptIds),
     });
   }
-  showContextMenu(clientX, clientY, items);
+  const extensionItems = extensionMenuItems('selection.context');
+  showContextMenu(
+    clientX,
+    clientY,
+    extensionItems.length > 0 ? [...items, SEPARATOR, ...extensionItems] : items,
+  );
+  void extensionRegistry.emitEvent('view.contextMenu', {
+    x: clientX,
+    y: clientY,
+    viewId,
+    targetId: id,
+    selectionIds: ids,
+  });
 }

@@ -1,3 +1,4 @@
+import { emitModelSaved } from '../extensions/events';
 import { parseArchimate, serializeArchimate } from '../model/io/archimate-xml';
 import {
   currentFileHandle,
@@ -80,6 +81,7 @@ export async function saveModelToDisk(saveAs = false): Promise<void> {
       await writable.write(xml);
       await writable.close();
       useStore.setState({ dirty: false, fileName: handle.name });
+      emitModelSaved();
     } catch (error) {
       if (shouldDownloadAfterSaveError(error)) {
         setCurrentFileHandle(null);
@@ -102,6 +104,7 @@ function downloadModel(xml: string, fileName: string): void {
   a.click();
   URL.revokeObjectURL(url);
   useStore.setState({ dirty: false, fileName });
+  emitModelSaved();
 }
 
 function isUserCancelledFileDialog(error: unknown): boolean {

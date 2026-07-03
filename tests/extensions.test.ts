@@ -1,0 +1,333 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  DEFAULT_EXTENSION_TEMPLATE,
+  EXTENSIONS_STORAGE_KEY,
+  createExtensionRecord,
+  loadExtensionRecords,
+  normalizeExtensionRecords,
+  persistExtensionRecords,
+} from '../src/extensions/extension-store';
+import { createAppApi } from '../src/extensions/app-api';
+import { startExtensionEventBridge } from '../src/extensions/events';
+import {
+  createExtensionRegistry,
+  extensionRegistry,
+} from '../src/extensions/registry';
+import { runExtensionRecord } from '../src/extensions/runtime';
+import { createEmptyModel } from '../src/model/ops';
+import { replaceModel, setSelection, useStore } from '../src/model/store';
+
+function storage(initial?: string) {
+  const data = new Map<string, string>();
+  if (initial !== undefined) data.set(EXTENSIONS_STORAGE_KEY, initial);
+  return {
+    data,
+    getItem(key: string) {
+      return data.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      data.set(key, value);
+    },
+  };
+}
+
+function browserStorage() {
+  const data = new Map<string, string>();
+  return {
+    get length() {
+      return data.size;
+    },
+    clear() {
+      data.clear();
+    },
+    getItem(key: string) {
+      return data.get(key) ?? null;
+    },
+    key(index: number) {
+      return [...data.keys()][index] ?? null;
+    },
+    removeItem(key: string) {
+      data.delete(key);
+    },
+    setItem(key: string, value: string) {
+      data.set(key, value);
+    },
+  };
+}
+
+describe('extension records', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', browserStorage());
+    localStorage.clear();
+  });
+
+  it('loads no extensions when storage is empty', () => {
+    expect(loadExtensionRecords(storage())).toEqual([]);
+  });
+
+  it('normalizes valid persisted records and ignores unknown fields', () => {
+    const records = normalizeExtensionRecords([
+      {
+        id: 'local.audit',
+        name: 'Audit',
+        version: '0.1.0',
+        enabled: true,
+        source: 'app.extension({ id: "local.audit", name: "Audit", version: "0.1.0" });',
+        createdAt: 10,
+        updatedAt: 20,
+        unknown: 'ignored',
+      },
+    ]);
+
+    expect(records).toEqual([
+      {
+        id: 'local.audit',
+        name: 'Audit',
+        version: '0.1.0',
+        enabled: true,
+        source: 'app.extension({ id: "local.audit", name: "Audit", version: "0.1.0" });',
+        createdAt: 10,
+        updatedAt: 20,
+      },
+    ]);
+  });
+
+  it('falls back to no extensions for invalid JSON', () => {
+    expect(loadExtensionRecords(storage('{broken'))).toEqual([]);
+  });
+
+  it('creates a manifest-shaped template extension', () => {
+    const record = createExtensionRecord('local.my-extension', 'My extension', 1234);
+
+    expect(record).toEqual({
+      id: 'local.my-extension',
+      name: 'My extension',
+      version: '0.1.0',
+      enabled: true,
+      source: DEFAULT_EXTENSION_TEMPLATE,
+      createdAt: 1234,
+      updatedAt: 1234,
+    });
+  });
+
+  it('persists normalized records', () => {
+    const s = storage();
+    const record = createExtensionRecord('local.saved', 'Saved', 100);
+
+    persistExtensionRecords([record], s);
+
+    expect(JSON.parse(s.data.get(EXTENSIONS_STORAGE_KEY) ?? '[]')).toEqual([record]);
+  });
+});
+
+describe('extension registry', () => {
+  beforeEach(() => {
+    extensionRegistry.clearAll();
+    replaceModel(null, null, false);
+  });
+
+  it('registers commands and runs them through the command API', async () => {
+    const registry = createExtensionRegistry();
+    const calls: unknown[] = [];
+
+    registry.registerCommand('local.audit', {
+      id: 'local.audit.count',
+      title: 'Count',
+      run: (_context, args) => calls.push(args),
+    });
+
+    await registry.runCommand('local.audit.count', { answer: 42 });
+
+    expect(calls).toEqual([{ answer: 42 }]);
+    expect(registry.getSnapshot().commands.map((command) => command.id)).toEqual([
+      'local.audit.count',
+    ]);
+  });
+
+  it('rejects duplicate contribution ids', () => {
+    const registry = createExtensionRegistry();
+    registry.registerCommand('local.one', {
+      id: 'local.shared.command',
+      title: 'One',
+      run: () => undefined,
+    });
+
+    expect(() =>
+      registry.registerCommand('local.two', {
+        id: 'local.shared.command',
+        title: 'Two',
+        run: () => undefined,
+      }),
+    ).toThrow(/Duplicate command id/);
+  });
+
+  it('clears all live contributions for one extension', () => {
+    const registry = createExtensionRegistry();
+    registry.registerCommand('local.audit', {
+      id: 'local.audit.count',
+      title: 'Count',
+      run: () => undefined,
+    });
+    registry.addToolbarButton('local.audit', {
+      id: 'local.audit.button',
+      label: 'Count',
+      command: 'local.audit.count',
+    });
+
+    registry.clearExtension('local.audit');
+
+    expect(registry.getSnapshot().commands).toEqual([]);
+    expect(registry.getSnapshot().toolbarButtons).toEqual([]);
+  });
+
+  it('notifies subscribers when contributions change', () => {
+    const registry = createExtensionRegistry();
+    let seen = 0;
+    const unsubscribe = registry.subscribe(() => {
+      seen += 1;
+    });
+
+    registry.registerCommand('local.audit', {
+      id: 'local.audit.count',
+      title: 'Count',
+      run: () => undefined,
+    });
+    unsubscribe();
+    registry.clearExtension('local.audit');
+
+    expect(seen).toBe(1);
+  });
+
+  it('returns a stable snapshot object between registry changes', () => {
+    const registry = createExtensionRegistry();
+    const before = registry.getSnapshot();
+
+    expect(registry.getSnapshot()).toBe(before);
+
+    registry.registerCommand('local.audit', {
+      id: 'local.audit.count',
+      title: 'Count',
+      run: () => undefined,
+    });
+    const after = registry.getSnapshot();
+
+    expect(after).not.toBe(before);
+    expect(registry.getSnapshot()).toBe(after);
+  });
+
+  it('exposes a singleton registry for UI surfaces', () => {
+    expect(extensionRegistry.getSnapshot().commands).toEqual([]);
+  });
+});
+
+describe('extension app API and runtime', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', browserStorage());
+    localStorage.clear();
+    extensionRegistry.clearAll();
+    replaceModel(null, null, false);
+  });
+
+  it('registers contributions from a source string', () => {
+    const registry = createExtensionRegistry();
+    const record = {
+      id: 'local.audit',
+      name: 'Audit',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.extension({ id: "local.audit", name: "Audit", version: "0.1.0" });
+        app.commands.register("local.audit.count", { title: "Count", run() {} });
+        app.toolbar.addButton({ id: "local.audit.button", label: "Count", command: "local.audit.count" });
+        app.menus.addItem("extensions.menu", { id: "local.audit.menu", label: "Count", command: "local.audit.count" });
+        app.panels.register("local.audit.panel", { title: "Audit", render(container) { container.textContent = "Audit"; } });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    expect(runExtensionRecord(record, registry)).toEqual({});
+    expect(registry.getSnapshot().commands.map((command) => command.id)).toEqual([
+      'local.audit.count',
+    ]);
+    expect(registry.getSnapshot().toolbarButtons.map((button) => button.id)).toEqual([
+      'local.audit.button',
+    ]);
+    expect(registry.getSnapshot().menus['extensions.menu'].map((item) => item.id)).toEqual([
+      'local.audit.menu',
+    ]);
+    expect(registry.getSnapshot().panels.map((panel) => panel.id)).toEqual([
+      'local.audit.panel',
+    ]);
+  });
+
+  it('records runtime errors without throwing to the app shell', () => {
+    const registry = createExtensionRegistry();
+    const record = {
+      id: 'local.broken',
+      name: 'Broken',
+      version: '0.1.0',
+      enabled: true,
+      source: 'throw new Error("broken extension");',
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    expect(runExtensionRecord(record, registry).error).toMatch(/broken extension/);
+    expect(registry.getSnapshot().errors[0]).toMatchObject({
+      extensionId: 'local.broken',
+      message: 'Error: broken extension',
+    });
+  });
+
+  it('stores extension-private values under the extension namespace', () => {
+    const registry = createExtensionRegistry();
+    const app = createAppApi('local.audit', registry);
+
+    app.storage.set('threshold', 7);
+
+    expect(app.storage.get('threshold')).toBe(7);
+    expect(localStorage.getItem('archi-online.extension-storage.v1.local.audit')).toContain(
+      '"threshold":7',
+    );
+  });
+});
+
+describe('extension events', () => {
+  beforeEach(() => {
+    extensionRegistry.clearAll();
+    replaceModel(null, null, false);
+  });
+
+  it('emits selection.changed when the app selection changes', async () => {
+    const registry = createExtensionRegistry();
+    const payloads: unknown[] = [];
+    registry.onEvent('local.audit', 'selection.changed', (payload) => payloads.push(payload));
+    const stop = startExtensionEventBridge(registry);
+
+    setSelection('tree', ['element-1']);
+
+    stop();
+    expect(payloads).toEqual([{ source: 'tree', ids: ['element-1'] }]);
+  });
+
+  it('debounces model.changed events', async () => {
+    vi.useFakeTimers();
+    const registry = createExtensionRegistry();
+    let count = 0;
+    registry.onEvent('local.audit', 'model.changed', () => {
+      count += 1;
+    });
+    const stop = startExtensionEventBridge(registry, 10);
+
+    replaceModel(createEmptyModel('One'), null, false);
+    replaceModel(createEmptyModel('Two'), null, false);
+    vi.advanceTimersByTime(10);
+    await Promise.resolve();
+
+    stop();
+    expect(count).toBe(1);
+    vi.useRealTimers();
+    useStore.setState({ model: null });
+  });
+});

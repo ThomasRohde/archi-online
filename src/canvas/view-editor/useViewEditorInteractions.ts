@@ -604,6 +604,7 @@ export function useViewEditorInteractions({
     showViewObjectContextMenu({
       clientX: e.clientX,
       clientY: e.clientY,
+      viewId,
       id,
       ids,
       model,

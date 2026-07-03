@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { extensionRegistry } from '../extensions/registry';
+import type { ExtensionMenuLocation } from '../extensions/types';
 
 export interface MenuItem {
   label: string;
@@ -24,6 +26,14 @@ let openMenuFn: ((state: MenuState) => void) | null = null;
 /** Open the global context menu at screen coordinates. */
 export function showContextMenu(x: number, y: number, items: MenuItem[]): void {
   openMenuFn?.({ x, y, items });
+}
+
+export function extensionMenuItems(location: ExtensionMenuLocation): MenuItem[] {
+  return extensionRegistry.getSnapshot().menus[location].map((item) => ({
+    label: item.label,
+    danger: item.danger,
+    onClick: () => void extensionRegistry.runCommand(item.command),
+  }));
 }
 
 function MenuList({ items, onDone }: { items: MenuItem[]; onDone: () => void }) {

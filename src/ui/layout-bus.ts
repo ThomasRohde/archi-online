@@ -12,6 +12,8 @@ export interface LayoutBus {
   getPanels(): DockPanelInfo[];
   /** Reopen a closed tool panel, or focus it when already open. */
   showPanel(id: string): void;
+  /** Open or focus a runtime-registered extension panel. */
+  showExtensionPanel(panelId: string): void;
   /** Restore the default arrangement. */
   reset(): void;
 }

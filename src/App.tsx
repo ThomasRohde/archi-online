@@ -1,4 +1,7 @@
 import { useEffect } from 'react';
+import { startExtensionEventBridge } from './extensions/events';
+import { extensionRegistry } from './extensions/registry';
+import { reloadEnabledExtensions } from './extensions/runtime';
 import { redo, undo, useStore } from './model/store';
 import { restoreAutosave, startAutosave } from './persistence/autosave';
 import { AppDialogHost } from './ui/AppDialog';
@@ -6,6 +9,7 @@ import { AppShell } from './ui/AppShell';
 import { openModel, saveModel } from './ui/Toolbar';
 
 let booted = false;
+let extensionEventBridgeStarted = false;
 
 if (import.meta.env.DEV) {
   // dev/testing hook: load a model from XML text in the browser console
@@ -35,6 +39,12 @@ export function App() {
       void restoreAutosave().finally(() => {
         startAutosave();
         useStore.setState({ booted: true });
+        reloadEnabledExtensions();
+        if (!extensionEventBridgeStarted) {
+          extensionEventBridgeStarted = true;
+          startExtensionEventBridge();
+        }
+        void extensionRegistry.emitEvent('app.ready');
       });
     }
     const onKey = (e: KeyboardEvent) => {

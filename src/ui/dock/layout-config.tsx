@@ -6,6 +6,8 @@ import type {
 } from 'dockview-react';
 import { ViewEditor } from '../../canvas/ViewEditor';
 import { useStore } from '../../model/store';
+import { ExtensionPanelHost } from '../ExtensionPanelHost';
+import { ExtensionsPanel } from '../ExtensionsPanel';
 import { ModelTree } from '../ModelTree';
 import { Palette } from '../Palette';
 import { PropertiesPanel } from '../PropertiesPanel';
@@ -91,6 +93,20 @@ export const TOOL_PANELS: ToolPanelDef[] = [
       }),
   },
   {
+    id: 'extensions',
+    title: 'Extensions',
+    add: (api) =>
+      api.addPanel({
+        id: 'extensions',
+        component: 'extensions',
+        title: 'Extensions',
+        position: api.getPanel('settings')
+          ? { referencePanel: 'settings', direction: 'within' }
+          : { direction: 'right' },
+        initialWidth: 380,
+      }),
+  },
+  {
     id: 'scripts',
     title: 'Scripting',
     add: (api) =>
@@ -140,6 +156,12 @@ export function buildDefaultLayout(api: DockviewApi): void {
     component: 'settings',
     title: 'Settings',
     position: { referencePanel: 'properties', direction: 'within' },
+  });
+  api.addPanel({
+    id: 'extensions',
+    component: 'extensions',
+    title: 'Extensions',
+    position: { referencePanel: 'settings', direction: 'within' },
   });
   api.addPanel({
     id: 'scripts',
@@ -202,6 +224,11 @@ export const components: Record<string, React.FunctionComponent<IDockviewPanelPr
       <SettingsPanel />
     </div>
   ),
+  extensions: () => (
+    <div className="dock-panel">
+      <ExtensionsPanel />
+    </div>
+  ),
   scripts: () => (
     <div className="dock-panel">
       <ScriptPanel />
@@ -209,6 +236,7 @@ export const components: Record<string, React.FunctionComponent<IDockviewPanelPr
   ),
   welcome: () => <WelcomePanel />,
   view: ViewPanel as React.FunctionComponent<IDockviewPanelProps>,
+  'extension-panel': ExtensionPanelHost as React.FunctionComponent<IDockviewPanelProps>,
 };
 
 /** Standard group controls: float, open-in-window, maximize/restore. */

@@ -108,5 +108,59 @@ declare namespace $ {
   const model: JModel;
 }
 declare const model: JModel;
+declare const app: {
+  extension(meta: { id: string; name: string; version: string }): void;
+  commands: {
+    register(id: string, options: {
+      title: string;
+      description?: string;
+      run(context: unknown, args?: unknown): unknown;
+    }): void;
+    run(id: string, args?: unknown): Promise<unknown>;
+  };
+  toolbar: {
+    addButton(options: { id: string; label: string; command: string }): void;
+  };
+  menus: {
+    addItem(
+      location: 'extensions.menu' | 'model-tree.context' | 'view.context' | 'selection.context',
+      options: { id?: string; label: string; command: string; danger?: boolean },
+    ): void;
+  };
+  panels: {
+    register(
+      id: string,
+      options: { title: string; render(container: HTMLElement): void | (() => void) },
+    ): void;
+    show(id: string): void;
+  };
+  events: {
+    on(
+      name:
+        | 'app.ready'
+        | 'model.opened'
+        | 'model.changed'
+        | 'model.saved'
+        | 'selection.changed'
+        | 'view.opened'
+        | 'view.activated'
+        | 'view.contextMenu'
+        | 'tree.contextMenu'
+        | 'script.error',
+      handler: (payload: unknown) => unknown,
+    ): void;
+  };
+  storage: {
+    get(key: string): unknown;
+    set(key: string, value: unknown): void;
+  };
+  dialogs: {
+    info(title: string, message?: string): Promise<void>;
+    confirm(title: string, message?: string): Promise<boolean>;
+  };
+  model: {
+    current(): unknown;
+  };
+};
 declare function exit(): never;
 `;

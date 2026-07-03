@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { StandaloneIcon } from '../canvas/figures/icons';
+import { extensionRegistry } from '../extensions/registry';
 import {
   ELEMENT_TYPES,
   ELEMENT_TYPE_MAP,
@@ -17,7 +18,12 @@ import {
 } from '../model/ops';
 import { openView, setSelection, useStore } from '../model/store';
 import type { Folder, ModelState } from '../model/types';
-import { showContextMenu, SEPARATOR, type MenuItem } from './ContextMenu';
+import {
+  extensionMenuItems,
+  showContextMenu,
+  SEPARATOR,
+  type MenuItem,
+} from './ContextMenu';
 
 const FOLDER_LAYERS: Record<string, Layer[]> = {
   strategy: ['strategy'],
@@ -187,6 +193,21 @@ function ModelTreeInner({
     if (name !== null && name.trim() !== '') renameItem(id, name.trim());
   };
 
+  const showTreeContextMenu = (x: number, y: number, items: MenuItem[], targetId: string) => {
+    const extensionItems = extensionMenuItems('model-tree.context');
+    showContextMenu(
+      x,
+      y,
+      extensionItems.length > 0 ? [...items, SEPARATOR, ...extensionItems] : items,
+    );
+    void extensionRegistry.emitEvent('tree.contextMenu', {
+      x,
+      y,
+      targetId,
+      selectionIds: useStore.getState().selection.ids,
+    });
+  };
+
   const itemLabel = (id: string): string => {
     const el = model.elements[id];
     if (el) return el.name;
@@ -281,7 +302,7 @@ function ModelTreeInner({
             depth={depth}
             icon={<span className="tree-chevron">{isCollapsed ? '▸' : '▾'}</span>}
             label={folder.name}
-            onContextMenu={(x, y) => showContextMenu(x, y, folderMenu(folder))}
+            onContextMenu={(x, y) => showTreeContextMenu(x, y, folderMenu(folder), folderId)}
             draggable={folder.parentId !== null}
             onDropIds={(ids) => moveItemsToFolder(ids, folderId)}
             renaming={renamingId === folderId}
@@ -301,7 +322,7 @@ function ModelTreeInner({
                     depth={depth + 1}
                     icon={<ElementIcon type={el.type} />}
                     label={el.name}
-                    onContextMenu={(x, y) => showContextMenu(x, y, conceptMenu(itemId))}
+                    onContextMenu={(x, y) => showTreeContextMenu(x, y, conceptMenu(itemId), itemId)}
                     draggable
                     renaming={renamingId === itemId}
                     onRenamed={finishRename(itemId)}
@@ -318,7 +339,7 @@ function ModelTreeInner({
                     icon={<span className="tree-rel-icon">→</span>}
                     label={itemLabel(itemId)}
                     dim
-                    onContextMenu={(x, y) => showContextMenu(x, y, conceptMenu(itemId))}
+                    onContextMenu={(x, y) => showTreeContextMenu(x, y, conceptMenu(itemId), itemId)}
                     draggable
                     renaming={renamingId === itemId}
                     onRenamed={finishRename(itemId)}
@@ -336,11 +357,16 @@ function ModelTreeInner({
                     label={view.name}
                     onDoubleClick={() => openView(itemId)}
                     onContextMenu={(x, y) =>
-                      showContextMenu(x, y, [
-                        { label: 'Open View', onClick: () => openView(itemId) },
-                        SEPARATOR,
-                        ...conceptMenu(itemId),
-                      ])
+                      showTreeContextMenu(
+                        x,
+                        y,
+                        [
+                          { label: 'Open View', onClick: () => openView(itemId) },
+                          SEPARATOR,
+                          ...conceptMenu(itemId),
+                        ],
+                        itemId,
+                      )
                     }
                     draggable
                     renaming={renamingId === itemId}
@@ -380,7 +406,7 @@ function ModelTreeInner({
         depth={0}
         icon={<span className="tree-model-icon">◈</span>}
         label={model.info.name}
-        onContextMenu={(x, y) => showContextMenu(x, y, rootMenu)}
+        onContextMenu={(x, y) => showTreeContextMenu(x, y, rootMenu, model.info.id)}
         renaming={renamingId === model.info.id}
         onRenamed={finishRename(model.info.id)}
       />

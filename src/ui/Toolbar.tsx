@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import { extensionRegistry } from '../extensions/registry';
 import { createEmptyModel } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
 import { openModelFromDisk, saveModelToDisk } from '../persistence/files';
@@ -72,6 +73,11 @@ export async function saveModel(saveAs = false): Promise<void> {
 
 export function Toolbar() {
   const [showHelp, setShowHelp] = useState(false);
+  const extensionSnapshot = useSyncExternalStore(
+    (listener) => extensionRegistry.subscribe(listener),
+    () => extensionRegistry.getSnapshot(),
+    () => extensionRegistry.getSnapshot(),
+  );
   const canUndo = useStore((s) => s.undoStack.length > 0);
   const canRedo = useStore((s) => s.redoStack.length > 0);
   const undoLabel = useStore((s) => s.undoStack[s.undoStack.length - 1]?.label);
@@ -80,6 +86,22 @@ export function Toolbar() {
   const fileName = useStore((s) => s.fileName);
   const hasModel = useStore((s) => s.model !== null);
   const modelName = useStore((s) => s.model?.info.name);
+  const extensionMenuItems: MenuItem[] = extensionSnapshot.menus['extensions.menu'].map((item) => ({
+    label: item.label,
+    danger: item.danger,
+    onClick: () => void extensionRegistry.runCommand(item.command),
+  }));
+  const explicitCommands = new Set(
+    extensionSnapshot.menus['extensions.menu'].map((item) => item.command),
+  );
+  for (const command of extensionSnapshot.commands) {
+    if (!explicitCommands.has(command.id)) {
+      extensionMenuItems.push({
+        label: command.title,
+        onClick: () => void extensionRegistry.runCommand(command.id),
+      });
+    }
+  }
 
   return (
     <div className="toolbar">
@@ -128,6 +150,27 @@ export function Toolbar() {
       <span className="file-status">
         {hasModel ? `${modelName} — ${fileName ?? 'unsaved'}${dirty ? ' •' : ''}` : ''}
       </span>
+      {extensionSnapshot.toolbarButtons.map((button) => (
+        <button
+          key={button.id}
+          className="tb-btn"
+          title={button.label}
+          onClick={() => void extensionRegistry.runCommand(button.command)}
+        >
+          {button.label}
+        </button>
+      ))}
+      <button
+        className="tb-btn"
+        title="Run extension commands"
+        disabled={extensionMenuItems.length === 0}
+        onClick={(e) => {
+          const rect = (e.target as HTMLElement).getBoundingClientRect();
+          showContextMenu(rect.left, rect.bottom + 4, extensionMenuItems);
+        }}
+      >
+        Extensions ▾
+      </button>
       <button
         className="tb-btn"
         title="Show or reopen panels"
