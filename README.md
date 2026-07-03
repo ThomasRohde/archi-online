@@ -58,6 +58,22 @@ npm run build      # typecheck + production build (static site in dist/)
 `tools/generate-rules.mjs` regenerates `src/model/data/relations-matrix.ts` from
 Archi's relationship matrix (`tools/data/relationships.xml`).
 
+## Documentation
+
+User and API documentation is maintained in `docs/wiki/` using GitHub Wiki page
+filenames:
+
+- [Wiki home](docs/wiki/Home.md)
+- [Getting started](docs/wiki/Getting-Started.md)
+- [User guide](docs/wiki/User-Guide.md)
+- [Scripting API](docs/wiki/Scripting-API.md)
+- [Extension API](docs/wiki/Extension-API.md)
+- [Extension packages](docs/wiki/Extension-Packages.md)
+- [Publishing to GitHub Wiki](docs/wiki/Publishing-GitHub-Wiki.md)
+
+Run `npm run docs:check` before publishing docs. Once the repo is on GitHub,
+`npm run docs:publish-wiki` copies these pages to the repository wiki.
+
 ## Architecture
 
 - `src/model/` — pure-TS domain core: metamodel, rules, normalized Zustand store,
