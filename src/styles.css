@@ -704,14 +704,39 @@ body {
   white-space: nowrap;
 }
 
-.zoom-indicator {
+.zoom-controls {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  background: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 1px 7px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.zoom-btn {
+  font: inherit;
+  font-size: 12px;
+  border: none;
+  background: transparent;
   color: var(--text-dim);
-  pointer-events: none;
+  padding: 2px 7px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-width: 24px;
+  justify-content: center;
+}
+
+.zoom-btn:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.zoom-pct {
+  min-width: 42px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
 }

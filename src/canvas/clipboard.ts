@@ -34,11 +34,27 @@ export function hasClipboard(): boolean {
   return clipboard !== null;
 }
 
-/** Paste into a view. Returns new root node ids. */
-export function pasteNodes(viewId: string, offset = 16): string[] {
+/** Paste into a view. Returns new root node ids. Pastes at `at` (view coords) when given. */
+export function pasteNodes(viewId: string, at?: { x: number; y: number }): string[] {
   const data = clipboard;
   const model = useStore.getState().model;
   if (!data || !model || !model.views[viewId]) return [];
+  let dx = 16;
+  let dy = 16;
+  if (at) {
+    let minX = Infinity;
+    let minY = Infinity;
+    for (const n of data.nodes) {
+      if (data.rootIds.includes(n.id)) {
+        minX = Math.min(minX, n.bounds.x);
+        minY = Math.min(minY, n.bounds.y);
+      }
+    }
+    if (isFinite(minX)) {
+      dx = Math.round(at.x - minX);
+      dy = Math.round(at.y - minY);
+    }
+  }
   const idMap = new Map<string, string>();
   for (const n of data.nodes) idMap.set(n.id, newId());
   for (const c of data.connections) idMap.set(c.id, newId());
@@ -60,7 +76,7 @@ export function pasteNodes(viewId: string, offset = 16): string[] {
         parentId,
         bounds:
           parentId === viewId
-            ? { ...orig.bounds, x: orig.bounds.x + offset, y: orig.bounds.y + offset }
+            ? { ...orig.bounds, x: orig.bounds.x + dx, y: orig.bounds.y + dy }
             : { ...orig.bounds },
         childIds: [],
         sourceConnectionIds: [],

@@ -379,6 +379,8 @@ export function DockLayout() {
     const d3 = api.onDidLayoutChange(() => {
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => {
+        // a maximized group serializes as a degenerate layout — skip until restored
+        if (api.hasMaximizedGroup()) return;
         try {
           localStorage.setItem(LAYOUT_KEY, JSON.stringify(api.toJSON()));
         } catch {

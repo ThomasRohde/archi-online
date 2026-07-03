@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ELEMENT_TYPE_MAP, relationshipLabel } from '../model/metamodel';
 import {
   addElementNodeToView,
@@ -20,7 +20,7 @@ import { openView, setActiveTool, setSelection, useStore } from '../model/store'
 import type { Bounds, ModelState } from '../model/types';
 import { showContextMenu, SEPARATOR, type MenuItem } from '../ui/ContextMenu';
 import { ConnectionView } from './ConnectionView';
-import { copyNodes, pasteNodes } from './clipboard';
+import { copyNodes, hasClipboard, pasteNodes } from './clipboard';
 import {
   bendpointPositions,
   connectionPolyline,
@@ -197,13 +197,74 @@ export function ViewEditor({ viewId }: { viewId: string }) {
   );
   const [inter, setInter] = useState<Interaction>({ kind: 'none' });
   const [edit, setEdit] = useState<EditState | null>(null);
+  const [spaceHeld, setSpaceHeld] = useState(false);
   const interRef = useRef(inter);
   interRef.current = inter;
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  const spaceRef = useRef(spaceHeld);
+  spaceRef.current = spaceHeld;
 
   const setViewport = (v: Viewport) => {
     viewports.set(viewId, v);
     setViewportState(v);
   };
+  const setViewportRefFn = useRef(setViewport);
+  setViewportRefFn.current = setViewport;
+
+  // Ctrl+wheel zoom must preventDefault to stop the browser's page zoom, but
+  // React attaches onWheel passively — so use a native non-passive listener.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const vp = viewportRef.current;
+      const set = setViewportRefFn.current;
+      if (e.ctrlKey || e.metaKey) {
+        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        const zoom = Math.min(4, Math.max(0.1, vp.zoom * factor));
+        const rect = svg.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const wx = (cx - vp.x) / vp.zoom;
+        const wy = (cy - vp.y) / vp.zoom;
+        set({ zoom, x: cx - wx * zoom, y: cy - wy * zoom });
+      } else if (e.shiftKey) {
+        set({ ...vp, x: vp.x - e.deltaY });
+      } else {
+        set({ ...vp, x: vp.x - e.deltaX, y: vp.y - e.deltaY });
+      }
+    };
+    svg.addEventListener('wheel', onWheelNative, { passive: false });
+    return () => svg.removeEventListener('wheel', onWheelNative);
+  }, []);
+
+  // hold Space for hand-tool panning with the left button
+  useEffect(() => {
+    const isTextTarget = (t: EventTarget | null) =>
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      (t instanceof HTMLElement && t.isContentEditable);
+    const down = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !isTextTarget(e.target)) {
+        if (e.target === svgRef.current) e.preventDefault();
+        setSpaceHeld(true);
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setSpaceHeld(false);
+    };
+    const clear = () => setSpaceHeld(false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', clear);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', clear);
+    };
+  }, []);
 
   const view = model?.views[viewId];
   const absBounds = useMemo(
@@ -223,6 +284,54 @@ export function ViewEditor({ viewId }: { viewId: string }) {
       x: (clientX - rect.left - viewport.x) / viewport.zoom,
       y: (clientY - rect.top - viewport.y) / viewport.zoom,
     };
+  };
+
+  /** Zoom keeping the canvas centre stable. */
+  const zoomTo = (zoom: number) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const z = Math.min(4, Math.max(0.1, zoom));
+    const rect = svg.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const wx = (cx - viewport.x) / viewport.zoom;
+    const wy = (cy - viewport.y) / viewport.zoom;
+    setViewport({ zoom: z, x: cx - wx * z, y: cy - wy * z });
+  };
+
+  const zoomBy = (factor: number) => zoomTo(viewport.zoom * factor);
+
+  /** Fit the whole diagram into the visible canvas. */
+  const fitToView = () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const b of absBounds.values()) {
+      minX = Math.min(minX, b.x);
+      minY = Math.min(minY, b.y);
+      maxX = Math.max(maxX, b.x + b.width);
+      maxY = Math.max(maxY, b.y + b.height);
+    }
+    if (!isFinite(minX)) {
+      setViewport({ zoom: 1, x: 20, y: 20 });
+      return;
+    }
+    const rect = svg.getBoundingClientRect();
+    const margin = 24;
+    const bw = Math.max(1, maxX - minX);
+    const bh = Math.max(1, maxY - minY);
+    const zoom = Math.min(
+      1.5,
+      Math.max(0.1, Math.min((rect.width - margin * 2) / bw, (rect.height - margin * 2) / bh)),
+    );
+    setViewport({
+      zoom,
+      x: (rect.width - bw * zoom) / 2 - minX * zoom,
+      y: (rect.height - bh * zoom) / 2 - minY * zoom,
+    });
   };
 
   const snap = (v: number, disable?: boolean) => (disable ? Math.round(v) : Math.round(v / GRID) * GRID);
@@ -336,7 +445,7 @@ export function ViewEditor({ viewId }: { viewId: string }) {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (edit) commitEdit(null);
-    if (e.button === 1) {
+    if (e.button === 1 || (e.button === 0 && spaceRef.current)) {
       setInter({ kind: 'pan', startX: e.clientX, startY: e.clientY, vx: viewport.x, vy: viewport.y });
       svgRef.current!.setPointerCapture(e.pointerId);
       e.preventDefault();
@@ -525,7 +634,7 @@ export function ViewEditor({ viewId }: { viewId: string }) {
     const p = toView(e.clientX, e.clientY);
     switch (cur.kind) {
       case 'pan':
-        setInter({ kind: 'none' });
+        if (e.button === 1 || e.button === 0) setInter({ kind: 'none' });
         break;
       case 'maybe-move':
       case 'maybe-bend':
@@ -666,6 +775,26 @@ export function ViewEditor({ viewId }: { viewId: string }) {
       setSelection('view', [...absBounds.keys()]);
       return;
     }
+    if (e.key === 'Home') {
+      e.preventDefault();
+      fitToView();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+      e.preventDefault();
+      zoomTo(1);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+      e.preventDefault();
+      zoomBy(1.2);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+      e.preventDefault();
+      zoomBy(1 / 1.2);
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && viewSel.length > 0) {
       copyNodes(viewSel);
       return;
@@ -708,7 +837,55 @@ export function ViewEditor({ viewId }: { viewId: string }) {
     e.preventDefault();
     const hit = hitFromEvent(e);
     const id = hit.nodeId ?? hit.connId;
-    if (!id) return;
+    if (!id) {
+      // empty canvas
+      const p = toView(e.clientX, e.clientY);
+      const parentId = containerAt(p, new Set()) ?? viewId;
+      const parentAbs = parentId === viewId ? { x: 0, y: 0 } : absBounds.get(parentId)!;
+      showContextMenu(e.clientX, e.clientY, [
+        {
+          label: 'Paste (Ctrl+V)',
+          disabled: !hasClipboard(),
+          onClick: () => {
+            const ids = pasteNodes(viewId, p);
+            if (ids.length > 0) setSelection('view', ids);
+          },
+        },
+        { label: 'Select All (Ctrl+A)', onClick: () => setSelection('view', [...absBounds.keys()]) },
+        SEPARATOR,
+        {
+          label: 'New Note',
+          onClick: () => {
+            const noteId = addNoteToView(viewId, parentId, {
+              x: Math.round(p.x - parentAbs.x),
+              y: Math.round(p.y - parentAbs.y),
+              width: 185,
+              height: 80,
+            });
+            setSelection('view', [noteId]);
+            setTimeout(() => startEdit(noteId), 0);
+          },
+        },
+        {
+          label: 'New Group',
+          onClick: () => {
+            const groupId = addGroupToView(viewId, parentId, {
+              x: Math.round(p.x - parentAbs.x),
+              y: Math.round(p.y - parentAbs.y),
+              width: 400,
+              height: 140,
+            });
+            setSelection('view', [groupId]);
+          },
+        },
+        SEPARATOR,
+        { label: 'Zoom In (Ctrl+=)', onClick: () => zoomBy(1.2) },
+        { label: 'Zoom Out (Ctrl+-)', onClick: () => zoomBy(1 / 1.2) },
+        { label: 'Zoom 100% (Ctrl+0)', onClick: () => zoomTo(1) },
+        { label: 'Fit to Window (Home)', onClick: fitToView },
+      ]);
+      return;
+    }
     const sel = useStore.getState().selection;
     if (!(sel.source === 'view' && sel.ids.includes(id))) setSelection('view', [id]);
     const ids = useStore.getState().selection.ids;
@@ -801,23 +978,6 @@ export function ViewEditor({ viewId }: { viewId: string }) {
 
   // ------------------------------------------------------------ rendering
 
-  const onWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      const zoom = Math.min(4, Math.max(0.2, viewport.zoom * factor));
-      const rect = svgRef.current!.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      const wx = (cx - viewport.x) / viewport.zoom;
-      const wy = (cy - viewport.y) / viewport.zoom;
-      setViewport({ zoom, x: cx - wx * zoom, y: cy - wy * zoom });
-    } else if (e.shiftKey) {
-      setViewport({ ...viewport, x: viewport.x - e.deltaY });
-    } else {
-      setViewport({ ...viewport, x: viewport.x - e.deltaX, y: viewport.y - e.deltaY });
-    }
-  };
-
   // move deltas per dragged root
   const moveDelta = new Map<string, Point>();
   let dropParentId: string | null = null;
@@ -899,11 +1059,15 @@ export function ViewEditor({ viewId }: { viewId: string }) {
   const editNodeAbs = edit ? liveAbs.get(edit.nodeId) : undefined;
 
   const cursor =
-    activeTool.kind === 'select'
-      ? undefined
-      : activeTool.kind === 'create-relationship' || activeTool.kind === 'magic-connector'
-        ? 'crosshair'
-        : 'copy';
+    inter.kind === 'pan'
+      ? 'grabbing'
+      : spaceHeld
+        ? 'grab'
+        : activeTool.kind === 'select'
+          ? undefined
+          : activeTool.kind === 'create-relationship' || activeTool.kind === 'magic-connector'
+            ? 'crosshair'
+            : 'copy';
 
   return (
     <div className="view-editor">
@@ -912,7 +1076,6 @@ export function ViewEditor({ viewId }: { viewId: string }) {
         className="view-svg"
         style={{ cursor }}
         tabIndex={0}
-        onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -1066,7 +1229,27 @@ export function ViewEditor({ viewId }: { viewId: string }) {
           }}
         />
       )}
-      <div className="zoom-indicator">{Math.round(viewport.zoom * 100)}%</div>
+      <div className="zoom-controls">
+        <button className="zoom-btn" title="Zoom out (Ctrl+-)" onClick={() => zoomBy(1 / 1.2)}>
+          −
+        </button>
+        <button className="zoom-btn zoom-pct" title="Reset to 100% (Ctrl+0)" onClick={() => zoomTo(1)}>
+          {Math.round(viewport.zoom * 100)}%
+        </button>
+        <button className="zoom-btn" title="Zoom in (Ctrl+=)" onClick={() => zoomBy(1.2)}>
+          +
+        </button>
+        <button className="zoom-btn" title="Fit to window (Home)" onClick={fitToView}>
+          <svg viewBox="0 0 14 14" width="11" height="11">
+            <path
+              d="M1 5 V1 H5 M9 1 H13 V5 M13 9 V13 H9 M5 13 H1 V9"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
