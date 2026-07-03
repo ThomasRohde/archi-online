@@ -127,7 +127,7 @@ export async function readExtensionArchive(
     manifest = JSON.parse(manifestFile.content);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid package manifest JSON: ${message}`);
+    throw new Error(`Invalid package manifest JSON: ${message}`, { cause: error });
   }
 
   return makeInstalledPackage({ manifest, files, enabled: true, now });

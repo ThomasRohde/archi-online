@@ -1,0 +1,5 @@
+{
+  "empty": "No current selection.",
+  "selected": "Selected IDs are stored in this browser profile for quick inspection.",
+  "historyLimit": 12
+}

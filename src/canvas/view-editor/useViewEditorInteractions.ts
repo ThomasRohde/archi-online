@@ -109,7 +109,7 @@ export function useViewEditorInteractions({
     const m = useStore.getState().model;
     const node = m?.nodes[nodeId];
     if (!m || !node) return;
-    let initial = '';
+    let initial: string;
     if (node.nodeType === 'element') initial = m.elements[node.elementId]?.name ?? '';
     else if (node.nodeType === 'group') initial = node.name;
     else if (node.nodeType === 'note') initial = node.content;

@@ -1,0 +1,117 @@
+app.extension({
+  id: 'local.event-log-console',
+  name: 'Event Log Console',
+  version: '0.1.0'
+});
+
+var config = app.assets.json('data/events.json');
+var panel = null;
+
+function readEvents() {
+  return app.storage.get('events') || [];
+}
+
+function simplify(payload) {
+  try {
+    return JSON.stringify(payload);
+  } catch (error) {
+    return String(payload);
+  }
+}
+
+function recordEvent(name, payload) {
+  var entry = {
+    name: name,
+    time: new Date().toISOString(),
+    payload: simplify(payload)
+  };
+  app.storage.set('events', [entry].concat(readEvents()).slice(0, config.limit));
+  renderPanel();
+}
+
+function renderPanel() {
+  if (!panel) return;
+  var events = readEvents();
+  panel.replaceChildren();
+  panel.style.fontFamily = 'system-ui, sans-serif';
+  panel.style.fontSize = '13px';
+
+  var bar = document.createElement('div');
+  bar.style.display = 'flex';
+  bar.style.justifyContent = 'space-between';
+  bar.style.alignItems = 'center';
+  bar.style.marginBottom = '8px';
+
+  var title = document.createElement('strong');
+  title.textContent = 'Event Log';
+
+  var clear = document.createElement('button');
+  clear.textContent = 'Clear';
+  clear.onclick = function () {
+    app.commands.run('local.event-log-console.clear');
+  };
+
+  bar.appendChild(title);
+  bar.appendChild(clear);
+  panel.appendChild(bar);
+
+  if (events.length === 0) {
+    var empty = document.createElement('div');
+    empty.style.color = '#666';
+    empty.textContent = 'No events captured yet.';
+    panel.appendChild(empty);
+    return;
+  }
+
+  events.forEach(function (event) {
+    var row = document.createElement('div');
+    row.style.borderBottom = '1px solid #e6e8eb';
+    row.style.padding = '6px 0';
+    row.innerHTML = '<strong>' + event.name + '</strong> <span style="color:#666">' + event.time + '</span><br><code style="white-space:pre-wrap">' + event.payload + '</code>';
+    panel.appendChild(row);
+  });
+}
+
+config.events.forEach(function (name) {
+  app.events.on(name, function (payload) {
+    recordEvent(name, payload);
+  });
+});
+
+app.commands.register('local.event-log-console.open', {
+  title: 'Open event log',
+  run: function () {
+    app.panels.show('local.event-log-console.panel');
+  }
+});
+
+app.commands.register('local.event-log-console.clear', {
+  title: 'Clear event log',
+  run: function () {
+    app.storage.set('events', []);
+    renderPanel();
+  }
+});
+
+app.menus.addItem('extensions.menu', {
+  id: 'local.event-log-console.menu.open',
+  label: 'Open event log',
+  command: 'local.event-log-console.open'
+});
+
+app.toolbar.addButton({
+  id: 'local.event-log-console.toolbar',
+  label: 'Events',
+  command: 'local.event-log-console.open'
+});
+
+app.panels.register('local.event-log-console.panel', {
+  title: 'Event Log',
+  render: function (container) {
+    panel = container;
+    renderPanel();
+    return function () {
+      panel = null;
+    };
+  }
+});

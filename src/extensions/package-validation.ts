@@ -147,7 +147,9 @@ export function readPackageJsonFile(pkg: InstalledExtensionPackage, path: string
     return JSON.parse(readPackageTextFile(pkg, path));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid package JSON file ${normalizePackagePath(path)}: ${message}`);
+    throw new Error(`Invalid package JSON file ${normalizePackagePath(path)}: ${message}`, {
+      cause: error,
+    });
   }
 }
 

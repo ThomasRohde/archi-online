@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "id": "local.selection-workbench",
+  "name": "Selection Workbench",
+  "version": "0.1.0",
+  "description": "Inspect and remember selection changes from tree, view, and context menu workflows.",
+  "main": "main.js",
+  "contributes": {
+    "commands": [
+      {
+        "id": "local.selection-workbench.describe",
+        "title": "Describe current selection"
+      },
+      {
+        "id": "local.selection-workbench.open",
+        "title": "Open selection workbench"
+      }
+    ],
+    "menus": [
+      {
+        "id": "local.selection-workbench.selection.describe",
+        "label": "Describe selection",
+        "command": "local.selection-workbench.describe",
+        "location": "selection.context"
+      },
+      {
+        "id": "local.selection-workbench.tree.describe",
+        "label": "Describe tree item",
+        "command": "local.selection-workbench.describe",
+        "location": "model-tree.context"
+      }
+    ],
+    "panels": [
+      {
+        "id": "local.selection-workbench.panel",
+        "title": "Selection Workbench"
+      }
+    ],
+    "events": [
+      {
+        "name": "selection.changed"
+      }
+    ]
+  }
+}

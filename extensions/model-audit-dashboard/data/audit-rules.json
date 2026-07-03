@@ -1,0 +1,12 @@
+{
+  "minimumViews": 1,
+  "warnWhenNoRelationships": true,
+  "warnWhenUnnamedConcepts": true,
+  "checks": [
+    "concept-count",
+    "relationship-count",
+    "view-count",
+    "unnamed-concepts",
+    "documentation-sample"
+  ]
+}

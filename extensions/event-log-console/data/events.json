@@ -1,0 +1,15 @@
+{
+  "limit": 40,
+  "events": [
+    "app.ready",
+    "model.opened",
+    "model.changed",
+    "model.saved",
+    "selection.changed",
+    "view.opened",
+    "view.activated",
+    "view.contextMenu",
+    "tree.contextMenu",
+    "script.error"
+  ]
+}

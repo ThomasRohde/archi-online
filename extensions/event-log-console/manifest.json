@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "id": "local.event-log-console",
+  "name": "Event Log Console",
+  "version": "0.1.0",
+  "description": "Records app, model, view, tree, and selection events from the extension event bridge.",
+  "main": "main.js",
+  "contributes": {
+    "commands": [
+      {
+        "id": "local.event-log-console.open",
+        "title": "Open event log"
+      },
+      {
+        "id": "local.event-log-console.clear",
+        "title": "Clear event log"
+      }
+    ],
+    "menus": [
+      {
+        "id": "local.event-log-console.menu.open",
+        "label": "Open event log",
+        "command": "local.event-log-console.open",
+        "location": "extensions.menu"
+      }
+    ],
+    "panels": [
+      {
+        "id": "local.event-log-console.panel",
+        "title": "Event Log"
+      }
+    ],
+    "events": [
+      {
+        "name": "app.ready"
+      },
+      {
+        "name": "model.changed"
+      },
+      {
+        "name": "selection.changed"
+      }
+    ]
+  }
+}

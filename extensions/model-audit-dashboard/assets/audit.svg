@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="Audit gauge">
+  <rect x="8" y="14" width="80" height="68" rx="8" fill="#e8f2f8" stroke="#315d7d" stroke-width="4"/>
+  <path d="M24 62a24 24 0 0 1 48 0" fill="none" stroke="#315d7d" stroke-width="6" stroke-linecap="round"/>
+  <path d="M48 62l15-22" fill="none" stroke="#1f7a4d" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="48" cy="62" r="5" fill="#1f7a4d"/>
+</svg>

@@ -1,0 +1,12 @@
+{
+  "accent": "#315d7d",
+  "capabilities": [
+    "manifest",
+    "package metadata",
+    "text asset",
+    "json asset",
+    "svg asset",
+    "panel",
+    "menu command"
+  ]
+}
