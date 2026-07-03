@@ -24,6 +24,8 @@ declare interface JConcept extends JObject {
 }
 
 declare interface JBounds { x: number; y: number; width: number; height: number }
+declare interface JPoint { x: number; y: number }
+declare interface JBendpoint { startX: number; startY: number; endX: number; endY: number }
 
 declare interface JVisual extends JObject {
   readonly concept?: JConcept;
@@ -36,6 +38,10 @@ declare interface JVisual extends JObject {
   text: string;
   /** Add a nested element (coordinates relative to this container). */
   add(element: JConcept, x: number, y: number, width: number, height: number): JVisual;
+  parent(): JView | JVisual;
+  children(): JVisual[];
+  absoluteBounds(): JBounds;
+  connections(options?: { incoming?: boolean; outgoing?: boolean }): JConnection[];
 }
 
 declare interface JConnection extends JObject {
@@ -44,6 +50,9 @@ declare interface JConnection extends JObject {
   readonly source: JVisual;
   readonly target: JVisual;
   lineColor: string | undefined;
+  bendpoints: JBendpoint[];
+  absoluteRoute(): JPoint[];
+  setAbsoluteRoute(points: JPoint[]): void;
 }
 
 declare interface JView extends JObject {
@@ -52,6 +61,14 @@ declare interface JView extends JObject {
   add(element: JConcept, x: number, y: number, width: number, height: number): JVisual;
   add(relationship: JConcept, source: JVisual, target: JVisual): JConnection;
   createObject(type: 'note' | 'group', x: number, y: number, width: number, height: number): JVisual;
+  nodes(options?: { recursive?: boolean }): JVisual[];
+  connections(): JConnection[];
+  bounds(options?: { recursive?: boolean }): JBounds | null;
+  layout(layout: {
+    nodes?: Record<string, Partial<JBounds>>;
+    connections?: Record<string, { route?: JPoint[]; bendpoints?: JBendpoint[] }>;
+    fitContent?: boolean;
+  }): void;
   openInUI(): void;
 }
 
@@ -137,6 +154,18 @@ declare const app: {
     text(path: string): string;
     json(path: string): unknown;
     url(path: string): string;
+  };
+  views: {
+    active(): JView | null;
+    open(id: string): JView | null;
+    get(id: string): JView | null;
+    all(): JView[];
+  };
+  selection: {
+    ids(): string[];
+    items(): JObject[];
+    visuals(): JVisual[];
+    clear(): void;
   };
   commands: {
     register(id: string, options: {

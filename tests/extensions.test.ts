@@ -15,8 +15,13 @@ import {
   extensionRegistry,
 } from '../src/extensions/registry';
 import { runExtensionRecord, runInstalledPackage } from '../src/extensions/runtime';
-import { createEmptyModel } from '../src/model/ops';
-import { replaceModel, setSelection, useStore } from '../src/model/store';
+import {
+  addElement,
+  addElementNodeToView,
+  addView,
+  createEmptyModel,
+} from '../src/model/ops';
+import { openView, replaceModel, setSelection, useStore } from '../src/model/store';
 
 function storage(initial?: string) {
   const data = new Map<string, string>();
@@ -293,6 +298,40 @@ describe('extension app API and runtime', () => {
     );
   });
 
+  it('exposes active views and current selection through app APIs', () => {
+    replaceModel(createEmptyModel('API'), null);
+    const registry = createExtensionRegistry();
+    const viewId = addView('Main');
+    const actorId = addElement('BusinessActor', 'Actor');
+    const nodeId = addElementNodeToView(
+      viewId,
+      actorId,
+      viewId,
+      { x: 10, y: 20, width: 120, height: 55 },
+      false,
+    );
+    openView(viewId);
+    setSelection('view', [nodeId, actorId, 'missing-id']);
+
+    const app = createAppApi('local.audit', registry);
+
+    expect(app.views.active()?.id).toBe(viewId);
+    expect(app.views.get(viewId)?.name).toBe('Main');
+    expect(app.views.open(viewId)?.id).toBe(viewId);
+    expect(app.views.get('missing-id')).toBeNull();
+    expect(app.views.all().map((view) => view.id)).toEqual([viewId]);
+    expect(app.selection.ids()).toEqual([nodeId, actorId, 'missing-id']);
+    expect(app.selection.items().map((item) => `${item.kind}:${item.id}`)).toEqual([
+      `visual:${nodeId}`,
+      `element:${actorId}`,
+    ]);
+    expect(app.selection.visuals().map((visual) => visual.id)).toEqual([nodeId]);
+
+    app.selection.clear();
+
+    expect(useStore.getState().selection.ids).toEqual([]);
+  });
+
   it('exposes package manifest and asset helpers to package-owned extensions', async () => {
     const registry = createExtensionRegistry();
     const pkg = makeInstalledPackage({
@@ -355,6 +394,74 @@ describe('extension app API and runtime', () => {
       packageId: 'local.assets',
     });
     expect(stored.assetUrl).toMatch(/^data:image\/svg\+xml;base64,/);
+  });
+
+  it('lets a packaged command layout the active view', async () => {
+    replaceModel(createEmptyModel('Package Layout'), null);
+    const registry = createExtensionRegistry();
+    const viewId = addView('Active');
+    const actorId = addElement('BusinessActor', 'Actor');
+    const nodeId = addElementNodeToView(
+      viewId,
+      actorId,
+      viewId,
+      { x: 10, y: 20, width: 120, height: 55 },
+      false,
+    );
+    openView(viewId);
+    const pkg = makeInstalledPackage({
+      manifest: {
+        schemaVersion: 2,
+        id: 'local.layout',
+        name: 'Layout',
+        version: '1.0.0',
+        main: 'main.js',
+      },
+      files: {
+        'manifest.json': {
+          encoding: 'utf8',
+          content: JSON.stringify({
+            schemaVersion: 2,
+            id: 'local.layout',
+            name: 'Layout',
+            version: '1.0.0',
+            main: 'main.js',
+          }),
+        },
+        'main.js': {
+          encoding: 'utf8',
+          content: `
+            app.extension({ id: "local.layout", name: "Layout", version: "1.0.0" });
+            app.commands.register("local.layout.apply", {
+              title: "Layout",
+              run() {
+                var view = app.views.active();
+                var node = view.nodes()[0];
+                view.layout({ nodes: { [node.id]: { x: 80, y: 90, width: 160, height: 70 } } });
+                app.storage.set("bounds", node.absoluteBounds());
+              }
+            });
+          `,
+        },
+      },
+      now: 1,
+    });
+
+    expect(runInstalledPackage(pkg, registry)).toEqual({});
+
+    await registry.runCommand('local.layout.apply');
+
+    expect(useStore.getState().model!.nodes[nodeId].bounds).toEqual({
+      x: 80,
+      y: 90,
+      width: 160,
+      height: 70,
+    });
+    expect(
+      JSON.parse(localStorage.getItem('archi-online.extension-storage.v1.local.layout') ?? '{}'),
+    ).toMatchObject({
+      bounds: { x: 80, y: 90, width: 160, height: 70 },
+    });
   });
 });
 

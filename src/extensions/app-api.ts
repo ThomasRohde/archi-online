@@ -1,4 +1,5 @@
-import { useStore } from '../model/store';
+import { openView, setSelection, useStore } from '../model/store';
+import { JView, JVisual, wrap } from '../scripting/jarchi';
 import { showAlertDialog, showConfirmDialog } from '../ui/AppDialog';
 import { layoutBus } from '../ui/layout-bus';
 import type { ExtensionManifestV2, InstalledExtensionPackage } from './package-types';
@@ -106,6 +107,46 @@ export function createAppApi(
             ? cloneManifest(context.packageRecord.manifest)
             : sourceManifest(extensionId, context?.sourceRecord),
         );
+      },
+    },
+    views: {
+      active() {
+        const appState = useStore.getState();
+        const viewId = appState.activeViewId;
+        return viewId && appState.model?.views[viewId] ? new JView(viewId) : null;
+      },
+      open(id: string) {
+        const model = useStore.getState().model;
+        if (!model?.views[id]) return null;
+        openView(id);
+        return new JView(id);
+      },
+      get(id: string) {
+        return useStore.getState().model?.views[id] ? new JView(id) : null;
+      },
+      all() {
+        const model = useStore.getState().model;
+        return model ? Object.values(model.views).map((view) => new JView(view.id)) : [];
+      },
+    },
+    selection: {
+      ids() {
+        return [...useStore.getState().selection.ids];
+      },
+      items() {
+        if (!useStore.getState().model) return [];
+        return useStore.getState().selection.ids
+          .map((id) => wrap(id))
+          .filter((item) => item !== undefined);
+      },
+      visuals() {
+        if (!useStore.getState().model) return [];
+        return useStore.getState().selection.ids
+          .map((id) => wrap(id))
+          .filter((item): item is JVisual => item instanceof JVisual);
+      },
+      clear() {
+        setSelection(useStore.getState().selection.source, []);
       },
     },
     assets: {

@@ -3,6 +3,7 @@
 
 export * from './ops/concepts';
 export * from './ops/deletion';
+export * from './ops/layout';
 export * from './ops/movement';
 export * from './ops/style';
 export * from './ops/view';

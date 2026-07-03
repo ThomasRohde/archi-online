@@ -15,19 +15,47 @@ import {
   addView,
   deleteItems,
   deleteViewObjects,
+  layoutView,
   renameItem,
   resizeNode,
+  setConnectionBendpoints,
   setDocumentation,
   setNodeStyle,
   setProperties,
   setRelationshipAttrs,
 } from '../../model/ops';
 import { openView } from '../../model/store';
-import type { Concept, Property } from '../../model/types';
+import {
+  absoluteBounds as modelAbsoluteBounds,
+  centerOf,
+  type Bendpoint,
+  type Bounds,
+  type Concept,
+  type DiagramConnection,
+  type ModelState,
+  type Property,
+} from '../../model/types';
+import { useSettingsStore } from '../../settings/app-settings';
+import { bendpointPositions, toRelativeBendpoint } from '../../canvas/geometry';
 import { state } from './state';
 import { resolveType } from './type-resolution';
 
 export type JKind = 'element' | 'relationship' | 'view' | 'folder' | 'visual' | 'connection' | 'model';
+
+export interface JPoint {
+  x: number;
+  y: number;
+}
+
+export type JBounds = Bounds;
+
+export type JBendpoint = Bendpoint;
+
+export interface ViewLayoutInput {
+  nodes?: Record<string, Partial<JBounds>>;
+  connections?: Record<string, { route?: JPoint[]; bendpoints?: JBendpoint[] }>;
+  fitContent?: boolean;
+}
 
 export abstract class JObject {
   constructor(readonly id: string) {}
@@ -88,6 +116,101 @@ function propApi(target: { id: string }) {
       );
     },
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function finiteNumber(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${label} must be a finite number`);
+  }
+  return value;
+}
+
+function optionalFiniteNumber(
+  source: Record<string, unknown>,
+  key: keyof Bounds,
+  fallback: number,
+  label: string,
+): number {
+  if (!(key in source) || source[key] === undefined) return fallback;
+  return finiteNumber(source[key], `${label}.${key}`);
+}
+
+function validatePoint(value: unknown, label: string): JPoint {
+  if (!isRecord(value)) throw new Error(`${label} must be a point`);
+  return {
+    x: finiteNumber(value.x, `${label}.x`),
+    y: finiteNumber(value.y, `${label}.y`),
+  };
+}
+
+function validatePointArray(value: unknown, label: string): JPoint[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  return value.map((point, index) => validatePoint(point, `${label}[${index}]`));
+}
+
+function validateBendpoint(value: unknown, label: string): Bendpoint {
+  if (!isRecord(value)) throw new Error(`${label} must be a bendpoint`);
+  return {
+    startX: finiteNumber(value.startX, `${label}.startX`),
+    startY: finiteNumber(value.startY, `${label}.startY`),
+    endX: finiteNumber(value.endX, `${label}.endX`),
+    endY: finiteNumber(value.endY, `${label}.endY`),
+  };
+}
+
+function validateBendpointArray(value: unknown, label: string): Bendpoint[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  return value.map((bp, index) => validateBendpoint(bp, `${label}[${index}]`));
+}
+
+function assertViewConnection(
+  m: ModelState,
+  viewId: string,
+  connectionId: string,
+): DiagramConnection {
+  const conn = m.connections[connectionId];
+  if (!conn || conn.viewId !== viewId) {
+    throw new Error(`Connection ${connectionId} is not in view ${viewId}`);
+  }
+  return conn;
+}
+
+function connectionEndpointCenters(
+  m: ModelState,
+  conn: DiagramConnection,
+  boundsForNode: (nodeId: string) => Bounds,
+): { source: JPoint; target: JPoint } {
+  if (!m.nodes[conn.sourceId] || !m.nodes[conn.targetId]) {
+    throw new Error(`Connection ${conn.id} has a missing endpoint`);
+  }
+  return {
+    source: centerOf(boundsForNode(conn.sourceId)),
+    target: centerOf(boundsForNode(conn.targetId)),
+  };
+}
+
+function absoluteRouteForConnection(
+  m: ModelState,
+  conn: DiagramConnection,
+  boundsForNode: (nodeId: string) => Bounds = (nodeId) => modelAbsoluteBounds(m, nodeId),
+): JPoint[] {
+  const centers = connectionEndpointCenters(m, conn, boundsForNode);
+  return bendpointPositions(conn.bendpoints, centers.source, centers.target)
+    .map((point) => ({ x: point.x, y: point.y }));
+}
+
+function routeToBendpoints(
+  m: ModelState,
+  conn: DiagramConnection,
+  points: JPoint[],
+  boundsForNode: (nodeId: string) => Bounds = (nodeId) => modelAbsoluteBounds(m, nodeId),
+): Bendpoint[] {
+  const centers = connectionEndpointCenters(m, conn, boundsForNode);
+  return points.map((point) => toRelativeBendpoint(point, centers.source, centers.target));
 }
 
 export class JConcept extends JObject {
@@ -284,6 +407,153 @@ export class JView extends JObject {
     throw new Error(`Unsupported view object type: ${type}`);
   }
 
+  nodes(options?: { recursive?: boolean }): JVisual[] {
+    const m = state();
+    const view = this.view();
+    const recursive = options?.recursive ?? false;
+    const ids: string[] = [];
+    const collect = (childIds: string[]) => {
+      for (const id of childIds) {
+        const node = m.nodes[id];
+        if (!node) continue;
+        ids.push(id);
+        if (recursive) collect(node.childIds);
+      }
+    };
+    collect(view.childIds);
+    return ids.map((id) => new JVisual(id));
+  }
+
+  connections(): JConnection[] {
+    return Object.values(state().connections)
+      .filter((conn) => conn.viewId === this.id)
+      .map((conn) => new JConnection(conn.id));
+  }
+
+  bounds(options?: { recursive?: boolean }): JBounds | null {
+    const m = state();
+    const nodes = this.nodes({ recursive: options?.recursive ?? true });
+    if (nodes.length === 0) return null;
+    let union: Bounds | null = null;
+    for (const node of nodes) {
+      const bounds = modelAbsoluteBounds(m, node.id);
+      if (!union) {
+        union = { ...bounds };
+      } else {
+        const x1 = Math.min(union.x, bounds.x);
+        const y1 = Math.min(union.y, bounds.y);
+        const x2 = Math.max(union.x + union.width, bounds.x + bounds.width);
+        const y2 = Math.max(union.y + union.height, bounds.y + bounds.height);
+        union = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+      }
+    }
+    return union;
+  }
+
+  layout(layout: ViewLayoutInput): void {
+    if (!isRecord(layout)) throw new Error('view.layout(layout) expects an object');
+    const m = state();
+    this.view();
+    const minNodeSize = useSettingsStore.getState().settings.minNodeSize;
+    const nodeInputs = layout.nodes ?? {};
+    const connectionInputs = layout.connections ?? {};
+    if (!isRecord(nodeInputs)) throw new Error('view.layout nodes must be an object');
+    if (!isRecord(connectionInputs)) throw new Error('view.layout connections must be an object');
+
+    const absoluteUpdates = new Map<string, Bounds>();
+    for (const [nodeId, patch] of Object.entries(nodeInputs)) {
+      const node = m.nodes[nodeId];
+      if (!node || node.viewId !== this.id) {
+        throw new Error(`Node ${nodeId} is not in view ${this.id}`);
+      }
+      if (!isRecord(patch)) throw new Error(`Node layout for ${nodeId} must be an object`);
+      const current = modelAbsoluteBounds(m, nodeId);
+      const width = Math.max(
+        minNodeSize,
+        optionalFiniteNumber(patch, 'width', current.width, `nodes.${nodeId}`),
+      );
+      const height = Math.max(
+        minNodeSize,
+        optionalFiniteNumber(patch, 'height', current.height, `nodes.${nodeId}`),
+      );
+      absoluteUpdates.set(nodeId, {
+        x: optionalFiniteNumber(patch, 'x', current.x, `nodes.${nodeId}`),
+        y: optionalFiniteNumber(patch, 'y', current.y, `nodes.${nodeId}`),
+        width,
+        height,
+      });
+    }
+
+    const absoluteCache = new Map<string, Bounds>();
+    const finalAbsoluteBounds = (nodeId: string): Bounds => {
+      const updated = absoluteUpdates.get(nodeId);
+      if (updated) return updated;
+      const cached = absoluteCache.get(nodeId);
+      if (cached) return cached;
+      const node = m.nodes[nodeId];
+      if (!node) throw new Error(`Node ${nodeId} no longer exists`);
+      const bounds =
+        node.parentId === node.viewId
+          ? { ...node.bounds }
+          : {
+              x: finalAbsoluteBounds(node.parentId).x + node.bounds.x,
+              y: finalAbsoluteBounds(node.parentId).y + node.bounds.y,
+              width: node.bounds.width,
+              height: node.bounds.height,
+            };
+      absoluteCache.set(nodeId, bounds);
+      return bounds;
+    };
+
+    const connectionUpdates = Object.entries(connectionInputs).flatMap(([connectionId, patch]) => {
+      const conn = assertViewConnection(m, this.id, connectionId);
+      if (!isRecord(patch)) throw new Error(`Connection layout for ${connectionId} must be an object`);
+      const hasRoute = Object.hasOwn(patch, 'route') && patch.route !== undefined;
+      const hasBendpoints = Object.hasOwn(patch, 'bendpoints') && patch.bendpoints !== undefined;
+      if (hasRoute && hasBendpoints) {
+        throw new Error(`Connection ${connectionId} cannot specify both route and bendpoints`);
+      }
+      if (hasRoute) {
+        return [{
+          id: connectionId,
+          bendpoints: routeToBendpoints(
+            m,
+            conn,
+            validatePointArray(patch.route, `connections.${connectionId}.route`),
+            finalAbsoluteBounds,
+          ),
+        }];
+      }
+      if (hasBendpoints) {
+        return [{
+          id: connectionId,
+          bendpoints: validateBendpointArray(
+            patch.bendpoints,
+            `connections.${connectionId}.bendpoints`,
+          ),
+        }];
+      }
+      return [];
+    });
+
+    const nodeUpdates = [...absoluteUpdates.entries()].map(([nodeId, bounds]) => {
+      const node = m.nodes[nodeId]!;
+      const parentBounds =
+        node.parentId === node.viewId ? { x: 0, y: 0 } : finalAbsoluteBounds(node.parentId);
+      return {
+        id: nodeId,
+        bounds: {
+          x: bounds.x - parentBounds.x,
+          y: bounds.y - parentBounds.y,
+          width: bounds.width,
+          height: bounds.height,
+        },
+      };
+    });
+
+    layoutView(nodeUpdates, connectionUpdates);
+  }
+
   openInUI(): void {
     openView(this.id);
   }
@@ -362,6 +632,38 @@ export class JVisual extends JObject {
       width: b.width ?? cur.width,
       height: b.height ?? cur.height,
     });
+  }
+
+  parent(): JView | JVisual {
+    const n = this.node();
+    return n.parentId === n.viewId ? new JView(n.viewId) : new JVisual(n.parentId);
+  }
+
+  children(): JVisual[] {
+    return this.node().childIds
+      .filter((id) => !!state().nodes[id])
+      .map((id) => new JVisual(id));
+  }
+
+  absoluteBounds(): JBounds {
+    return modelAbsoluteBounds(state(), this.id);
+  }
+
+  connections(options?: { incoming?: boolean; outgoing?: boolean }): JConnection[] {
+    const n = this.node();
+    const includeIncoming = options?.incoming ?? true;
+    const includeOutgoing = options?.outgoing ?? true;
+    const ids: string[] = [];
+    if (includeOutgoing) ids.push(...n.sourceConnectionIds);
+    if (includeIncoming) ids.push(...n.targetConnectionIds);
+    const seen = new Set<string>();
+    return ids
+      .filter((id) => {
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return !!state().connections[id];
+      })
+      .map((id) => new JConnection(id));
   }
 
   get fillColor(): string | undefined {
@@ -461,6 +763,31 @@ export class JConnection extends JObject {
 
   set lineColor(v: string | undefined) {
     setNodeStyle([this.id], { lineColor: v });
+  }
+
+  get bendpoints(): JBendpoint[] {
+    return this.conn().bendpoints.map((bp) => ({ ...bp }));
+  }
+
+  set bendpoints(value: JBendpoint[]) {
+    setConnectionBendpoints(this.id, validateBendpointArray(value, `connection.${this.id}.bendpoints`));
+  }
+
+  absoluteRoute(): JPoint[] {
+    const m = state();
+    return absoluteRouteForConnection(m, this.conn());
+  }
+
+  setAbsoluteRoute(points: JPoint[]): void {
+    const m = state();
+    setConnectionBendpoints(
+      this.id,
+      routeToBendpoints(
+        m,
+        this.conn(),
+        validatePointArray(points, `connection.${this.id}.route`),
+      ),
+    );
   }
 
   delete(): void {

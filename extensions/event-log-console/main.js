@@ -14,7 +14,7 @@ function readEvents() {
 function simplify(payload) {
   try {
     return JSON.stringify(payload);
-  } catch (error) {
+  } catch {
     return String(payload);
   }
 }

@@ -11,7 +11,7 @@ var auditPanel = null;
 function collection(selector) {
   try {
     return $(selector);
-  } catch (error) {
+  } catch {
     return null;
   }
 }

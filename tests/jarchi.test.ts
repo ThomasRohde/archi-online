@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createEmptyModel } from '../src/model/ops';
+import {
+  addConnectionToView,
+  addElement,
+  addElementNodeToView,
+  addGroupToView,
+  addRelationship,
+  addView,
+  createEmptyModel,
+} from '../src/model/ops';
 import { replaceModel, undo, useStore } from '../src/model/store';
+import { JView } from '../src/scripting/jarchi';
 import { JARCHI_CAPABILITY_TEST_SCRIPT } from '../src/scripting/example-scripts';
 import { runScript, type ConsoleEntry } from '../src/scripting/runner';
 
@@ -148,6 +157,151 @@ describe('jArchi scripting API', () => {
     expect(nodes).toHaveLength(2);
     const child = nodes.find((n) => n.parentId !== n.viewId)!;
     expect(child.bounds).toEqual({ x: 10, y: 40, width: 100, height: 40 });
+  });
+
+  it('exposes diagram automation traversal helpers', () => {
+    const { logs, error } = run(`
+      var actor = model.createElement("business-actor", "Actor");
+      var role = model.createElement("business-role", "Role");
+      var rel = model.createRelationship("assignment-relationship", "assigned", actor, role);
+      var view = model.createArchimateView("Main");
+      var group = view.createObject("group", 100, 80, 300, 150);
+      group.name = "Container";
+      var actorNode = group.add(actor, 10, 20, 120, 55);
+      var roleNode = view.add(role, 400, 100, 120, 55);
+      var conn = view.add(rel, actorNode, roleNode);
+      var viewBounds = view.bounds({ recursive: true });
+
+      console.log(view.nodes().length, view.nodes({ recursive: true }).length, view.connections().length);
+      console.log(actorNode.parent().id === group.id, group.children().length, actorNode.absoluteBounds().x, actorNode.absoluteBounds().y);
+      console.log(actorNode.connections().length, roleNode.connections({ outgoing: false }).length, actorNode.connections({ incoming: false }).length);
+      console.log(viewBounds.x, viewBounds.y, viewBounds.width, viewBounds.height);
+      console.log(conn.source.id === actorNode.id, conn.target.id === roleNode.id);
+    `);
+
+    expect(error).toBeUndefined();
+    expect(logs).toEqual([
+      'log:2 3 1',
+      'log:true 1 110 100',
+      'log:1 1 1',
+      'log:100 80 420 150',
+      'log:true true',
+    ]);
+  });
+
+  it('supports raw bendpoints and absolute connection routes', () => {
+    const { logs, error } = run(`
+      var source = model.createElement("application-component", "Source");
+      var target = model.createElement("application-service", "Target");
+      var rel = model.createRelationship("realization-relationship", "realizes", source, target);
+      var view = model.createArchimateView("Routes");
+      var sourceNode = view.add(source, 10, 20, 100, 50);
+      var targetNode = view.add(target, 310, 220, 100, 50);
+      var conn = view.add(rel, sourceNode, targetNode);
+
+      conn.bendpoints = [{ startX: 10, startY: 20, endX: -30, endY: 40 }];
+      console.log(conn.bendpoints.length, conn.bendpoints[0].startX, conn.bendpoints[0].endY);
+
+      conn.setAbsoluteRoute([{ x: 180, y: 130 }, { x: 220, y: 160 }]);
+      var route = conn.absoluteRoute();
+      console.log(route.length, Math.round(route[0].x), Math.round(route[0].y), Math.round(route[1].x), Math.round(route[1].y));
+
+      conn.setAbsoluteRoute([]);
+      console.log(conn.bendpoints.length, conn.absoluteRoute().length);
+    `);
+
+    expect(error).toBeUndefined();
+    expect(logs).toEqual([
+      'log:1 10 40',
+      'log:2 180 130 220 160',
+      'log:0 0',
+    ]);
+  });
+
+  it('applies bulk view layout with absolute bounds and routes in one transaction', () => {
+    const actor = addElement('BusinessActor', 'Actor');
+    const role = addElement('BusinessRole', 'Role');
+    const rel = addRelationship('AssignmentRelationship', actor, role)!;
+    const viewId = addView('Layout');
+    const groupId = addGroupToView(viewId, viewId, { x: 100, y: 100, width: 300, height: 200 }, 'Container');
+    const actorNodeId = addElementNodeToView(
+      viewId,
+      actor,
+      groupId,
+      { x: 10, y: 10, width: 120, height: 55 },
+      false,
+    );
+    const roleNodeId = addElementNodeToView(
+      viewId,
+      role,
+      viewId,
+      { x: 500, y: 100, width: 120, height: 55 },
+      false,
+    );
+    const connId = addConnectionToView(viewId, rel, actorNodeId, roleNodeId);
+    const undoBefore = useStore.getState().undoStack.length;
+
+    new JView(viewId).layout({
+      nodes: {
+        [groupId]: { x: 40, y: 50, width: 320, height: 180 },
+        [actorNodeId]: { x: 70, y: 85, width: 140 },
+        [roleNodeId]: { x: 300, y: 90, height: 60 },
+      },
+      connections: {
+        [connId]: { route: [{ x: 220, y: 100 }] },
+      },
+    });
+
+    const m = model();
+    expect(m.nodes[groupId].bounds).toEqual({ x: 40, y: 50, width: 320, height: 180 });
+    expect(m.nodes[actorNodeId].bounds).toEqual({ x: 30, y: 35, width: 140, height: 55 });
+    expect(m.nodes[roleNodeId].bounds).toEqual({ x: 300, y: 90, width: 120, height: 60 });
+    const route = new JView(viewId).connections()[0].absoluteRoute();
+    expect(route[0].x).toBeCloseTo(220);
+    expect(route[0].y).toBeCloseTo(100.25);
+    expect(useStore.getState().undoStack).toHaveLength(undoBefore + 1);
+    expect(useStore.getState().undoStack.at(-1)?.label).toBe('Layout View');
+  });
+
+  it('rejects invalid bulk layout input without partial mutation', () => {
+    const actor = addElement('BusinessActor', 'Actor');
+    const role = addElement('BusinessRole', 'Role');
+    const rel = addRelationship('AssignmentRelationship', actor, role)!;
+    const viewId = addView('Layout');
+    const otherViewId = addView('Other');
+    const actorNodeId = addElementNodeToView(
+      viewId,
+      actor,
+      viewId,
+      { x: 10, y: 10, width: 120, height: 55 },
+      false,
+    );
+    const roleNodeId = addElementNodeToView(
+      viewId,
+      role,
+      viewId,
+      { x: 300, y: 10, width: 120, height: 55 },
+      false,
+    );
+    const otherNodeId = addElementNodeToView(
+      otherViewId,
+      actor,
+      otherViewId,
+      { x: 1, y: 1, width: 120, height: 55 },
+      false,
+    );
+    const connId = addConnectionToView(viewId, rel, actorNodeId, roleNodeId);
+    const before = model();
+    const view = new JView(viewId);
+
+    expect(() => view.layout({ nodes: { [otherNodeId]: { x: 99 } } })).toThrow(/not in view/);
+    expect(() =>
+      view.layout({ connections: { [connId]: { route: [{ x: Number.NaN, y: 5 }] } } }),
+    ).toThrow(/finite/);
+    expect(() =>
+      view.layout({ connections: { [connId]: { route: [], bendpoints: [] } } }),
+    ).toThrow(/route.*bendpoints/);
+    expect(model()).toEqual(before);
   });
 
   it('supports exit() and reports script errors', () => {
