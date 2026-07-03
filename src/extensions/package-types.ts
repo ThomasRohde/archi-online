@@ -65,6 +65,7 @@ export interface ExtensionPackageInfo {
   version: string;
   description?: string;
   main: string;
+  contributes?: ExtensionManifestV2['contributes'];
   files: string[];
   installedAt: number;
   updatedAt: number;

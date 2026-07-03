@@ -14,6 +14,7 @@ import {
   flattenInstalledPackage,
   makeInstalledPackage,
   normalizePackagePath,
+  packageInfo,
   readPackageJsonFile,
   readPackageTextFile,
 } from '../src/extensions/package-validation';
@@ -21,6 +22,10 @@ import { createExtensionRegistry } from '../src/extensions/registry';
 import { reloadEnabledExtensions } from '../src/extensions/runtime';
 import { createExtensionRecord, useExtensionStore } from '../src/extensions/extension-store';
 import type { InstalledExtensionPackage } from '../src/extensions/package-types';
+import {
+  packageConversionWarning,
+  packageImportWarning,
+} from '../src/extensions/package-conversion';
 
 function packageFixture(now = 100): InstalledExtensionPackage {
   return makeInstalledPackage({
@@ -67,6 +72,17 @@ function storage(initial?: string) {
     },
     setItem(key: string, value: string) {
       data.set(key, value);
+    },
+  };
+}
+
+function throwingStorage() {
+  return {
+    getItem() {
+      return null;
+    },
+    setItem() {
+      throw new DOMException('quota exceeded', 'QuotaExceededError');
     },
   };
 }
@@ -129,6 +145,38 @@ describe('extension package validation', () => {
     expect(readPackageJsonFile(pkg, 'data/config.json')).toEqual({ threshold: 7 });
   });
 
+  it('exposes static contribution metadata in package info', () => {
+    const pkg = makeInstalledPackage({
+      manifest: {
+        schemaVersion: 2,
+        id: 'local.contributes',
+        name: 'Contributes',
+        version: '1.0.0',
+        main: 'main.js',
+        contributes: {
+          commands: [{ id: 'local.contributes.run', title: 'Run' }],
+          events: [{ name: 'selection.changed' }],
+        },
+      },
+      files: {
+        'manifest.json': {
+          encoding: 'utf8',
+          content: '{}',
+        },
+        'main.js': {
+          encoding: 'utf8',
+          content: 'app.extension({ id: "local.contributes", name: "Contributes", version: "1.0.0" });',
+        },
+      },
+      now: 1,
+    });
+
+    expect(packageInfo(pkg).contributes).toEqual({
+      commands: [{ id: 'local.contributes.run', title: 'Run' }],
+      events: [{ name: 'selection.changed' }],
+    });
+  });
+
   it('rejects invalid manifests and missing main files', () => {
     expect(() =>
       makeInstalledPackage({
@@ -173,6 +221,14 @@ describe('extension package store and runtime loading', () => {
     expect(loadInstalledPackages(storage('{broken'))).toEqual([]);
   });
 
+  it('surfaces localStorage persistence failures', () => {
+    const pkg = packageFixture();
+
+    expect(() => persistInstalledPackages([pkg], throwingStorage())).toThrow(
+      /Could not persist extension packages/,
+    );
+  });
+
   it('ignores unknown persisted fields and invalid package entries', () => {
     const pkg = packageFixture();
     const raw = JSON.stringify([
@@ -193,9 +249,39 @@ describe('extension package store and runtime loading', () => {
       'local.audit-tools.count',
     ]);
   });
+
+  it('falls back to an enabled package when a same-id source override is disabled', () => {
+    const registry = createExtensionRegistry();
+    const pkg = packageFixture();
+    useExtensionStore.getState().setExtensions([
+      {
+        id: pkg.id,
+        name: 'Disabled override',
+        version: '0.1.0',
+        enabled: false,
+        source: 'throw new Error("disabled source should not load");',
+        createdAt: 1,
+        updatedAt: 1,
+        origin: 'override',
+      },
+    ]);
+    useExtensionPackageStore.getState().setPackages([pkg]);
+
+    reloadEnabledExtensions(registry);
+
+    expect(registry.getSnapshot().commands.map((command) => command.id)).toEqual([
+      'local.audit-tools.count',
+    ]);
+  });
 });
 
 describe('extension package archives', () => {
+  it('rejects oversized compressed archives before decompression', async () => {
+    await expect(readExtensionArchive(new Uint8Array(20_000_001))).rejects.toThrow(
+      /Package archive is too large/,
+    );
+  });
+
   it('round trips installed package archives', async () => {
     const pkg = packageFixture();
 
@@ -222,5 +308,18 @@ describe('extension package archives', () => {
       main: 'main.js',
     });
     expect(readPackageTextFile(imported, 'main.js')).toBe(source.source);
+  });
+});
+
+describe('extension package conversion', () => {
+  it('warns when converting a package would drop bundled assets', () => {
+    expect(packageConversionWarning(packageFixture())).toContain('1 bundled file will be lost');
+  });
+
+  it('warns that imported packages run trusted code', () => {
+    expect(packageImportWarning(packageFixture(), false)).toContain(
+      'Extensions run with full access',
+    );
+    expect(packageImportWarning(packageFixture(), true)).toContain('Replace the existing');
   });
 });

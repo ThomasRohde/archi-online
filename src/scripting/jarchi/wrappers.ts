@@ -54,7 +54,6 @@ export type JBendpoint = Bendpoint;
 export interface ViewLayoutInput {
   nodes?: Record<string, Partial<JBounds>>;
   connections?: Record<string, { route?: JPoint[]; bendpoints?: JBendpoint[] }>;
-  fitContent?: boolean;
 }
 
 export abstract class JObject {

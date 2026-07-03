@@ -463,6 +463,105 @@ describe('extension app API and runtime', () => {
       bounds: { x: 80, y: 90, width: 160, height: 70 },
     });
   });
+
+  it('clears partial registrations when a source extension fails to load', () => {
+    const registry = createExtensionRegistry();
+    const record = {
+      id: 'local.partial',
+      name: 'Partial',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.partial.before-error", { title: "Before", run() {} });
+        throw new Error("load failed");
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    expect(runExtensionRecord(record, registry).error).toMatch(/load failed/);
+
+    expect(registry.getSnapshot().commands).toEqual([]);
+  });
+
+  it('forwards extension console output to the browser console with an extension prefix', () => {
+    const registry = createExtensionRegistry();
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const record = {
+      id: 'local.logs',
+      name: 'Logs',
+      version: '0.1.0',
+      enabled: true,
+      source: 'console.log("ready", 7);',
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    expect(runExtensionRecord(record, registry)).toEqual({});
+
+    expect(spy).toHaveBeenCalledWith('[ext:local.logs]', 'ready 7');
+    spy.mockRestore();
+  });
+
+  it('provides dialog window shims to extension source code', () => {
+    const registry = createExtensionRegistry();
+    const spy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    const record = {
+      id: 'local.window-shim',
+      name: 'Window Shim',
+      version: '0.1.0',
+      enabled: true,
+      source: 'window.alert("hello");',
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    expect(runExtensionRecord(record, registry)).toEqual({});
+
+    expect(spy).toHaveBeenCalledWith('hello');
+    spy.mockRestore();
+  });
+
+  it('batches top-level extension load model mutations into one undo step', () => {
+    replaceModel(createEmptyModel('Load Batch'), null);
+    const registry = createExtensionRegistry();
+    const record = {
+      id: 'local.load-batch',
+      name: 'Load Batch',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        model.createElement("BusinessActor", "Actor");
+        model.createElement("BusinessRole", "Role");
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    expect(runExtensionRecord(record, registry)).toEqual({});
+
+    expect(useStore.getState().undoStack.map((tx) => tx.label)).toEqual([
+      'Extension load: Load Batch',
+    ]);
+  });
+
+  it('records command errors without rejecting callers', async () => {
+    const registry = createExtensionRegistry();
+    registry.registerCommand('local.broken-command', {
+      id: 'local.broken-command.fail',
+      title: 'Fail',
+      run: () => {
+        throw new Error('command failed');
+      },
+    });
+
+    await expect(registry.runCommand('local.broken-command.fail')).resolves.toBeUndefined();
+
+    expect(registry.getSnapshot().errors[0]).toMatchObject({
+      extensionId: 'local.broken-command',
+      message: 'Error: command failed',
+    });
+  });
 });
 
 describe('extension events', () => {
@@ -501,5 +600,19 @@ describe('extension events', () => {
     expect(count).toBe(1);
     vi.useRealTimers();
     useStore.setState({ model: null });
+  });
+
+  it('lets extensions unregister event handlers', async () => {
+    const registry = createExtensionRegistry();
+    let count = 0;
+    const handler = () => {
+      count += 1;
+    };
+    registry.onEvent('local.audit', 'app.ready', handler);
+    registry.offEvent('local.audit', 'app.ready', handler);
+
+    await registry.emitEvent('app.ready');
+
+    expect(count).toBe(0);
   });
 });

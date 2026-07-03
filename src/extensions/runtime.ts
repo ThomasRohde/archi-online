@@ -1,4 +1,5 @@
 import { createJArchiGlobals, JCollection } from '../scripting/jarchi';
+import { runBatch } from '../model/store';
 import type { ConsoleEntry } from '../scripting/runner';
 import { createAppApi } from './app-api';
 import { useExtensionStore } from './extension-store';
@@ -45,6 +46,8 @@ function extensionConsole(
   const emit = (level: ConsoleEntry['level'], args: unknown[]) => {
     const entry = { level, text: args.map(fmt).join(' '), time: Date.now() };
     onConsole?.(entry);
+    const target = globalThis.console?.[level] ?? globalThis.console?.log;
+    target?.call(globalThis.console, `[ext:${extensionId}]`, entry.text);
     if (level === 'error') registry.recordError(extensionId, entry.text);
   };
   return {
@@ -54,6 +57,14 @@ function extensionConsole(
     info: (...args: unknown[]) => emit('info', args),
     show: () => {},
     clear: () => onConsole?.({ level: 'info', text: '\u0000clear', time: Date.now() }),
+  };
+}
+
+function extensionWindow() {
+  return {
+    alert: (message: unknown) => window.alert(fmt(message)),
+    confirm: (message: unknown) => window.confirm(fmt(message)),
+    prompt: (message: unknown, def?: string) => window.prompt(fmt(message), def),
   };
 }
 
@@ -82,11 +93,14 @@ export function runExtensionRecord(
       'exit',
       `"use strict";\n${record.source}`,
     );
-    fn($, model, app, extensionConsole(record.id, registry, onConsole), {}, exit);
+    runBatch(`Extension load: ${record.name}`, () => {
+      fn($, model, app, extensionConsole(record.id, registry, onConsole), extensionWindow(), exit);
+    });
     return {};
   } catch (error) {
     if (error instanceof ExtensionExitSignal) return {};
     const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    registry.clearExtension(record.id);
     registry.recordError(record.id, error);
     return { error: message };
   }
@@ -106,8 +120,10 @@ export function reloadEnabledExtensions(registry: ExtensionRegistry = extensionR
   registry.clearAll();
   const sourceIds = new Set<string>();
   for (const record of useExtensionStore.getState().extensions) {
-    sourceIds.add(record.id);
-    if (record.enabled) runExtensionRecord(record, registry);
+    if (record.enabled) {
+      sourceIds.add(record.id);
+      runExtensionRecord(record, registry);
+    }
   }
   for (const pkg of useExtensionPackageStore.getState().packages) {
     if (pkg.enabled && !sourceIds.has(pkg.id)) runInstalledPackage(pkg, registry);

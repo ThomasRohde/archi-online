@@ -221,6 +221,9 @@ export function createAppApi(
       on(name: ExtensionEventName, handler: ExtensionEventHandler) {
         registry.onEvent(extensionId, name, handler);
       },
+      off(name: ExtensionEventName, handler: ExtensionEventHandler) {
+        registry.offEvent(extensionId, name, handler);
+      },
     },
     storage: {
       get(key: string) {

@@ -12,11 +12,11 @@ node extensions/build-archives.mjs
 
 The generated archives are written to `extensions/dist/`:
 
-- `local.model-audit-dashboard-0.1.0.archi-ext`
-- `local.selection-workbench-0.1.0.archi-ext`
-- `local.package-showcase-0.1.0.archi-ext`
-- `local.event-log-console-0.1.0.archi-ext`
-- `local.elk-layout-0.1.0.archi-ext`
+- `examples.model-audit-dashboard-0.1.0.archi-ext`
+- `examples.selection-workbench-0.1.0.archi-ext`
+- `examples.package-showcase-0.1.0.archi-ext`
+- `examples.event-log-console-0.1.0.archi-ext`
+- `examples.elk-layout-0.1.0.archi-ext`
 
 Use the app's Extensions panel to import the generated archive files.
 

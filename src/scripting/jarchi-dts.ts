@@ -1,5 +1,5 @@
 /** Type declarations injected into Monaco for script IntelliSense. */
-export const JARCHI_DTS = `
+export const JARCHI_SCRIPT_DTS = `
 declare interface JObject {
   readonly id: string;
   readonly type: string;
@@ -67,7 +67,6 @@ declare interface JView extends JObject {
   layout(layout: {
     nodes?: Record<string, Partial<JBounds>>;
     connections?: Record<string, { route?: JPoint[]; bendpoints?: JBendpoint[] }>;
-    fitContent?: boolean;
   }): void;
   openInUI(): void;
 }
@@ -143,6 +142,10 @@ declare namespace $ {
   const model: JModel;
 }
 declare const model: JModel;
+declare function exit(): never;
+`;
+
+export const JARCHI_EXTENSION_DTS = `
 declare const app: {
   extension: {
     (meta: { id: string; name: string; version: string }): void;
@@ -227,6 +230,20 @@ declare const app: {
         | 'script.error',
       handler: (payload: unknown) => unknown,
     ): void;
+    off(
+      name:
+        | 'app.ready'
+        | 'model.opened'
+        | 'model.changed'
+        | 'model.saved'
+        | 'selection.changed'
+        | 'view.opened'
+        | 'view.activated'
+        | 'view.contextMenu'
+        | 'tree.contextMenu'
+        | 'script.error',
+      handler: (payload: unknown) => unknown,
+    ): void;
   };
   storage: {
     get(key: string): unknown;
@@ -240,5 +257,6 @@ declare const app: {
     current(): unknown;
   };
 };
-declare function exit(): never;
 `;
+
+export const JARCHI_DTS = JARCHI_SCRIPT_DTS;

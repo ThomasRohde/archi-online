@@ -14,3 +14,7 @@ storage:
 
 The extension contributes an Extensions menu item, active-view context menu item,
 selection context menu item, and a dockable panel.
+
+Version 0.1 lays out selected root visuals or top-level view visuals only.
+Connections whose endpoints are nested inside selected containers are not passed
+to ELK until recursive container layout is added.

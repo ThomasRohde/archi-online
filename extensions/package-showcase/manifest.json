@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "id": "local.package-showcase",
+  "id": "examples.package-showcase",
   "name": "Package Showcase",
   "version": "0.1.0",
   "description": "Demonstrates package manifest and bundled asset APIs.",
@@ -8,25 +8,25 @@
   "contributes": {
     "commands": [
       {
-        "id": "local.package-showcase.info",
+        "id": "examples.package-showcase.info",
         "title": "Show package info"
       },
       {
-        "id": "local.package-showcase.open",
+        "id": "examples.package-showcase.open",
         "title": "Open package showcase"
       }
     ],
     "menus": [
       {
-        "id": "local.package-showcase.menu.info",
+        "id": "examples.package-showcase.menu.info",
         "label": "Show package info",
-        "command": "local.package-showcase.info",
+        "command": "examples.package-showcase.info",
         "location": "extensions.menu"
       }
     ],
     "panels": [
       {
-        "id": "local.package-showcase.panel",
+        "id": "examples.package-showcase.panel",
         "title": "Package Showcase"
       }
     ]

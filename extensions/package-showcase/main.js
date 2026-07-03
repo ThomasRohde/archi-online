@@ -1,5 +1,5 @@
 app.extension({
-  id: 'local.package-showcase',
+  id: 'examples.package-showcase',
   name: 'Package Showcase',
   version: '0.1.0'
 });
@@ -10,7 +10,7 @@ var readme = app.assets.text('README.md');
 var showcase = app.assets.json('data/showcase.json');
 var imageUrl = app.assets.url('assets/showcase.svg');
 
-app.commands.register('local.package-showcase.info', {
+app.commands.register('examples.package-showcase.info', {
   title: 'Show package info',
   run: function () {
     return app.dialogs.info(
@@ -20,26 +20,26 @@ app.commands.register('local.package-showcase.info', {
   }
 });
 
-app.commands.register('local.package-showcase.open', {
+app.commands.register('examples.package-showcase.open', {
   title: 'Open package showcase',
   run: function () {
-    app.panels.show('local.package-showcase.panel');
+    app.panels.show('examples.package-showcase.panel');
   }
 });
 
 app.menus.addItem('extensions.menu', {
-  id: 'local.package-showcase.menu.info',
+  id: 'examples.package-showcase.menu.info',
   label: 'Show package info',
-  command: 'local.package-showcase.info'
+  command: 'examples.package-showcase.info'
 });
 
 app.toolbar.addButton({
-  id: 'local.package-showcase.toolbar',
+  id: 'examples.package-showcase.toolbar',
   label: 'Package',
-  command: 'local.package-showcase.open'
+  command: 'examples.package-showcase.open'
 });
 
-app.panels.register('local.package-showcase.panel', {
+app.panels.register('examples.package-showcase.panel', {
   title: 'Package Showcase',
   render: function (container) {
     container.replaceChildren();

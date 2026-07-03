@@ -25,7 +25,8 @@ The toolbar contains:
 - **Save** - save through a file handle or download fallback.
 - **Save As...** - choose a new save target.
 - **Undo** and **Redo** - model transactions.
-- **Extensions** - commands registered by extensions.
+- **Extensions** - extension menu items and commands not already shown in an
+  extension menu.
 - **Views** - show or reopen dock panels.
 - **?** - keyboard shortcut reference.
 
@@ -140,4 +141,3 @@ Related pages:
 - [[Scripting API|Scripting-API]]
 - [[Extension API|Extension-API]]
 - [[Extension Packages|Extension-Packages]]
-

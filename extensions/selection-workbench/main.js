@@ -1,5 +1,5 @@
 app.extension({
-  id: 'local.selection-workbench',
+  id: 'examples.selection-workbench',
   name: 'Selection Workbench',
   version: '0.1.0'
 });
@@ -86,7 +86,7 @@ app.events.on('selection.changed', function (payload) {
   recordSelection(payload && payload.source, payload && payload.ids);
 });
 
-app.commands.register('local.selection-workbench.describe', {
+app.commands.register('examples.selection-workbench.describe', {
   title: 'Describe current selection',
   run: function (context) {
     var ids = contextIds(context);
@@ -95,32 +95,32 @@ app.commands.register('local.selection-workbench.describe', {
   }
 });
 
-app.commands.register('local.selection-workbench.open', {
+app.commands.register('examples.selection-workbench.open', {
   title: 'Open selection workbench',
   run: function () {
-    app.panels.show('local.selection-workbench.panel');
+    app.panels.show('examples.selection-workbench.panel');
   }
 });
 
 app.menus.addItem('selection.context', {
-  id: 'local.selection-workbench.selection.describe',
+  id: 'examples.selection-workbench.selection.describe',
   label: 'Describe selection',
-  command: 'local.selection-workbench.describe'
+  command: 'examples.selection-workbench.describe'
 });
 
 app.menus.addItem('model-tree.context', {
-  id: 'local.selection-workbench.tree.describe',
+  id: 'examples.selection-workbench.tree.describe',
   label: 'Describe tree item',
-  command: 'local.selection-workbench.describe'
+  command: 'examples.selection-workbench.describe'
 });
 
 app.toolbar.addButton({
-  id: 'local.selection-workbench.toolbar',
+  id: 'examples.selection-workbench.toolbar',
   label: 'Selection',
-  command: 'local.selection-workbench.open'
+  command: 'examples.selection-workbench.open'
 });
 
-app.panels.register('local.selection-workbench.panel', {
+app.panels.register('examples.selection-workbench.panel', {
   title: 'Selection Workbench',
   render: function (container) {
     panel = container;

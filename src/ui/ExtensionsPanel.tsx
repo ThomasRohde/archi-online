@@ -9,7 +9,16 @@ import {
   createExtensionRecord,
   useExtensionStore,
 } from '../extensions/extension-store';
+import {
+  extensionDraftFromRecord,
+  hasExtensionDraftChanges,
+  type ExtensionDraft,
+} from '../extensions/extension-draft';
 import { useExtensionPackageStore } from '../extensions/package-store';
+import {
+  packageConversionWarning,
+  packageImportWarning,
+} from '../extensions/package-conversion';
 import {
   flattenInstalledPackage,
   packageInfo,
@@ -83,6 +92,22 @@ function downloadBlob(blob: Blob, fileName: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+function contributionSummary(info: ReturnType<typeof packageInfo>): string | null {
+  const contributes = info.contributes;
+  if (!contributes) return null;
+  const counts: [string, number][] = [
+    ['commands', contributes.commands?.length ?? 0],
+    ['menus', contributes.menus?.length ?? 0],
+    ['toolbar', contributes.toolbar?.length ?? 0],
+    ['panels', contributes.panels?.length ?? 0],
+    ['events', contributes.events?.length ?? 0],
+  ];
+  const parts = counts
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => `${count} ${label}`);
+  return parts.length > 0 ? `Declared contributions: ${parts.join(', ')}` : null;
+}
+
 export function ExtensionsPanel() {
   const extensions = useExtensionStore((s) => s.extensions);
   const upsert = useExtensionStore((s) => s.upsert);
@@ -98,9 +123,12 @@ export function ExtensionsPanel() {
   const [draftName, setDraftName] = useState('');
   const [draftVersion, setDraftVersion] = useState('0.1.0');
   const [draftSource, setDraftSource] = useState('');
+  const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
 
   const items = useMemo<ExtensionListItem[]>(() => {
-    const sourceIds = new Set(extensions.map((record) => record.id));
+    const enabledSourceIds = new Set(
+      extensions.filter((record) => record.enabled).map((record) => record.id),
+    );
     return [
       ...extensions.map((record) => ({
         key: `source:${record.id}`,
@@ -108,7 +136,7 @@ export function ExtensionsPanel() {
         record,
       }) satisfies ExtensionListItem),
       ...packages
-        .filter((pkg) => !sourceIds.has(pkg.id))
+        .filter((pkg) => !enabledSourceIds.has(pkg.id))
         .map((pkg) => ({
           key: `package:${pkg.id}`,
           origin: 'package',
@@ -121,6 +149,14 @@ export function ExtensionsPanel() {
   const current = items.find((item) => item.key === selectedKey) ?? items[0] ?? null;
   const currentRecord = current?.record ?? null;
   const currentPackageInfo = current?.packageRecord ? packageInfo(current.packageRecord) : null;
+  const currentDraftKey = current ? `${current.key}:${current.record.updatedAt}` : null;
+  const draft: ExtensionDraft = {
+    name: draftName,
+    version: draftVersion,
+    source: draftSource,
+  };
+  const draftDirty =
+    current?.origin !== 'package' && hasExtensionDraftChanges(currentRecord, draft);
   const currentErrors = useMemo(
     () => runtime.errors.filter((error) => error.extensionId === currentRecord?.id),
     [currentRecord?.id, runtime.errors],
@@ -130,15 +166,37 @@ export function ExtensionsPanel() {
     if (!current && items[0]) {
       setSelectedKey(items[0].key);
     } else if (current) {
-      setDraftName(current.record.name);
-      setDraftVersion(current.record.version);
-      setDraftSource(current.record.source);
+      if (loadedDraftKey !== currentDraftKey) {
+        const nextDraft = extensionDraftFromRecord(current.record);
+        setDraftName(nextDraft.name);
+        setDraftVersion(nextDraft.version);
+        setDraftSource(nextDraft.source);
+        setLoadedDraftKey(currentDraftKey);
+      }
     } else {
       setDraftName('');
       setDraftVersion('0.1.0');
       setDraftSource('');
+      setLoadedDraftKey(null);
     }
-  }, [current, items]);
+  }, [current, currentDraftKey, items, loadedDraftKey]);
+
+  const selectItem = (key: string) => {
+    if (key === selectedKey) return;
+    void (async () => {
+      if (draftDirty) {
+        const confirmed = await showConfirmDialog({
+          title: 'Discard extension edits?',
+          message: 'The current extension has unsaved changes.',
+          confirmLabel: 'Discard',
+          cancelLabel: 'Keep editing',
+          intent: 'danger',
+        });
+        if (!confirmed) return;
+      }
+      setSelectedKey(key);
+    })();
+  };
 
   const draftRecord = (): LocalExtensionRecord | null => {
     if (!currentRecord || current?.origin === 'package') return null;
@@ -212,19 +270,18 @@ export function ExtensionsPanel() {
         const pkg = await readExtensionArchive(file);
         const existingSource = extensions.find((record) => record.id === pkg.id);
         const existingPackage = packages.find((record) => record.id === pkg.id);
-        if (existingSource || existingPackage) {
-          const confirmed = await showConfirmDialog({
-            title: 'Replace extension?',
-            message: `Replace the existing "${pkg.id}" extension in this browser profile?`,
-            confirmLabel: 'Replace',
-            cancelLabel: 'Keep existing',
-            intent: 'danger',
-          });
-          if (!confirmed) return;
-        }
+        const replacing = !!(existingSource || existingPackage);
+        const confirmed = await showConfirmDialog({
+          title: replacing ? 'Replace extension?' : 'Install extension?',
+          message: packageImportWarning(pkg, replacing),
+          confirmLabel: replacing ? 'Replace' : 'Install',
+          cancelLabel: replacing ? 'Keep existing' : 'Cancel',
+          intent: replacing ? 'danger' : 'default',
+        });
+        if (!confirmed) return;
+        upsertPackage(pkg);
         extensionRegistry.clearExtension(pkg.id);
         if (existingSource) remove(existingSource.id);
-        upsertPackage(pkg);
         setSelectedKey(`package:${pkg.id}`);
         if (pkg.enabled) runInstalledPackage(pkg);
       } catch (error) {
@@ -258,7 +315,7 @@ export function ExtensionsPanel() {
     void (async () => {
       const confirmed = await showConfirmDialog({
         title: 'Convert to source?',
-        message: `Convert "${current.record.name}" into an editable local source extension?`,
+        message: packageConversionWarning(current.packageRecord),
         confirmLabel: 'Convert',
         cancelLabel: 'Keep package',
       });
@@ -336,7 +393,7 @@ export function ExtensionsPanel() {
           <button
             key={item.key}
             className={`extension-row ${item.key === current?.key ? 'active' : ''}`}
-            onClick={() => setSelectedKey(item.key)}
+            onClick={() => selectItem(item.key)}
           >
             <input
               type="checkbox"
@@ -427,6 +484,11 @@ export function ExtensionsPanel() {
                   {currentPackageInfo.description}
                 </div>
               )}
+              {contributionSummary(currentPackageInfo) && (
+                <div className="extension-package-description">
+                  {contributionSummary(currentPackageInfo)}
+                </div>
+              )}
               <div className="extension-package-files">
                 {currentPackageInfo.files.map((file) => (
                   <span key={file}>{file}</span>
@@ -444,6 +506,7 @@ export function ExtensionsPanel() {
               <MonacoEditor
                 value={draftSource}
                 readOnly={current.origin === 'package'}
+                extensionApi
                 onChange={current.origin === 'package' ? () => undefined : setDraftSource}
                 onRun={reload}
               />

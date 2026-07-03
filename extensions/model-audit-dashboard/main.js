@@ -1,5 +1,5 @@
 app.extension({
-  id: 'local.model-audit-dashboard',
+  id: 'examples.model-audit-dashboard',
   name: 'Model Audit Dashboard',
   version: '0.1.0'
 });
@@ -133,7 +133,7 @@ function renderAuditPanel() {
   auditPanel.appendChild(button);
 }
 
-app.commands.register('local.model-audit-dashboard.run', {
+app.commands.register('examples.model-audit-dashboard.run', {
   title: 'Run model audit',
   description: 'Count model content and store the latest audit result.',
   run: function () {
@@ -147,26 +147,26 @@ app.commands.register('local.model-audit-dashboard.run', {
   }
 });
 
-app.commands.register('local.model-audit-dashboard.open', {
+app.commands.register('examples.model-audit-dashboard.open', {
   title: 'Open audit dashboard',
   run: function () {
-    app.panels.show('local.model-audit-dashboard.panel');
+    app.panels.show('examples.model-audit-dashboard.panel');
   }
 });
 
 app.toolbar.addButton({
-  id: 'local.model-audit-dashboard.toolbar',
+  id: 'examples.model-audit-dashboard.toolbar',
   label: 'Audit',
-  command: 'local.model-audit-dashboard.open'
+  command: 'examples.model-audit-dashboard.open'
 });
 
 app.menus.addItem('extensions.menu', {
-  id: 'local.model-audit-dashboard.menu.run',
+  id: 'examples.model-audit-dashboard.menu.run',
   label: 'Run model audit',
-  command: 'local.model-audit-dashboard.run'
+  command: 'examples.model-audit-dashboard.run'
 });
 
-app.panels.register('local.model-audit-dashboard.panel', {
+app.panels.register('examples.model-audit-dashboard.panel', {
   title: 'Model Audit',
   render: function (container) {
     auditPanel = container;

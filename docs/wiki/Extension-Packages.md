@@ -20,6 +20,8 @@ node extensions/build-archives.mjs
 Generated archives are written to `extensions/dist/` and are ignored by Git.
 
 Import a generated `.archi-ext` file through the app's **Extensions** panel.
+Imports show a trust warning because packages run local extension code with full
+access to the current model and browser profile.
 
 ## Package Layout
 
@@ -40,7 +42,7 @@ assets/icon.svg
 ```json
 {
   "schemaVersion": 2,
-  "id": "local.model-audit-dashboard",
+  "id": "examples.model-audit-dashboard",
   "name": "Model Audit Dashboard",
   "version": "0.1.0",
   "description": "Counts model content and reports warnings.",
@@ -48,29 +50,29 @@ assets/icon.svg
   "contributes": {
     "commands": [
       {
-        "id": "local.model-audit-dashboard.run",
+        "id": "examples.model-audit-dashboard.run",
         "title": "Run model audit",
         "description": "Count model content and store the latest audit result."
       }
     ],
     "menus": [
       {
-        "id": "local.model-audit-dashboard.menu.run",
+        "id": "examples.model-audit-dashboard.menu.run",
         "label": "Run model audit",
-        "command": "local.model-audit-dashboard.run",
+        "command": "examples.model-audit-dashboard.run",
         "location": "extensions.menu"
       }
     ],
     "toolbar": [
       {
-        "id": "local.model-audit-dashboard.toolbar",
+        "id": "examples.model-audit-dashboard.toolbar",
         "label": "Audit",
-        "command": "local.model-audit-dashboard.run"
+        "command": "examples.model-audit-dashboard.run"
       }
     ],
     "panels": [
       {
-        "id": "local.model-audit-dashboard.panel",
+        "id": "examples.model-audit-dashboard.panel",
         "title": "Model Audit"
       }
     ],
@@ -97,6 +99,7 @@ Package import validates:
 - `manifest.json` must exist
 - the manifest `main` file must exist and be UTF-8 text
 - installed package records are bounded by file count and stored content size
+- oversized compressed archives are rejected before decompression
 
 ## Assets
 
@@ -119,10 +122,15 @@ The **Extensions** panel supports:
 - uninstalling imported packages
 - exporting installed packages
 - exporting source extensions as package archives
+- converting a package main file to editable source
 - reloading enabled extensions
 
 Source extensions remain editable in the browser. Package-owned extensions are
 loaded from imported package contents.
+
+Converting a package to source keeps only the package `main` file. The app warns
+when bundled files would be lost because `app.assets.*` only works for
+package-owned extensions.
 
 ## Example Packages
 
@@ -136,9 +144,10 @@ The repo includes these example packages:
   and SVG asset APIs.
 - `event-log-console` - event bridge listeners, event storage, panel rendering,
   and clear/open commands.
+- `elk-layout` - app-hosted ELK layout API usage, context-menu commands, a
+  dockable settings panel, packaged JSON defaults, and private storage.
 
 Related pages:
 
 - [[Extension API|Extension-API]]
 - [[Development|Development]]
-

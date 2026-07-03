@@ -111,17 +111,18 @@ export function showEmptyCanvasContextMenu({
     { label: 'Zoom 100% (Ctrl+0)', onClick: () => zoomTo(1) },
     { label: 'Fit to Window (Home)', onClick: fitToView },
   ];
-  const extensionItems = extensionMenuItems('view.context');
+  const trigger = {
+    x: clientX,
+    y: clientY,
+    viewId,
+  };
+  const extensionItems = extensionMenuItems('view.context', trigger);
   showContextMenu(
     clientX,
     clientY,
     extensionItems.length > 0 ? [...items, SEPARATOR, ...extensionItems] : items,
   );
-  void extensionRegistry.emitEvent('view.contextMenu', {
-    x: clientX,
-    y: clientY,
-    viewId,
-  });
+  void extensionRegistry.emitEvent('view.contextMenu', trigger);
 }
 
 export function showViewObjectContextMenu({
@@ -178,17 +179,18 @@ export function showViewObjectContextMenu({
       onClick: () => deleteItems(conceptIds),
     });
   }
-  const extensionItems = extensionMenuItems('selection.context');
-  showContextMenu(
-    clientX,
-    clientY,
-    extensionItems.length > 0 ? [...items, SEPARATOR, ...extensionItems] : items,
-  );
-  void extensionRegistry.emitEvent('view.contextMenu', {
+  const trigger = {
     x: clientX,
     y: clientY,
     viewId,
     targetId: id,
     selectionIds: ids,
-  });
+  };
+  const extensionItems = extensionMenuItems('selection.context', trigger);
+  showContextMenu(
+    clientX,
+    clientY,
+    extensionItems.length > 0 ? [...items, SEPARATOR, ...extensionItems] : items,
+  );
+  void extensionRegistry.emitEvent('view.contextMenu', trigger);
 }

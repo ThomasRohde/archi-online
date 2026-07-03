@@ -112,7 +112,17 @@ Command context:
 }
 ```
 
-Command mutations are batched into one undo step by the extension registry.
+Synchronous command mutations are batched into one undo step by the extension
+registry. If a command awaits a dialog, network call, dynamic import, or other
+promise, mutations after that await run as normal model operations. To keep an
+async command to one undo step, collect data first and then perform model
+mutations together in one synchronous block.
+
+Commands reached from context-menu locations receive the right-click payload in
+`context.trigger`, for example `{ x, y, viewId, targetId, selectionIds }`.
+
+Command errors are recorded in the Extensions panel error list and do not reject
+UI menu or toolbar invocations.
 
 ## Toolbar Buttons
 
@@ -127,6 +137,10 @@ app.toolbar.addButton({
 ```
 
 Toolbar IDs should be namespaced under the extension ID.
+
+The toolbar **Extensions** dropdown shows items registered in
+`extensions.menu`. As a fallback it also auto-lists registered commands that do
+not already appear in any extension menu location.
 
 ## Menus
 
@@ -186,6 +200,17 @@ Register event handlers:
 app.events.on("selection.changed", function (payload) {
   console.log(payload);
 });
+```
+
+Unregister a handler when it is no longer needed:
+
+```js
+function onSelection(payload) {
+  console.log(payload);
+}
+
+app.events.on("selection.changed", onSelection);
+app.events.off("selection.changed", onSelection);
 ```
 
 Supported event names:
@@ -274,9 +299,10 @@ Treat this as an escape hatch. Do not mutate raw state objects.
 
 Registration errors are isolated to the failing extension. Command and event
 errors are recorded in the extension registry. Other extensions continue to run.
+If an extension throws while loading, contributions registered before the error
+are removed so the extension is not left partially active.
 
 Related pages:
 
 - [[Scripting API|Scripting-API]]
 - [[Extension Packages|Extension-Packages]]
-

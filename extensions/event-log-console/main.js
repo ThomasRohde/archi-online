@@ -1,5 +1,5 @@
 app.extension({
-  id: 'local.event-log-console',
+  id: 'examples.event-log-console',
   name: 'Event Log Console',
   version: '0.1.0'
 });
@@ -48,7 +48,7 @@ function renderPanel() {
   var clear = document.createElement('button');
   clear.textContent = 'Clear';
   clear.onclick = function () {
-    app.commands.run('local.event-log-console.clear');
+    app.commands.run('examples.event-log-console.clear');
   };
 
   bar.appendChild(title);
@@ -78,14 +78,14 @@ config.events.forEach(function (name) {
   });
 });
 
-app.commands.register('local.event-log-console.open', {
+app.commands.register('examples.event-log-console.open', {
   title: 'Open event log',
   run: function () {
-    app.panels.show('local.event-log-console.panel');
+    app.panels.show('examples.event-log-console.panel');
   }
 });
 
-app.commands.register('local.event-log-console.clear', {
+app.commands.register('examples.event-log-console.clear', {
   title: 'Clear event log',
   run: function () {
     app.storage.set('events', []);
@@ -94,18 +94,18 @@ app.commands.register('local.event-log-console.clear', {
 });
 
 app.menus.addItem('extensions.menu', {
-  id: 'local.event-log-console.menu.open',
+  id: 'examples.event-log-console.menu.open',
   label: 'Open event log',
-  command: 'local.event-log-console.open'
+  command: 'examples.event-log-console.open'
 });
 
 app.toolbar.addButton({
-  id: 'local.event-log-console.toolbar',
+  id: 'examples.event-log-console.toolbar',
   label: 'Events',
-  command: 'local.event-log-console.open'
+  command: 'examples.event-log-console.open'
 });
 
-app.panels.register('local.event-log-console.panel', {
+app.panels.register('examples.event-log-console.panel', {
   title: 'Event Log',
   render: function (container) {
     panel = container;

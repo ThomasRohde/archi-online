@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "id": "local.model-audit-dashboard",
+  "id": "examples.model-audit-dashboard",
   "name": "Model Audit Dashboard",
   "version": "0.1.0",
   "description": "Audit the current model for common modelling hygiene signals.",
@@ -8,33 +8,33 @@
   "contributes": {
     "commands": [
       {
-        "id": "local.model-audit-dashboard.run",
+        "id": "examples.model-audit-dashboard.run",
         "title": "Run model audit",
         "description": "Count model concepts, relationships, views, and common gaps."
       },
       {
-        "id": "local.model-audit-dashboard.open",
+        "id": "examples.model-audit-dashboard.open",
         "title": "Open audit dashboard"
       }
     ],
     "menus": [
       {
-        "id": "local.model-audit-dashboard.menu.run",
+        "id": "examples.model-audit-dashboard.menu.run",
         "label": "Run model audit",
-        "command": "local.model-audit-dashboard.run",
+        "command": "examples.model-audit-dashboard.run",
         "location": "extensions.menu"
       }
     ],
     "toolbar": [
       {
-        "id": "local.model-audit-dashboard.toolbar",
+        "id": "examples.model-audit-dashboard.toolbar",
         "label": "Audit",
-        "command": "local.model-audit-dashboard.open"
+        "command": "examples.model-audit-dashboard.open"
       }
     ],
     "panels": [
       {
-        "id": "local.model-audit-dashboard.panel",
+        "id": "examples.model-audit-dashboard.panel",
         "title": "Model Audit"
       }
     ]

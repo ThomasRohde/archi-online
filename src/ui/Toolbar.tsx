@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import { autoListedExtensionCommands } from '../extensions/command-visibility';
 import { extensionRegistry } from '../extensions/registry';
 import { createEmptyModel } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
@@ -91,16 +92,11 @@ export function Toolbar() {
     danger: item.danger,
     onClick: () => void extensionRegistry.runCommand(item.command),
   }));
-  const explicitCommands = new Set(
-    extensionSnapshot.menus['extensions.menu'].map((item) => item.command),
-  );
-  for (const command of extensionSnapshot.commands) {
-    if (!explicitCommands.has(command.id)) {
-      extensionMenuItems.push({
-        label: command.title,
-        onClick: () => void extensionRegistry.runCommand(command.id),
-      });
-    }
+  for (const command of autoListedExtensionCommands(extensionSnapshot)) {
+    extensionMenuItems.push({
+      label: command.title,
+      onClick: () => void extensionRegistry.runCommand(command.id),
+    });
   }
 
   return (

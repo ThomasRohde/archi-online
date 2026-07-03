@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-import { JARCHI_DTS } from '../scripting/jarchi-dts';
+import { JARCHI_EXTENSION_DTS, JARCHI_SCRIPT_DTS } from '../scripting/jarchi-dts';
 
 self.MonacoEnvironment = {
   getWorker(_workerId: string, label: string) {
@@ -17,16 +17,23 @@ monaco.typescript.javascriptDefaults.setCompilerOptions({
   allowNonTsExtensions: true,
   lib: ['es2020'],
 });
-monaco.typescript.javascriptDefaults.addExtraLib(JARCHI_DTS, 'ts:jarchi.d.ts');
+monaco.typescript.javascriptDefaults.addExtraLib(JARCHI_SCRIPT_DTS, 'ts:jarchi.d.ts');
 
 export interface MonacoEditorProps {
   value: string;
   onChange: (value: string) => void;
   onRun: () => void;
   readOnly?: boolean;
+  extensionApi?: boolean;
 }
 
-export default function MonacoEditor({ value, onChange, onRun, readOnly = false }: MonacoEditorProps) {
+export default function MonacoEditor({
+  value,
+  onChange,
+  onRun,
+  readOnly = false,
+  extensionApi = false,
+}: MonacoEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const onChangeRef = useRef(onChange);
@@ -62,6 +69,15 @@ export default function MonacoEditor({ value, onChange, onRun, readOnly = false 
   useEffect(() => {
     editorRef.current?.updateOptions({ readOnly, domReadOnly: readOnly });
   }, [readOnly]);
+
+  useEffect(() => {
+    if (!extensionApi) return undefined;
+    const disposable = monaco.typescript.javascriptDefaults.addExtraLib(
+      JARCHI_EXTENSION_DTS,
+      'ts:archi-online-extension-app.d.ts',
+    );
+    return () => disposable.dispose();
+  }, [extensionApi]);
 
   return <div ref={hostRef} className="monaco-host" />;
 }

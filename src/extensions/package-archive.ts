@@ -8,6 +8,7 @@ import {
 } from './package-validation';
 
 export const ARCHI_EXTENSION_MIME = 'application/vnd.archi-online.extension+zip';
+export const MAX_EXTENSION_ARCHIVE_BYTES = 20_000_000;
 
 const TEXT_EXTENSIONS = new Set([
   '.css',
@@ -21,7 +22,7 @@ const TEXT_EXTENSIONS = new Set([
   '.xml',
 ]);
 
-const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const BASE64_CHUNK_SIZE = 0x8000;
 
 function mediaTypeForPath(path: string): string | undefined {
   const lower = path.toLowerCase();
@@ -44,37 +45,26 @@ function isTextPath(path: string): boolean {
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
-  let output = '';
-  for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i];
-    const b = bytes[i + 1] ?? 0;
-    const c = bytes[i + 2] ?? 0;
-    const triplet = (a << 16) | (b << 8) | c;
-    output += BASE64_CHARS[(triplet >> 18) & 63];
-    output += BASE64_CHARS[(triplet >> 12) & 63];
-    output += i + 1 < bytes.length ? BASE64_CHARS[(triplet >> 6) & 63] : '=';
-    output += i + 2 < bytes.length ? BASE64_CHARS[triplet & 63] : '=';
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_SIZE));
   }
-  return output;
+  return btoa(binary);
 }
 
 function base64ToBytes(value: string): Uint8Array {
   const clean = value.replace(/\s+/g, '');
-  const bytes: number[] = [];
-  for (let i = 0; i < clean.length; i += 4) {
-    const a = BASE64_CHARS.indexOf(clean[i]);
-    const b = BASE64_CHARS.indexOf(clean[i + 1]);
-    const c = clean[i + 2] === '=' ? -1 : BASE64_CHARS.indexOf(clean[i + 2]);
-    const d = clean[i + 3] === '=' ? -1 : BASE64_CHARS.indexOf(clean[i + 3]);
-    if (a < 0 || b < 0 || (c < 0 && clean[i + 2] !== '=') || (d < 0 && clean[i + 3] !== '=')) {
-      throw new Error('Invalid base64 package file content');
-    }
-    const triplet = (a << 18) | (b << 12) | ((c < 0 ? 0 : c) << 6) | (d < 0 ? 0 : d);
-    bytes.push((triplet >> 16) & 255);
-    if (c >= 0) bytes.push((triplet >> 8) & 255);
-    if (d >= 0) bytes.push(triplet & 255);
+  let binary: string;
+  try {
+    binary = atob(clean);
+  } catch (error) {
+    throw new Error('Invalid base64 package file content', { cause: error });
   }
-  return new Uint8Array(bytes);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 async function inputToBytes(input: Blob | ArrayBuffer | Uint8Array): Promise<Uint8Array> {
@@ -98,7 +88,11 @@ export async function readExtensionArchive(
   input: Blob | ArrayBuffer | Uint8Array,
   now = Date.now(),
 ): Promise<InstalledExtensionPackage> {
-  const archive = unzipSync(await inputToBytes(input));
+  const inputBytes = await inputToBytes(input);
+  if (inputBytes.byteLength > MAX_EXTENSION_ARCHIVE_BYTES) {
+    throw new Error('Package archive is too large to import');
+  }
+  const archive = unzipSync(inputBytes);
   const files: Record<string, InstalledPackageFile> = {};
   for (const [rawPath, bytes] of Object.entries(archive)) {
     if (rawPath.endsWith('/')) continue;

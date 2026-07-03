@@ -77,8 +77,9 @@ export function persistInstalledPackages(
   if (!storage) return;
   try {
     storage.setItem(EXTENSION_PACKAGES_STORAGE_KEY, JSON.stringify(normalizeInstalledPackages(packages)));
-  } catch {
-    /* localStorage failures should not block extension editing */
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Could not persist extension packages: ${message}`, { cause: error });
   }
 }
 

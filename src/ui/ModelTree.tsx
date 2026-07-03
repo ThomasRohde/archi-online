@@ -194,18 +194,19 @@ function ModelTreeInner({
   };
 
   const showTreeContextMenu = (x: number, y: number, items: MenuItem[], targetId: string) => {
-    const extensionItems = extensionMenuItems('model-tree.context');
+    const trigger = {
+      x,
+      y,
+      targetId,
+      selectionIds: useStore.getState().selection.ids,
+    };
+    const extensionItems = extensionMenuItems('model-tree.context', trigger);
     showContextMenu(
       x,
       y,
       extensionItems.length > 0 ? [...items, SEPARATOR, ...extensionItems] : items,
     );
-    void extensionRegistry.emitEvent('tree.contextMenu', {
-      x,
-      y,
-      targetId,
-      selectionIds: useStore.getState().selection.ids,
-    });
+    void extensionRegistry.emitEvent('tree.contextMenu', trigger);
   };
 
   const itemLabel = (id: string): string => {

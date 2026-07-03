@@ -176,6 +176,7 @@ export function packageInfo(pkg: InstalledExtensionPackage): ExtensionPackageInf
     version: pkg.version,
     ...(pkg.manifest.description ? { description: pkg.manifest.description } : {}),
     main: pkg.manifest.main,
+    ...(pkg.manifest.contributes ? { contributes: cloneManifest(pkg.manifest).contributes } : {}),
     files: Object.keys(pkg.files).sort(),
     installedAt: pkg.installedAt,
     updatedAt: pkg.updatedAt,

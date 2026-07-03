@@ -1,5 +1,5 @@
 app.extension({
-  id: 'local.elk-layout',
+  id: 'examples.elk-layout',
   name: 'ELK Layout',
   version: '0.1.0'
 });
@@ -126,7 +126,7 @@ function renderPanel() {
   panel.style.gap = '12px';
 
   var title = document.createElement('div');
-  title.innerHTML = '<strong>ELK Layout</strong><br><span style="color:#666">Layer selected objects or the whole active view.</span>';
+  title.innerHTML = '<strong>ELK Layout</strong><br><span style="color:GrayText">Layer selected objects or the whole active view.</span>';
   panel.appendChild(title);
 
   addSelect(panel, 'Scope', options.scope, config.options.scope, function (value) {
@@ -187,15 +187,15 @@ function renderPanel() {
   panel.appendChild(buttons);
 
   var status = document.createElement('div');
-  status.style.border = '1px solid #d8dee4';
+  status.style.border = '1px solid ButtonBorder';
   status.style.borderRadius = '4px';
   status.style.padding = '8px';
-  status.style.background = '#f9fafb';
+  status.style.background = 'Canvas';
   status.textContent = statusText(lastResult());
   panel.appendChild(status);
 }
 
-app.commands.register('local.elk-layout.apply', {
+app.commands.register('examples.elk-layout.apply', {
   title: 'Apply ELK layout',
   description: 'Run ELK layered layout on the active view or selected diagram objects.',
   run: function () {
@@ -205,32 +205,32 @@ app.commands.register('local.elk-layout.apply', {
   }
 });
 
-app.commands.register('local.elk-layout.open', {
+app.commands.register('examples.elk-layout.open', {
   title: 'Open ELK layout panel',
   run: function () {
-    app.panels.show('local.elk-layout.panel');
+    app.panels.show('examples.elk-layout.panel');
   }
 });
 
 app.menus.addItem('extensions.menu', {
-  id: 'local.elk-layout.menu.open',
+  id: 'examples.elk-layout.menu.open',
   label: 'ELK layout...',
-  command: 'local.elk-layout.open'
+  command: 'examples.elk-layout.open'
 });
 
 app.menus.addItem('view.context', {
-  id: 'local.elk-layout.view.apply',
+  id: 'examples.elk-layout.view.apply',
   label: 'Layout view with ELK',
-  command: 'local.elk-layout.apply'
+  command: 'examples.elk-layout.apply'
 });
 
 app.menus.addItem('selection.context', {
-  id: 'local.elk-layout.selection.apply',
+  id: 'examples.elk-layout.selection.apply',
   label: 'Layout selection with ELK',
-  command: 'local.elk-layout.apply'
+  command: 'examples.elk-layout.apply'
 });
 
-app.panels.register('local.elk-layout.panel', {
+app.panels.register('examples.elk-layout.panel', {
   title: 'ELK Layout',
   render: function (container) {
     panel = container;

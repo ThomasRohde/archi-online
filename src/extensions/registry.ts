@@ -136,6 +136,14 @@ export class ExtensionRegistry {
     this.eventHandlers.set(name, [...handlers, { extensionId, value: handler }]);
   }
 
+  offEvent(extensionId: string, name: ExtensionEventName, handler: ExtensionEventHandler): void {
+    const handlers = this.eventHandlers.get(name) ?? [];
+    this.eventHandlers.set(
+      name,
+      handlers.filter((owned) => owned.extensionId !== extensionId || owned.value !== handler),
+    );
+  }
+
   async emitEvent(name: ExtensionEventName, payload?: unknown): Promise<void> {
     const handlers = this.eventHandlers.get(name) ?? [];
     for (const handler of handlers) {
@@ -156,7 +164,7 @@ export class ExtensionRegistry {
       );
     } catch (error) {
       this.recordError(owned.extensionId, error);
-      throw error;
+      return undefined;
     }
   }
 

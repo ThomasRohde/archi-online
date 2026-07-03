@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { extensionRegistry } from '../extensions/registry';
+import type { ExtensionRegistry } from '../extensions/registry';
 import type { ExtensionMenuLocation } from '../extensions/types';
 
 export interface MenuItem {
@@ -28,11 +29,15 @@ export function showContextMenu(x: number, y: number, items: MenuItem[]): void {
   openMenuFn?.({ x, y, items });
 }
 
-export function extensionMenuItems(location: ExtensionMenuLocation): MenuItem[] {
-  return extensionRegistry.getSnapshot().menus[location].map((item) => ({
+export function extensionMenuItems(
+  location: ExtensionMenuLocation,
+  trigger?: unknown,
+  registry: ExtensionRegistry = extensionRegistry,
+): MenuItem[] {
+  return registry.getSnapshot().menus[location].map((item) => ({
     label: item.label,
     danger: item.danger,
-    onClick: () => void extensionRegistry.runCommand(item.command),
+    onClick: () => void registry.runCommand(item.command, undefined, trigger),
   }));
 }
 
