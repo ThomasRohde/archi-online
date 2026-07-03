@@ -26,7 +26,7 @@
     "dockview-react": "^7.0.2",
     "fflate": "^0.8.3",
     "idb-keyval": "^6.2.1",
-    "immer": "^10.1.1",
+    "immer": "^11.1.9",
     "monaco-editor": "^0.55.1",
     "nanoid": "^5.0.7",
     "react": "^18.3.1",
