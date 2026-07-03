@@ -3,7 +3,11 @@
   "private": true,
   "version": "0.1.0",
   "description": "Web-based ArchiMate modeler inspired by Archi, scriptable with a jArchi-compatible JavaScript API",
+  "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -13,7 +17,9 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "docs:check": "node tools/check-wiki-docs.mjs",
-    "docs:publish-wiki": "node tools/publish-wiki.mjs"
+    "docs:publish-wiki": "node tools/publish-wiki.mjs",
+    "security:audit": "npm audit",
+    "ci:check": "npm run docs:check && npm run lint && npm run typecheck && npm test && npm run security:audit && npm run build"
   },
   "dependencies": {
     "dockview": "^7.0.2",
@@ -27,6 +33,9 @@
     "react-dom": "^18.3.1",
     "zustand": "^5.0.2"
   },
+  "overrides": {
+    "dompurify": "3.4.11"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.1.0",
@@ -39,6 +48,6 @@
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.62.1",
     "vite": "^6.0.3",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.9"
   }
 }

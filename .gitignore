@@ -6,3 +6,9 @@ coverage/
 .playwright-cli/
 *.tsbuildinfo
 .herenow/
+.env
+.env.*
+!.env.example
+.wiki-publish/
+.tmp-wiki-check/
+extensions/dist/

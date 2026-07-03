@@ -65,12 +65,13 @@ npm run docs:publish-wiki -- --dry-run
 
 ## First GitHub Publish Checklist
 
-1. Push the main repository to GitHub.
-2. Enable the repository Wiki in GitHub settings if it is not already enabled.
-3. Run `npm run docs:check`.
-4. Run `npm run docs:publish-wiki -- --dry-run`.
-5. Run `npm run docs:publish-wiki`.
-6. Open the GitHub Wiki **Home** page and verify `_Sidebar.md` renders.
+1. Follow the repository runbook in `docs/github-publication.md`.
+2. Push the main repository to GitHub.
+3. Enable the repository Wiki in GitHub settings if it is not already enabled.
+4. Run `npm run docs:check`.
+5. Run `npm run docs:publish-wiki -- --dry-run`.
+6. Run `npm run docs:publish-wiki`.
+7. Open the GitHub Wiki **Home** page and verify `_Sidebar.md` renders.
 
 ## Authentication
 
@@ -81,4 +82,3 @@ Related pages:
 
 - [[Home]]
 - [[Development]]
-

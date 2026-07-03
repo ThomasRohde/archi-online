@@ -74,6 +74,17 @@ filenames:
 Run `npm run docs:check` before publishing docs. Once the repo is on GitHub,
 `npm run docs:publish-wiki` copies these pages to the repository wiki.
 
+## GitHub Publication
+
+This repository includes GitHub Actions CI, issue and pull request templates,
+community files, and a wiki publishing helper. See
+[GitHub Publication Runbook](docs/github-publication.md) before pushing the
+project to GitHub.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
 ## Architecture
 
 - `src/model/` — pure-TS domain core: metamodel, rules, normalized Zustand store,
