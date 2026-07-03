@@ -85,6 +85,9 @@ project to GitHub.
 
 MIT. See [LICENSE](LICENSE).
 
+Some Archi compatibility data and icon geometry are derived from the Archi
+project under the MIT License. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Architecture
 
 - `src/model/` — pure-TS domain core: metamodel, rules, normalized Zustand store,

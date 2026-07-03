@@ -42,6 +42,10 @@ extension archives under `extensions/dist/`.
 Run `node tools/generate-rules.mjs` only after changing
 `tools/data/relationships.xml`.
 
+`tools/data/relationships.xml` and `src/canvas/figures/icons.tsx` contain
+Archi-derived material. Keep `THIRD_PARTY_NOTICES.md` accurate if those sources
+or derived files change.
+
 ## Documentation
 
 Wiki source lives in `docs/wiki/`. Check docs links with:

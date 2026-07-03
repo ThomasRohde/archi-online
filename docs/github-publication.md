@@ -53,6 +53,12 @@ Recommended GitHub settings:
 - Require the `CI / validate` workflow before merging pull requests.
 - Enable private vulnerability reporting if the repository is public.
 
+## License And Notices
+
+The project license is MIT, matching Archi. Keep `LICENSE` and
+`THIRD_PARTY_NOTICES.md` in the repository root so the Archi-derived
+relationship matrix and icon geometry retain their attribution.
+
 ## Publish The Wiki
 
 After `origin` points to GitHub and the Wiki exists:
