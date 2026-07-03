@@ -1,6 +1,14 @@
 import { useStore } from '../model/store';
 import { showAlertDialog, showConfirmDialog } from '../ui/AppDialog';
 import { layoutBus } from '../ui/layout-bus';
+import type { ExtensionManifestV2, InstalledExtensionPackage } from './package-types';
+import {
+  cloneManifest,
+  normalizePackagePath,
+  packageInfo,
+  readPackageJsonFile,
+  readPackageTextFile,
+} from './package-validation';
 import { extensionRegistry, type ExtensionRegistry } from './registry';
 import type {
   ExtensionCommand,
@@ -10,6 +18,7 @@ import type {
   ExtensionMenuLocation,
   ExtensionPanel,
   ExtensionToolbarButton,
+  LocalExtensionRecord,
 } from './types';
 
 const STORAGE_PREFIX = 'archi-online.extension-storage.v1.';
@@ -40,13 +49,75 @@ function withId<T extends { id?: string }>(
   return { ...value, id: value.id ?? `${extensionId}.${fallbackSuffix}` };
 }
 
+interface AppApiRuntimeContext {
+  sourceRecord?: LocalExtensionRecord;
+  packageRecord?: InstalledExtensionPackage;
+}
+
+type AppExtensionFunction = ((meta: { id: string; name: string; version: string }) => void) & {
+  package(): ReturnType<typeof packageInfo> | null;
+};
+
+function sourceManifest(extensionId: string, record?: LocalExtensionRecord): ExtensionManifestV2 {
+  return {
+    schemaVersion: 2,
+    id: extensionId,
+    name: record?.name ?? extensionId,
+    version: record?.version ?? '0.0.0',
+    main: 'main.js',
+  };
+}
+
+function freezeClone<T>(value: T): T {
+  return Object.freeze(JSON.parse(JSON.stringify(value))) as T;
+}
+
+function packageFileUrl(pkg: InstalledExtensionPackage, path: string): string {
+  const normalized = normalizePackagePath(path);
+  const file = pkg.files[normalized];
+  if (!file) throw new Error(`Package file not found: ${normalized}`);
+  const mediaType = file.mediaType ?? (file.encoding === 'utf8' ? 'text/plain' : 'application/octet-stream');
+  if (file.encoding === 'base64') return `data:${mediaType};base64,${file.content}`;
+  return `data:${mediaType};charset=utf-8,${encodeURIComponent(file.content)}`;
+}
+
+function requirePackage(context: AppApiRuntimeContext | undefined): InstalledExtensionPackage {
+  if (!context?.packageRecord) throw new Error('This extension is not package-owned');
+  return context.packageRecord;
+}
+
 export function createAppApi(
   extensionId: string,
   registry: ExtensionRegistry = extensionRegistry,
+  context?: AppApiRuntimeContext,
 ) {
+  const extension = ((meta: { id: string; name: string; version: string }) => {
+    if (meta.id !== extensionId) throw new Error(`Extension id mismatch: ${meta.id}`);
+  }) as AppExtensionFunction;
+  extension.package = () =>
+    context?.packageRecord ? freezeClone(packageInfo(context.packageRecord)) : null;
+
   return {
-    extension(meta: { id: string; name: string; version: string }) {
-      if (meta.id !== extensionId) throw new Error(`Extension id mismatch: ${meta.id}`);
+    extension,
+    manifest: {
+      get() {
+        return freezeClone(
+          context?.packageRecord
+            ? cloneManifest(context.packageRecord.manifest)
+            : sourceManifest(extensionId, context?.sourceRecord),
+        );
+      },
+    },
+    assets: {
+      text(path: string) {
+        return readPackageTextFile(requirePackage(context), path);
+      },
+      json(path: string) {
+        return readPackageJsonFile(requirePackage(context), path);
+      },
+      url(path: string) {
+        return packageFileUrl(requirePackage(context), path);
+      },
     },
     commands: {
       register(id: string, options: Omit<ExtensionCommand, 'id'>) {

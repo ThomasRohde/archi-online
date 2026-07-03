@@ -9,11 +9,12 @@ import {
 } from '../src/extensions/extension-store';
 import { createAppApi } from '../src/extensions/app-api';
 import { startExtensionEventBridge } from '../src/extensions/events';
+import { makeInstalledPackage } from '../src/extensions/package-validation';
 import {
   createExtensionRegistry,
   extensionRegistry,
 } from '../src/extensions/registry';
-import { runExtensionRecord } from '../src/extensions/runtime';
+import { runExtensionRecord, runInstalledPackage } from '../src/extensions/runtime';
 import { createEmptyModel } from '../src/model/ops';
 import { replaceModel, setSelection, useStore } from '../src/model/store';
 
@@ -290,6 +291,70 @@ describe('extension app API and runtime', () => {
     expect(localStorage.getItem('archi-online.extension-storage.v1.local.audit')).toContain(
       '"threshold":7',
     );
+  });
+
+  it('exposes package manifest and asset helpers to package-owned extensions', async () => {
+    const registry = createExtensionRegistry();
+    const pkg = makeInstalledPackage({
+      manifest: {
+        schemaVersion: 2,
+        id: 'local.assets',
+        name: 'Assets',
+        version: '1.0.0',
+        main: 'main.js',
+      },
+      files: {
+        'manifest.json': {
+          encoding: 'utf8',
+          content: JSON.stringify({
+            schemaVersion: 2,
+            id: 'local.assets',
+            name: 'Assets',
+            version: '1.0.0',
+            main: 'main.js',
+          }),
+        },
+        'main.js': {
+          encoding: 'utf8',
+          content: `
+            app.extension({ id: "local.assets", name: "Assets", version: "1.0.0" });
+            app.commands.register("local.assets.read", {
+              title: "Read",
+              run() {
+                app.storage.set("manifestName", app.manifest.get().name);
+                app.storage.set("configEnabled", app.assets.json("data/config.json").enabled);
+                app.storage.set("text", app.assets.text("README.md"));
+                app.storage.set("packageId", app.extension.package().id);
+                app.storage.set("assetUrl", app.assets.url("assets/icon.svg"));
+              }
+            });
+          `,
+        },
+        'README.md': { encoding: 'utf8', content: 'Package readme' },
+        'data/config.json': { encoding: 'utf8', content: '{"enabled":true}' },
+        'assets/icon.svg': {
+          encoding: 'base64',
+          mediaType: 'image/svg+xml',
+          content: 'PHN2Zy8+',
+        },
+      },
+      now: 1,
+    });
+
+    expect(runInstalledPackage(pkg, registry)).toEqual({});
+
+    await registry.runCommand('local.assets.read');
+
+    const stored = JSON.parse(
+      localStorage.getItem('archi-online.extension-storage.v1.local.assets') ?? '{}',
+    );
+    expect(stored).toMatchObject({
+      manifestName: 'Assets',
+      configEnabled: true,
+      text: 'Package readme',
+      packageId: 'local.assets',
+    });
+    expect(stored.assetUrl).toMatch(/^data:image\/svg\+xml;base64,/);
   });
 });
 

@@ -23,9 +23,10 @@ export interface MonacoEditorProps {
   value: string;
   onChange: (value: string) => void;
   onRun: () => void;
+  readOnly?: boolean;
 }
 
-export default function MonacoEditor({ value, onChange, onRun }: MonacoEditorProps) {
+export default function MonacoEditor({ value, onChange, onRun, readOnly = false }: MonacoEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const onChangeRef = useRef(onChange);
@@ -39,6 +40,8 @@ export default function MonacoEditor({ value, onChange, onRun }: MonacoEditorPro
       language: 'javascript',
       minimap: { enabled: false },
       fontSize: 13,
+      readOnly,
+      domReadOnly: readOnly,
       automaticLayout: true,
       scrollBeyondLastLine: false,
       fixedOverflowWidgets: true,
@@ -55,6 +58,10 @@ export default function MonacoEditor({ value, onChange, onRun }: MonacoEditorPro
     const editor = editorRef.current;
     if (editor && editor.getValue() !== value) editor.setValue(value);
   }, [value]);
+
+  useEffect(() => {
+    editorRef.current?.updateOptions({ readOnly, domReadOnly: readOnly });
+  }, [readOnly]);
 
   return <div ref={hostRef} className="monaco-host" />;
 }

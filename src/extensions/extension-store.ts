@@ -54,7 +54,8 @@ function normalizeRecord(value: unknown): LocalExtensionRecord | null {
   ) {
     return null;
   }
-  return { id, name, version, enabled, source, createdAt, updatedAt };
+  const origin = value.origin === 'source' || value.origin === 'override' ? value.origin : undefined;
+  return { id, name, version, enabled, source, createdAt, updatedAt, ...(origin ? { origin } : {}) };
 }
 
 export function normalizeExtensionRecords(value: unknown): LocalExtensionRecord[] {

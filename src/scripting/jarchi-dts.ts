@@ -109,7 +109,35 @@ declare namespace $ {
 }
 declare const model: JModel;
 declare const app: {
-  extension(meta: { id: string; name: string; version: string }): void;
+  extension: {
+    (meta: { id: string; name: string; version: string }): void;
+    package(): {
+      id: string;
+      name: string;
+      version: string;
+      description?: string;
+      main: string;
+      files: string[];
+      installedAt: number;
+      updatedAt: number;
+    } | null;
+  };
+  manifest: {
+    get(): {
+      schemaVersion: 2;
+      id: string;
+      name: string;
+      version: string;
+      description?: string;
+      main: string;
+      contributes?: unknown;
+    };
+  };
+  assets: {
+    text(path: string): string;
+    json(path: string): unknown;
+    url(path: string): string;
+  };
   commands: {
     register(id: string, options: {
       title: string;

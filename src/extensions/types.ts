@@ -6,6 +6,7 @@ export interface LocalExtensionRecord {
   source: string;
   createdAt: number;
   updatedAt: number;
+  origin?: 'source' | 'override';
 }
 
 export interface ExtensionCommandContext {

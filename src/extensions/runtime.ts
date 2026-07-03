@@ -2,8 +2,11 @@ import { createJArchiGlobals, JCollection } from '../scripting/jarchi';
 import type { ConsoleEntry } from '../scripting/runner';
 import { createAppApi } from './app-api';
 import { useExtensionStore } from './extension-store';
+import { useExtensionPackageStore } from './package-store';
+import { flattenInstalledPackage } from './package-validation';
 import { extensionRegistry, type ExtensionRegistry } from './registry';
 import type { LocalExtensionRecord } from './types';
+import type { InstalledExtensionPackage } from './package-types';
 
 class ExtensionExitSignal extends Error {}
 
@@ -58,10 +61,14 @@ export function runExtensionRecord(
   record: LocalExtensionRecord,
   registry: ExtensionRegistry = extensionRegistry,
   onConsole?: (entry: ConsoleEntry) => void,
+  options?: { packageRecord?: InstalledExtensionPackage },
 ): { error?: string } {
   registry.clearExtension(record.id);
   const { $, model } = createJArchiGlobals();
-  const app = createAppApi(record.id, registry);
+  const app = createAppApi(record.id, registry, {
+    sourceRecord: record,
+    packageRecord: options?.packageRecord,
+  });
   const exit = () => {
     throw new ExtensionExitSignal('exit');
   };
@@ -85,9 +92,24 @@ export function runExtensionRecord(
   }
 }
 
+export function runInstalledPackage(
+  pkg: InstalledExtensionPackage,
+  registry: ExtensionRegistry = extensionRegistry,
+  onConsole?: (entry: ConsoleEntry) => void,
+): { error?: string } {
+  return runExtensionRecord(flattenInstalledPackage(pkg), registry, onConsole, {
+    packageRecord: pkg,
+  });
+}
+
 export function reloadEnabledExtensions(registry: ExtensionRegistry = extensionRegistry): void {
   registry.clearAll();
+  const sourceIds = new Set<string>();
   for (const record of useExtensionStore.getState().extensions) {
+    sourceIds.add(record.id);
     if (record.enabled) runExtensionRecord(record, registry);
+  }
+  for (const pkg of useExtensionPackageStore.getState().packages) {
+    if (pkg.enabled && !sourceIds.has(pkg.id)) runInstalledPackage(pkg, registry);
   }
 }
