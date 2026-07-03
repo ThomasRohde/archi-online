@@ -12,8 +12,10 @@ files that open in desktop Archi (and vice versa), with autosave to IndexedDB.
 - **ArchiMate 3.2 metamodel** — all element and relationship types, with the official
   allowed-relationship matrix (generated from Archi's own `relationships.xml`)
 - **IDE-style docking layout** ([dockview](https://dockview.dev)) — every view opens as a
-  draggable tab; split editors side-by-side, rearrange the Models/Properties/Scripting
-  panels, layout persists across sessions (toolbar → Reset Layout to restore defaults)
+  draggable tab; split editors side-by-side, rearrange the Models/Palette/Properties/
+  Scripting panels, float groups or pop them out into separate windows, maximize any
+  group. Layout persists across sessions; the toolbar **Views** menu reopens closed
+  panels and resets the layout
 - **Model tree** — folders, drag-drop, context menus, inline rename
 - **View editor** — custom SVG canvas with:
   - drag/resize/nesting with grid snap, marquee selection, copy/paste

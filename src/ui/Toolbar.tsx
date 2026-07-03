@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { createEmptyModel } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
 import { openModelFromDisk, saveModelToDisk } from '../persistence/files';
+import { showContextMenu, SEPARATOR, type MenuItem } from './ContextMenu';
+import { layoutBus } from './layout-bus';
 
 const SHORTCUTS: [string, string][] = [
   ['Ctrl+S / Ctrl+O', 'Save / open model'],
@@ -94,10 +96,22 @@ export function Toolbar() {
       </span>
       <button
         className="tb-btn"
-        title="Reset window layout"
-        onClick={() => window.dispatchEvent(new Event('archi:reset-layout'))}
+        title="Show or reopen panels"
+        onClick={(e) => {
+          const bus = layoutBus();
+          if (!bus) return;
+          const rect = (e.target as HTMLElement).getBoundingClientRect();
+          const items: MenuItem[] = bus.getPanels().map((p) => ({
+            label: p.title,
+            icon: p.open ? <span className="menu-check">✓</span> : undefined,
+            onClick: () => bus.showPanel(p.id),
+          }));
+          items.push(SEPARATOR);
+          items.push({ label: 'Reset Layout', onClick: () => bus.reset() });
+          showContextMenu(rect.left, rect.bottom + 4, items);
+        }}
       >
-        Reset Layout
+        Views ▾
       </button>
       <button className="tb-btn" title="Keyboard shortcuts" onClick={() => setShowHelp(true)}>
         ?
