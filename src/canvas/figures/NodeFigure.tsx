@@ -241,9 +241,21 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
   });
 
   const alignOf = (def: 'left' | 'center' | 'right' = 'center') =>
-    node.textAlignment === 1 ? 'left' : node.textAlignment === 4 ? 'right' : def;
-  const vertOf = (def: 'top' | 'center' | 'bottom' = 'top') =>
-    node.textPosition === 1 ? 'center' : node.textPosition === 2 ? 'bottom' : def;
+    node.textAlignment === 1
+      ? 'left'
+      : node.textAlignment === 2
+        ? 'center'
+        : node.textAlignment === 4
+          ? 'right'
+          : def;
+  const vertOf = (def: 'top' | 'center' | 'bottom' = 'center') =>
+    node.textPosition === 0
+      ? 'top'
+      : node.textPosition === 1
+        ? 'center'
+        : node.textPosition === 2
+          ? 'bottom'
+          : def;
 
   function label(text: string, opts?: { align?: 'left' | 'center' | 'right'; vert?: 'top' | 'center' | 'bottom'; inset?: number }) {
     if (!text) return null;
@@ -288,7 +300,7 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
             strokeOpacity={lineAlpha}
           />
         )}
-        {label(node.content, { align: alignOf('left'), vert: 'top' })}
+        {label(node.content, { align: alignOf('left'), vert: vertOf('top') })}
       </g>
     );
   }
@@ -301,7 +313,7 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
       return (
         <g>
           <rect width={w} height={h} fill={fill} fillOpacity={alpha} stroke={stroke} strokeOpacity={lineAlpha} />
-          {label(node.name, { vert: 'top' })}
+          {label(node.name, { vert: vertOf('top') })}
         </g>
       );
     }

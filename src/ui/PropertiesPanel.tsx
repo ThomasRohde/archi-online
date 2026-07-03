@@ -211,7 +211,7 @@ function AppearanceTab({ target }: { target: Target }) {
           <div className="prop-row">
             <label>Text position</label>
             <select
-              value={node.textPosition ?? 0}
+              value={node.textPosition ?? 1}
               onChange={(e) => apply({ textPosition: parseInt(e.target.value, 10) })}
             >
               <option value={0}>Top</option>

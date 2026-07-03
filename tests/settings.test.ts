@@ -35,6 +35,13 @@ describe('app settings', () => {
     expect(loadSettings(storage())).toEqual(DEFAULT_SETTINGS);
   });
 
+  it('defaults new text style to center alignment and center position', () => {
+    expect(defaultTextStyle(DEFAULT_SETTINGS)).toEqual({
+      textAlignment: 2,
+      textPosition: 1,
+    });
+  });
+
   it('loads valid persisted settings', () => {
     const saved = {
       ...DEFAULT_SETTINGS,

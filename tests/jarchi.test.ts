@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
 import { replaceModel, undo, useStore } from '../src/model/store';
+import { JARCHI_CAPABILITY_TEST_SCRIPT } from '../src/scripting/example-scripts';
 import { runScript, type ConsoleEntry } from '../src/scripting/runner';
 
 function model() {
@@ -170,5 +171,19 @@ describe('jArchi scripting API', () => {
       console.log($(".Bob").parent().first().name);
     `);
     expect(logs).toEqual(['log:9', 'log:Business']);
+  });
+
+  it('runs the built-in elaborate capability test script', () => {
+    const { error, logs } = run(JARCHI_CAPABILITY_TEST_SCRIPT);
+
+    expect(error).toBeUndefined();
+    expect(logs.some((line) => line.startsWith('log:RESULT: PASS'))).toBe(true);
+    expect(logs.some((line) => line.includes('FAIL:'))).toBe(false);
+    expect(logs.some((line) => line.includes('SKIP:'))).toBe(false);
+    expect(Object.keys(model().elements).length).toBeGreaterThanOrEqual(9);
+    expect(Object.keys(model().relationships).length).toBeGreaterThanOrEqual(3);
+    expect(Object.keys(model().views)).toHaveLength(1);
+    expect(Object.keys(model().nodes).length).toBeGreaterThanOrEqual(10);
+    expect(Object.keys(model().connections).length).toBeGreaterThanOrEqual(3);
   });
 });
