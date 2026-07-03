@@ -1,4 +1,5 @@
 import type { Bounds, DiagramConnection } from '../../model/types';
+import { useSettingsStore } from '../../settings/app-settings';
 import { bendpointPositions, toRelativeBendpoint } from '../geometry';
 import type { EditState, Interaction, Viewport } from './types';
 
@@ -171,15 +172,16 @@ export function ZoomControls({
   zoomTo: (zoom: number) => void;
   fitToView: () => void;
 }) {
+  const buttonZoomFactor = useSettingsStore((s) => s.settings.buttonZoomFactor);
   return (
     <div className="zoom-controls">
-      <button className="zoom-btn" title="Zoom out (Ctrl+-)" onClick={() => zoomBy(1 / 1.2)}>
+      <button className="zoom-btn" title="Zoom out (Ctrl+-)" onClick={() => zoomBy(1 / buttonZoomFactor)}>
         -
       </button>
       <button className="zoom-btn zoom-pct" title="Reset to 100% (Ctrl+0)" onClick={() => zoomTo(1)}>
         {Math.round(viewport.zoom * 100)}%
       </button>
-      <button className="zoom-btn" title="Zoom in (Ctrl+=)" onClick={() => zoomBy(1.2)}>
+      <button className="zoom-btn" title="Zoom in (Ctrl+=)" onClick={() => zoomBy(buttonZoomFactor)}>
         +
       </button>
       <button className="zoom-btn" title="Fit to window (Home)" onClick={fitToView}>

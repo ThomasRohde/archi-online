@@ -12,6 +12,11 @@ import type {
 import { defaultFolderId, folderForElementType } from './concepts';
 import { attachConnection, attachNode } from './draft';
 
+export interface DiagramNodeDefaults {
+  textAlignment?: number;
+  textPosition?: number;
+}
+
 /**
  * Archi behaviour: when an element is placed on a view, connections are added
  * for every model relationship between it and elements already on the view.
@@ -73,6 +78,7 @@ export function addElementNodeToView(
   parentId: string,
   bounds: Bounds,
   autoConnect = true,
+  defaults: DiagramNodeDefaults = {},
 ): string {
   const id = newId();
   transact('Add to View', (draft) => {
@@ -87,6 +93,7 @@ export function addElementNodeToView(
       targetConnectionIds: [],
       nodeType: 'element',
       elementId,
+      ...defaults,
     };
     attachNode(draft, node);
     // UI drops auto-connect existing relationships (Archi preference default);
@@ -103,6 +110,7 @@ export function createElementOnView(
   parentId: string,
   bounds: Bounds,
   name?: string,
+  defaults: DiagramNodeDefaults = {},
 ): { elementId: string; nodeId: string } {
   const elementId = newId();
   const nodeId = newId();
@@ -129,6 +137,7 @@ export function createElementOnView(
       targetConnectionIds: [],
       nodeType: 'element',
       elementId,
+      ...defaults,
     };
     attachNode(draft, node);
   });
@@ -204,7 +213,13 @@ export function addConnectionToView(
   return id;
 }
 
-export function addNoteToView(viewId: string, parentId: string, bounds: Bounds, content = ''): string {
+export function addNoteToView(
+  viewId: string,
+  parentId: string,
+  bounds: Bounds,
+  content = '',
+  defaults: DiagramNodeDefaults = {},
+): string {
   const id = newId();
   transact('Create Note', (draft) => {
     const node: NoteNode = {
@@ -218,6 +233,7 @@ export function addNoteToView(viewId: string, parentId: string, bounds: Bounds, 
       nodeType: 'note',
       content,
       properties: [],
+      ...defaults,
     };
     attachNode(draft, node);
   });
@@ -225,7 +241,13 @@ export function addNoteToView(viewId: string, parentId: string, bounds: Bounds, 
 }
 
 /** Drop a view from the tree onto a canvas: creates a diagram model reference. */
-export function addRefNodeToView(viewId: string, refViewId: string, parentId: string, bounds: Bounds): string {
+export function addRefNodeToView(
+  viewId: string,
+  refViewId: string,
+  parentId: string,
+  bounds: Bounds,
+  defaults: DiagramNodeDefaults = {},
+): string {
   const id = newId();
   transact('Add View Reference', (draft) => {
     if (!draft.views[refViewId]) return;
@@ -239,12 +261,19 @@ export function addRefNodeToView(viewId: string, refViewId: string, parentId: st
       targetConnectionIds: [],
       nodeType: 'ref',
       refViewId,
+      ...defaults,
     });
   });
   return id;
 }
 
-export function addGroupToView(viewId: string, parentId: string, bounds: Bounds, name = 'Group'): string {
+export function addGroupToView(
+  viewId: string,
+  parentId: string,
+  bounds: Bounds,
+  name = 'Group',
+  defaults: DiagramNodeDefaults = {},
+): string {
   const id = newId();
   transact('Create Group', (draft) => {
     const node: GroupNode = {
@@ -259,6 +288,7 @@ export function addGroupToView(viewId: string, parentId: string, bounds: Bounds,
       name,
       documentation: '',
       properties: [],
+      ...defaults,
     };
     attachNode(draft, node);
   });

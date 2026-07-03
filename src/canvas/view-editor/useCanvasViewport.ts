@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { Bounds } from '../../model/types';
+import { useSettingsStore } from '../../settings/app-settings';
 import type { Point } from '../geometry';
 import type { Viewport } from './types';
 
@@ -11,12 +12,15 @@ export function useCanvasViewport(
   svgRef: RefObject<SVGSVGElement>,
   absBounds: Map<string, Bounds>,
 ) {
+  const settings = useSettingsStore((s) => s.settings);
   const [viewport, setViewportState] = useState<Viewport>(
     () => viewports.get(viewId) ?? { zoom: 1, x: 20, y: 20 },
   );
   const [spaceHeld, setSpaceHeld] = useState(false);
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const spaceRef = useRef(spaceHeld);
   spaceRef.current = spaceHeld;
 
@@ -39,7 +43,7 @@ export function useCanvasViewport(
   const zoomTo = (zoom: number) => {
     const svg = svgRef.current;
     if (!svg) return;
-    const z = Math.min(4, Math.max(0.1, zoom));
+    const z = Math.min(settings.maxZoom, Math.max(settings.minZoom, zoom));
     const rect = svg.getBoundingClientRect();
     const cx = rect.width / 2;
     const cy = rect.height / 2;
@@ -69,12 +73,16 @@ export function useCanvasViewport(
       return;
     }
     const rect = svg.getBoundingClientRect();
-    const margin = 24;
+    const margin = settings.fitPadding;
     const bw = Math.max(1, maxX - minX);
     const bh = Math.max(1, maxY - minY);
+    const maxFitZoom = Math.max(settings.minZoom, settings.fitMaxZoom);
     const zoom = Math.min(
-      1.5,
-      Math.max(0.1, Math.min((rect.width - margin * 2) / bw, (rect.height - margin * 2) / bh)),
+      maxFitZoom,
+      Math.max(
+        settings.minZoom,
+        Math.min((rect.width - margin * 2) / bw, (rect.height - margin * 2) / bh),
+      ),
     );
     setViewport({
       zoom,
@@ -91,10 +99,17 @@ export function useCanvasViewport(
     const onWheelNative = (e: WheelEvent) => {
       e.preventDefault();
       const vp = viewportRef.current;
+      const currentSettings = settingsRef.current;
       const set = setViewportRefFn.current;
       if (e.ctrlKey || e.metaKey) {
-        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-        const zoom = Math.min(4, Math.max(0.1, vp.zoom * factor));
+        const factor =
+          e.deltaY < 0
+            ? currentSettings.wheelZoomFactor
+            : 1 / currentSettings.wheelZoomFactor;
+        const zoom = Math.min(
+          currentSettings.maxZoom,
+          Math.max(currentSettings.minZoom, vp.zoom * factor),
+        );
         const rect = svg.getBoundingClientRect();
         const cx = e.clientX - rect.left;
         const cy = e.clientY - rect.top;

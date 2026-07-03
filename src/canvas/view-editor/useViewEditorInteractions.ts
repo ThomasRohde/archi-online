@@ -7,7 +7,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   RefObject,
 } from 'react';
-import { ELEMENT_TYPE_MAP, relationshipLabel } from '../../model/metamodel';
+import { relationshipLabel } from '../../model/metamodel';
 import {
   addGroupToView,
   addNoteToView,
@@ -22,13 +22,20 @@ import {
 import { isAllowedRelationship, validRelationshipTypes } from '../../model/rules';
 import { openView, setActiveTool, setSelection, useStore, type Tool } from '../../model/store';
 import type { Bounds, DiagramView, ModelState } from '../../model/types';
+import {
+  defaultElementSize,
+  defaultGroupSize,
+  defaultNoteSize,
+  defaultTextStyle,
+  useSettingsStore,
+} from '../../settings/app-settings';
 import { showContextMenu } from '../../ui/ContextMenu';
 import { copyNodes, pasteNodes } from '../clipboard';
 import { closestSegment, connectionPolyline, rectsIntersect, toRelativeBendpoint, type Point } from '../geometry';
 import { containerAt, dropTargetFor, selectionRoots } from './bounds';
 import { showEmptyCanvasContextMenu, showViewObjectContextMenu } from './contextMenu';
 import { addDroppedItemsToView } from './drop';
-import { GRID, type EditState, type Interaction, type Viewport } from './types';
+import type { EditState, Interaction, Viewport } from './types';
 
 interface UseViewEditorInteractionsParams {
   model: ModelState | null;
@@ -63,13 +70,16 @@ export function useViewEditorInteractions({
   spaceHeld,
   spaceRef,
 }: UseViewEditorInteractionsParams) {
+  const settings = useSettingsStore((s) => s.settings);
   const [inter, setInter] = useState<Interaction>({ kind: 'none' });
   const [edit, setEdit] = useState<EditState | null>(null);
   const interRef = useRef(inter);
   interRef.current = inter;
 
   const snap = (v: number, disable?: boolean) =>
-    disable ? Math.round(v) : Math.round(v / GRID) * GRID;
+    disable || !settings.snapToGrid
+      ? Math.round(v)
+      : Math.round(v / settings.gridSize) * settings.gridSize;
 
   const hitFromEvent = (
     e: { clientX: number; clientY: number },
@@ -167,35 +177,57 @@ export function useViewEditorInteractions({
     if (tool.kind === 'create-element' || tool.kind === 'create-note' || tool.kind === 'create-group') {
       const parentId = containerAt(model, viewId, absBounds, p, new Set()) ?? viewId;
       const parentAbs = parentId === viewId ? { x: 0, y: 0 } : absBounds.get(parentId)!;
+      const textDefaults = defaultTextStyle(settings);
       if (tool.kind === 'create-element') {
-        const def = ELEMENT_TYPE_MAP[tool.type];
+        const def = defaultElementSize(tool.type, settings);
         const bounds = {
           x: snap(p.x - parentAbs.x - def.width / 2, e.altKey),
           y: snap(p.y - parentAbs.y - def.height / 2, e.altKey),
           width: def.width,
           height: def.height,
         };
-        const { nodeId } = createElementOnView(tool.type, viewId, parentId, bounds);
+        const { nodeId } = createElementOnView(
+          tool.type,
+          viewId,
+          parentId,
+          bounds,
+          undefined,
+          textDefaults,
+        );
         setSelection('view', [nodeId]);
         setActiveTool({ kind: 'select' });
         setTimeout(() => startEdit(nodeId), 0);
       } else if (tool.kind === 'create-note') {
-        const id = addNoteToView(viewId, parentId, {
-          x: snap(p.x - parentAbs.x),
-          y: snap(p.y - parentAbs.y),
-          width: 185,
-          height: 80,
-        });
+        const def = defaultNoteSize(settings);
+        const id = addNoteToView(
+          viewId,
+          parentId,
+          {
+            x: snap(p.x - parentAbs.x),
+            y: snap(p.y - parentAbs.y),
+            width: def.width,
+            height: def.height,
+          },
+          '',
+          textDefaults,
+        );
         setSelection('view', [id]);
         setActiveTool({ kind: 'select' });
         setTimeout(() => startEdit(id), 0);
       } else {
-        const id = addGroupToView(viewId, parentId, {
-          x: snap(p.x - parentAbs.x),
-          y: snap(p.y - parentAbs.y),
-          width: 400,
-          height: 140,
-        });
+        const def = defaultGroupSize(settings);
+        const id = addGroupToView(
+          viewId,
+          parentId,
+          {
+            x: snap(p.x - parentAbs.x),
+            y: snap(p.y - parentAbs.y),
+            width: def.width,
+            height: def.height,
+          },
+          'Group',
+          textDefaults,
+        );
         setSelection('view', [id]);
         setActiveTool({ kind: 'select' });
       }
@@ -269,7 +301,10 @@ export function useViewEditorInteractions({
         });
         break;
       case 'maybe-move': {
-        if (Math.hypot(p.x - cur.start.x, p.y - cur.start.y) * viewport.zoom > 4) {
+        if (
+          Math.hypot(p.x - cur.start.x, p.y - cur.start.y) * viewport.zoom >
+          settings.moveDragThreshold
+        ) {
           const sel = useStore.getState().selection;
           const ids = sel.source === 'view' && sel.ids.includes(cur.nodeId) ? sel.ids : [cur.nodeId];
           const rootIds = selectionRoots(model, ids);
@@ -280,7 +315,10 @@ export function useViewEditorInteractions({
         break;
       }
       case 'maybe-bend': {
-        if (Math.hypot(p.x - cur.start.x, p.y - cur.start.y) * viewport.zoom > 5) {
+        if (
+          Math.hypot(p.x - cur.start.x, p.y - cur.start.y) * viewport.zoom >
+          settings.bendDragThreshold
+        ) {
           const conn = model.connections[cur.connId];
           const src = absBounds.get(conn?.sourceId ?? '');
           const tgt = absBounds.get(conn?.targetId ?? '');
@@ -301,16 +339,20 @@ export function useViewEditorInteractions({
         let { x, y, width, height } = startAbs;
         const dx = p.x - (handle.includes('w') ? startAbs.x : startAbs.x + startAbs.width);
         const dy = p.y - (handle.includes('n') ? startAbs.y : startAbs.y + startAbs.height);
-        if (handle.includes('e')) width = Math.max(20, snap(startAbs.width + dx, e.altKey));
-        if (handle.includes('s')) height = Math.max(20, snap(startAbs.height + dy, e.altKey));
+        if (handle.includes('e')) {
+          width = Math.max(settings.minNodeSize, snap(startAbs.width + dx, e.altKey));
+        }
+        if (handle.includes('s')) {
+          height = Math.max(settings.minNodeSize, snap(startAbs.height + dy, e.altKey));
+        }
         if (handle.includes('w')) {
           const nx = snap(startAbs.x + dx, e.altKey);
-          width = Math.max(20, startAbs.width + (startAbs.x - nx));
+          width = Math.max(settings.minNodeSize, startAbs.width + (startAbs.x - nx));
           x = startAbs.x + startAbs.width - width;
         }
         if (handle.includes('n')) {
           const ny = snap(startAbs.y + dy, e.altKey);
-          height = Math.max(20, startAbs.height + (startAbs.y - ny));
+          height = Math.max(settings.minNodeSize, startAbs.height + (startAbs.y - ny));
           y = startAbs.y + startAbs.height - height;
         }
         setInter({ ...cur, currentAbs: { x, y, width, height } });
@@ -486,12 +528,12 @@ export function useViewEditorInteractions({
     }
     if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
       e.preventDefault();
-      zoomBy(1.2);
+      zoomBy(settings.buttonZoomFactor);
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key === '-') {
       e.preventDefault();
-      zoomBy(1 / 1.2);
+      zoomBy(1 / settings.buttonZoomFactor);
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && viewSel.length > 0) {
@@ -511,7 +553,7 @@ export function useViewEditorInteractions({
     };
     if (arrow[e.key] && viewSel.length > 0) {
       e.preventDefault();
-      const step = e.shiftKey ? GRID : 1;
+      const step = e.shiftKey ? settings.gridSize : 1;
       const roots = selectionRoots(model, viewSel);
       commitMove(
         roots.map((id) => {
@@ -548,6 +590,8 @@ export function useViewEditorInteractions({
         point: p,
         absBounds,
         startEdit,
+        settings,
+        snap,
         zoomBy,
         zoomTo,
         fitToView,
@@ -589,6 +633,7 @@ export function useViewEditorInteractions({
       absBounds,
       point: p,
       snap,
+      settings,
     });
     if (created.length > 0) setSelection('view', created);
   };

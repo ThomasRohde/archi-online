@@ -8,6 +8,12 @@ import {
 } from '../../model/ops';
 import { setSelection } from '../../model/store';
 import type { Bounds, ModelState } from '../../model/types';
+import {
+  defaultGroupSize,
+  defaultNoteSize,
+  defaultTextStyle,
+  type AppSettings,
+} from '../../settings/app-settings';
 import { SEPARATOR, showContextMenu, type MenuItem } from '../../ui/ContextMenu';
 import { hasClipboard, pasteNodes } from '../clipboard';
 import type { Point } from '../geometry';
@@ -21,6 +27,8 @@ export function showEmptyCanvasContextMenu({
   point,
   absBounds,
   startEdit,
+  settings,
+  snap,
   zoomBy,
   zoomTo,
   fitToView,
@@ -33,6 +41,8 @@ export function showEmptyCanvasContextMenu({
   point: Point;
   absBounds: Map<string, Bounds>;
   startEdit: (nodeId: string) => void;
+  settings: AppSettings;
+  snap: (value: number) => number;
   zoomBy: (factor: number) => void;
   zoomTo: (zoom: number) => void;
   fitToView: () => void;
@@ -51,12 +61,20 @@ export function showEmptyCanvasContextMenu({
     {
       label: 'New Note',
       onClick: () => {
-        const noteId = addNoteToView(viewId, parentId, {
-          x: Math.round(point.x - parentAbs.x),
-          y: Math.round(point.y - parentAbs.y),
-          width: 185,
-          height: 80,
-        });
+        const def = defaultNoteSize(settings);
+        const textDefaults = defaultTextStyle(settings);
+        const noteId = addNoteToView(
+          viewId,
+          parentId,
+          {
+            x: snap(point.x - parentAbs.x),
+            y: snap(point.y - parentAbs.y),
+            width: def.width,
+            height: def.height,
+          },
+          '',
+          textDefaults,
+        );
         setSelection('view', [noteId]);
         setTimeout(() => startEdit(noteId), 0);
       },
@@ -64,18 +82,26 @@ export function showEmptyCanvasContextMenu({
     {
       label: 'New Group',
       onClick: () => {
-        const groupId = addGroupToView(viewId, parentId, {
-          x: Math.round(point.x - parentAbs.x),
-          y: Math.round(point.y - parentAbs.y),
-          width: 400,
-          height: 140,
-        });
+        const def = defaultGroupSize(settings);
+        const textDefaults = defaultTextStyle(settings);
+        const groupId = addGroupToView(
+          viewId,
+          parentId,
+          {
+            x: snap(point.x - parentAbs.x),
+            y: snap(point.y - parentAbs.y),
+            width: def.width,
+            height: def.height,
+          },
+          'Group',
+          textDefaults,
+        );
         setSelection('view', [groupId]);
       },
     },
     SEPARATOR,
-    { label: 'Zoom In (Ctrl+=)', onClick: () => zoomBy(1.2) },
-    { label: 'Zoom Out (Ctrl+-)', onClick: () => zoomBy(1 / 1.2) },
+    { label: 'Zoom In (Ctrl+=)', onClick: () => zoomBy(settings.buttonZoomFactor) },
+    { label: 'Zoom Out (Ctrl+-)', onClick: () => zoomBy(1 / settings.buttonZoomFactor) },
     { label: 'Zoom 100% (Ctrl+0)', onClick: () => zoomTo(1) },
     { label: 'Fit to Window (Home)', onClick: fitToView },
   ]);

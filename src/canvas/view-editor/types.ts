@@ -1,8 +1,6 @@
 import type { Bounds } from '../../model/types';
 import type { Point } from '../geometry';
 
-export const GRID = 12;
-
 export interface Viewport {
   zoom: number;
   x: number;

@@ -2,6 +2,7 @@
 import { newId } from '../model/id';
 import { transact, useStore } from '../model/store';
 import type { DiagramConnection, DiagramNode } from '../model/types';
+import { useSettingsStore } from '../settings/app-settings';
 
 interface ClipboardData {
   nodes: DiagramNode[]; // deep-cloned, original ids
@@ -39,8 +40,9 @@ export function pasteNodes(viewId: string, at?: { x: number; y: number }): strin
   const data = clipboard;
   const model = useStore.getState().model;
   if (!data || !model || !model.views[viewId]) return [];
-  let dx = 16;
-  let dy = 16;
+  const pasteOffset = useSettingsStore.getState().settings.pasteOffset;
+  let dx = pasteOffset;
+  let dy = pasteOffset;
   if (at) {
     let minX = Infinity;
     let minY = Infinity;

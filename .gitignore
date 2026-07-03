@@ -5,3 +5,4 @@ dist/
 coverage/
 .playwright-cli/
 *.tsbuildinfo
+.herenow/

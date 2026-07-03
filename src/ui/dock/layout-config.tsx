@@ -9,6 +9,7 @@ import { useStore } from '../../model/store';
 import { ModelTree } from '../ModelTree';
 import { Palette } from '../Palette';
 import { PropertiesPanel } from '../PropertiesPanel';
+import { SettingsPanel } from '../SettingsPanel';
 import { ScriptPanel } from '../ScriptPanel';
 import { WelcomePanel } from '../WelcomePanel';
 
@@ -76,6 +77,20 @@ export const TOOL_PANELS: ToolPanelDef[] = [
       }),
   },
   {
+    id: 'settings',
+    title: 'Settings',
+    add: (api) =>
+      api.addPanel({
+        id: 'settings',
+        component: 'settings',
+        title: 'Settings',
+        position: api.getPanel('properties')
+          ? { referencePanel: 'properties', direction: 'within' }
+          : { direction: 'right' },
+        initialWidth: 340,
+      }),
+  },
+  {
     id: 'scripts',
     title: 'Scripting',
     add: (api) =>
@@ -121,6 +136,12 @@ export function buildDefaultLayout(api: DockviewApi): void {
     position: { referencePanel: 'welcome', direction: 'right' },
   });
   api.addPanel({
+    id: 'settings',
+    component: 'settings',
+    title: 'Settings',
+    position: { referencePanel: 'properties', direction: 'within' },
+  });
+  api.addPanel({
     id: 'scripts',
     component: 'scripts',
     title: 'Scripting',
@@ -130,6 +151,7 @@ export function buildDefaultLayout(api: DockviewApi): void {
   api.getPanel('models')?.api.setSize({ width: 250 });
   api.getPanel('palette')?.api.setSize({ width: 88 });
   api.getPanel('properties')?.api.setSize({ width: 300 });
+  api.getPanel('properties')?.api.setActive();
 }
 
 /** Re-add open store views that have no dockview panel (used by reset). */
@@ -173,6 +195,11 @@ export const components: Record<string, React.FunctionComponent<IDockviewPanelPr
   properties: () => (
     <div className="dock-panel">
       <PropertiesPanel />
+    </div>
+  ),
+  settings: () => (
+    <div className="dock-panel">
+      <SettingsPanel />
     </div>
   ),
   scripts: () => (
