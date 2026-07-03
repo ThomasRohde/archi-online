@@ -92,6 +92,13 @@ export function Toolbar() {
       <span className="file-status">
         {hasModel ? `${modelName} — ${fileName ?? 'unsaved'}${dirty ? ' •' : ''}` : ''}
       </span>
+      <button
+        className="tb-btn"
+        title="Reset window layout"
+        onClick={() => window.dispatchEvent(new Event('archi:reset-layout'))}
+      >
+        Reset Layout
+      </button>
       <button className="tb-btn" title="Keyboard shortcuts" onClick={() => setShowHelp(true)}>
         ?
       </button>

@@ -86,38 +86,25 @@ body {
   cursor: default;
 }
 
-/* Panels */
-.panel {
-  background: var(--panel-bg);
+/* Dockview integration */
+.dock-root {
+  width: 100%;
+  height: 100%;
+}
+
+.dock-panel {
+  height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+  background: var(--panel-bg);
 }
 
-.panel-header {
-  padding: 5px 8px;
-  font-weight: 600;
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--border);
-  user-select: none;
-  flex-shrink: 0;
-}
-
-.resize-handle-h {
-  width: 4px;
-  background: var(--bg);
-  cursor: col-resize;
-}
-
-.resize-handle-v {
-  height: 4px;
-  background: var(--bg);
-  cursor: row-resize;
-}
-
-.resize-handle-h:hover,
-.resize-handle-v:hover {
-  background: var(--accent-soft);
+.view-panel {
+  height: 100%;
+  display: flex;
+  min-width: 0;
 }
 
 .empty-hint {
@@ -126,16 +113,13 @@ body {
 }
 
 /* Editor */
-.editor-area {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-}
-
 .editor-empty {
   margin: auto;
   color: var(--text-dim);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .script-panel {
@@ -149,6 +133,10 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 4px 8px;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .script-header select {
@@ -378,55 +366,6 @@ body {
   position: absolute;
   left: 100%;
   top: -5px;
-}
-
-/* Editor tabs */
-.editor-tabs {
-  display: flex;
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  flex-shrink: 0;
-  user-select: none;
-}
-
-.editor-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 8px 5px 12px;
-  border-right: 1px solid var(--border);
-  cursor: default;
-  max-width: 200px;
-  white-space: nowrap;
-}
-
-.editor-tab.active {
-  background: var(--panel-bg);
-  border-bottom: 2px solid var(--accent);
-}
-
-.tab-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-close {
-  color: var(--text-dim);
-  border-radius: 3px;
-  padding: 0 4px;
-  font-size: 14px;
-}
-
-.tab-close:hover {
-  background: #d6dde6;
-  color: var(--text);
-}
-
-.editor-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
 }
 
 /* View editor canvas */

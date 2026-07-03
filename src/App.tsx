@@ -24,7 +24,10 @@ export function App() {
   useEffect(() => {
     if (!booted) {
       booted = true;
-      void restoreAutosave().finally(startAutosave);
+      void restoreAutosave().finally(() => {
+        startAutosave();
+        useStore.setState({ booted: true });
+      });
     }
     const onKey = (e: KeyboardEvent) => {
       const inText =

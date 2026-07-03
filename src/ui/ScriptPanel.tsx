@@ -51,11 +51,7 @@ export function ScriptPanel() {
   }, [entries]);
 
   if (!scripts || !currentId) {
-    return (
-      <div className="script-panel">
-        <div className="panel-header">Scripting</div>
-      </div>
-    );
+    return <div className="script-panel" />;
   }
 
   const current = scripts.find((s) => s.id === currentId) ?? scripts[0];
@@ -123,8 +119,7 @@ export function ScriptPanel() {
 
   return (
     <div className="script-panel">
-      <div className="panel-header script-header">
-        <span>Scripting</span>
+      <div className="script-header">
         <select value={current.id} onChange={(e) => setCurrentId(e.target.value)}>
           {scripts.map((s) => (
             <option key={s.id} value={s.id}>

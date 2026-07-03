@@ -43,6 +43,8 @@ export interface AppState {
   activeTool: Tool;
   /** Bumped on every model replacement (new/open) so editors can reset viewport. */
   modelEpoch: number;
+  /** True once startup restore (autosave) has finished; layout restore waits for it. */
+  booted: boolean;
 }
 
 export const useStore = create<AppState>(() => ({
@@ -56,6 +58,7 @@ export const useStore = create<AppState>(() => ({
   activeViewId: null,
   activeTool: { kind: 'select' },
   modelEpoch: 0,
+  booted: false,
 }));
 
 /** File handle kept outside the store: not cloneable/immutable-friendly. */
