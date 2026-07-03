@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "id": "local.elk-layout",
+  "name": "ELK Layout",
+  "version": "0.1.0",
+  "description": "Apply layered ELK automatic layout to the active view or selected diagram objects.",
+  "main": "main.js",
+  "contributes": {
+    "commands": [
+      {
+        "id": "local.elk-layout.apply",
+        "title": "Apply ELK layout"
+      },
+      {
+        "id": "local.elk-layout.open",
+        "title": "Open ELK layout panel"
+      }
+    ],
+    "menus": [
+      {
+        "id": "local.elk-layout.menu.open",
+        "label": "ELK layout...",
+        "command": "local.elk-layout.open",
+        "location": "extensions.menu"
+      },
+      {
+        "id": "local.elk-layout.view.apply",
+        "label": "Layout view with ELK",
+        "command": "local.elk-layout.apply",
+        "location": "view.context"
+      },
+      {
+        "id": "local.elk-layout.selection.apply",
+        "label": "Layout selection with ELK",
+        "command": "local.elk-layout.apply",
+        "location": "selection.context"
+      }
+    ],
+    "panels": [
+      {
+        "id": "local.elk-layout.panel",
+        "title": "ELK Layout"
+      }
+    ]
+  }
+}

@@ -16,6 +16,7 @@ The generated archives are written to `extensions/dist/`:
 - `local.selection-workbench-0.1.0.archi-ext`
 - `local.package-showcase-0.1.0.archi-ext`
 - `local.event-log-console-0.1.0.archi-ext`
+- `local.elk-layout-0.1.0.archi-ext`
 
 Use the app's Extensions panel to import the generated archive files.
 
@@ -29,3 +30,5 @@ Use the app's Extensions panel to import the generated archive files.
   SVG asset access.
 - `event-log-console`: app/model/view/context-menu event listeners, a panel, and
   clear/open commands.
+- `elk-layout`: app-hosted ELK layout API usage, menu commands, a settings panel,
+  packaged JSON defaults, and private storage.

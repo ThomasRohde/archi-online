@@ -1,0 +1,31 @@
+{
+  "defaults": {
+    "scope": "selection-or-view",
+    "direction": "right",
+    "edgeRouting": "orthogonal",
+    "nodeSpacing": 40,
+    "layerSpacing": 80
+  },
+  "limits": {
+    "nodeSpacing": { "min": 10, "max": 300 },
+    "layerSpacing": { "min": 20, "max": 500 }
+  },
+  "options": {
+    "scope": [
+      { "value": "selection-or-view", "label": "Selection first" },
+      { "value": "selection", "label": "Selection only" },
+      { "value": "view", "label": "Whole view" }
+    ],
+    "direction": [
+      { "value": "right", "label": "Right" },
+      { "value": "down", "label": "Down" },
+      { "value": "left", "label": "Left" },
+      { "value": "up", "label": "Up" }
+    ],
+    "edgeRouting": [
+      { "value": "orthogonal", "label": "Orthogonal" },
+      { "value": "splines", "label": "Splines" },
+      { "value": "preserve", "label": "Preserve existing" }
+    ]
+  }
+}

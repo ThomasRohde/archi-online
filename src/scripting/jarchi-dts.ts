@@ -118,6 +118,24 @@ declare interface JModel {
   createArchimateView(name?: string, folder?: JFolder): JView;
 }
 
+declare interface JElkLayoutOptions {
+  view?: JView;
+  scope?: 'selection-or-view' | 'selection' | 'view';
+  direction?: 'right' | 'down' | 'left' | 'up';
+  nodeSpacing?: number;
+  layerSpacing?: number;
+  edgeRouting?: 'preserve' | 'orthogonal' | 'splines';
+  recursive?: boolean;
+}
+
+declare interface JElkLayoutResult {
+  scope: 'selection' | 'view';
+  nodeCount: number;
+  connectionCount: number;
+  routedConnectionCount: number;
+  elapsedMs: number;
+}
+
 /** Select objects: "*", "element", "relationship", "view", "folder", "concept",
  *  a type like "business-actor", "#id", ".Name", or "business-actor.Bob". */
 declare function $(selector: string | JObject | JCollection): JCollection;
@@ -166,6 +184,9 @@ declare const app: {
     items(): JObject[];
     visuals(): JVisual[];
     clear(): void;
+  };
+  layout: {
+    elk(options?: JElkLayoutOptions): Promise<JElkLayoutResult>;
   };
   commands: {
     register(id: string, options: {

@@ -8,6 +8,7 @@ import { runInstalledPackage } from '../src/extensions/runtime';
 
 const examplesRoot = join(process.cwd(), 'extensions');
 const exampleIds = [
+  'elk-layout',
   'model-audit-dashboard',
   'selection-workbench',
   'package-showcase',

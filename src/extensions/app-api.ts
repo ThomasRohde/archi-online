@@ -2,6 +2,7 @@ import { openView, setSelection, useStore } from '../model/store';
 import { JView, JVisual, wrap } from '../scripting/jarchi';
 import { showAlertDialog, showConfirmDialog } from '../ui/AppDialog';
 import { layoutBus } from '../ui/layout-bus';
+import { runElkLayout, type ElkLayoutOptions } from './layout/elk';
 import type { ExtensionManifestV2, InstalledExtensionPackage } from './package-types';
 import {
   cloneManifest,
@@ -87,6 +88,23 @@ function requirePackage(context: AppApiRuntimeContext | undefined): InstalledExt
   return context.packageRecord;
 }
 
+function activeView(): JView | null {
+  const appState = useStore.getState();
+  const viewId = appState.activeViewId;
+  return viewId && appState.model?.views[viewId] ? new JView(viewId) : null;
+}
+
+function selectedVisuals(): JVisual[] {
+  if (!useStore.getState().model) return [];
+  return useStore.getState().selection.ids
+    .map((id) => wrap(id))
+    .filter((item): item is JVisual => item instanceof JVisual);
+}
+
+type AppElkLayoutOptions = ElkLayoutOptions & {
+  view?: JView;
+};
+
 export function createAppApi(
   extensionId: string,
   registry: ExtensionRegistry = extensionRegistry,
@@ -111,9 +129,7 @@ export function createAppApi(
     },
     views: {
       active() {
-        const appState = useStore.getState();
-        const viewId = appState.activeViewId;
-        return viewId && appState.model?.views[viewId] ? new JView(viewId) : null;
+        return activeView();
       },
       open(id: string) {
         const model = useStore.getState().model;
@@ -140,13 +156,21 @@ export function createAppApi(
           .filter((item) => item !== undefined);
       },
       visuals() {
-        if (!useStore.getState().model) return [];
-        return useStore.getState().selection.ids
-          .map((id) => wrap(id))
-          .filter((item): item is JVisual => item instanceof JVisual);
+        return selectedVisuals();
       },
       clear() {
         setSelection(useStore.getState().selection.source, []);
+      },
+    },
+    layout: {
+      elk(options: AppElkLayoutOptions = {}) {
+        const view = options.view ?? activeView();
+        if (!view) throw new Error('No active view');
+        return runElkLayout({
+          ...options,
+          view,
+          selectedVisuals: selectedVisuals(),
+        });
       },
     },
     assets: {

@@ -22,3 +22,11 @@ Derived material in this repository:
   Archi element icon geometry from Archi figure classes.
 
 The MIT permission notice is included in `LICENSE`.
+
+## elkjs
+
+Source: https://github.com/kieler/elkjs
+
+License: EPL-2.0
+
+Used for the bundled ELK layered layout extension host API.
