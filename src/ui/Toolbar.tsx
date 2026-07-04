@@ -2,10 +2,19 @@ import { useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { autoListedExtensionCommands } from '../extensions/command-visibility';
 import { extensionRegistry } from '../extensions/registry';
+import { serializeArchimate } from '../model/io/archimate-xml';
 import { createEmptyModel } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
 import { openModelFromDisk, saveModelToDisk } from '../persistence/files';
-import { showAlertDialog, showConfirmDialog } from './AppDialog';
+import { getStoredGitHubToken, setStoredGitHubToken } from '../persistence/github';
+import {
+  INLINE_SHARE_THRESHOLD,
+  encodeModelToInlineShare,
+  getRememberedGistId,
+  gistShareHref,
+  saveShareGistForModel,
+} from '../persistence/share';
+import { showAlertDialog, showConfirmDialog, showPromptDialog } from './AppDialog';
 import { showContextMenu, SEPARATOR, type MenuItem } from './ContextMenu';
 import { layoutBus } from './layout-bus';
 
@@ -42,6 +51,10 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+export function shareDecisionForInline(encodedLength: number): 'inline' | 'gist' {
+  return encodedLength <= INLINE_SHARE_THRESHOLD ? 'inline' : 'gist';
+}
+
 export async function newModel(): Promise<void> {
   if (!(await confirmDiscardChanges())) return;
   replaceModel(createEmptyModel('New ArchiMate Model'), null, false);
@@ -72,6 +85,84 @@ export async function saveModel(saveAs = false): Promise<void> {
   }
 }
 
+async function copyShareLink(href: string): Promise<void> {
+  await navigator.clipboard.writeText(href);
+  await showAlertDialog({
+    title: 'Share link copied',
+    message: href,
+    details: 'Anyone with this link can read the model data contained in the link or referenced gist.',
+  });
+}
+
+export async function shareModel(): Promise<void> {
+  const model = useStore.getState().model;
+  if (!model) return;
+
+  const inline = encodeModelToInlineShare(model);
+  if (shareDecisionForInline(inline.encodedLength) === 'inline') {
+    await copyShareLink(inline.href);
+    return;
+  }
+
+  const useGist = await showConfirmDialog({
+    title: 'Use GitHub Gist?',
+    message: 'This model is too large for a reliable URL-only share link.',
+    details:
+      'A gist stores the .archimate file in GitHub. Secret gists are unlisted, but anyone with the link can read them.',
+    confirmLabel: 'Use Gist',
+    cancelLabel: 'Cancel',
+  });
+  if (!useGist) return;
+
+  let token = await getStoredGitHubToken();
+  if (!token) {
+    const entered = await showPromptDialog({
+      title: 'GitHub token',
+      message: 'Enter a GitHub personal access token with gist scope.',
+      placeholder: 'ghp_...',
+      confirmLabel: 'Save token',
+      cancelLabel: 'Cancel',
+    });
+    if (!entered) return;
+    await setStoredGitHubToken(entered);
+    token = entered.trim();
+  }
+
+  const rememberedGistId = await getRememberedGistId(model.info.id);
+  const makePublic = rememberedGistId
+    ? false
+    : await showConfirmDialog({
+        title: 'Gist visibility',
+        message: 'Secret is recommended. Choose Public only when the model may be indexed and listed publicly.',
+        details: 'This choice applies when creating a gist. Re-sharing an existing gist keeps its current visibility.',
+        confirmLabel: 'Public',
+        cancelLabel: 'Secret',
+      });
+
+  const xml = serializeArchimate(model);
+  const fileName = `${model.info.name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'model'}.archimate`;
+  const saved = await saveShareGistForModel({
+    token,
+    modelId: model.info.id,
+    xml,
+    fileName,
+    public: makePublic,
+  });
+  await copyShareLink(gistShareHref(saved.id));
+}
+
+async function runShareModel(): Promise<void> {
+  try {
+    await shareModel();
+  } catch (error) {
+    await showAlertDialog({
+      title: 'Could not share model',
+      message: errorMessage(error),
+      intent: 'error',
+    });
+  }
+}
+
 export function Toolbar() {
   const [showHelp, setShowHelp] = useState(false);
   const extensionSnapshot = useSyncExternalStore(
@@ -87,6 +178,7 @@ export function Toolbar() {
   const fileName = useStore((s) => s.fileName);
   const hasModel = useStore((s) => s.model !== null);
   const modelName = useStore((s) => s.model?.info.name);
+  const readOnly = useStore((s) => s.readOnly);
   const extensionMenuItems: MenuItem[] = extensionSnapshot.menus['extensions.menu'].map((item) => ({
     label: item.label,
     danger: item.danger,
@@ -124,6 +216,14 @@ export function Toolbar() {
         onClick={() => saveModel(true)}
       >
         Save As…
+      </button>
+      <button
+        className="tb-btn"
+        title="Share model"
+        disabled={!hasModel || readOnly}
+        onClick={() => void runShareModel()}
+      >
+        Share…
       </button>
       <div className="toolbar-sep" />
       <button

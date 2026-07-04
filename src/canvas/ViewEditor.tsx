@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useStore } from '../model/store';
 import type { Bounds } from '../model/types';
 import { ConnectionView } from './ConnectionView';
-import { connectionPolyline } from './geometry';
+import { connectionPolyline, type Point } from './geometry';
 import { computeAbsBounds, deriveLiveViewState } from './view-editor/bounds';
 import { NodeView } from './view-editor/NodeView';
 import {
@@ -19,7 +19,18 @@ import { useViewEditorInteractions } from './view-editor/useViewEditorInteractio
 
 export type { Viewport } from './view-editor/types';
 
-export function ViewEditor({ viewId }: { viewId: string }) {
+export interface ViewEditorProps {
+  viewId: string;
+  readOnly?: boolean;
+}
+
+export function ViewEditor({ viewId, readOnly: readOnlyProp }: ViewEditorProps) {
+  const readOnlyStore = useStore((s) => s.readOnly);
+  const readOnly = readOnlyProp ?? readOnlyStore;
+  return readOnly ? <ReadOnlyViewEditor viewId={viewId} /> : <EditableViewEditor viewId={viewId} />;
+}
+
+function EditableViewEditor({ viewId }: { viewId: string }) {
   const model = useStore((s) => s.model);
   const selection = useStore((s) => s.selection);
   const activeTool = useStore((s) => s.activeTool);
@@ -139,6 +150,109 @@ export function ViewEditor({ viewId }: { viewId: string }) {
         viewport={viewport}
         commitEdit={commitEdit}
       />
+      <ZoomControls viewport={viewport} zoomBy={zoomBy} zoomTo={zoomTo} fitToView={fitToView} />
+    </div>
+  );
+}
+
+function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
+  const model = useStore((s) => s.model);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const panRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
+  const emptyMoveDelta = useMemo(() => new Map<string, Point>(), []);
+
+  const view = model?.views[viewId];
+  const absBounds = useMemo(
+    () => (model && view ? computeAbsBounds(model, viewId) : new Map<string, Bounds>()),
+    [model, view, viewId],
+  );
+  const connections = useMemo(
+    () => (model ? Object.values(model.connections).filter((c) => c.viewId === viewId) : []),
+    [model, viewId],
+  );
+  const { viewport, setViewport, zoomTo, zoomBy, fitToView } = useCanvasViewport(
+    viewId,
+    svgRef,
+    absBounds,
+  );
+
+  if (!model || !view) return null;
+
+  const stopPan = (pointerId: number, target: SVGSVGElement) => {
+    if (panRef.current?.pointerId !== pointerId) return;
+    if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
+    panRef.current = null;
+  };
+
+  return (
+    <div className="view-editor read-only">
+      <svg
+        ref={svgRef}
+        className="view-svg"
+        style={{ cursor: 'default' }}
+        tabIndex={0}
+        onPointerDown={(event) => {
+          if (event.button !== 1) return;
+          event.preventDefault();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          panRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            originX: viewport.x,
+            originY: viewport.y,
+          };
+        }}
+        onPointerMove={(event) => {
+          const pan = panRef.current;
+          if (!pan || pan.pointerId !== event.pointerId) return;
+          setViewport({
+            ...viewport,
+            x: pan.originX + event.clientX - pan.startX,
+            y: pan.originY + event.clientY - pan.startY,
+          });
+        }}
+        onPointerUp={(event) => stopPan(event.pointerId, event.currentTarget)}
+        onPointerCancel={(event) => stopPan(event.pointerId, event.currentTarget)}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        <g transform={`translate(${viewport.x},${viewport.y}) scale(${viewport.zoom})`}>
+          {view.childIds.map((id) => (
+            <NodeView
+              key={id}
+              model={model}
+              nodeId={id}
+              moveDelta={emptyMoveDelta}
+              resize={null}
+              dropParentId={null}
+              connectSource={null}
+              connectHover={null}
+            />
+          ))}
+          <g>
+            {connections.map((conn) => {
+              const src = absBounds.get(conn.sourceId);
+              const tgt = absBounds.get(conn.targetId);
+              if (!src || !tgt) return null;
+              return (
+                <ConnectionView
+                  key={conn.id}
+                  conn={conn}
+                  rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
+                  points={connectionPolyline(src, tgt, conn.bendpoints)}
+                  selected={false}
+                />
+              );
+            })}
+          </g>
+        </g>
+      </svg>
       <ZoomControls viewport={viewport} zoomBy={zoomBy} zoomTo={zoomTo} fitToView={fitToView} />
     </div>
   );

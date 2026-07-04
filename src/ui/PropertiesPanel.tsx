@@ -71,11 +71,13 @@ function ColorRow({
   value,
   fallback,
   onChange,
+  disabled,
 }: {
   label: string;
   value: string | undefined;
   fallback: string;
   onChange: (v: string | undefined) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="prop-row">
@@ -84,11 +86,12 @@ function ColorRow({
         <input
           type="color"
           value={value ?? fallback}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         />
         <button
           className="tb-btn small"
-          disabled={value === undefined}
+          disabled={disabled || value === undefined}
           title="Reset to default"
           onClick={() => onChange(undefined)}
         >
@@ -99,9 +102,11 @@ function ColorRow({
   );
 }
 
-function PropertiesTable({ target }: { target: Target }) {
+function PropertiesTable({ target, readOnly }: { target: Target; readOnly: boolean }) {
   const props = target.properties ?? [];
-  const commit = (next: Property[]) => setProperties(target.conceptId!, next);
+  const commit = (next: Property[]) => {
+    if (!readOnly) setProperties(target.conceptId!, next);
+  };
   if (!target.conceptId) return <div className="empty-hint">No properties for this selection.</div>;
   return (
     <div className="prop-table">
@@ -114,29 +119,36 @@ function PropertiesTable({ target }: { target: Target }) {
         <div className="prop-table-row" key={i}>
           <CommitInput
             value={p.key}
+            disabled={readOnly}
             onCommit={(v) => commit(props.map((q, j) => (j === i ? { ...q, key: v } : q)))}
           />
           <CommitInput
             value={p.value}
+            disabled={readOnly}
             onCommit={(v) => commit(props.map((q, j) => (j === i ? { ...q, value: v } : q)))}
           />
           <button
             className="tb-btn small"
             title="Remove property"
+            disabled={readOnly}
             onClick={() => commit(props.filter((_, j) => j !== i))}
           >
             ×
           </button>
         </div>
       ))}
-      <button className="tb-btn add-prop" onClick={() => commit([...props, { key: '', value: '' }])}>
+      <button
+        className="tb-btn add-prop"
+        disabled={readOnly}
+        onClick={() => commit([...props, { key: '', value: '' }])}
+      >
         + Add property
       </button>
     </div>
   );
 }
 
-function AppearanceTab({ target }: { target: Target }) {
+function AppearanceTab({ target, readOnly }: { target: Target; readOnly: boolean }) {
   if (target.styleIds.length === 0) {
     return <div className="empty-hint">Select objects on a view to edit their appearance.</div>;
   }
@@ -157,6 +169,7 @@ function AppearanceTab({ target }: { target: Target }) {
             label="Fill color"
             value={node?.fillColor}
             fallback={defaultFill}
+            disabled={readOnly}
             onChange={(v) => apply({ fillColor: v })}
           />
           <div className="prop-row">
@@ -166,6 +179,7 @@ function AppearanceTab({ target }: { target: Target }) {
               min={0}
               max={255}
               value={node?.alpha ?? 255}
+              disabled={readOnly}
               onChange={(e) => apply({ alpha: parseInt(e.target.value, 10) })}
             />
           </div>
@@ -175,12 +189,14 @@ function AppearanceTab({ target }: { target: Target }) {
         label="Line color"
         value={node?.lineColor ?? conn?.lineColor}
         fallback="#5c5c5c"
+        disabled={readOnly}
         onChange={(v) => apply({ lineColor: v })}
       />
       <ColorRow
         label="Font color"
         value={node?.fontColor ?? conn?.fontColor}
         fallback="#000000"
+        disabled={readOnly}
         onChange={(v) => apply({ fontColor: v })}
       />
       {node?.nodeType === 'element' && (
@@ -188,6 +204,7 @@ function AppearanceTab({ target }: { target: Target }) {
           <label>Figure</label>
           <select
             value={node.figureType ?? 0}
+            disabled={readOnly}
             onChange={(e) => apply({ figureType: parseInt(e.target.value, 10) })}
           >
             <option value={0}>Default (box + icon)</option>
@@ -201,6 +218,7 @@ function AppearanceTab({ target }: { target: Target }) {
             <label>Text align</label>
             <select
               value={node.textAlignment ?? 2}
+              disabled={readOnly}
               onChange={(e) => apply({ textAlignment: parseInt(e.target.value, 10) })}
             >
               <option value={1}>Left</option>
@@ -212,6 +230,7 @@ function AppearanceTab({ target }: { target: Target }) {
             <label>Text position</label>
             <select
               value={node.textPosition ?? 1}
+              disabled={readOnly}
               onChange={(e) => apply({ textPosition: parseInt(e.target.value, 10) })}
             >
               <option value={0}>Top</option>
@@ -228,7 +247,11 @@ function AppearanceTab({ target }: { target: Target }) {
 export function PropertiesPanel() {
   const model = useStore((s) => s.model);
   const selection = useStore((s) => s.selection);
+  const readOnly = useStore((s) => s.readOnly);
   const [tab, setTab] = useState<Tab>('main');
+  useEffect(() => {
+    if (readOnly && tab === 'appearance') setTab('main');
+  }, [readOnly, tab]);
 
   if (!model) return <div className="properties-panel empty-hint">No model open</div>;
   const target = resolveTarget(model, selection.source, selection.ids);
@@ -238,7 +261,7 @@ export function PropertiesPanel() {
     <div className="properties-panel">
       <div className="prop-type">{target.typeLabel}</div>
       <div className="prop-tabs">
-        {(['main', 'properties', 'appearance'] as Tab[]).map((t) => (
+        {(['main', 'properties', ...(readOnly ? [] : ['appearance'])] as Tab[]).map((t) => (
           <button
             key={t}
             className={'prop-tab' + (tab === t ? ' active' : '')}
@@ -256,7 +279,7 @@ export function PropertiesPanel() {
                 <label>Name</label>
                 <CommitInput
                   value={target.name ?? ''}
-                  disabled={!target.nameEditable}
+                  disabled={readOnly || !target.nameEditable}
                   onCommit={(v) => target.conceptId && renameItem(target.conceptId, v)}
                 />
               </div>
@@ -264,18 +287,20 @@ export function PropertiesPanel() {
                 <div className="prop-row">
                   <label>Documentation</label>
                   <CommitInput
-                    multiline
-                    value={target.documentation}
-                    onCommit={(v) => target.conceptId && setDocumentation(target.conceptId, v)}
-                  />
+                  multiline
+                  value={target.documentation}
+                  disabled={readOnly}
+                  onCommit={(v) => target.conceptId && setDocumentation(target.conceptId, v)}
+                />
                 </div>
               )}
               {target.relationship?.type === 'AccessRelationship' && (
                 <div className="prop-row">
                   <label>Access type</label>
                   <select
-                    value={target.relationship.accessType ?? 0}
-                    onChange={(e) =>
+                  value={target.relationship.accessType ?? 0}
+                  disabled={readOnly}
+                  onChange={(e) =>
                       setRelationshipAttrs(target.relationship!.id, {
                         accessType: parseInt(e.target.value, 10),
                       })
@@ -292,10 +317,11 @@ export function PropertiesPanel() {
                 <div className="prop-row">
                   <label>Strength</label>
                   <CommitInput
-                    value={target.relationship.strength ?? ''}
-                    placeholder="e.g. ++ or --"
-                    onCommit={(v) => setRelationshipAttrs(target.relationship!.id, { strength: v })}
-                  />
+                  value={target.relationship.strength ?? ''}
+                  placeholder="e.g. ++ or --"
+                  disabled={readOnly}
+                  onCommit={(v) => setRelationshipAttrs(target.relationship!.id, { strength: v })}
+                />
                 </div>
               )}
               {target.relationship?.type === 'AssociationRelationship' && (
@@ -304,6 +330,7 @@ export function PropertiesPanel() {
                     <input
                       type="checkbox"
                       checked={target.relationship.directed ?? false}
+                      disabled={readOnly}
                       onChange={(e) =>
                         setRelationshipAttrs(target.relationship!.id, { directed: e.target.checked })
                       }
@@ -317,6 +344,7 @@ export function PropertiesPanel() {
                   <label>Junction type</label>
                   <select
                     value={target.junctionType}
+                    disabled={readOnly}
                     onChange={(e) =>
                       setJunctionType(target.junctionElementId!, e.target.value as 'and' | 'or')
                     }
@@ -332,6 +360,7 @@ export function PropertiesPanel() {
                   <CommitInput
                     value={target.viewpoint ?? ''}
                     placeholder="e.g. layered"
+                    disabled={readOnly}
                     onCommit={(v) => setViewpoint(target.viewId!, v)}
                   />
                 </div>
@@ -347,8 +376,8 @@ export function PropertiesPanel() {
           {target.count > 1 && <div className="empty-hint">{target.typeLabel}</div>}
         </div>
       )}
-      {tab === 'properties' && <PropertiesTable target={target} />}
-      {tab === 'appearance' && <AppearanceTab target={target} />}
+      {tab === 'properties' && <PropertiesTable target={target} readOnly={readOnly} />}
+      {tab === 'appearance' && !readOnly && <AppearanceTab target={target} readOnly={readOnly} />}
     </div>
   );
 }

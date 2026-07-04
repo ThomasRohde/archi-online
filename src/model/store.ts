@@ -35,6 +35,7 @@ export interface AppState {
   model: ModelState | null;
   fileName: string | null;
   dirty: boolean;
+  readOnly: boolean;
   undoStack: Transaction[];
   redoStack: Transaction[];
   selection: SelectionState;
@@ -47,10 +48,15 @@ export interface AppState {
   booted: boolean;
 }
 
+export interface ReplaceModelOptions {
+  readOnly?: boolean;
+}
+
 export const useStore = create<AppState>(() => ({
   model: null,
   fileName: null,
   dirty: false,
+  readOnly: false,
   undoStack: [],
   redoStack: [],
   selection: { source: 'tree', ids: [] },
@@ -80,7 +86,7 @@ let batchInverse: Patch[] = [];
  */
 export function transact(label: string, recipe: (draft: ModelState) => void): void {
   const state = useStore.getState();
-  if (!state.model) return;
+  if (!state.model || state.readOnly) return;
   const [next, patches, inverse] = produceWithPatches(state.model, recipe);
   if (patches.length === 0) return;
   if (batchDepth > 0) {
@@ -124,6 +130,7 @@ export function runBatch<T>(label: string, fn: () => T): T {
 
 export function undo(): void {
   const s = useStore.getState();
+  if (s.readOnly) return;
   const tx = s.undoStack[s.undoStack.length - 1];
   if (!tx || !s.model) return;
   useStore.setState({
@@ -137,6 +144,7 @@ export function undo(): void {
 
 export function redo(): void {
   const s = useStore.getState();
+  if (s.readOnly) return;
   const tx = s.redoStack[s.redoStack.length - 1];
   if (!tx || !s.model) return;
   useStore.setState({
@@ -176,11 +184,17 @@ function pruneSelection(): void {
 }
 
 /** Replace the whole model (new / open file). Clears history and editor state. */
-export function replaceModel(model: ModelState | null, fileName: string | null, dirty = false): void {
+export function replaceModel(
+  model: ModelState | null,
+  fileName: string | null,
+  dirty = false,
+  options: ReplaceModelOptions = {},
+): void {
   useStore.setState((s) => ({
     model,
     fileName,
     dirty,
+    readOnly: options.readOnly ?? false,
     undoStack: [],
     redoStack: [],
     selection: { source: 'tree', ids: [] },
@@ -214,5 +228,12 @@ export function closeView(viewId: string): void {
 }
 
 export function setActiveTool(tool: Tool): void {
+  if (useStore.getState().readOnly && tool.kind !== 'select') return;
   useStore.setState({ activeTool: tool });
+}
+
+export function cloneModelForEditing(model: ModelState): ModelState {
+  return typeof structuredClone === 'function'
+    ? structuredClone(model)
+    : JSON.parse(JSON.stringify(model));
 }

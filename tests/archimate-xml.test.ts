@@ -6,6 +6,10 @@ import { createEmptyModel } from '../src/model/ops';
 import type { ModelState } from '../src/model/types';
 
 const archisurance = readFileSync(join(__dirname, 'fixtures', 'Archisurance.archimate'), 'utf8');
+const archiOnlineCapabilityModel = readFileSync(
+  join(__dirname, '..', 'public', 'examples', 'archi-online-capability-model.archimate'),
+  'utf8',
+);
 
 describe('.archimate parsing', () => {
   const m = parseArchimate(archisurance);
@@ -60,20 +64,32 @@ describe('.archimate parsing', () => {
   });
 
   it('every node/connection reference resolves', () => {
-    for (const rel of Object.values(m.relationships)) {
-      expect(m.elements[rel.sourceId] ?? m.relationships[rel.sourceId], rel.id).toBeDefined();
-      expect(m.elements[rel.targetId] ?? m.relationships[rel.targetId], rel.id).toBeDefined();
-    }
-    for (const node of Object.values(m.nodes)) {
-      if (node.nodeType === 'element') expect(m.elements[node.elementId], node.id).toBeDefined();
-      if (node.nodeType === 'ref') expect(m.views[node.refViewId], node.id).toBeDefined();
-      expect(m.views[node.viewId], node.id).toBeDefined();
-    }
-    for (const conn of Object.values(m.connections)) {
-      if (conn.relationshipId) expect(m.relationships[conn.relationshipId], conn.id).toBeDefined();
-      expect(m.nodes[conn.sourceId], conn.id).toBeDefined();
-      expect(m.nodes[conn.targetId], conn.id).toBeDefined();
-    }
+    expectReferencesResolve(m);
+  });
+});
+
+describe('Archi Online capability model example', () => {
+  const m = parseArchimate(archiOnlineCapabilityModel);
+
+  it('is detailed enough to exercise gist-backed sharing', () => {
+    expect(m.info.name).toBe('Archi Online Capability Model');
+    expect(Object.keys(m.elements)).toHaveLength(80);
+    expect(Object.keys(m.relationships)).toHaveLength(85);
+    expect(Object.keys(m.views)).toHaveLength(4);
+    expect(Object.keys(m.connections)).toHaveLength(61);
+  });
+
+  it('contains the expected model-sharing views', () => {
+    const viewNames = Object.values(m.views).map((view) => view.name);
+
+    expect(viewNames).toContain('01 - Product Goals and Requirements');
+    expect(viewNames).toContain('02 - Application Component Map');
+    expect(viewNames).toContain('03 - Share and Read-only Viewer Flow');
+    expect(viewNames).toContain('04 - Runtime and Persistence Context');
+  });
+
+  it('has no dangling references', () => {
+    expectReferencesResolve(m);
   });
 });
 
@@ -114,3 +130,20 @@ describe('.archimate round-trip', () => {
     expect(() => parseArchimate('not xml at all')).toThrow();
   });
 });
+
+function expectReferencesResolve(m: ModelState): void {
+  for (const rel of Object.values(m.relationships)) {
+    expect(m.elements[rel.sourceId] ?? m.relationships[rel.sourceId], rel.id).toBeDefined();
+    expect(m.elements[rel.targetId] ?? m.relationships[rel.targetId], rel.id).toBeDefined();
+  }
+  for (const node of Object.values(m.nodes)) {
+    if (node.nodeType === 'element') expect(m.elements[node.elementId], node.id).toBeDefined();
+    if (node.nodeType === 'ref') expect(m.views[node.refViewId], node.id).toBeDefined();
+    expect(m.views[node.viewId], node.id).toBeDefined();
+  }
+  for (const conn of Object.values(m.connections)) {
+    if (conn.relationshipId) expect(m.relationships[conn.relationshipId], conn.id).toBeDefined();
+    expect(m.nodes[conn.sourceId], conn.id).toBeDefined();
+    expect(m.nodes[conn.targetId], conn.id).toBeDefined();
+  }
+}

@@ -45,7 +45,7 @@ export async function openModelFromDisk(): Promise<void> {
   }
 }
 
-function loadModelText(text: string, fileName: string): void {
+export function loadModelText(text: string, fileName: string): void {
   const model = parseArchimate(text);
   replaceModel(model, fileName, false);
   setCurrentFileHandle(null);

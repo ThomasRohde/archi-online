@@ -1,0 +1,827 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="Archi Online Capability Model" id="id-archi-online-capability-model" version="5.0.0">
+  <folder name="Strategy" id="id-folder-strategy" type="strategy"/>
+  <folder name="Business" id="id-folder-business" type="business">
+    <element xsi:type="archimate:BusinessService" name="ArchiMate modeling service" id="id-el-modeling-service">
+      <documentation>The user-facing capability for authoring and maintaining ArchiMate models.</documentation>
+    </element>
+    <element xsi:type="archimate:BusinessService" name="Model review service" id="id-el-review-service">
+      <documentation>The user-facing capability for opening a shared model as a read-only review surface.</documentation>
+    </element>
+    <element xsi:type="archimate:BusinessProcess" name="Author model" id="id-el-author-process">
+      <documentation>Create, edit, script, layout, and save an architecture model.</documentation>
+    </element>
+    <element xsi:type="archimate:BusinessProcess" name="Share model" id="id-el-share-process">
+      <documentation>Generate a share URL and, when needed, publish the serialized model to GitHub Gist.</documentation>
+    </element>
+    <element xsi:type="archimate:BusinessProcess" name="Inspect shared model" id="id-el-review-process">
+      <documentation>Open a viewer link, select views, pan and zoom, and inspect properties without editing the shared model.</documentation>
+    </element>
+    <element xsi:type="archimate:BusinessProcess" name="Open copy for editing" id="id-el-copy-process">
+      <documentation>Clone a read-only shared model into a normal editor session.</documentation>
+    </element>
+    <element xsi:type="archimate:BusinessObject" name="Architecture model" id="id-el-architecture-model">
+      <documentation>The conceptual model being edited and reviewed.</documentation>
+    </element>
+    <element xsi:type="archimate:BusinessObject" name="Review link" id="id-el-review-link">
+      <documentation>A URL containing an inline fragment, gist id, or raw GitHub model URL.</documentation>
+    </element>
+  </folder>
+  <folder name="Application" id="id-folder-application" type="application">
+    <element xsi:type="archimate:ApplicationComponent" name="Archi Online SPA" id="id-el-spa">
+      <documentation>The React/Vite browser application containing the editor, viewer, persistence, scripting, and extension surfaces.</documentation>
+      <property key="layer">
+        <value>application shell</value>
+      </property>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="App runtime boot" id="id-el-runtime-boot">
+      <documentation>Chooses editor or viewer mode from URL state and hydrates only the stores required for that mode.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Docked editor shell" id="id-el-app-shell">
+      <documentation>Normal editable application shell with toolbar, dock layout, model tree, canvas views, properties, scripting, settings, and extensions.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Read-only viewer shell" id="id-el-viewer-shell">
+      <documentation>Lightweight shell for shared models with source label, view picker, canvas, properties, and open-copy action.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Toolbar and share command" id="id-el-toolbar">
+      <documentation>Creates new models, opens/saves files, and runs the share flow with inline or gist-backed links.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="SVG view editor" id="id-el-view-editor">
+      <documentation>Renders ArchiMate views on SVG, including editable interactions in editor mode and pan/zoom inspection in read-only mode.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Properties panel" id="id-el-properties-panel">
+      <documentation>Shows concept metadata and edits properties in normal mode while hiding mutating controls in read-only mode.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Model tree" id="id-el-model-tree">
+      <documentation>Navigates model folders, elements, relationships, and views.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Normalized model store" id="id-el-model-store">
+      <documentation>Zustand store for ModelState, selection, active view, tools, dirty state, undo/redo, and read-only mode.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Transaction and undo/redo operations" id="id-el-undo-redo">
+      <documentation>Routes model mutations through transactions so UI, scripting, and undo/redo stay consistent.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="ArchiMate XML I/O" id="id-el-xml-io">
+      <documentation>Parser and serializer for Archi native .archimate XML.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Share encoding module" id="id-el-share-encoding">
+      <documentation>Compresses inline share payloads, parses fragments, loads shared models, and remembers gist associations.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="GitHub Gist persistence module" id="id-el-github-persistence">
+      <documentation>Creates, updates, and reads GitHub Gists and raw GitHub model URLs.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="File persistence module" id="id-el-file-persistence">
+      <documentation>Uses File System Access and download fallback for opening and saving .archimate files.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="IndexedDB autosave" id="id-el-autosave">
+      <documentation>Stores and restores editor workspaces, but is deliberately skipped while booting shared viewer links.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Settings store" id="id-el-settings-store">
+      <documentation>Persists canvas, layout, and behavior preferences.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Extension runtime" id="id-el-extension-runtime">
+      <documentation>Loads extension packages, exposes commands, panels, context menus, and app events.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="jArchi script runner" id="id-el-script-runner">
+      <documentation>Executes scripts against the model API and reports console output.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Monaco script editor" id="id-el-monaco-editor">
+      <documentation>Provides the browser code editor used by scripting and extension source editing.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="ELK layout extension" id="id-el-elk-extension">
+      <documentation>Example extension applying ELK layout to model views.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationService" name="Browser model editing" id="id-el-model-editing-app-service">
+      <documentation>Application service exposed by the editor shell.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationService" name="Read-only model viewing" id="id-el-viewer-app-service">
+      <documentation>Application service exposed by the viewer shell.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationService" name="Share link generation" id="id-el-share-app-service">
+      <documentation>Application service that produces inline, gist-backed, or raw-source viewer links.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationService" name="Gist publication" id="id-el-gist-app-service">
+      <documentation>Application service that stores large shared models in GitHub Gist.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationService" name="XML import/export" id="id-el-xml-app-service">
+      <documentation>Application service for Archi native file interchange.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationService" name="Extension API" id="id-el-extension-app-service">
+      <documentation>Application service consumed by local extensions and future automation.</documentation>
+    </element>
+    <element xsi:type="archimate:ApplicationService" name="jArchi-compatible scripting" id="id-el-scripting-app-service">
+      <documentation>Application service for executing scripts against the current model.</documentation>
+    </element>
+    <element xsi:type="archimate:DataObject" name="ModelState graph" id="id-el-model-state">
+      <documentation>Normalized in-memory model: folders, concepts, views, nodes, connections, and model metadata.</documentation>
+    </element>
+    <element xsi:type="archimate:DataObject" name=".archimate XML document" id="id-el-archimate-xml">
+      <documentation>Serialized Archi native XML used by disk persistence, gist sharing, and raw URL loading.</documentation>
+    </element>
+    <element xsi:type="archimate:DataObject" name="Compressed inline share payload" id="id-el-inline-payload">
+      <documentation>Deflated XML encoded as base64url in the URL fragment.</documentation>
+    </element>
+    <element xsi:type="archimate:DataObject" name="Gist-backed viewer link" id="id-el-gist-link-data">
+      <documentation>Viewer URL containing #gist=&lt;id&gt; for a model stored in GitHub Gist.</documentation>
+    </element>
+    <element xsi:type="archimate:DataObject" name="Raw GitHub model URL" id="id-el-raw-url-data">
+      <documentation>Viewer URL containing #raw=&lt;url&gt; that points at GitHub raw content.</documentation>
+    </element>
+    <element xsi:type="archimate:DataObject" name="IndexedDB workspace" id="id-el-workspace-data">
+      <documentation>Autosave, settings, token, and gist association records stored in browser IndexedDB.</documentation>
+    </element>
+    <element xsi:type="archimate:DataObject" name="Local .archimate file" id="id-el-local-file-data">
+      <documentation>A file selected through File System Access or downloaded from the app.</documentation>
+    </element>
+    <element xsi:type="archimate:DataObject" name="Extension package" id="id-el-extension-package-data">
+      <documentation>Extension source or package manifest and files.</documentation>
+    </element>
+  </folder>
+  <folder name="Technology &amp; Physical" id="id-folder-technology" type="technology">
+    <element xsi:type="archimate:Node" name="Browser runtime" id="id-el-browser-runtime">
+      <documentation>Modern browser executing the SPA and providing DOM, Clipboard, File System Access, and IndexedDB APIs.</documentation>
+    </element>
+    <element xsi:type="archimate:Node" name="Static web host" id="id-el-static-host">
+      <documentation>Hosts the built Vite assets for Archi Online.</documentation>
+    </element>
+    <element xsi:type="archimate:Node" name="GitHub platform" id="id-el-github-platform">
+      <documentation>External platform providing Gist and raw content endpoints.</documentation>
+    </element>
+    <element xsi:type="archimate:Device" name="User workstation" id="id-el-local-device">
+      <documentation>The device running the browser and holding local files.</documentation>
+    </element>
+    <element xsi:type="archimate:SystemSoftware" name="React" id="id-el-react-runtime">
+      <documentation>UI runtime used by the app shells, panels, and dialogs.</documentation>
+    </element>
+    <element xsi:type="archimate:SystemSoftware" name="Vite build" id="id-el-vite-build">
+      <documentation>Development server and production bundler for the browser app.</documentation>
+    </element>
+    <element xsi:type="archimate:SystemSoftware" name="TypeScript" id="id-el-typescript">
+      <documentation>Strict TypeScript source layer for application and model behavior.</documentation>
+    </element>
+    <element xsi:type="archimate:SystemSoftware" name="Monaco Editor" id="id-el-monaco-lib">
+      <documentation>Browser code editor library.</documentation>
+    </element>
+    <element xsi:type="archimate:SystemSoftware" name="ELK.js" id="id-el-elk-lib">
+      <documentation>Graph layout engine used by extension functionality.</documentation>
+    </element>
+    <element xsi:type="archimate:SystemSoftware" name="fflate" id="id-el-fflate-lib">
+      <documentation>Compression library used for inline share payloads.</documentation>
+    </element>
+    <element xsi:type="archimate:SystemSoftware" name="idb-keyval" id="id-el-idb-keyval-lib">
+      <documentation>Small key-value wrapper around IndexedDB.</documentation>
+    </element>
+    <element xsi:type="archimate:TechnologyService" name="GitHub Gist API" id="id-el-gist-api">
+      <documentation>api.github.com/gists create, update, and metadata read endpoints.</documentation>
+    </element>
+    <element xsi:type="archimate:TechnologyService" name="GitHub raw content" id="id-el-raw-content">
+      <documentation>gist.githubusercontent.com and raw.githubusercontent.com model file reads.</documentation>
+    </element>
+    <element xsi:type="archimate:TechnologyService" name="File System Access API" id="id-el-filesystem-api">
+      <documentation>Browser API for opening and saving local model files when available.</documentation>
+    </element>
+    <element xsi:type="archimate:TechnologyService" name="IndexedDB API" id="id-el-indexeddb-api">
+      <documentation>Browser database used by autosave, settings, token, and gist association stores.</documentation>
+    </element>
+    <element xsi:type="archimate:TechnologyService" name="Clipboard API" id="id-el-clipboard-api">
+      <documentation>Browser API used to place share links on the clipboard.</documentation>
+    </element>
+    <element xsi:type="archimate:Artifact" name="Production static assets" id="id-el-static-assets">
+      <documentation>Built HTML, CSS, JavaScript, workers, Monaco assets, and ELK bundle.</documentation>
+    </element>
+    <element xsi:type="archimate:Artifact" name="Gist .archimate file" id="id-el-gist-file-artifact">
+      <documentation>The .archimate file stored inside a GitHub Gist.</documentation>
+    </element>
+  </folder>
+  <folder name="Motivation" id="id-folder-motivation" type="motivation">
+    <element xsi:type="archimate:Stakeholder" name="Enterprise Architect" id="id-el-enterprise-architect">
+      <documentation>Owns model quality and uses Archi Online to inspect, edit, and share ArchiMate models.</documentation>
+    </element>
+    <element xsi:type="archimate:Stakeholder" name="Model Author" id="id-el-model-author">
+      <documentation>Creates and edits models in the browser, then shares links for review.</documentation>
+    </element>
+    <element xsi:type="archimate:Stakeholder" name="Model Reviewer" id="id-el-reviewer">
+      <documentation>Opens shared models without installing Archi or receiving editable files.</documentation>
+    </element>
+    <element xsi:type="archimate:Stakeholder" name="Extension Developer" id="id-el-extension-developer">
+      <documentation>Adds local extensions and scripts through the app extension surface.</documentation>
+    </element>
+    <element xsi:type="archimate:Driver" name="Browser-first enterprise modeling" id="id-el-browser-first-driver">
+      <documentation>Architecture work should be possible from a modern browser without a desktop Archi install.</documentation>
+    </element>
+    <element xsi:type="archimate:Driver" name="Fast model review loops" id="id-el-review-driver">
+      <documentation>Sharing a model should be as easy as sending a link while preserving model fidelity.</documentation>
+    </element>
+    <element xsi:type="archimate:Assessment" name="Long inline links are fragile" id="id-el-url-risk">
+      <documentation>Real models exceed practical URL limits in browsers, chat clients, and email tools.</documentation>
+    </element>
+    <element xsi:type="archimate:Goal" name="Edit ArchiMate models in the browser" id="id-el-edit-goal">
+      <documentation>Provide a usable browser modeler with canvas editing, properties, persistence, and scripting.</documentation>
+    </element>
+    <element xsi:type="archimate:Goal" name="Share models for review" id="id-el-share-goal">
+      <documentation>Create a link that opens the same model in read-only mode.</documentation>
+    </element>
+    <element xsi:type="archimate:Goal" name="Keep review links read-only" id="id-el-readonly-goal">
+      <documentation>Reviewers can inspect the model and open an editable copy, but the shared source is never mutated by viewing.</documentation>
+    </element>
+    <element xsi:type="archimate:Goal" name="Preserve Archi .archimate fidelity" id="id-el-fidelity-goal">
+      <documentation>Import, edit, serialize, and round-trip Archi native XML without losing structure relevant to this app.</documentation>
+    </element>
+    <element xsi:type="archimate:Requirement" name="URL and gist share links" id="id-el-share-links-req">
+      <documentation>Small models use compressed fragments; larger models publish a .archimate file to GitHub Gist.</documentation>
+    </element>
+    <element xsi:type="archimate:Requirement" name="Zero-auth viewer loading" id="id-el-zero-auth-req">
+      <documentation>Public and secret gist links, plus GitHub raw URLs, open in the viewer without requiring a GitHub token.</documentation>
+    </element>
+    <element xsi:type="archimate:Requirement" name="Open shared model as editable copy" id="id-el-copy-req">
+      <documentation>The viewer can switch into the full editor with a cloned model and autosave restore disabled for that transition.</documentation>
+    </element>
+    <element xsi:type="archimate:Requirement" name="GitHub token stays local" id="id-el-token-req">
+      <documentation>The gist token is stored in local IndexedDB key-value storage and is only sent to api.github.com.</documentation>
+    </element>
+    <element xsi:type="archimate:Requirement" name="Reuse gist per model id" id="id-el-gist-reuse-req">
+      <documentation>Re-sharing a model updates the remembered gist id for the same model.info.id.</documentation>
+    </element>
+    <element xsi:type="archimate:Principle" name="Native .archimate remains source of truth" id="id-el-native-file-principle">
+      <documentation>Sharing and persistence are wrappers around the same ArchiMate XML model, not a separate export format.</documentation>
+    </element>
+  </folder>
+  <folder name="Implementation &amp; Migration" id="id-folder-implementation_migration" type="implementation_migration">
+    <element xsi:type="archimate:WorkPackage" name="Milestone 1 model sharing" id="id-el-m1-sharing">
+      <documentation>Implemented read-only viewer links, inline payloads, GitHub gist-backed links, public raw loading, and open-copy editing.</documentation>
+    </element>
+    <element xsi:type="archimate:Deliverable" name="Read-only viewer and gist sharing" id="id-el-m1-deliverable">
+      <documentation>The shipped capability under test with this model.</documentation>
+    </element>
+  </folder>
+  <folder name="Other" id="id-folder-other" type="other"/>
+  <folder name="Relations" id="id-folder-relations" type="relations">
+    <element xsi:type="archimate:InfluenceRelationship" name="+" id="id-rel-author-influences-edit" source="id-el-model-author" target="id-el-edit-goal">
+      <documentation>Model authors motivate browser-based editing.</documentation>
+    </element>
+    <element xsi:type="archimate:InfluenceRelationship" name="+" id="id-rel-reviewer-influences-share" source="id-el-reviewer" target="id-el-share-goal">
+      <documentation>Reviewers motivate link-based sharing.</documentation>
+    </element>
+    <element xsi:type="archimate:InfluenceRelationship" name="+" id="id-rel-architect-influences-fidelity" source="id-el-enterprise-architect" target="id-el-fidelity-goal">
+      <documentation>Enterprise architects need model fidelity.</documentation>
+    </element>
+    <element xsi:type="archimate:InfluenceRelationship" name="++" id="id-rel-browser-driver-influences-edit" source="id-el-browser-first-driver" target="id-el-edit-goal">
+      <documentation>Browser-first work strongly drives the editing goal.</documentation>
+    </element>
+    <element xsi:type="archimate:InfluenceRelationship" name="++" id="id-rel-review-driver-influences-share" source="id-el-review-driver" target="id-el-share-goal">
+      <documentation>Fast review loops strongly drive share links.</documentation>
+    </element>
+    <element xsi:type="archimate:InfluenceRelationship" name="++" id="id-rel-url-risk-influences-gist" source="id-el-url-risk" target="id-el-share-links-req">
+      <documentation>The URL risk drives gist-backed fallback.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-share-realizes-review" source="id-el-share-links-req" target="id-el-share-goal">
+      <documentation>Share link requirement realizes the share goal.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-zero-auth-realizes-share" source="id-el-zero-auth-req" target="id-el-share-goal">
+      <documentation>Zero-auth opening realizes practical model review.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-copy-realizes-readonly" source="id-el-copy-req" target="id-el-readonly-goal">
+      <documentation>Open-copy editing keeps review links read-only.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="supports" id="id-rel-token-realizes-security" source="id-el-token-req" target="id-el-readonly-goal">
+      <documentation>Local token storage avoids embedding credentials in links.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="supports" id="id-rel-reuse-realizes-share" source="id-el-gist-reuse-req" target="id-el-share-goal">
+      <documentation>Stable gist reuse keeps shared URLs durable.</documentation>
+    </element>
+    <element xsi:type="archimate:InfluenceRelationship" name="+" id="id-rel-principle-influences-fidelity" source="id-el-native-file-principle" target="id-el-fidelity-goal">
+      <documentation>The native-file principle supports fidelity.</documentation>
+    </element>
+    <element xsi:type="archimate:AssignmentRelationship" name="performs" id="id-rel-author-assigned-author" source="id-el-model-author" target="id-el-author-process">
+      <documentation>Model author performs the authoring process.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="updates" id="id-rel-author-process-accesses-model" source="id-el-author-process" target="id-el-architecture-model" accessType="3">
+      <documentation>Authoring updates the architecture model.</documentation>
+    </element>
+    <element xsi:type="archimate:TriggeringRelationship" name="then shares" id="id-rel-author-triggers-share" source="id-el-author-process" target="id-el-share-process">
+      <documentation>The author shares after editing.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="serializes" id="id-rel-share-accesses-model" source="id-el-share-process" target="id-el-architecture-model" accessType="1">
+      <documentation>Sharing reads the current model.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="writes" id="id-rel-share-creates-link" source="id-el-share-process" target="id-el-review-link" accessType="0">
+      <documentation>Sharing writes a review link.</documentation>
+    </element>
+    <element xsi:type="archimate:AssignmentRelationship" name="performs" id="id-rel-reviewer-assigned-review" source="id-el-reviewer" target="id-el-review-process">
+      <documentation>Reviewer performs the inspection process.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="opens" id="id-rel-review-reads-link" source="id-el-review-process" target="id-el-review-link" accessType="1">
+      <documentation>Review process reads the shared link.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="inspects" id="id-rel-review-reads-model" source="id-el-review-process" target="id-el-architecture-model" accessType="1">
+      <documentation>Review process reads the architecture model.</documentation>
+    </element>
+    <element xsi:type="archimate:TriggeringRelationship" name="optional copy" id="id-rel-review-triggers-copy" source="id-el-review-process" target="id-el-copy-process">
+      <documentation>The reviewer can open a copy for editing.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="supports" id="id-rel-modeling-serves-author" source="id-el-modeling-service" target="id-el-author-process">
+      <documentation>Modeling service serves authoring.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="supports" id="id-rel-review-serves-review" source="id-el-review-service" target="id-el-review-process">
+      <documentation>Review service serves inspection.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains" id="id-rel-spa-composes-runtime" source="id-el-spa" target="id-el-runtime-boot">
+      <documentation>SPA contains runtime boot.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains" id="id-rel-spa-composes-app-shell" source="id-el-spa" target="id-el-app-shell">
+      <documentation>SPA contains editable shell.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains" id="id-rel-spa-composes-viewer-shell" source="id-el-spa" target="id-el-viewer-shell">
+      <documentation>SPA contains viewer shell.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains" id="id-rel-app-shell-composes-toolbar" source="id-el-app-shell" target="id-el-toolbar">
+      <documentation>App shell contains toolbar.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains" id="id-rel-app-shell-composes-tree" source="id-el-app-shell" target="id-el-model-tree">
+      <documentation>App shell contains model tree.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains" id="id-rel-app-shell-composes-editor" source="id-el-app-shell" target="id-el-view-editor">
+      <documentation>App shell contains view editor panels.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains" id="id-rel-app-shell-composes-props" source="id-el-app-shell" target="id-el-properties-panel">
+      <documentation>App shell contains properties panel.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains readonly" id="id-rel-viewer-composes-editor" source="id-el-viewer-shell" target="id-el-view-editor">
+      <documentation>Viewer shell contains read-only view editor.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains inspect" id="id-rel-viewer-composes-props" source="id-el-viewer-shell" target="id-el-properties-panel">
+      <documentation>Viewer shell contains properties inspection.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-app-shell-realizes-editing-service" source="id-el-app-shell" target="id-el-model-editing-app-service">
+      <documentation>Editable shell realizes browser model editing.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-viewer-realizes-viewer-service" source="id-el-viewer-shell" target="id-el-viewer-app-service">
+      <documentation>Viewer shell realizes read-only viewing.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-toolbar-realizes-share-service" source="id-el-toolbar" target="id-el-share-app-service">
+      <documentation>Toolbar share command realizes share link generation.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-github-realizes-gist-service" source="id-el-github-persistence" target="id-el-gist-app-service">
+      <documentation>GitHub module realizes gist publication.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-xml-realizes-xml-service" source="id-el-xml-io" target="id-el-xml-app-service">
+      <documentation>XML module realizes import/export.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-extension-realizes-extension-service" source="id-el-extension-runtime" target="id-el-extension-app-service">
+      <documentation>Extension runtime realizes extension API.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="realizes" id="id-rel-script-realizes-script-service" source="id-el-script-runner" target="id-el-scripting-app-service">
+      <documentation>Script runner realizes scripting service.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="owns" id="id-rel-model-store-accesses-state" source="id-el-model-store" target="id-el-model-state" accessType="3">
+      <documentation>Store owns the normalized graph.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="mutates" id="id-rel-undo-accesses-state" source="id-el-undo-redo" target="id-el-model-state" accessType="3">
+      <documentation>Transactions mutate model state.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="reads and writes" id="id-rel-xml-accesses-state" source="id-el-xml-io" target="id-el-model-state" accessType="3">
+      <documentation>XML I/O parses and serializes ModelState.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="reads/writes XML" id="id-rel-xml-accesses-xml" source="id-el-xml-io" target="id-el-archimate-xml" accessType="3">
+      <documentation>XML I/O reads and writes ArchiMate XML.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="compresses" id="id-rel-share-encoding-accesses-xml" source="id-el-share-encoding" target="id-el-archimate-xml" accessType="1">
+      <documentation>Share encoding compresses serialized XML.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="writes" id="id-rel-share-encoding-writes-payload" source="id-el-share-encoding" target="id-el-inline-payload" accessType="0">
+      <documentation>Share encoding writes inline payloads.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="writes" id="id-rel-share-encoding-writes-gist-link" source="id-el-share-encoding" target="id-el-gist-link-data" accessType="0">
+      <documentation>Share encoding writes gist-backed links.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="reads" id="id-rel-share-encoding-reads-raw-url" source="id-el-share-encoding" target="id-el-raw-url-data" accessType="1">
+      <documentation>Share loader accepts raw URL fragments.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="uploads/downloads" id="id-rel-github-accesses-xml" source="id-el-github-persistence" target="id-el-archimate-xml" accessType="3">
+      <documentation>GitHub persistence uploads and downloads XML.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="stores workspace" id="id-rel-autosave-accesses-workspace" source="id-el-autosave" target="id-el-workspace-data" accessType="3">
+      <documentation>Autosave stores workspace data.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="stores settings" id="id-rel-settings-accesses-workspace" source="id-el-settings-store" target="id-el-workspace-data" accessType="3">
+      <documentation>Settings store uses IndexedDB workspace records.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="opens/saves" id="id-rel-file-accesses-local-file" source="id-el-file-persistence" target="id-el-local-file-data" accessType="3">
+      <documentation>File persistence opens and saves local files.</documentation>
+    </element>
+    <element xsi:type="archimate:AccessRelationship" name="loads" id="id-rel-extension-accesses-package" source="id-el-extension-runtime" target="id-el-extension-package-data" accessType="1">
+      <documentation>Extension runtime loads package data.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="renders diagrams" id="id-rel-view-editor-serves-shells" source="id-el-view-editor" target="id-el-app-shell">
+      <documentation>View editor serves the shell.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="shows metadata" id="id-rel-properties-serves-shells" source="id-el-properties-panel" target="id-el-app-shell">
+      <documentation>Properties panel serves editable shell.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="state API" id="id-rel-model-store-serves-ui" source="id-el-model-store" target="id-el-app-shell">
+      <documentation>Model store serves editor UI.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="readonly state" id="id-rel-model-store-serves-viewer" source="id-el-model-store" target="id-el-viewer-shell">
+      <documentation>Model store serves viewer UI.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="share helpers" id="id-rel-share-encoding-serves-toolbar" source="id-el-share-encoding" target="id-el-toolbar">
+      <documentation>Share encoding serves the toolbar.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="gist helpers" id="id-rel-github-serves-share-encoding" source="id-el-github-persistence" target="id-el-share-encoding">
+      <documentation>GitHub persistence serves share encoding.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="serialize/parse" id="id-rel-xml-serves-file" source="id-el-xml-io" target="id-el-file-persistence">
+      <documentation>XML I/O serves file persistence.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="serialize/parse" id="id-rel-xml-serves-share" source="id-el-xml-io" target="id-el-share-encoding">
+      <documentation>XML I/O serves sharing.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="commands/panels" id="id-rel-extension-serves-app-shell" source="id-el-extension-runtime" target="id-el-app-shell">
+      <documentation>Extension runtime serves app shell.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="script execution" id="id-rel-script-serves-app-shell" source="id-el-script-runner" target="id-el-app-shell">
+      <documentation>Script runner serves the app shell.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="serves assets" id="id-rel-static-host-serves-browser" source="id-el-static-host" target="id-el-browser-runtime">
+      <documentation>Static host serves assets to browser runtime.</documentation>
+    </element>
+    <element xsi:type="archimate:AssignmentRelationship" name="executes" id="id-rel-browser-hosts-spa" source="id-el-browser-runtime" target="id-el-spa">
+      <documentation>Browser runtime executes the SPA.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="implements" id="id-rel-static-assets-realize-spa" source="id-el-static-assets" target="id-el-spa">
+      <documentation>Built static assets implement the SPA.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="UI runtime" id="id-rel-react-serves-spa" source="id-el-react-runtime" target="id-el-spa">
+      <documentation>React serves the SPA.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="builds" id="id-rel-vite-realizes-assets" source="id-el-vite-build" target="id-el-static-assets">
+      <documentation>Vite produces static assets.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="source" id="id-rel-typescript-realizes-spa" source="id-el-typescript" target="id-el-spa">
+      <documentation>TypeScript source realizes application behavior.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="library" id="id-rel-monaco-serves-editor" source="id-el-monaco-lib" target="id-el-monaco-editor">
+      <documentation>Monaco library serves editor component.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="layout engine" id="id-rel-elk-serves-extension" source="id-el-elk-lib" target="id-el-elk-extension">
+      <documentation>ELK.js serves the layout extension.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="compression" id="id-rel-fflate-serves-share" source="id-el-fflate-lib" target="id-el-share-encoding">
+      <documentation>fflate serves share encoding.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="keyval" id="id-rel-idb-serves-autosave" source="id-el-idb-keyval-lib" target="id-el-autosave">
+      <documentation>idb-keyval serves autosave and local stores.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="create/update/read" id="id-rel-gist-api-serves-github-module" source="id-el-gist-api" target="id-el-github-persistence">
+      <documentation>GitHub Gist API serves the app module.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="raw XML" id="id-rel-raw-content-serves-github-module" source="id-el-raw-content" target="id-el-github-persistence">
+      <documentation>Raw content endpoints serve model loading.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="local files" id="id-rel-filesystem-serves-file-module" source="id-el-filesystem-api" target="id-el-file-persistence">
+      <documentation>File System Access API serves file persistence.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="local database" id="id-rel-indexeddb-serves-stores" source="id-el-indexeddb-api" target="id-el-autosave">
+      <documentation>IndexedDB serves autosave.</documentation>
+    </element>
+    <element xsi:type="archimate:ServingRelationship" name="copy link" id="id-rel-clipboard-serves-toolbar" source="id-el-clipboard-api" target="id-el-toolbar">
+      <documentation>Clipboard API serves share link copy.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains" id="id-rel-github-platform-composes-api" source="id-el-github-platform" target="id-el-gist-api">
+      <documentation>GitHub platform contains Gist API.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="contains" id="id-rel-github-platform-composes-raw" source="id-el-github-platform" target="id-el-raw-content">
+      <documentation>GitHub platform contains raw content endpoints.</documentation>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="runs" id="id-rel-local-device-composes-browser" source="id-el-local-device" target="id-el-browser-runtime">
+      <documentation>User workstation runs browser runtime.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="stores" id="id-rel-gist-file-realizes-xml" source="id-el-gist-file-artifact" target="id-el-archimate-xml">
+      <documentation>Gist file stores ArchiMate XML.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="implements" id="id-rel-m1-realizes-share-req" source="id-el-m1-sharing" target="id-el-share-links-req">
+      <documentation>Milestone 1 implements share links.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="implements" id="id-rel-m1-realizes-zero-auth" source="id-el-m1-sharing" target="id-el-zero-auth-req">
+      <documentation>Milestone 1 implements zero-auth viewing.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="implements" id="id-rel-m1-realizes-copy" source="id-el-m1-sharing" target="id-el-copy-req">
+      <documentation>Milestone 1 implements open-copy editing.</documentation>
+    </element>
+    <element xsi:type="archimate:RealizationRelationship" name="documents" id="id-rel-m1-produces-deliverable" source="id-el-m1-deliverable" target="id-el-m1-sharing">
+      <documentation>Deliverable documents the milestone implementation.</documentation>
+    </element>
+  </folder>
+  <folder name="Views" id="id-folder-diagrams" type="diagrams">
+    <element xsi:type="archimate:ArchimateDiagramModel" name="01 - Product Goals and Requirements" id="id-view-01-goals" connectionRouterType="1" viewpoint="requirements_realization">
+      <child xsi:type="archimate:Group" id="id-view-01-goals-group-stakeholders" name="Stakeholders and drivers" lineColor="#8a94a6" fillColor="#f7f8fa">
+        <bounds x="20" y="20" width="720" height="220"/>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-author" fillColor="#ccccff" archimateElement="id-el-model-author">
+          <bounds x="30" y="35" width="160" height="60"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-author-edit" lineColor="#5f6f89" source="id-view-01-goals-node-author" target="id-view-01-goals-node-edit-goal" archimateRelationship="id-rel-author-influences-edit"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-reviewer" fillColor="#ccccff" archimateElement="id-el-reviewer">
+          <bounds x="210" y="35" width="160" height="60"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-reviewer-share" lineColor="#5f6f89" source="id-view-01-goals-node-reviewer" target="id-view-01-goals-node-share-goal" archimateRelationship="id-rel-reviewer-influences-share"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-architect" fillColor="#ccccff" archimateElement="id-el-enterprise-architect">
+          <bounds x="390" y="35" width="170" height="60"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-architect-fidelity" lineColor="#5f6f89" source="id-view-01-goals-node-architect" target="id-view-01-goals-node-fidelity-goal" archimateRelationship="id-rel-architect-influences-fidelity"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-browser-driver" fillColor="#ccccff" archimateElement="id-el-browser-first-driver">
+          <bounds x="110" y="130" width="220" height="60"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-browser-edit" lineColor="#5f6f89" source="id-view-01-goals-node-browser-driver" target="id-view-01-goals-node-edit-goal" archimateRelationship="id-rel-browser-driver-influences-edit"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-review-driver" fillColor="#ccccff" archimateElement="id-el-review-driver">
+          <bounds x="360" y="130" width="220" height="60"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-review-share" lineColor="#5f6f89" source="id-view-01-goals-node-review-driver" target="id-view-01-goals-node-share-goal" archimateRelationship="id-rel-review-driver-influences-share"/>
+        </child>
+      </child>
+      <child xsi:type="archimate:Group" id="id-view-01-goals-group-goals" name="Goals" lineColor="#8a94a6" fillColor="#f7f8fa">
+        <bounds x="780" y="20" width="600" height="220"/>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-edit-goal" targetConnections="id-view-01-goals-conn-author-edit id-view-01-goals-conn-browser-edit" fillColor="#ccccff" archimateElement="id-el-edit-goal">
+          <bounds x="40" y="35" width="200" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-share-goal" targetConnections="id-view-01-goals-conn-reviewer-share id-view-01-goals-conn-review-share id-view-01-goals-conn-share-realizes id-view-01-goals-conn-zero-realizes id-view-01-goals-conn-reuse-realizes" fillColor="#ccccff" archimateElement="id-el-share-goal">
+          <bounds x="300" y="35" width="200" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-readonly-goal" targetConnections="id-view-01-goals-conn-copy-realizes id-view-01-goals-conn-token-realizes" fillColor="#ccccff" archimateElement="id-el-readonly-goal">
+          <bounds x="170" y="130" width="220" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-fidelity-goal" targetConnections="id-view-01-goals-conn-architect-fidelity id-view-01-goals-conn-principle-fidelity" fillColor="#ccccff" archimateElement="id-el-fidelity-goal">
+          <bounds x="430" y="130" width="150" height="65"/>
+        </child>
+      </child>
+      <child xsi:type="archimate:Group" id="id-view-01-goals-group-requirements" name="Milestone 1 requirements" lineColor="#8a94a6" fillColor="#f7f8fa">
+        <bounds x="120" y="300" width="1180" height="270"/>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-share-req" targetConnections="id-view-01-goals-conn-risk-req" fillColor="#ccccff" archimateElement="id-el-share-links-req">
+          <bounds x="35" y="45" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-share-realizes" lineColor="#5f6f89" source="id-view-01-goals-node-share-req" target="id-view-01-goals-node-share-goal" archimateRelationship="id-rel-share-realizes-review"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-zero-auth" fillColor="#ccccff" archimateElement="id-el-zero-auth-req">
+          <bounds x="245" y="45" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-zero-realizes" lineColor="#5f6f89" source="id-view-01-goals-node-zero-auth" target="id-view-01-goals-node-share-goal" archimateRelationship="id-rel-zero-auth-realizes-share"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-copy-req" fillColor="#ccccff" archimateElement="id-el-copy-req">
+          <bounds x="455" y="45" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-copy-realizes" lineColor="#5f6f89" source="id-view-01-goals-node-copy-req" target="id-view-01-goals-node-readonly-goal" archimateRelationship="id-rel-copy-realizes-readonly"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-token-req" fillColor="#ccccff" archimateElement="id-el-token-req">
+          <bounds x="665" y="45" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-token-realizes" lineColor="#5f6f89" source="id-view-01-goals-node-token-req" target="id-view-01-goals-node-readonly-goal" archimateRelationship="id-rel-token-realizes-security"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-reuse-req" fillColor="#ccccff" archimateElement="id-el-gist-reuse-req">
+          <bounds x="875" y="45" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-reuse-realizes" lineColor="#5f6f89" source="id-view-01-goals-node-reuse-req" target="id-view-01-goals-node-share-goal" archimateRelationship="id-rel-reuse-realizes-share"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-native-principle" fillColor="#ccccff" archimateElement="id-el-native-file-principle">
+          <bounds x="365" y="160" width="260" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-principle-fidelity" lineColor="#5f6f89" source="id-view-01-goals-node-native-principle" target="id-view-01-goals-node-fidelity-goal" archimateRelationship="id-rel-principle-influences-fidelity"/>
+        </child>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-01-goals-node-url-risk" fillColor="#ccccff" archimateElement="id-el-url-risk">
+        <bounds x="310" y="250" width="210" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-01-goals-conn-risk-req" lineColor="#a55" source="id-view-01-goals-node-url-risk" target="id-view-01-goals-node-share-req" archimateRelationship="id-rel-url-risk-influences-gist"/>
+      </child>
+      <child xsi:type="archimate:Note" id="id-view-01-goals-note-scope" lineColor="#c9ad4f" fillColor="#fff7d6">
+        <bounds x="980" y="590" width="340" height="95"/>
+        <content>This model is the share-test artifact: it is large enough for gist fallback and structured enough to inspect in read-only viewer mode.</content>
+      </child>
+      <documentation>Motivation view for the model-sharing capable Archi Online app.</documentation>
+    </element>
+    <element xsi:type="archimate:ArchimateDiagramModel" name="02 - Application Component Map" id="id-view-02-application-map" connectionRouterType="1" viewpoint="application_structure">
+      <child xsi:type="archimate:Group" id="id-view-02-application-map-group-ui" name="UI shells and panels" lineColor="#8a94a6" fillColor="#f7f8fa">
+        <bounds x="30" y="30" width="520" height="500"/>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-runtime" targetConnections="id-view-02-application-map-conn-spa-runtime" fillColor="#b5ffff" archimateElement="id-el-runtime-boot">
+          <bounds x="25" y="35" width="175" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-app-shell" targetConnections="id-view-02-application-map-conn-spa-app-shell id-view-02-application-map-conn-store-ui id-view-02-application-map-conn-extension-app id-view-02-application-map-conn-script-app" fillColor="#b5ffff" archimateElement="id-el-app-shell">
+          <bounds x="25" y="135" width="180" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-app-toolbar" lineColor="#5f6f89" source="id-view-02-application-map-node-app-shell" target="id-view-02-application-map-node-toolbar" archimateRelationship="id-rel-app-shell-composes-toolbar"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-app-tree" lineColor="#5f6f89" source="id-view-02-application-map-node-app-shell" target="id-view-02-application-map-node-tree" archimateRelationship="id-rel-app-shell-composes-tree"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-app-editor" lineColor="#5f6f89" source="id-view-02-application-map-node-app-shell" target="id-view-02-application-map-node-view-editor" archimateRelationship="id-rel-app-shell-composes-editor"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-app-props" lineColor="#5f6f89" source="id-view-02-application-map-node-app-shell" target="id-view-02-application-map-node-properties" archimateRelationship="id-rel-app-shell-composes-props"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-viewer" targetConnections="id-view-02-application-map-conn-spa-viewer id-view-02-application-map-conn-store-viewer" fillColor="#b5ffff" archimateElement="id-el-viewer-shell">
+          <bounds x="250" y="135" width="180" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-viewer-editor" lineColor="#5f6f89" source="id-view-02-application-map-node-viewer" target="id-view-02-application-map-node-view-editor" archimateRelationship="id-rel-viewer-composes-editor"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-viewer-props" lineColor="#5f6f89" source="id-view-02-application-map-node-viewer" target="id-view-02-application-map-node-properties" archimateRelationship="id-rel-viewer-composes-props"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-toolbar" targetConnections="id-view-02-application-map-conn-app-toolbar id-view-02-application-map-conn-share-toolbar" fillColor="#b5ffff" archimateElement="id-el-toolbar">
+          <bounds x="25" y="235" width="180" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-view-editor" targetConnections="id-view-02-application-map-conn-app-editor id-view-02-application-map-conn-viewer-editor" fillColor="#b5ffff" archimateElement="id-el-view-editor">
+          <bounds x="250" y="235" width="180" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-properties" targetConnections="id-view-02-application-map-conn-app-props id-view-02-application-map-conn-viewer-props" fillColor="#b5ffff" archimateElement="id-el-properties-panel">
+          <bounds x="250" y="335" width="180" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-tree" targetConnections="id-view-02-application-map-conn-app-tree" fillColor="#b5ffff" archimateElement="id-el-model-tree">
+          <bounds x="25" y="335" width="180" height="65"/>
+        </child>
+      </child>
+      <child xsi:type="archimate:Group" id="id-view-02-application-map-group-core" name="Model core" lineColor="#8a94a6" fillColor="#f7f8fa">
+        <bounds x="590" y="30" width="440" height="500"/>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-store" fillColor="#b5ffff" archimateElement="id-el-model-store">
+          <bounds x="35" y="35" width="180" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-store-ui" lineColor="#5f6f89" source="id-view-02-application-map-node-store" target="id-view-02-application-map-node-app-shell" archimateRelationship="id-rel-model-store-serves-ui"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-store-viewer" lineColor="#5f6f89" source="id-view-02-application-map-node-store" target="id-view-02-application-map-node-viewer" archimateRelationship="id-rel-model-store-serves-viewer"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-store-state" lineColor="#5f6f89" source="id-view-02-application-map-node-store" target="id-view-02-application-map-node-state" archimateRelationship="id-rel-model-store-accesses-state"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-undo" fillColor="#b5ffff" archimateElement="id-el-undo-redo">
+          <bounds x="235" y="35" width="180" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-undo-state" lineColor="#5f6f89" source="id-view-02-application-map-node-undo" target="id-view-02-application-map-node-state" archimateRelationship="id-rel-undo-accesses-state"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-xml" fillColor="#b5ffff" archimateElement="id-el-xml-io">
+          <bounds x="35" y="155" width="180" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-xml-state" lineColor="#5f6f89" source="id-view-02-application-map-node-xml" target="id-view-02-application-map-node-state" archimateRelationship="id-rel-xml-accesses-state"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-xml-doc" lineColor="#5f6f89" source="id-view-02-application-map-node-xml" target="id-view-02-application-map-node-archimate-xml" archimateRelationship="id-rel-xml-accesses-xml"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-share-xml" lineColor="#5f6f89" source="id-view-02-application-map-node-xml" target="id-view-02-application-map-node-share" archimateRelationship="id-rel-xml-serves-share"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-file-xml" lineColor="#5f6f89" source="id-view-02-application-map-node-xml" target="id-view-02-application-map-node-file" archimateRelationship="id-rel-xml-serves-file"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-state" targetConnections="id-view-02-application-map-conn-undo-state id-view-02-application-map-conn-store-state id-view-02-application-map-conn-xml-state" fillColor="#b5ffff" archimateElement="id-el-model-state">
+          <bounds x="235" y="155" width="180" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-archimate-xml" targetConnections="id-view-02-application-map-conn-xml-doc" fillColor="#b5ffff" archimateElement="id-el-archimate-xml">
+          <bounds x="135" y="295" width="190" height="65"/>
+        </child>
+      </child>
+      <child xsi:type="archimate:Group" id="id-view-02-application-map-group-persistence" name="Persistence and sharing" lineColor="#8a94a6" fillColor="#f7f8fa">
+        <bounds x="1070" y="30" width="500" height="500"/>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-share" targetConnections="id-view-02-application-map-conn-github-share id-view-02-application-map-conn-share-xml" fillColor="#b5ffff" archimateElement="id-el-share-encoding">
+          <bounds x="35" y="35" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-share-toolbar" lineColor="#5f6f89" source="id-view-02-application-map-node-share" target="id-view-02-application-map-node-toolbar" archimateRelationship="id-rel-share-encoding-serves-toolbar"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-share-payload" lineColor="#5f6f89" source="id-view-02-application-map-node-share" target="id-view-02-application-map-node-payload" archimateRelationship="id-rel-share-encoding-writes-payload"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-github" fillColor="#b5ffff" archimateElement="id-el-github-persistence">
+          <bounds x="270" y="35" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-github-share" lineColor="#5f6f89" source="id-view-02-application-map-node-github" target="id-view-02-application-map-node-share" archimateRelationship="id-rel-github-serves-share-encoding"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-file" targetConnections="id-view-02-application-map-conn-file-xml" fillColor="#b5ffff" archimateElement="id-el-file-persistence">
+          <bounds x="35" y="155" width="190" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-autosave" fillColor="#b5ffff" archimateElement="id-el-autosave">
+          <bounds x="270" y="155" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-autosave-workspace" lineColor="#5f6f89" source="id-view-02-application-map-node-autosave" target="id-view-02-application-map-node-workspace" archimateRelationship="id-rel-autosave-accesses-workspace"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-settings" fillColor="#b5ffff" archimateElement="id-el-settings-store">
+          <bounds x="270" y="275" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-settings-workspace" lineColor="#5f6f89" source="id-view-02-application-map-node-settings" target="id-view-02-application-map-node-workspace" archimateRelationship="id-rel-settings-accesses-workspace"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-payload" targetConnections="id-view-02-application-map-conn-share-payload" fillColor="#b5ffff" archimateElement="id-el-inline-payload">
+          <bounds x="35" y="275" width="190" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-workspace" targetConnections="id-view-02-application-map-conn-autosave-workspace id-view-02-application-map-conn-settings-workspace" fillColor="#b5ffff" archimateElement="id-el-workspace-data">
+          <bounds x="270" y="385" width="190" height="65"/>
+        </child>
+      </child>
+      <child xsi:type="archimate:Group" id="id-view-02-application-map-group-extension" name="Scripting and extensions" lineColor="#8a94a6" fillColor="#f7f8fa">
+        <bounds x="420" y="570" width="680" height="250"/>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-extension-runtime" fillColor="#b5ffff" archimateElement="id-el-extension-runtime">
+          <bounds x="35" y="45" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-extension-app" lineColor="#5f6f89" source="id-view-02-application-map-node-extension-runtime" target="id-view-02-application-map-node-app-shell" archimateRelationship="id-rel-extension-serves-app-shell"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-extension-package" lineColor="#5f6f89" source="id-view-02-application-map-node-extension-runtime" target="id-view-02-application-map-node-extension-package" archimateRelationship="id-rel-extension-accesses-package"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-script-runner" fillColor="#b5ffff" archimateElement="id-el-script-runner">
+          <bounds x="255" y="45" width="190" height="65"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-script-app" lineColor="#5f6f89" source="id-view-02-application-map-node-script-runner" target="id-view-02-application-map-node-app-shell" archimateRelationship="id-rel-script-serves-app-shell"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-script-service" lineColor="#5f6f89" source="id-view-02-application-map-node-script-runner" target="id-view-02-application-map-node-monaco-editor" archimateRelationship="id-rel-script-realizes-script-service"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-monaco-editor" targetConnections="id-view-02-application-map-conn-script-service" fillColor="#b5ffff" archimateElement="id-el-monaco-editor">
+          <bounds x="475" y="45" width="170" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-extension-package" targetConnections="id-view-02-application-map-conn-extension-package" fillColor="#b5ffff" archimateElement="id-el-extension-package-data">
+          <bounds x="145" y="150" width="220" height="65"/>
+        </child>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-spa" fillColor="#b5ffff" archimateElement="id-el-spa">
+        <bounds x="30" y="560" width="260" height="80"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-spa-runtime" lineColor="#5f6f89" source="id-view-02-application-map-node-spa" target="id-view-02-application-map-node-runtime" archimateRelationship="id-rel-spa-composes-runtime"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-spa-app-shell" lineColor="#5f6f89" source="id-view-02-application-map-node-spa" target="id-view-02-application-map-node-app-shell" archimateRelationship="id-rel-spa-composes-app-shell"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-spa-viewer" lineColor="#5f6f89" source="id-view-02-application-map-node-spa" target="id-view-02-application-map-node-viewer" archimateRelationship="id-rel-spa-composes-viewer-shell"/>
+      </child>
+      <documentation>Application structure of the browser modeler and sharing slice.</documentation>
+    </element>
+    <element xsi:type="archimate:ArchimateDiagramModel" name="03 - Share and Read-only Viewer Flow" id="id-view-03-share-flow" connectionRouterType="1" viewpoint="application_usage">
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-author-process" fillColor="#ffffb5" archimateElement="id-el-author-process">
+        <bounds x="30" y="80" width="170" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-author-share" lineColor="#5f6f89" source="id-view-03-share-flow-node-author-process" target="id-view-03-share-flow-node-share-process" archimateRelationship="id-rel-author-triggers-share"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-share-process" targetConnections="id-view-03-share-flow-conn-author-share id-view-03-share-flow-conn-share-toolbar" fillColor="#ffffb5" archimateElement="id-el-share-process">
+        <bounds x="250" y="80" width="170" height="70"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-toolbar" targetConnections="id-view-03-share-flow-conn-share-service" fillColor="#b5ffff" archimateElement="id-el-toolbar">
+        <bounds x="470" y="80" width="180" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-share-toolbar" lineColor="#5f6f89" source="id-view-03-share-flow-node-toolbar" target="id-view-03-share-flow-node-share-process" archimateRelationship="id-rel-toolbar-realizes-share-service"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-share-module" targetConnections="id-view-03-share-flow-conn-github-service" fillColor="#b5ffff" archimateElement="id-el-share-encoding">
+        <bounds x="700" y="80" width="190" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-share-service" lineColor="#5f6f89" source="id-view-03-share-flow-node-share-module" target="id-view-03-share-flow-node-toolbar" archimateRelationship="id-rel-share-encoding-serves-toolbar"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-share-gist-link" lineColor="#5f6f89" source="id-view-03-share-flow-node-share-module" target="id-view-03-share-flow-node-gist-link" archimateRelationship="id-rel-share-encoding-writes-gist-link"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-github-module" targetConnections="id-view-03-share-flow-conn-gist-api" fillColor="#b5ffff" archimateElement="id-el-github-persistence">
+        <bounds x="940" y="80" width="200" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-github-service" lineColor="#5f6f89" source="id-view-03-share-flow-node-github-module" target="id-view-03-share-flow-node-share-module" archimateRelationship="id-rel-github-serves-share-encoding"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-github-xml" lineColor="#5f6f89" source="id-view-03-share-flow-node-github-module" target="id-view-03-share-flow-node-xml-data" archimateRelationship="id-rel-github-accesses-xml"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-gist-api" fillColor="#c9e7b7" archimateElement="id-el-gist-api">
+        <bounds x="1190" y="80" width="170" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-gist-api" lineColor="#5f6f89" source="id-view-03-share-flow-node-gist-api" target="id-view-03-share-flow-node-github-module" archimateRelationship="id-rel-gist-api-serves-github-module"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-xml-data" targetConnections="id-view-03-share-flow-conn-github-xml" fillColor="#b5ffff" archimateElement="id-el-archimate-xml">
+        <bounds x="700" y="230" width="190" height="70"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-gist-link" targetConnections="id-view-03-share-flow-conn-share-gist-link id-view-03-share-flow-conn-review-link" fillColor="#b5ffff" archimateElement="id-el-gist-link-data">
+        <bounds x="940" y="230" width="200" height="70"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-review-process" targetConnections="id-view-03-share-flow-conn-viewer-service" fillColor="#ffffb5" archimateElement="id-el-review-process">
+        <bounds x="1190" y="230" width="170" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-review-link" lineColor="#5f6f89" source="id-view-03-share-flow-node-review-process" target="id-view-03-share-flow-node-gist-link" archimateRelationship="id-rel-review-reads-link"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-review-copy" lineColor="#5f6f89" source="id-view-03-share-flow-node-review-process" target="id-view-03-share-flow-node-copy-process" archimateRelationship="id-rel-review-triggers-copy"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-viewer-shell" fillColor="#b5ffff" archimateElement="id-el-viewer-shell">
+        <bounds x="940" y="390" width="200" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-viewer-service" lineColor="#5f6f89" source="id-view-03-share-flow-node-viewer-shell" target="id-view-03-share-flow-node-review-process" archimateRelationship="id-rel-viewer-realizes-viewer-service"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-copy-process" targetConnections="id-view-03-share-flow-conn-review-copy" fillColor="#ffffb5" archimateElement="id-el-copy-process">
+        <bounds x="700" y="390" width="190" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-copy-store" lineColor="#5f6f89" source="id-view-03-share-flow-node-copy-process" target="id-view-03-share-flow-node-store" archimateRelationship="id-rel-copy-realizes-readonly"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-store" targetConnections="id-view-03-share-flow-conn-copy-store" fillColor="#b5ffff" archimateElement="id-el-model-store">
+        <bounds x="470" y="390" width="180" height="70"/>
+      </child>
+      <child xsi:type="archimate:Note" id="id-view-03-share-flow-note-flow-note" lineColor="#c9ad4f" fillColor="#fff7d6">
+        <bounds x="45" y="350" width="360" height="110"/>
+        <content>The viewer boot path hydrates settings and shared model only. It skips autosave and extensions so a copied shared model cannot be overwritten by a previous workspace.</content>
+      </child>
+      <documentation>End-to-end model sharing flow exercised by this generated test model.</documentation>
+    </element>
+    <element xsi:type="archimate:ArchimateDiagramModel" name="04 - Runtime and Persistence Context" id="id-view-04-runtime-context" connectionRouterType="1" viewpoint="technology">
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-device" fillColor="#c9e7b7" archimateElement="id-el-local-device">
+        <bounds x="40" y="80" width="190" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-device-browser" lineColor="#5f6f89" source="id-view-04-runtime-context-node-device" target="id-view-04-runtime-context-node-browser" archimateRelationship="id-rel-local-device-composes-browser"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-browser" targetConnections="id-view-04-runtime-context-conn-device-browser id-view-04-runtime-context-conn-host-browser" fillColor="#c9e7b7" archimateElement="id-el-browser-runtime">
+        <bounds x="290" y="80" width="190" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-browser-spa" lineColor="#5f6f89" source="id-view-04-runtime-context-node-browser" target="id-view-04-runtime-context-node-spa" archimateRelationship="id-rel-browser-hosts-spa"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-host" fillColor="#c9e7b7" archimateElement="id-el-static-host">
+        <bounds x="40" y="260" width="190" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-host-browser" lineColor="#5f6f89" source="id-view-04-runtime-context-node-host" target="id-view-04-runtime-context-node-browser" archimateRelationship="id-rel-static-host-serves-browser"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-assets" fillColor="#c9e7b7" archimateElement="id-el-static-assets">
+        <bounds x="290" y="260" width="190" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-assets-spa" lineColor="#5f6f89" source="id-view-04-runtime-context-node-assets" target="id-view-04-runtime-context-node-spa" archimateRelationship="id-rel-static-assets-realize-spa"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-spa" targetConnections="id-view-04-runtime-context-conn-assets-spa id-view-04-runtime-context-conn-browser-spa id-view-04-runtime-context-conn-clipboard-toolbar id-view-04-runtime-context-conn-idb-autosave" fillColor="#b5ffff" archimateElement="id-el-spa">
+        <bounds x="540" y="80" width="190" height="75"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-github-platform" fillColor="#c9e7b7" archimateElement="id-el-github-platform">
+        <bounds x="1040" y="80" width="210" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-gist-platform-api" lineColor="#5f6f89" source="id-view-04-runtime-context-node-github-platform" target="id-view-04-runtime-context-node-gist-api" archimateRelationship="id-rel-github-platform-composes-api"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-gist-platform-raw" lineColor="#5f6f89" source="id-view-04-runtime-context-node-github-platform" target="id-view-04-runtime-context-node-raw-content" archimateRelationship="id-rel-github-platform-composes-raw"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-gist-api" targetConnections="id-view-04-runtime-context-conn-gist-platform-api" fillColor="#c9e7b7" archimateElement="id-el-gist-api">
+        <bounds x="1040" y="220" width="210" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-gist-api-module" lineColor="#5f6f89" source="id-view-04-runtime-context-node-gist-api" target="id-view-04-runtime-context-node-github-module" archimateRelationship="id-rel-gist-api-serves-github-module"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-raw-content" targetConnections="id-view-04-runtime-context-conn-gist-platform-raw" fillColor="#c9e7b7" archimateElement="id-el-raw-content">
+        <bounds x="1040" y="360" width="210" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-raw-module" lineColor="#5f6f89" source="id-view-04-runtime-context-node-raw-content" target="id-view-04-runtime-context-node-github-module" archimateRelationship="id-rel-raw-content-serves-github-module"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-github-module" targetConnections="id-view-04-runtime-context-conn-gist-api-module id-view-04-runtime-context-conn-raw-module id-view-04-runtime-context-conn-gist-file-xml" fillColor="#b5ffff" archimateElement="id-el-github-persistence">
+        <bounds x="790" y="220" width="190" height="75"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-file-module" targetConnections="id-view-04-runtime-context-conn-fileapi-file" fillColor="#b5ffff" archimateElement="id-el-file-persistence">
+        <bounds x="540" y="410" width="190" height="75"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-indexeddb" fillColor="#c9e7b7" archimateElement="id-el-indexeddb-api">
+        <bounds x="290" y="440" width="190" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-idb-autosave" lineColor="#5f6f89" source="id-view-04-runtime-context-node-indexeddb" target="id-view-04-runtime-context-node-spa" archimateRelationship="id-rel-indexeddb-serves-stores"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-file-api" fillColor="#c9e7b7" archimateElement="id-el-filesystem-api">
+        <bounds x="40" y="440" width="190" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-fileapi-file" lineColor="#5f6f89" source="id-view-04-runtime-context-node-file-api" target="id-view-04-runtime-context-node-file-module" archimateRelationship="id-rel-filesystem-serves-file-module"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-clipboard-api" fillColor="#c9e7b7" archimateElement="id-el-clipboard-api">
+        <bounds x="540" y="260" width="190" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-clipboard-toolbar" lineColor="#5f6f89" source="id-view-04-runtime-context-node-clipboard-api" target="id-view-04-runtime-context-node-spa" archimateRelationship="id-rel-clipboard-serves-toolbar"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-gist-file" fillColor="#c9e7b7" archimateElement="id-el-gist-file-artifact">
+        <bounds x="790" y="360" width="190" height="75"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-gist-file-xml" lineColor="#5f6f89" source="id-view-04-runtime-context-node-gist-file" target="id-view-04-runtime-context-node-github-module" archimateRelationship="id-rel-gist-file-realizes-xml"/>
+      </child>
+      <documentation>Technology and external services used by the browser app.</documentation>
+    </element>
+  </folder>
+  <purpose>A self-describing ArchiMate model of the Archi Online browser app. It is intentionally detailed enough to exercise inline encoding, gist-backed sharing, read-only viewing, properties inspection, and open-copy editing.</purpose>
+  <property key="repository">
+    <value>C:/Users/thoma/Projects/archi-online</value>
+  </property>
+  <property key="generatedBy">
+    <value>tools/create-archi-online-capability-model.mjs</value>
+  </property>
+  <property key="testPurpose">
+    <value>Milestone 1 model sharing and viewer capability</value>
+  </property>
+</archimate:model>
