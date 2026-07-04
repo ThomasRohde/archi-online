@@ -242,8 +242,8 @@ other extensions.
 Use private extension storage:
 
 ```js
-app.storage.set("lastRun", new Date().toISOString());
-var lastRun = app.storage.get("lastRun");
+await app.storage.set("lastRun", new Date().toISOString());
+var lastRun = await app.storage.get("lastRun");
 ```
 
 Storage is browser/profile-local and namespaced under the extension ID. It is

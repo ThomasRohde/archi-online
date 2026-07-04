@@ -1,4 +1,5 @@
 import { openView, setSelection, useStore } from '../model/store';
+import { defaultKeyValueStore } from '../persistence/keyval';
 import { JView, JVisual, wrap } from '../scripting/jarchi';
 import { showAlertDialog, showConfirmDialog } from '../ui/AppDialog';
 import { layoutBus } from '../ui/layout-bus';
@@ -23,29 +24,36 @@ import type {
   LocalExtensionRecord,
 } from './types';
 
-const STORAGE_PREFIX = 'archi-online.extension-storage.v1.';
+export const EXTENSION_STORAGE_PREFIX = 'archi-online.extension-storage.v1.';
 
-export function clearExtensionStorage(extensionId: string): void {
+export function extensionStorageKey(extensionId: string): string {
+  return EXTENSION_STORAGE_PREFIX + extensionId;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export async function clearExtensionStorage(extensionId: string): Promise<void> {
   try {
-    localStorage.removeItem(STORAGE_PREFIX + extensionId);
+    await defaultKeyValueStore().del(extensionStorageKey(extensionId));
   } catch {
     /* private extension storage cleanup is best-effort */
   }
 }
 
-function readStorage(extensionId: string): Record<string, unknown> {
+async function readStorage(extensionId: string): Promise<Record<string, unknown>> {
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + extensionId);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed : {};
+    const parsed = await defaultKeyValueStore().get<unknown>(extensionStorageKey(extensionId));
+    return isRecord(parsed) ? parsed : {};
   } catch {
     return {};
   }
 }
 
-function writeStorage(extensionId: string, value: Record<string, unknown>): void {
+async function writeStorage(extensionId: string, value: Record<string, unknown>): Promise<void> {
   try {
-    localStorage.setItem(STORAGE_PREFIX + extensionId, JSON.stringify(value));
+    await defaultKeyValueStore().set(extensionStorageKey(extensionId), value);
   } catch {
     /* private extension storage failures should not block editing */
   }
@@ -234,13 +242,13 @@ export function createAppApi(
       },
     },
     storage: {
-      get(key: string) {
-        return readStorage(extensionId)[key];
+      async get(key: string) {
+        return (await readStorage(extensionId))[key];
       },
-      set(key: string, value: unknown) {
-        const current = readStorage(extensionId);
+      async set(key: string, value: unknown) {
+        const current = await readStorage(extensionId);
         current[key] = value;
-        writeStorage(extensionId, current);
+        await writeStorage(extensionId, current);
       },
     },
     dialogs: {

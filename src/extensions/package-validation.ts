@@ -106,7 +106,7 @@ export function normalizePackageFiles(
     const file = normalizePackageFile(rawFile, path);
     totalChars += file.content.length;
     if (totalChars > MAX_PACKAGE_CONTENT_CHARS) {
-      throw new Error('Package is too large for browser-local storage');
+      throw new Error('Package is too large for browser storage');
     }
     files[path] = file;
   }

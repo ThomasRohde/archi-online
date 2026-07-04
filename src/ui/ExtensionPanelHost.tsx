@@ -21,6 +21,13 @@ export function ExtensionPanelHost(props: IDockviewPanelProps<{ panelId: string 
     container.replaceChildren();
     try {
       const cleanup = panel.render(container);
+      if (cleanup instanceof Promise) {
+        void cleanup.catch((error) => {
+          const owner = extensionRegistry.getPanelOwner(props.params.panelId) ?? props.params.panelId;
+          extensionRegistry.recordError(owner, error);
+          container.textContent = error instanceof Error ? error.message : String(error);
+        });
+      }
       return () => {
         if (typeof cleanup === 'function') cleanup();
         container.replaceChildren();

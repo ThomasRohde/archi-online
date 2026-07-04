@@ -7,7 +7,7 @@ import {
   normalizeExtensionRecords,
   persistExtensionRecords,
 } from '../src/extensions/extension-store';
-import { clearExtensionStorage, createAppApi } from '../src/extensions/app-api';
+import { clearExtensionStorage, createAppApi, extensionStorageKey } from '../src/extensions/app-api';
 import { startExtensionEventBridge } from '../src/extensions/events';
 import { makeInstalledPackage } from '../src/extensions/package-validation';
 import {
@@ -23,53 +23,22 @@ import {
   createEmptyModel,
 } from '../src/model/ops';
 import { openView, replaceModel, setSelection, useStore } from '../src/model/store';
+import { memoryKeyValueStore, setDefaultKeyValueStoreForTests } from '../src/persistence/keyval';
 
-function storage(initial?: string) {
-  const data = new Map<string, string>();
-  if (initial !== undefined) data.set(EXTENSIONS_STORAGE_KEY, initial);
-  return {
-    data,
-    getItem(key: string) {
-      return data.get(key) ?? null;
-    },
-    setItem(key: string, value: string) {
-      data.set(key, value);
-    },
-  };
+function storage(initial?: unknown) {
+  return memoryKeyValueStore(initial === undefined ? undefined : [[EXTENSIONS_STORAGE_KEY, initial]]);
 }
 
-function browserStorage() {
-  const data = new Map<string, string>();
-  return {
-    get length() {
-      return data.size;
-    },
-    clear() {
-      data.clear();
-    },
-    getItem(key: string) {
-      return data.get(key) ?? null;
-    },
-    key(index: number) {
-      return [...data.keys()][index] ?? null;
-    },
-    removeItem(key: string) {
-      data.delete(key);
-    },
-    setItem(key: string, value: string) {
-      data.set(key, value);
-    },
-  };
-}
+let persistenceStore = memoryKeyValueStore();
+
+beforeEach(() => {
+  persistenceStore = memoryKeyValueStore();
+  setDefaultKeyValueStoreForTests(persistenceStore);
+});
 
 describe('extension records', () => {
-  beforeEach(() => {
-    vi.stubGlobal('localStorage', browserStorage());
-    localStorage.clear();
-  });
-
-  it('loads no extensions when storage is empty', () => {
-    expect(loadExtensionRecords(storage())).toEqual([]);
+  it('loads no extensions when storage is empty', async () => {
+    await expect(loadExtensionRecords(storage())).resolves.toEqual([]);
   });
 
   it('normalizes valid persisted records and ignores unknown fields', () => {
@@ -99,8 +68,8 @@ describe('extension records', () => {
     ]);
   });
 
-  it('falls back to no extensions for invalid JSON', () => {
-    expect(loadExtensionRecords(storage('{broken'))).toEqual([]);
+  it('falls back to no extensions for unreadable records', async () => {
+    await expect(loadExtensionRecords(storage('{broken'))).resolves.toEqual([]);
   });
 
   it('creates a manifest-shaped template extension', () => {
@@ -117,16 +86,16 @@ describe('extension records', () => {
     });
   });
 
-  it('persists normalized records', () => {
+  it('persists normalized records', async () => {
     const s = storage();
     const record = createExtensionRecord('local.saved', 'Saved', 100);
 
-    persistExtensionRecords([record], s);
+    await persistExtensionRecords([record], s);
 
-    expect(JSON.parse(s.data.get(EXTENSIONS_STORAGE_KEY) ?? '[]')).toEqual([record]);
+    expect(s.data.get(EXTENSIONS_STORAGE_KEY)).toEqual([record]);
   });
 
-  it('preserves unreadable persisted source records across unrelated writes', () => {
+  it('preserves unreadable persisted source records across unrelated writes', async () => {
     const record = createExtensionRecord('local.saved', 'Saved', 100);
     const futureRecord = {
       id: 'local.future-source',
@@ -137,12 +106,12 @@ describe('extension records', () => {
       createdAt: 1,
       updatedAt: 1,
     };
-    const s = storage(JSON.stringify([futureRecord, record]));
+    const s = storage([futureRecord, record]);
 
-    expect(loadExtensionRecords(s)).toEqual([record]);
-    persistExtensionRecords([{ ...record, enabled: false, updatedAt: 101 }], s);
+    await expect(loadExtensionRecords(s)).resolves.toEqual([record]);
+    await persistExtensionRecords([{ ...record, enabled: false, updatedAt: 101 }], s);
 
-    const written = JSON.parse(s.data.get(EXTENSIONS_STORAGE_KEY) ?? '[]');
+    const written = s.data.get(EXTENSIONS_STORAGE_KEY) as unknown[];
     expect(written).toHaveLength(2);
     expect(written[0]).toEqual(futureRecord);
     expect(written[1]).toMatchObject({ id: record.id, enabled: false });
@@ -251,8 +220,6 @@ describe('extension registry', () => {
 
 describe('extension app API and runtime', () => {
   beforeEach(() => {
-    vi.stubGlobal('localStorage', browserStorage());
-    localStorage.clear();
     extensionRegistry.clearAll();
     replaceModel(null, null, false);
   });
@@ -309,20 +276,20 @@ describe('extension app API and runtime', () => {
     });
   });
 
-  it('stores extension-private values under the extension namespace', () => {
+  it('stores extension-private values under the extension namespace', async () => {
     const registry = createExtensionRegistry();
     const app = createAppApi('local.audit', registry);
 
-    app.storage.set('threshold', 7);
+    await app.storage.set('threshold', 7);
 
-    expect(app.storage.get('threshold')).toBe(7);
-    expect(localStorage.getItem('archi-online.extension-storage.v1.local.audit')).toContain(
-      '"threshold":7',
-    );
+    await expect(app.storage.get('threshold')).resolves.toBe(7);
+    expect(persistenceStore.data.get(extensionStorageKey('local.audit'))).toMatchObject({
+      threshold: 7,
+    });
 
-    clearExtensionStorage('local.audit');
+    await clearExtensionStorage('local.audit');
 
-    expect(localStorage.getItem('archi-online.extension-storage.v1.local.audit')).toBeNull();
+    expect(persistenceStore.data.get(extensionStorageKey('local.audit'))).toBeUndefined();
   });
 
   it('exposes active views and current selection through app APIs', () => {
@@ -386,12 +353,12 @@ describe('extension app API and runtime', () => {
             app.extension({ id: "local.assets", name: "Assets", version: "1.0.0" });
             app.commands.register("local.assets.read", {
               title: "Read",
-              run() {
-                app.storage.set("manifestName", app.manifest.get().name);
-                app.storage.set("configEnabled", app.assets.json("data/config.json").enabled);
-                app.storage.set("text", app.assets.text("README.md"));
-                app.storage.set("packageId", app.extension.package().id);
-                app.storage.set("assetUrl", app.assets.url("assets/icon.svg"));
+              async run() {
+                await app.storage.set("manifestName", app.manifest.get().name);
+                await app.storage.set("configEnabled", app.assets.json("data/config.json").enabled);
+                await app.storage.set("text", app.assets.text("README.md"));
+                await app.storage.set("packageId", app.extension.package().id);
+                await app.storage.set("assetUrl", app.assets.url("assets/icon.svg"));
               }
             });
           `,
@@ -411,9 +378,10 @@ describe('extension app API and runtime', () => {
 
     await registry.runCommand('local.assets.read');
 
-    const stored = JSON.parse(
-      localStorage.getItem('archi-online.extension-storage.v1.local.assets') ?? '{}',
-    );
+    const stored = persistenceStore.data.get(extensionStorageKey('local.assets')) as Record<
+      string,
+      unknown
+    >;
     expect(stored).toMatchObject({
       manifestName: 'Assets',
       configEnabled: true,
@@ -461,11 +429,11 @@ describe('extension app API and runtime', () => {
             app.extension({ id: "local.layout", name: "Layout", version: "1.0.0" });
             app.commands.register("local.layout.apply", {
               title: "Layout",
-              run() {
+              async run() {
                 var view = app.views.active();
                 var node = view.nodes()[0];
                 view.layout({ nodes: { [node.id]: { x: 80, y: 90, width: 160, height: 70 } } });
-                app.storage.set("bounds", node.absoluteBounds());
+                await app.storage.set("bounds", node.absoluteBounds());
               }
             });
           `,
@@ -484,9 +452,7 @@ describe('extension app API and runtime', () => {
       width: 160,
       height: 70,
     });
-    expect(
-      JSON.parse(localStorage.getItem('archi-online.extension-storage.v1.local.layout') ?? '{}'),
-    ).toMatchObject({
+    expect(persistenceStore.data.get(extensionStorageKey('local.layout'))).toMatchObject({
       bounds: { x: 80, y: 90, width: 160, height: 70 },
     });
   });

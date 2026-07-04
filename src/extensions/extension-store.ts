@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { defaultKeyValueStore, type AsyncKeyValueStore } from '../persistence/keyval';
 import type { LocalExtensionRecord } from './types';
 
 export const EXTENSIONS_STORAGE_KEY = 'archi-online.extensions.v1';
@@ -23,8 +24,6 @@ app.toolbar.addButton({
 });
 `;
 
-type ExtensionStorage = Pick<Storage, 'getItem' | 'setItem'>;
-
 interface ParsedExtensionRecords {
   records: LocalExtensionRecord[];
   retained: unknown[];
@@ -36,15 +35,6 @@ interface PersistOptions {
 }
 
 let retainedExtensionRecords: unknown[] = [];
-
-function storageOrNull(): ExtensionStorage | null {
-  if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return null;
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return null;
-  }
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -96,14 +86,12 @@ function parseExtensionRecords(value: unknown): ParsedExtensionRecords {
   return { records, retained };
 }
 
-export function loadExtensionRecords(
-  storage: ExtensionStorage | null = storageOrNull(),
-): LocalExtensionRecord[] {
-  if (!storage) return [];
+export async function loadExtensionRecords(
+  storage: AsyncKeyValueStore = defaultKeyValueStore(),
+): Promise<LocalExtensionRecord[]> {
   try {
-    const raw = storage.getItem(EXTENSIONS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = parseExtensionRecords(JSON.parse(raw));
+    const raw = await storage.get<unknown>(EXTENSIONS_STORAGE_KEY);
+    const parsed = parseExtensionRecords(raw);
     retainedExtensionRecords = parsed.retained;
     return parsed.records;
   } catch {
@@ -112,12 +100,11 @@ export function loadExtensionRecords(
   }
 }
 
-export function persistExtensionRecords(
+export async function persistExtensionRecords(
   records: LocalExtensionRecord[],
-  storage: ExtensionStorage | null = storageOrNull(),
+  storage: AsyncKeyValueStore = defaultKeyValueStore(),
   options: PersistOptions = {},
-): void {
-  if (!storage) return;
+): Promise<void> {
   try {
     const normalized = normalizeExtensionRecords(records);
     const normalizedIds = new Set(normalized.map((record) => record.id));
@@ -128,10 +115,10 @@ export function persistExtensionRecords(
           const id = rawRecordId(record);
           return id && !dropIds.has(id) && !normalizedIds.has(id);
         });
-    storage.setItem(EXTENSIONS_STORAGE_KEY, JSON.stringify([...retained, ...normalized]));
+    await storage.set(EXTENSIONS_STORAGE_KEY, [...retained, ...normalized]);
     retainedExtensionRecords = retained;
   } catch {
-    /* localStorage failures should not block editing */
+    /* IndexedDB failures should not block editing */
   }
 }
 
@@ -160,46 +147,58 @@ export function extensionTemplateSource(id: string, name: string): string {
 
 interface ExtensionStoreState {
   extensions: LocalExtensionRecord[];
-  setExtensions(records: LocalExtensionRecord[]): void;
-  upsert(record: LocalExtensionRecord): void;
-  remove(id: string): void;
-  setEnabled(id: string, enabled: boolean): void;
+  setExtensions(records: LocalExtensionRecord[]): Promise<void>;
+  upsert(record: LocalExtensionRecord): Promise<void>;
+  remove(id: string): Promise<void>;
+  setEnabled(id: string, enabled: boolean): Promise<void>;
 }
 
-function commit(
+async function commit(
   records: LocalExtensionRecord[],
   options: PersistOptions = {},
-): LocalExtensionRecord[] {
+): Promise<LocalExtensionRecord[]> {
   const normalized = normalizeExtensionRecords(records);
-  persistExtensionRecords(normalized, undefined, options);
+  await persistExtensionRecords(normalized, undefined, options);
   return normalized;
 }
 
 export const useExtensionStore = create<ExtensionStoreState>((set) => ({
-  extensions: loadExtensionRecords(),
-  setExtensions: (records) => set({ extensions: commit(records, { retainUnreadable: false }) }),
-  upsert: (record) =>
-    set((state) => ({
-      extensions: commit(
+  extensions: [],
+  setExtensions: async (records) => {
+    set({ extensions: await commit(records, { retainUnreadable: false }) });
+  },
+  upsert: async (record) => {
+    const state = useExtensionStore.getState();
+    set({
+      extensions: await commit(
         [
           ...state.extensions.filter((existing) => existing.id !== record.id),
           { ...record, updatedAt: Date.now() },
         ],
         { dropRetainedIds: [record.id] },
       ),
-    })),
-  remove: (id) =>
-    set((state) => ({
-      extensions: commit(state.extensions.filter((record) => record.id !== id), {
+    });
+  },
+  remove: async (id) => {
+    const state = useExtensionStore.getState();
+    set({
+      extensions: await commit(state.extensions.filter((record) => record.id !== id), {
         dropRetainedIds: [id],
       }),
-    })),
-  setEnabled: (id, enabled) =>
-    set((state) => ({
-      extensions: commit(
+    });
+  },
+  setEnabled: async (id, enabled) => {
+    const state = useExtensionStore.getState();
+    set({
+      extensions: await commit(
         state.extensions.map((record) =>
           record.id === id ? { ...record, enabled, updatedAt: Date.now() } : record,
         ),
       ),
-    })),
+    });
+  },
 }));
+
+export async function hydrateExtensionStore(): Promise<void> {
+  useExtensionStore.setState({ extensions: await loadExtensionRecords() });
+}

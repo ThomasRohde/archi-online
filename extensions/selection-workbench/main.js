@@ -7,24 +7,24 @@ app.extension({
 var help = app.assets.json('data/help.json');
 var panel = null;
 
-function readHistory() {
-  return app.storage.get('history') || [];
+async function readHistory() {
+  return (await app.storage.get('history')) || [];
 }
 
-function writeHistory(history) {
-  app.storage.set('history', history.slice(0, help.historyLimit));
+async function writeHistory(history) {
+  await app.storage.set('history', history.slice(0, help.historyLimit));
 }
 
-function recordSelection(source, ids) {
+async function recordSelection(source, ids) {
   var cleanIds = Array.isArray(ids) ? ids.slice(0, 20) : [];
   var item = {
     time: new Date().toISOString(),
     source: source || 'unknown',
     ids: cleanIds
   };
-  writeHistory([item].concat(readHistory()));
-  app.storage.set('lastSelection', item);
-  renderPanel();
+  await writeHistory([item].concat(await readHistory()));
+  await app.storage.set('lastSelection', item);
+  await renderPanel();
 }
 
 function contextIds(context) {
@@ -36,10 +36,10 @@ function describeIds(ids) {
   return ids.length + ' selected: ' + ids.join(', ');
 }
 
-function renderPanel() {
+async function renderPanel() {
   if (!panel) return;
-  var history = readHistory();
-  var latest = app.storage.get('lastSelection');
+  var history = await readHistory();
+  var latest = await app.storage.get('lastSelection');
   panel.replaceChildren();
   panel.style.fontFamily = 'system-ui, sans-serif';
   panel.style.fontSize = '13px';
@@ -93,14 +93,14 @@ function renderPanel() {
 }
 
 app.events.on('selection.changed', function (payload) {
-  recordSelection(payload && payload.source, payload && payload.ids);
+  return recordSelection(payload && payload.source, payload && payload.ids);
 });
 
 app.commands.register('examples.selection-workbench.describe', {
   title: 'Describe current selection',
-  run: function (context) {
+  run: async function (context) {
     var ids = contextIds(context);
-    recordSelection('command', ids);
+    await recordSelection('command', ids);
     return app.dialogs.info('Selection', describeIds(ids));
   }
 });
@@ -134,7 +134,7 @@ app.panels.register('examples.selection-workbench.panel', {
   title: 'Selection Workbench',
   render: function (container) {
     panel = container;
-    renderPanel();
+    void renderPanel();
     return function () {
       panel = null;
     };

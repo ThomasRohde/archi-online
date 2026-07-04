@@ -21,8 +21,8 @@ function clamp(value, fallback, min, max) {
   return Math.min(max, Math.max(min, finiteNumber(value, fallback)));
 }
 
-function readOptions() {
-  var stored = app.storage.get('options') || {};
+async function readOptions() {
+  var stored = (await app.storage.get('options')) || {};
   return {
     scope: knownValue(config.options.scope, stored.scope, config.defaults.scope),
     direction: knownValue(config.options.direction, stored.direction, config.defaults.direction),
@@ -42,12 +42,12 @@ function readOptions() {
   };
 }
 
-function writeOptions(options) {
-  app.storage.set('options', options);
+async function writeOptions(options) {
+  await app.storage.set('options', options);
 }
 
-function lastResult() {
-  return app.storage.get('lastResult') || null;
+async function lastResult() {
+  return (await app.storage.get('lastResult')) || null;
 }
 
 function statusText(result) {
@@ -57,11 +57,11 @@ function statusText(result) {
 }
 
 async function applyLayout(options) {
-  var cleanOptions = options || readOptions();
-  writeOptions(cleanOptions);
+  var cleanOptions = options || await readOptions();
+  await writeOptions(cleanOptions);
   var result = await app.layout.elk(cleanOptions);
-  app.storage.set('lastResult', result);
-  renderPanel();
+  await app.storage.set('lastResult', result);
+  await renderPanel();
   return result;
 }
 
@@ -116,9 +116,9 @@ function addNumber(container, labelText, value, min, max, onChange) {
   container.appendChild(row);
 }
 
-function renderPanel() {
+async function renderPanel() {
   if (!panel) return;
-  var options = readOptions();
+  var options = await readOptions();
   panel.replaceChildren();
   panel.style.fontFamily = 'system-ui, sans-serif';
   panel.style.fontSize = '13px';
@@ -138,15 +138,15 @@ function renderPanel() {
 
   addSelect(panel, 'Scope', options.scope, config.options.scope, function (value) {
     options.scope = value;
-    writeOptions(options);
+    void writeOptions(options);
   });
   addSelect(panel, 'Direction', options.direction, config.options.direction, function (value) {
     options.direction = value;
-    writeOptions(options);
+    void writeOptions(options);
   });
   addSelect(panel, 'Edge routing', options.edgeRouting, config.options.edgeRouting, function (value) {
     options.edgeRouting = value;
-    writeOptions(options);
+    void writeOptions(options);
   });
   addNumber(
     panel,
@@ -156,7 +156,7 @@ function renderPanel() {
     config.limits.nodeSpacing.max,
     function (value) {
       options.nodeSpacing = value;
-      writeOptions(options);
+      void writeOptions(options);
     }
   );
   addNumber(
@@ -167,7 +167,7 @@ function renderPanel() {
     config.limits.layerSpacing.max,
     function (value) {
       options.layerSpacing = value;
-      writeOptions(options);
+      void writeOptions(options);
     }
   );
 
@@ -178,7 +178,7 @@ function renderPanel() {
   var apply = document.createElement('button');
   apply.textContent = 'Apply';
   apply.onclick = function () {
-    applyLayout(readOptions()).catch(function (error) {
+    readOptions().then(applyLayout).catch(function (error) {
       return app.dialogs.info('ELK layout failed', error && error.message ? error.message : String(error));
     });
   };
@@ -187,8 +187,7 @@ function renderPanel() {
   var reset = document.createElement('button');
   reset.textContent = 'Reset';
   reset.onclick = function () {
-    writeOptions(config.defaults);
-    renderPanel();
+    writeOptions(config.defaults).then(renderPanel);
   };
   buttons.appendChild(reset);
   panel.appendChild(buttons);
@@ -198,15 +197,15 @@ function renderPanel() {
   status.style.borderRadius = '4px';
   status.style.padding = '8px';
   status.style.background = 'Canvas';
-  status.textContent = statusText(lastResult());
+  status.textContent = statusText(await lastResult());
   panel.appendChild(status);
 }
 
 app.commands.register('examples.elk-layout.apply', {
   title: 'Apply ELK layout',
   description: 'Run ELK layered layout on the active view or selected diagram objects.',
-  run: function () {
-    return applyLayout(readOptions()).then(function (result) {
+  run: async function () {
+    return applyLayout(await readOptions()).then(function (result) {
       return app.dialogs.info('ELK layout', statusText(result));
     });
   }
@@ -241,7 +240,7 @@ app.panels.register('examples.elk-layout.panel', {
   title: 'ELK Layout',
   render: function (container) {
     panel = container;
-    renderPanel();
+    void renderPanel();
     return function () {
       panel = null;
     };

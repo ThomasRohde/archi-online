@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { createAppApi } from '../src/extensions/app-api';
 import {
   addConnectionToView,
@@ -12,38 +12,12 @@ import {
 } from '../src/model/ops';
 import { openView, replaceModel, setSelection, useStore } from '../src/model/store';
 
-function browserStorage() {
-  const data = new Map<string, string>();
-  return {
-    get length() {
-      return data.size;
-    },
-    clear() {
-      data.clear();
-    },
-    getItem(key: string) {
-      return data.get(key) ?? null;
-    },
-    key(index: number) {
-      return [...data.keys()][index] ?? null;
-    },
-    removeItem(key: string) {
-      data.delete(key);
-    },
-    setItem(key: string, value: string) {
-      data.set(key, value);
-    },
-  };
-}
-
 function model() {
   return useStore.getState().model!;
 }
 
 describe('ELK extension layout API', () => {
   beforeEach(() => {
-    vi.stubGlobal('localStorage', browserStorage());
-    localStorage.clear();
     replaceModel(createEmptyModel('ELK Test'), null);
   });
 

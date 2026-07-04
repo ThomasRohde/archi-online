@@ -1,9 +1,12 @@
 import { useEffect } from 'react';
 import { startExtensionEventBridge } from './extensions/events';
+import { hydrateExtensionStore } from './extensions/extension-store';
+import { hydrateExtensionPackageStore } from './extensions/package-store';
 import { extensionRegistry } from './extensions/registry';
 import { reloadEnabledExtensions } from './extensions/runtime';
 import { redo, undo, useStore } from './model/store';
 import { restoreAutosave, startAutosave } from './persistence/autosave';
+import { hydrateSettingsStore } from './settings/app-settings';
 import { AppDialogHost } from './ui/AppDialog';
 import { AppShell } from './ui/AppShell';
 import { openModel, saveModel } from './ui/Toolbar';
@@ -36,7 +39,12 @@ export function App() {
   useEffect(() => {
     if (!booted) {
       booted = true;
-      void restoreAutosave().finally(() => {
+      void Promise.all([
+        restoreAutosave(),
+        hydrateSettingsStore(),
+        hydrateExtensionStore(),
+        hydrateExtensionPackageStore(),
+      ]).finally(() => {
         startAutosave();
         useStore.setState({ booted: true });
         reloadEnabledExtensions();

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ElementType } from '../model/metamodel';
+import { defaultKeyValueStore, type AsyncKeyValueStore } from '../persistence/keyval';
 
 export const SETTINGS_STORAGE_KEY = 'archi-online.settings.v1';
 
@@ -363,17 +364,6 @@ const ROWS_BY_KEY = new Map<SettingKey, SettingRow>(
   SETTING_SECTIONS.flatMap((section) => section.rows.map((row) => [row.key, row] as const)),
 );
 
-type SettingsStorage = Pick<Storage, 'getItem' | 'setItem'>;
-
-function storageOrNull(): SettingsStorage | null {
-  if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return null;
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return null;
-  }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -414,26 +404,25 @@ export function normalizeSettings(value: unknown): AppSettings {
   return next;
 }
 
-export function loadSettings(storage: SettingsStorage | null = storageOrNull()): AppSettings {
-  if (!storage) return { ...DEFAULT_SETTINGS };
+export async function loadSettings(
+  storage: AsyncKeyValueStore = defaultKeyValueStore(),
+): Promise<AppSettings> {
   try {
-    const raw = storage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_SETTINGS };
-    return normalizeSettings(JSON.parse(raw));
+    const raw = await storage.get<unknown>(SETTINGS_STORAGE_KEY);
+    return normalizeSettings(raw);
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
 }
 
-export function persistSettings(
+export async function persistSettings(
   settings: AppSettings,
-  storage: SettingsStorage | null = storageOrNull(),
-): void {
-  if (!storage) return;
+  storage: AsyncKeyValueStore = defaultKeyValueStore(),
+): Promise<void> {
   try {
-    storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(normalizeSettings(settings)));
+    await storage.set(SETTINGS_STORAGE_KEY, normalizeSettings(settings));
   } catch {
-    /* localStorage failures should not block editing */
+    /* IndexedDB failures should not block editing */
   }
 }
 
@@ -507,15 +496,19 @@ interface SettingsState {
 
 function commit(settings: AppSettings): AppSettings {
   const normalized = normalizeSettings(settings);
-  persistSettings(normalized);
+  void persistSettings(normalized);
   return normalized;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  settings: loadSettings(),
+  settings: { ...DEFAULT_SETTINGS },
   setSetting: (key, value) =>
     set((state) => ({ settings: commit(updateSetting(state.settings, key, value)) })),
   resetSetting: (key) =>
     set((state) => ({ settings: commit(resetSetting(state.settings, key)) })),
   resetAll: () => set({ settings: commit(resetAllSettings()) }),
 }));
+
+export async function hydrateSettingsStore(): Promise<void> {
+  useSettingsStore.setState({ settings: await loadSettings() });
+}

@@ -246,8 +246,8 @@ declare const app: {
     ): void;
   };
   storage: {
-    get(key: string): unknown;
-    set(key: string, value: unknown): void;
+    get(key: string): Promise<unknown>;
+    set(key: string, value: unknown): Promise<void>;
   };
   dialogs: {
     info(title: string, message?: string): Promise<void>;

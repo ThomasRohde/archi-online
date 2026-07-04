@@ -1,6 +1,6 @@
-import { del, get, set } from 'idb-keyval';
 import { parseArchimate, serializeArchimate } from '../model/io/archimate-xml';
 import { replaceModel, useStore } from '../model/store';
+import { defaultKeyValueStore } from './keyval';
 
 const KEY = 'archi-online.autosave';
 
@@ -26,7 +26,7 @@ async function persist(): Promise<void> {
   const s = useStore.getState();
   try {
     if (!s.model) {
-      await del(KEY);
+      await defaultKeyValueStore().del(KEY);
       return;
     }
     const rec: AutosaveRecord = {
@@ -35,7 +35,7 @@ async function persist(): Promise<void> {
       dirty: s.dirty,
       savedAt: Date.now(),
     };
-    await set(KEY, rec);
+    await defaultKeyValueStore().set(KEY, rec);
   } catch (e) {
     console.warn('autosave failed', e);
   }
@@ -44,7 +44,7 @@ async function persist(): Promise<void> {
 /** Restore the autosaved workspace, if any. Returns true when a model was restored. */
 export async function restoreAutosave(): Promise<boolean> {
   try {
-    const rec = await get<AutosaveRecord>(KEY);
+    const rec = await defaultKeyValueStore().get<AutosaveRecord>(KEY);
     if (!rec) return false;
     const model = parseArchimate(rec.xml);
     replaceModel(model, rec.fileName, rec.dirty);
