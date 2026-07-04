@@ -25,6 +25,14 @@ import type {
 
 const STORAGE_PREFIX = 'archi-online.extension-storage.v1.';
 
+export function clearExtensionStorage(extensionId: string): void {
+  try {
+    localStorage.removeItem(STORAGE_PREFIX + extensionId);
+  } catch {
+    /* private extension storage cleanup is best-effort */
+  }
+}
+
 function readStorage(extensionId: string): Record<string, unknown> {
   try {
     const raw = localStorage.getItem(STORAGE_PREFIX + extensionId);

@@ -58,7 +58,14 @@ app.panels.register('examples.package-showcase.panel', {
     img.height = 48;
 
     var title = document.createElement('div');
-    title.innerHTML = '<strong>' + manifest.name + '</strong><br><span style="color:#666">' + manifest.description + '</span>';
+    var titleStrong = document.createElement('strong');
+    titleStrong.textContent = manifest.name;
+    var titleDetail = document.createElement('span');
+    titleDetail.style.color = '#666';
+    titleDetail.textContent = manifest.description;
+    title.appendChild(titleStrong);
+    title.appendChild(document.createElement('br'));
+    title.appendChild(titleDetail);
 
     header.appendChild(img);
     header.appendChild(title);

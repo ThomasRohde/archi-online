@@ -14,6 +14,10 @@ Current extensions are trusted local code. They run in the browser context and
 can access the APIs documented here. Do not import extension packages from
 untrusted sources.
 
+Model names, file names, IDs, properties, and event payloads are still external
+data. When building panel DOM, prefer `textContent` and DOM nodes over
+`innerHTML` for anything derived from a model or user input.
+
 ## Minimal Extension
 
 ```js
@@ -190,7 +194,8 @@ app.panels.register("local.audit.panel", {
 app.panels.show("local.audit.panel");
 ```
 
-Panel renderers use plain DOM. They should not assume React is available.
+Panel renderers use plain DOM. They should not assume React is available. Treat
+model-derived strings as untrusted data when constructing panel contents.
 
 ## Events
 
@@ -226,6 +231,9 @@ Supported event names:
 - `tree.contextMenu`
 - `script.error`
 
+`script.error` fires when a script run from the **Scripting** panel throws. Its
+payload is `{ message: string }`.
+
 Event handler errors are recorded on the extension registry and should not break
 other extensions.
 
@@ -239,7 +247,8 @@ var lastRun = app.storage.get("lastRun");
 ```
 
 Storage is browser/profile-local and namespaced under the extension ID. It is
-not model data.
+not model data. Deleting or uninstalling an extension removes that extension's
+private storage for the current browser profile.
 
 ## Dialogs
 
@@ -268,6 +277,35 @@ var opened = app.views.open("view-id");
 Return values are `JView` wrappers or `null` where no view exists. See
 [[Scripting API|Scripting-API]] for `JView` methods such as `nodes()`,
 `connections()`, and `layout()`.
+
+## Layout
+
+Use `app.layout.elk()` to run the app-hosted ELK layered layout engine:
+
+```js
+var result = await app.layout.elk({
+  scope: "selection-or-view",
+  direction: "right",
+  edgeRouting: "orthogonal",
+  nodeSpacing: 40,
+  layerSpacing: 80
+});
+```
+
+Options:
+
+- `view`: optional `JView`; defaults to the active view.
+- `scope`: `selection-or-view`, `selection`, or `view`.
+- `direction`: `right`, `down`, `left`, or `up`.
+- `edgeRouting`: `orthogonal`, `splines`, or `preserve`.
+- `nodeSpacing` and `layerSpacing`: positive numbers used by ELK.
+
+The result includes `scope`, `nodeCount`, `connectionCount`,
+`routedConnectionCount`, and `elapsedMs`.
+
+`app.layout.elk()` is async because the ELK engine is lazy-loaded. Model changes
+that happen after `await app.layout.elk(...)` follow the async command undo
+caveat described in [Commands](#commands).
 
 ## Selection
 

@@ -25,6 +25,18 @@ app.toolbar.addButton({
 
 type ExtensionStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
+interface ParsedExtensionRecords {
+  records: LocalExtensionRecord[];
+  retained: unknown[];
+}
+
+interface PersistOptions {
+  retainUnreadable?: boolean;
+  dropRetainedIds?: Iterable<string>;
+}
+
+let retainedExtensionRecords: unknown[] = [];
+
 function storageOrNull(): ExtensionStorage | null {
   if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return null;
   try {
@@ -36,6 +48,10 @@ function storageOrNull(): ExtensionStorage | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function rawRecordId(value: unknown): string | null {
+  return isRecord(value) && typeof value.id === 'string' ? value.id : null;
 }
 
 function normalizeRecord(value: unknown): LocalExtensionRecord | null {
@@ -59,16 +75,25 @@ function normalizeRecord(value: unknown): LocalExtensionRecord | null {
 }
 
 export function normalizeExtensionRecords(value: unknown): LocalExtensionRecord[] {
-  if (!Array.isArray(value)) return [];
+  return parseExtensionRecords(value).records;
+}
+
+function parseExtensionRecords(value: unknown): ParsedExtensionRecords {
+  if (!Array.isArray(value)) return { records: [], retained: [] };
   const seen = new Set<string>();
   const records: LocalExtensionRecord[] = [];
+  const retained: unknown[] = [];
   for (const item of value) {
     const record = normalizeRecord(item);
-    if (!record || seen.has(record.id)) continue;
+    if (!record) {
+      if (rawRecordId(item)) retained.push(item);
+      continue;
+    }
+    if (seen.has(record.id)) continue;
     seen.add(record.id);
     records.push(record);
   }
-  return records;
+  return { records, retained };
 }
 
 export function loadExtensionRecords(
@@ -78,8 +103,11 @@ export function loadExtensionRecords(
   try {
     const raw = storage.getItem(EXTENSIONS_STORAGE_KEY);
     if (!raw) return [];
-    return normalizeExtensionRecords(JSON.parse(raw));
+    const parsed = parseExtensionRecords(JSON.parse(raw));
+    retainedExtensionRecords = parsed.retained;
+    return parsed.records;
   } catch {
+    retainedExtensionRecords = [];
     return [];
   }
 }
@@ -87,10 +115,21 @@ export function loadExtensionRecords(
 export function persistExtensionRecords(
   records: LocalExtensionRecord[],
   storage: ExtensionStorage | null = storageOrNull(),
+  options: PersistOptions = {},
 ): void {
   if (!storage) return;
   try {
-    storage.setItem(EXTENSIONS_STORAGE_KEY, JSON.stringify(normalizeExtensionRecords(records)));
+    const normalized = normalizeExtensionRecords(records);
+    const normalizedIds = new Set(normalized.map((record) => record.id));
+    const dropIds = new Set(options.dropRetainedIds ?? []);
+    const retained = options.retainUnreadable === false
+      ? []
+      : retainedExtensionRecords.filter((record) => {
+          const id = rawRecordId(record);
+          return id && !dropIds.has(id) && !normalizedIds.has(id);
+        });
+    storage.setItem(EXTENSIONS_STORAGE_KEY, JSON.stringify([...retained, ...normalized]));
+    retainedExtensionRecords = retained;
   } catch {
     /* localStorage failures should not block editing */
   }
@@ -127,25 +166,33 @@ interface ExtensionStoreState {
   setEnabled(id: string, enabled: boolean): void;
 }
 
-function commit(records: LocalExtensionRecord[]): LocalExtensionRecord[] {
+function commit(
+  records: LocalExtensionRecord[],
+  options: PersistOptions = {},
+): LocalExtensionRecord[] {
   const normalized = normalizeExtensionRecords(records);
-  persistExtensionRecords(normalized);
+  persistExtensionRecords(normalized, undefined, options);
   return normalized;
 }
 
 export const useExtensionStore = create<ExtensionStoreState>((set) => ({
   extensions: loadExtensionRecords(),
-  setExtensions: (records) => set({ extensions: commit(records) }),
+  setExtensions: (records) => set({ extensions: commit(records, { retainUnreadable: false }) }),
   upsert: (record) =>
     set((state) => ({
-      extensions: commit([
-        ...state.extensions.filter((existing) => existing.id !== record.id),
-        { ...record, updatedAt: Date.now() },
-      ]),
+      extensions: commit(
+        [
+          ...state.extensions.filter((existing) => existing.id !== record.id),
+          { ...record, updatedAt: Date.now() },
+        ],
+        { dropRetainedIds: [record.id] },
+      ),
     })),
   remove: (id) =>
     set((state) => ({
-      extensions: commit(state.extensions.filter((record) => record.id !== id)),
+      extensions: commit(state.extensions.filter((record) => record.id !== id), {
+        dropRetainedIds: [id],
+      }),
     })),
   setEnabled: (id, enabled) =>
     set((state) => ({

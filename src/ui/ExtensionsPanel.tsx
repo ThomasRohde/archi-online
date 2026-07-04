@@ -5,6 +5,7 @@ import {
   extensionArchiveFileName,
   readExtensionArchive,
 } from '../extensions/package-archive';
+import { clearExtensionStorage } from '../extensions/app-api';
 import {
   createExtensionRecord,
   useExtensionStore,
@@ -348,6 +349,7 @@ export function ExtensionsPanel() {
       extensionRegistry.clearExtension(current.record.id);
       if (isPackage) removePackage(current.record.id);
       else remove(current.record.id);
+      clearExtensionStorage(current.record.id);
       const next = items.find((item) => item.key !== current.key) ?? null;
       setSelectedKey(next?.key ?? null);
     })();

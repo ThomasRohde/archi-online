@@ -70,7 +70,17 @@ function renderPanel() {
     var row = document.createElement('div');
     row.style.borderBottom = '1px solid #e6e8eb';
     row.style.paddingBottom = '5px';
-    row.innerHTML = '<strong>' + entry.source + '</strong> <span style="color:#666">' + entry.time + '</span><br><code>' + entry.ids.join(', ') + '</code>';
+    var source = document.createElement('strong');
+    source.textContent = entry.source;
+    var time = document.createElement('span');
+    time.style.color = '#666';
+    time.textContent = ' ' + entry.time;
+    var ids = document.createElement('code');
+    ids.textContent = entry.ids.join(', ');
+    row.appendChild(source);
+    row.appendChild(time);
+    row.appendChild(document.createElement('br'));
+    row.appendChild(ids);
     list.appendChild(row);
   });
   if (history.length === 0) {

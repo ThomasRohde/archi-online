@@ -6,6 +6,18 @@ export const EXTENSION_PACKAGES_STORAGE_KEY = 'archi-online.extension-packages.v
 
 type ExtensionPackageStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
+interface ParsedInstalledPackages {
+  packages: InstalledExtensionPackage[];
+  retained: unknown[];
+}
+
+interface PersistOptions {
+  retainUnreadable?: boolean;
+  dropRetainedIds?: Iterable<string>;
+}
+
+let retainedInstalledPackageRecords: unknown[] = [];
+
 function storageOrNull(): ExtensionPackageStorage | null {
   if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return null;
   try {
@@ -17,6 +29,15 @@ function storageOrNull(): ExtensionPackageStorage | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function rawPackageId(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.id === 'string') return value.id;
+  if (isRecord(value.manifest) && typeof value.manifest.id === 'string') {
+    return value.manifest.id;
+  }
+  return null;
 }
 
 function normalizeInstalledPackage(value: unknown): InstalledExtensionPackage | null {
@@ -45,16 +66,25 @@ function normalizeInstalledPackage(value: unknown): InstalledExtensionPackage | 
 }
 
 export function normalizeInstalledPackages(value: unknown): InstalledExtensionPackage[] {
-  if (!Array.isArray(value)) return [];
+  return parseInstalledPackages(value).packages;
+}
+
+function parseInstalledPackages(value: unknown): ParsedInstalledPackages {
+  if (!Array.isArray(value)) return { packages: [], retained: [] };
   const seen = new Set<string>();
   const packages: InstalledExtensionPackage[] = [];
+  const retained: unknown[] = [];
   for (const item of value) {
     const pkg = normalizeInstalledPackage(item);
-    if (!pkg || seen.has(pkg.id)) continue;
+    if (!pkg) {
+      if (rawPackageId(item)) retained.push(item);
+      continue;
+    }
+    if (seen.has(pkg.id)) continue;
     seen.add(pkg.id);
     packages.push(pkg);
   }
-  return packages;
+  return { packages, retained };
 }
 
 export function loadInstalledPackages(
@@ -64,8 +94,11 @@ export function loadInstalledPackages(
   try {
     const raw = storage.getItem(EXTENSION_PACKAGES_STORAGE_KEY);
     if (!raw) return [];
-    return normalizeInstalledPackages(JSON.parse(raw));
+    const parsed = parseInstalledPackages(JSON.parse(raw));
+    retainedInstalledPackageRecords = parsed.retained;
+    return parsed.packages;
   } catch {
+    retainedInstalledPackageRecords = [];
     return [];
   }
 }
@@ -73,10 +106,21 @@ export function loadInstalledPackages(
 export function persistInstalledPackages(
   packages: InstalledExtensionPackage[],
   storage: ExtensionPackageStorage | null = storageOrNull(),
+  options: PersistOptions = {},
 ): void {
   if (!storage) return;
   try {
-    storage.setItem(EXTENSION_PACKAGES_STORAGE_KEY, JSON.stringify(normalizeInstalledPackages(packages)));
+    const normalized = normalizeInstalledPackages(packages);
+    const normalizedIds = new Set(normalized.map((pkg) => pkg.id));
+    const dropIds = new Set(options.dropRetainedIds ?? []);
+    const retained = options.retainUnreadable === false
+      ? []
+      : retainedInstalledPackageRecords.filter((record) => {
+          const id = rawPackageId(record);
+          return id && !dropIds.has(id) && !normalizedIds.has(id);
+        });
+    storage.setItem(EXTENSION_PACKAGES_STORAGE_KEY, JSON.stringify([...retained, ...normalized]));
+    retainedInstalledPackageRecords = retained;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Could not persist extension packages: ${message}`, { cause: error });
@@ -91,25 +135,31 @@ interface ExtensionPackageStoreState {
   setPackageEnabled(id: string, enabled: boolean): void;
 }
 
-function commit(packages: InstalledExtensionPackage[]): InstalledExtensionPackage[] {
+function commit(
+  packages: InstalledExtensionPackage[],
+  options: PersistOptions = {},
+): InstalledExtensionPackage[] {
   const normalized = normalizeInstalledPackages(packages);
-  persistInstalledPackages(normalized);
+  persistInstalledPackages(normalized, undefined, options);
   return normalized;
 }
 
 export const useExtensionPackageStore = create<ExtensionPackageStoreState>((set) => ({
   packages: loadInstalledPackages(),
-  setPackages: (packages) => set({ packages: commit(packages) }),
+  setPackages: (packages) => set({ packages: commit(packages, { retainUnreadable: false }) }),
   upsertPackage: (pkg) =>
     set((state) => ({
-      packages: commit([
-        ...state.packages.filter((existing) => existing.id !== pkg.id),
-        { ...pkg, updatedAt: Date.now() },
-      ]),
+      packages: commit(
+        [
+          ...state.packages.filter((existing) => existing.id !== pkg.id),
+          { ...pkg, updatedAt: Date.now() },
+        ],
+        { dropRetainedIds: [pkg.id] },
+      ),
     })),
   removePackage: (id) =>
     set((state) => ({
-      packages: commit(state.packages.filter((pkg) => pkg.id !== id)),
+      packages: commit(state.packages.filter((pkg) => pkg.id !== id), { dropRetainedIds: [id] }),
     })),
   setPackageEnabled: (id, enabled) =>
     set((state) => ({

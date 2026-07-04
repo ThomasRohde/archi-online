@@ -81,7 +81,6 @@ function addSelect(container, labelText, value, values, onChange) {
   addLabel(row, labelText);
 
   var select = document.createElement('select');
-  select.value = value;
   select.style.width = '100%';
   values.forEach(function (entry) {
     var option = document.createElement('option');
@@ -89,6 +88,7 @@ function addSelect(container, labelText, value, values, onChange) {
     option.textContent = entry.label;
     select.appendChild(option);
   });
+  select.value = value;
   select.onchange = function () {
     onChange(select.value);
   };
@@ -126,7 +126,14 @@ function renderPanel() {
   panel.style.gap = '12px';
 
   var title = document.createElement('div');
-  title.innerHTML = '<strong>ELK Layout</strong><br><span style="color:GrayText">Layer selected objects or the whole active view.</span>';
+  var titleStrong = document.createElement('strong');
+  titleStrong.textContent = 'ELK Layout';
+  var titleDetail = document.createElement('span');
+  titleDetail.style.color = 'GrayText';
+  titleDetail.textContent = 'Layer selected objects or the whole active view.';
+  title.appendChild(titleStrong);
+  title.appendChild(document.createElement('br'));
+  title.appendChild(titleDetail);
   panel.appendChild(title);
 
   addSelect(panel, 'Scope', options.scope, config.options.scope, function (value) {

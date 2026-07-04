@@ -2,6 +2,7 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import type { InstalledExtensionPackage, InstalledPackageFile } from './package-types';
 import type { LocalExtensionRecord } from './types';
 import {
+  MAX_PACKAGE_CONTENT_CHARS,
   cloneManifest,
   makeInstalledPackage,
   normalizePackagePath,
@@ -9,6 +10,7 @@ import {
 
 export const ARCHI_EXTENSION_MIME = 'application/vnd.archi-online.extension+zip';
 export const MAX_EXTENSION_ARCHIVE_BYTES = 20_000_000;
+export const MAX_EXTENSION_UNCOMPRESSED_BYTES = MAX_PACKAGE_CONTENT_CHARS;
 
 const TEXT_EXTENSIONS = new Set([
   '.css',
@@ -84,6 +86,26 @@ function blobPart(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 
+function unzipPackageArchive(inputBytes: Uint8Array): Record<string, Uint8Array> {
+  let totalBytes = 0;
+  const seen = new Set<string>();
+  return unzipSync(inputBytes, {
+    filter(file) {
+      if (file.name.endsWith('/')) return false;
+      const path = normalizePackagePath(file.name);
+      if (seen.has(path)) {
+        throw new Error(`Duplicate package path after normalization: ${path}`);
+      }
+      seen.add(path);
+      totalBytes += file.originalSize;
+      if (totalBytes > MAX_EXTENSION_UNCOMPRESSED_BYTES) {
+        throw new Error('Uncompressed package content is too large to import');
+      }
+      return true;
+    },
+  });
+}
+
 export async function readExtensionArchive(
   input: Blob | ArrayBuffer | Uint8Array,
   now = Date.now(),
@@ -92,7 +114,7 @@ export async function readExtensionArchive(
   if (inputBytes.byteLength > MAX_EXTENSION_ARCHIVE_BYTES) {
     throw new Error('Package archive is too large to import');
   }
-  const archive = unzipSync(inputBytes);
+  const archive = unzipPackageArchive(inputBytes);
   const files: Record<string, InstalledPackageFile> = {};
   for (const [rawPath, bytes] of Object.entries(archive)) {
     if (rawPath.endsWith('/')) continue;

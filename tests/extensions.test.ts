@@ -7,7 +7,7 @@ import {
   normalizeExtensionRecords,
   persistExtensionRecords,
 } from '../src/extensions/extension-store';
-import { createAppApi } from '../src/extensions/app-api';
+import { clearExtensionStorage, createAppApi } from '../src/extensions/app-api';
 import { startExtensionEventBridge } from '../src/extensions/events';
 import { makeInstalledPackage } from '../src/extensions/package-validation';
 import {
@@ -15,6 +15,7 @@ import {
   extensionRegistry,
 } from '../src/extensions/registry';
 import { runExtensionRecord, runInstalledPackage } from '../src/extensions/runtime';
+import { runScript } from '../src/scripting/runner';
 import {
   addElement,
   addElementNodeToView,
@@ -123,6 +124,28 @@ describe('extension records', () => {
     persistExtensionRecords([record], s);
 
     expect(JSON.parse(s.data.get(EXTENSIONS_STORAGE_KEY) ?? '[]')).toEqual([record]);
+  });
+
+  it('preserves unreadable persisted source records across unrelated writes', () => {
+    const record = createExtensionRecord('local.saved', 'Saved', 100);
+    const futureRecord = {
+      id: 'local.future-source',
+      schemaVersion: 99,
+      name: 'Future source',
+      version: '9.0.0',
+      enabled: true,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const s = storage(JSON.stringify([futureRecord, record]));
+
+    expect(loadExtensionRecords(s)).toEqual([record]);
+    persistExtensionRecords([{ ...record, enabled: false, updatedAt: 101 }], s);
+
+    const written = JSON.parse(s.data.get(EXTENSIONS_STORAGE_KEY) ?? '[]');
+    expect(written).toHaveLength(2);
+    expect(written[0]).toEqual(futureRecord);
+    expect(written[1]).toMatchObject({ id: record.id, enabled: false });
   });
 });
 
@@ -296,6 +319,10 @@ describe('extension app API and runtime', () => {
     expect(localStorage.getItem('archi-online.extension-storage.v1.local.audit')).toContain(
       '"threshold":7',
     );
+
+    clearExtensionStorage('local.audit');
+
+    expect(localStorage.getItem('archi-online.extension-storage.v1.local.audit')).toBeNull();
   });
 
   it('exposes active views and current selection through app APIs', () => {
@@ -614,5 +641,20 @@ describe('extension events', () => {
     await registry.emitEvent('app.ready');
 
     expect(count).toBe(0);
+  });
+
+  it('emits script.error when a user script fails', () => {
+    replaceModel(createEmptyModel('Script Error'), null);
+    const payloads: unknown[] = [];
+    extensionRegistry.onEvent('local.audit', 'script.error', (payload) => payloads.push(payload));
+
+    const result = runScript('throw new Error("script exploded");', () => undefined);
+
+    expect(result.error).toBe('Error: script exploded');
+    expect(payloads).toEqual([
+      {
+        message: 'Error: script exploded',
+      },
+    ]);
   });
 });

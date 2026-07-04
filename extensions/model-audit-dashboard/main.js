@@ -93,7 +93,14 @@ function renderAuditPanel() {
   img.height = 42;
 
   var title = document.createElement('div');
-  title.innerHTML = '<strong>Model Audit</strong><br><span style="color:#666">Last run ' + result.time + '</span>';
+  var titleStrong = document.createElement('strong');
+  titleStrong.textContent = 'Model Audit';
+  var titleDetail = document.createElement('span');
+  titleDetail.style.color = '#666';
+  titleDetail.textContent = 'Last run ' + result.time;
+  title.appendChild(titleStrong);
+  title.appendChild(document.createElement('br'));
+  title.appendChild(titleDetail);
 
   header.appendChild(img);
   header.appendChild(title);
@@ -113,7 +120,15 @@ function renderAuditPanel() {
     cell.style.border = '1px solid #d8dee4';
     cell.style.borderRadius = '4px';
     cell.style.padding = '8px';
-    cell.innerHTML = '<div style="font-size:11px;color:#666">' + entry[0] + '</div><strong style="font-size:20px">' + entry[1] + '</strong>';
+    var cellLabel = document.createElement('div');
+    cellLabel.style.fontSize = '11px';
+    cellLabel.style.color = '#666';
+    cellLabel.textContent = entry[0];
+    var cellValue = document.createElement('strong');
+    cellValue.style.fontSize = '20px';
+    cellValue.textContent = String(entry[1]);
+    cell.appendChild(cellLabel);
+    cell.appendChild(cellValue);
     grid.appendChild(cell);
   });
   auditPanel.appendChild(grid);

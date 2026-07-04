@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { strToU8, zipSync } from 'fflate';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { zipSync } from 'fflate';
 import { readExtensionArchive } from '../src/extensions/package-archive';
 import { createExtensionRegistry } from '../src/extensions/registry';
 import { runInstalledPackage } from '../src/extensions/runtime';
@@ -23,14 +23,52 @@ function archiveBytesFromFolder(folder: string): Uint8Array {
       const path = join(dir, entry.name);
       const archivePath = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) visit(path, archivePath);
-      else files[archivePath] = strToU8(readFileSync(path, 'utf8'));
+      else files[archivePath] = readFileSync(path);
     }
   };
   visit(folder);
   return zipSync(files);
 }
 
+async function loadExample(folderName: string) {
+  const bytes = archiveBytesFromFolder(join(examplesRoot, folderName));
+  const pkg = await readExtensionArchive(bytes, 100);
+  const registry = createExtensionRegistry();
+  const result = runInstalledPackage(pkg, registry);
+  expect(result).toEqual({});
+  return { pkg, registry };
+}
+
+function browserStorage() {
+  const data = new Map<string, string>();
+  return {
+    get length() {
+      return data.size;
+    },
+    clear() {
+      data.clear();
+    },
+    getItem(key: string) {
+      return data.get(key) ?? null;
+    },
+    key(index: number) {
+      return [...data.keys()][index] ?? null;
+    },
+    removeItem(key: string) {
+      data.delete(key);
+    },
+    setItem(key: string, value: string) {
+      data.set(key, value);
+    },
+  };
+}
+
 describe('example extension packages', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', browserStorage());
+    localStorage.clear();
+  });
+
   it('defines the expected example package folders', () => {
     const folders = readdirSync(examplesRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -42,17 +80,75 @@ describe('example extension packages', () => {
   });
 
   it.each(exampleIds)('imports and registers runtime contributions for %s', async (folderName) => {
-    const bytes = archiveBytesFromFolder(join(examplesRoot, folderName));
-    const pkg = await readExtensionArchive(bytes, 100);
-    const registry = createExtensionRegistry();
+    const { pkg, registry } = await loadExample(folderName);
 
     expect(pkg.manifest.main).toBe('main.js');
     expect(pkg.files['manifest.json']).toBeDefined();
     expect(pkg.files[pkg.manifest.main]).toBeDefined();
 
-    const result = runInstalledPackage(pkg, registry);
-
-    expect(result).toEqual({});
     expect(registry.getSnapshot().commands.length).toBeGreaterThan(0);
+  });
+
+  it('renders stored ELK dropdown values after panel re-render', async () => {
+    const { registry } = await loadExample('elk-layout');
+    localStorage.setItem(
+      'archi-online.extension-storage.v1.examples.elk-layout',
+      JSON.stringify({
+        options: {
+          scope: 'selection',
+          direction: 'down',
+          edgeRouting: 'splines',
+          nodeSpacing: 40,
+          layerSpacing: 80,
+        },
+      }),
+    );
+    const panel = registry
+      .getSnapshot()
+      .panels.find((candidate) => candidate.id === 'examples.elk-layout.panel');
+    const container = document.createElement('div');
+
+    panel?.render(container);
+
+    expect([...container.querySelectorAll('select')].map((select) => select.value)).toEqual([
+      'selection',
+      'down',
+      'splines',
+    ]);
+  });
+
+  it('renders event log payloads as text instead of HTML', async () => {
+    const { registry } = await loadExample('event-log-console');
+    await registry.emitEvent('model.opened', {
+      fileName: '<img src=x onerror="globalThis.__xss = true">',
+    });
+    const panel = registry
+      .getSnapshot()
+      .panels.find((candidate) => candidate.id === 'examples.event-log-console.panel');
+    const container = document.createElement('div');
+
+    panel?.render(container);
+
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.textContent).toContain('<img src=x');
+  });
+
+  it('renders selection history values as text instead of HTML', async () => {
+    const { registry } = await loadExample('selection-workbench');
+    await registry.emitEvent('selection.changed', {
+      source: '<img src=x onerror="globalThis.__xss = true">',
+      ids: ['<svg onload="globalThis.__xss = true">'],
+    });
+    const panel = registry
+      .getSnapshot()
+      .panels.find((candidate) => candidate.id === 'examples.selection-workbench.panel');
+    const container = document.createElement('div');
+
+    panel?.render(container);
+
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.textContent).toContain('<img src=x');
+    expect(container.textContent).toContain('<svg onload=');
   });
 });

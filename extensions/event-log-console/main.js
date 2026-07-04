@@ -67,7 +67,18 @@ function renderPanel() {
     var row = document.createElement('div');
     row.style.borderBottom = '1px solid #e6e8eb';
     row.style.padding = '6px 0';
-    row.innerHTML = '<strong>' + event.name + '</strong> <span style="color:#666">' + event.time + '</span><br><code style="white-space:pre-wrap">' + event.payload + '</code>';
+    var name = document.createElement('strong');
+    name.textContent = event.name;
+    var time = document.createElement('span');
+    time.style.color = '#666';
+    time.textContent = ' ' + event.time;
+    var payload = document.createElement('code');
+    payload.style.whiteSpace = 'pre-wrap';
+    payload.textContent = event.payload;
+    row.appendChild(name);
+    row.appendChild(time);
+    row.appendChild(document.createElement('br'));
+    row.appendChild(payload);
     panel.appendChild(row);
   });
 }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { strToU8, zipSync } from 'fflate';
 import {
   createArchiveBytesForPackage,
   createArchiveBytesForSourceRecord,
@@ -239,6 +240,27 @@ describe('extension package store and runtime loading', () => {
     expect(loadInstalledPackages(storage(raw))).toEqual([pkg]);
   });
 
+  it('preserves unreadable persisted package records across unrelated writes', () => {
+    const pkg = packageFixture();
+    const futurePackage = {
+      id: 'local.future-package',
+      schemaVersion: 99,
+      enabled: true,
+      installedAt: 1,
+      updatedAt: 1,
+      files: { 'main.js': { encoding: 'utf8', content: '' } },
+    };
+    const s = storage(JSON.stringify([futurePackage, pkg]));
+
+    expect(loadInstalledPackages(s)).toEqual([pkg]);
+    persistInstalledPackages([{ ...pkg, enabled: false, updatedAt: 101 }], s);
+
+    const written = JSON.parse(s.data.get(EXTENSION_PACKAGES_STORAGE_KEY) ?? '[]');
+    expect(written).toHaveLength(2);
+    expect(written[0]).toEqual(futurePackage);
+    expect(written[1]).toMatchObject({ id: pkg.id, enabled: false });
+  });
+
   it('loads enabled packages through the existing extension runtime registry', () => {
     const registry = createExtensionRegistry();
     useExtensionPackageStore.getState().setPackages([packageFixture()]);
@@ -280,6 +302,23 @@ describe('extension package archives', () => {
     await expect(readExtensionArchive(new Uint8Array(20_000_001))).rejects.toThrow(
       /Package archive is too large/,
     );
+  });
+
+  it('rejects oversized uncompressed archive contents before package validation', async () => {
+    const manifest = {
+      schemaVersion: 2,
+      id: 'local.big-package',
+      name: 'Big package',
+      version: '1.0.0',
+      main: 'main.js',
+    };
+    const bytes = zipSync({
+      'manifest.json': strToU8(JSON.stringify(manifest)),
+      'main.js': strToU8('app.extension({ id: "local.big-package", name: "Big package", version: "1.0.0" });'),
+      'assets/large.bin': new Uint8Array(5_000_001),
+    });
+
+    await expect(readExtensionArchive(bytes)).rejects.toThrow(/uncompressed package content/i);
   });
 
   it('round trips installed package archives', async () => {
