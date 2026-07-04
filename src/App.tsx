@@ -6,11 +6,16 @@ import { extensionRegistry } from './extensions/registry';
 import { reloadEnabledExtensions } from './extensions/runtime';
 import { cloneModelForEditing, openView, replaceModel, redo, undo, useStore } from './model/store';
 import { restoreAutosave, startAutosave } from './persistence/autosave';
+import { loadModelText } from './persistence/files';
 import { loadSharedModelFromLocation, parseShareFragment } from './persistence/share';
+import { consumePwaAction } from './pwa/actions';
+import { signalEditorRuntimeReady } from './pwa/boot-signal';
+import { takeSharedFile } from './pwa/share-target-inbox';
+import { shouldBlockUnload } from './pwa/unload-guard';
 import { hydrateSettingsStore } from './settings/app-settings';
-import { AppDialogHost } from './ui/AppDialog';
+import { AppDialogHost, showAlertDialog, showConfirmDialog } from './ui/AppDialog';
 import { AppShell } from './ui/AppShell';
-import { openModel, saveModel } from './ui/Toolbar';
+import { confirmDiscardChanges, newModel, openModel, saveModel } from './ui/Toolbar';
 import { ViewerShell } from './ui/ViewerShell';
 
 let editorBooted = false;
@@ -73,7 +78,45 @@ async function bootEditorRuntime(restoreWorkspace: boolean): Promise<void> {
       startExtensionEventBridge();
     }
     void extensionRegistry.emitEvent('app.ready');
+    signalEditorRuntimeReady();
   });
+}
+
+/** Handle `?action=` URLs from manifest shortcuts and the share-target redirect. */
+async function handlePwaAction(): Promise<void> {
+  const action = consumePwaAction();
+  if (!action) return;
+  if (action === 'new') {
+    await newModel();
+  } else if (action === 'open') {
+    // showOpenFilePicker needs transient user activation; the confirm
+    // button click supplies it.
+    const proceed = await showConfirmDialog({
+      title: 'Open model file',
+      message: 'Choose an ArchiMate model file to open.',
+      confirmLabel: 'Choose file…',
+    });
+    if (proceed) await openModel();
+  } else if (action === 'share-received') {
+    const shared = await takeSharedFile();
+    if (!shared) {
+      await showAlertDialog({
+        title: 'Shared model',
+        message: 'No shared file was received.',
+      });
+      return;
+    }
+    if (!(await confirmDiscardChanges())) return;
+    try {
+      loadModelText(shared.text, shared.name);
+    } catch (error) {
+      await showAlertDialog({
+        title: 'Could not open shared model',
+        message: error instanceof Error ? error.message : String(error),
+        intent: 'error',
+      });
+    }
+  }
 }
 
 async function bootViewerRuntime(
@@ -142,7 +185,7 @@ export function App() {
 
   useEffect(() => {
     if (mode.kind !== 'editor') return;
-    void bootEditorRuntime(editorBoot.restoreWorkspace);
+    void bootEditorRuntime(editorBoot.restoreWorkspace).then(() => handlePwaAction());
     const onKey = (e: KeyboardEvent) => {
       const inText =
         e.target instanceof HTMLInputElement ||
@@ -168,7 +211,7 @@ export function App() {
     };
     window.addEventListener('keydown', onKey);
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (useStore.getState().dirty) e.preventDefault();
+      if (useStore.getState().dirty && shouldBlockUnload()) e.preventDefault();
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {

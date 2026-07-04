@@ -22,6 +22,15 @@ export function startAutosave(): void {
   });
 }
 
+/** Persist the current model immediately, cancelling any pending debounce. */
+export async function flushAutosaveNow(): Promise<void> {
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    timer = undefined;
+  }
+  await persist();
+}
+
 async function persist(): Promise<void> {
   const s = useStore.getState();
   try {

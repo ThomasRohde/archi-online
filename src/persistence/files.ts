@@ -30,9 +30,7 @@ export async function openModelFromDisk(): Promise<void> {
     } catch {
       return; // user cancelled
     }
-    const file = await handles[0].getFile();
-    loadModelText(await file.text(), file.name);
-    setCurrentFileHandle(handles[0]);
+    await openModelFromHandle(handles[0]);
   } else {
     const input = document.createElement('input');
     input.type = 'file';
@@ -43,6 +41,14 @@ export async function openModelFromDisk(): Promise<void> {
     };
     input.click();
   }
+}
+
+/** Open a model from a FileSystemFileHandle (picker or PWA launch queue),
+ * keeping the handle so silent Ctrl+S re-save works. */
+export async function openModelFromHandle(handle: FileSystemFileHandle): Promise<void> {
+  const file = await handle.getFile();
+  loadModelText(await file.text(), file.name);
+  setCurrentFileHandle(handle); // after loadModelText, which clears the handle
 }
 
 export function loadModelText(text: string, fileName: string): void {

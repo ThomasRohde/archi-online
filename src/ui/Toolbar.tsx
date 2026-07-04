@@ -36,7 +36,7 @@ const SHORTCUTS: [string, string][] = [
   ['Double-click bendpoint', 'Remove bendpoint'],
 ];
 
-async function confirmDiscardChanges(): Promise<boolean> {
+export async function confirmDiscardChanges(): Promise<boolean> {
   if (!useStore.getState().dirty) return true;
   return showConfirmDialog({
     title: 'Discard unsaved changes?',
