@@ -16,4 +16,3 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <UpdatePrompt />
   </React.StrictMode>,
 );
-

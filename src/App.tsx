@@ -6,10 +6,11 @@ import { extensionRegistry } from './extensions/registry';
 import { reloadEnabledExtensions } from './extensions/runtime';
 import { cloneModelForEditing, openView, replaceModel, redo, undo, useStore } from './model/store';
 import { restoreAutosave, startAutosave } from './persistence/autosave';
-import { loadModelText } from './persistence/files';
+import { loadModelText, openModelFromHandle } from './persistence/files';
 import { loadSharedModelFromLocation, parseShareFragment } from './persistence/share';
 import { consumePwaAction } from './pwa/actions';
 import { signalEditorRuntimeReady } from './pwa/boot-signal';
+import { subscribeLaunchedFiles } from './pwa/launch-queue';
 import { takeSharedFile } from './pwa/share-target-inbox';
 import { shouldBlockUnload } from './pwa/unload-guard';
 import { hydrateSettingsStore } from './settings/app-settings';
@@ -119,6 +120,18 @@ async function handlePwaAction(): Promise<void> {
   }
 }
 
+async function openLaunchedFile(handle: FileSystemFileHandle): Promise<void> {
+  try {
+    await openModelFromHandle(handle);
+  } catch (error) {
+    await showAlertDialog({
+      title: 'Could not open model',
+      message: error instanceof Error ? error.message : String(error),
+      intent: 'error',
+    });
+  }
+}
+
 async function bootViewerRuntime(
   routeKey: string,
   setMode: (mode: AppMode) => void,
@@ -218,6 +231,23 @@ export function App() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('beforeunload', onBeforeUnload);
     };
+  }, [mode.kind, editorBoot.restoreWorkspace]);
+
+  useEffect(() => {
+    return subscribeLaunchedFiles((handle) => {
+      void (async () => {
+        const inEditor = mode.kind === 'editor';
+        if (!inEditor) {
+          clearViewerUrl();
+          replaceModel(null, null, false, { readOnly: false });
+          setEditorBoot({ restoreWorkspace: false });
+          setMode({ kind: 'editor' });
+        }
+        await bootEditorRuntime(inEditor ? editorBoot.restoreWorkspace : false);
+        if (!(await confirmDiscardChanges())) return;
+        await openLaunchedFile(handle);
+      })();
+    });
   }, [mode.kind, editorBoot.restoreWorkspace]);
 
   const openEditorHome = () => {

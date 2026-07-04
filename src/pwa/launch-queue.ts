@@ -1,7 +1,7 @@
-import { openModelFromHandle } from '../persistence/files';
-import { showAlertDialog } from '../ui/AppDialog';
-import { confirmDiscardChanges } from '../ui/Toolbar';
-import { editorRuntimeReady } from './boot-signal';
+export type LaunchedFileHandler = (handle: FileSystemFileHandle) => void;
+
+const handlers = new Set<LaunchedFileHandler>();
+const pendingHandles: FileSystemFileHandle[] = [];
 
 /**
  * Consume OS file-handler launches (double-clicked .archimate files).
@@ -13,20 +13,31 @@ export function initLaunchQueue(): void {
   window.launchQueue.setConsumer((params) => {
     const handle = params.files?.[0];
     if (!handle || handle.kind !== 'file') return;
-    void openLaunchedFile(handle as FileSystemFileHandle);
+    deliverLaunchedFile(handle as FileSystemFileHandle);
   });
 }
 
-async function openLaunchedFile(handle: FileSystemFileHandle): Promise<void> {
-  await editorRuntimeReady();
-  if (!(await confirmDiscardChanges())) return;
-  try {
-    await openModelFromHandle(handle);
-  } catch (error) {
-    await showAlertDialog({
-      title: 'Could not open model',
-      message: error instanceof Error ? error.message : String(error),
-      intent: 'error',
-    });
+export function subscribeLaunchedFiles(handler: LaunchedFileHandler): () => void {
+  handlers.add(handler);
+  while (pendingHandles.length > 0) {
+    handler(pendingHandles.shift()!);
   }
+  return () => {
+    handlers.delete(handler);
+  };
+}
+
+function deliverLaunchedFile(handle: FileSystemFileHandle): void {
+  if (handlers.size === 0) {
+    pendingHandles.push(handle);
+    return;
+  }
+  for (const handler of handlers) {
+    handler(handle);
+  }
+}
+
+export function resetLaunchQueueForTests(): void {
+  handlers.clear();
+  pendingHandles.splice(0);
 }
