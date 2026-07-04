@@ -14,8 +14,10 @@ import {
   gistShareHref,
   saveShareGistForModel,
 } from '../persistence/share';
+import { copyViewPngToClipboard } from '../canvas/export/view-image';
 import { showAlertDialog, showConfirmDialog, showPromptDialog } from './AppDialog';
 import { showContextMenu, SEPARATOR, type MenuItem } from './ContextMenu';
+import { ExportImageDialog } from './ExportImageDialog';
 import { layoutBus } from './layout-bus';
 
 const SHORTCUTS: [string, string][] = [
@@ -163,8 +165,23 @@ async function runShareModel(): Promise<void> {
   }
 }
 
+async function copyActiveViewImage(): Promise<void> {
+  const s = useStore.getState();
+  if (!s.model || !s.activeViewId) return;
+  try {
+    await copyViewPngToClipboard(s.model, s.activeViewId);
+  } catch (error) {
+    await showAlertDialog({
+      title: 'Could not copy image',
+      message: errorMessage(error),
+      intent: 'error',
+    });
+  }
+}
+
 export function Toolbar() {
   const [showHelp, setShowHelp] = useState(false);
+  const [showExportImage, setShowExportImage] = useState(false);
   const extensionSnapshot = useSyncExternalStore(
     (listener) => extensionRegistry.subscribe(listener),
     () => extensionRegistry.getSnapshot(),
@@ -179,6 +196,19 @@ export function Toolbar() {
   const hasModel = useStore((s) => s.model !== null);
   const modelName = useStore((s) => s.model?.info.name);
   const readOnly = useStore((s) => s.readOnly);
+  const hasActiveView = useStore((s) => s.activeViewId !== null);
+  const exportMenuItems: MenuItem[] = [
+    {
+      label: 'View as image…',
+      disabled: !hasActiveView,
+      onClick: () => setShowExportImage(true),
+    },
+    {
+      label: 'Copy view as image',
+      disabled: !hasActiveView,
+      onClick: () => void copyActiveViewImage(),
+    },
+  ];
   const extensionMenuItems: MenuItem[] = extensionSnapshot.menus['extensions.menu'].map((item) => ({
     label: item.label,
     danger: item.danger,
@@ -224,6 +254,17 @@ export function Toolbar() {
         onClick={() => void runShareModel()}
       >
         Share…
+      </button>
+      <button
+        className="tb-btn"
+        title="Export view or model"
+        disabled={!hasModel}
+        onClick={(e) => {
+          const rect = (e.target as HTMLElement).getBoundingClientRect();
+          showContextMenu(rect.left, rect.bottom + 4, exportMenuItems);
+        }}
+      >
+        Export ▾
       </button>
       <div className="toolbar-sep" />
       <button
@@ -289,6 +330,7 @@ export function Toolbar() {
       <button className="tb-btn" title="Keyboard shortcuts" onClick={() => setShowHelp(true)}>
         ?
       </button>
+      {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
       {showHelp &&
         createPortal(
           <div className="modal-backdrop" onClick={() => setShowHelp(false)}>

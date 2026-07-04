@@ -101,6 +101,51 @@ export async function saveModelToDisk(saveAs = false): Promise<void> {
   }
 }
 
+export interface BlobSaveType {
+  description: string;
+  accept: Record<string, `.${string}`[]>;
+}
+
+/**
+ * Save an arbitrary blob (exported image, exchange file, CSV) to disk via
+ * the save picker when available, falling back to a download. Does not touch
+ * model dirty/fileName state. Returns false when the user cancelled.
+ */
+export async function saveBlobToDisk(
+  blob: Blob,
+  suggestedName: string,
+  type: BlobSaveType,
+): Promise<boolean> {
+  if (supportsSaveFsAccess()) {
+    let handle: FileSystemFileHandle;
+    try {
+      handle = await window.showSaveFilePicker({ suggestedName, types: [type] });
+    } catch (error) {
+      if (isUserCancelledFileDialog(error)) return false;
+      if (shouldDownloadAfterSaveError(error)) {
+        downloadBlob(blob, suggestedName);
+        return true;
+      }
+      throw error;
+    }
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return true;
+  }
+  downloadBlob(blob, suggestedName);
+  return true;
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function downloadModel(xml: string, fileName: string): void {
   const blob = new Blob([xml], { type: 'application/xml' });
   const url = URL.createObjectURL(blob);
@@ -132,6 +177,6 @@ function domExceptionName(error: unknown): string {
   return '';
 }
 
-function sanitizeFileName(name: string): string {
+export function sanitizeFileName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'model';
 }

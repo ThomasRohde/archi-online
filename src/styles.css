@@ -1102,6 +1102,52 @@ body {
   user-select: none;
 }
 
+.export-dialog {
+  min-width: 340px;
+}
+
+.export-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.export-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+
+.export-label {
+  width: 90px;
+  color: #555;
+  user-select: none;
+}
+
+.export-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.export-actions-spacer {
+  flex: 1;
+}
+
+.tb-btn.primary {
+  background: #2a6cc4;
+  border-color: #2a6cc4;
+  color: #fff;
+}
+
+.tb-btn.primary:hover:not(:disabled) {
+  background: #235aa5;
+}
+
 .app-dialog-backdrop {
   padding: 16px;
 }
