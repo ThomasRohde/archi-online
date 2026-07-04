@@ -1,41 +1,50 @@
 # Extension Packages
 
-Extension packages are local `.archi-ext` archives. They let an extension bundle
-`manifest.json`, `main.js`, optional docs, JSON config, images, and other assets
-into one importable file.
+An extension package is a `.archi-ext` file — a zip archive that bundles an
+extension's `manifest.json`, its main script, and any docs, JSON data, or
+image assets into one importable unit. Packages make extensions portable:
+export one from your browser, send it to a colleague, and they import it
+through their **Extensions** panel.
 
-Packages are installed only into the current browser/profile. They are not
-fetched remotely, synced by the app, or stored in `.archimate` model files.
+Packages are installed into the current browser profile only. They are not
+fetched remotely, not synced, and never stored in `.archimate` model files.
+Imports show a trust warning because packages run local extension code with
+full access to the current model and browser profile.
 
-## Build Example Packages
+## The Extensions panel
 
-The repository includes example package source under `extensions/`.
+The **Extensions** panel manages both kinds of extensions:
 
-Build archives:
+- **Source extensions** — created and edited directly in the panel
+  (**Add extension**), with the source stored in the browser.
+- **Package-owned extensions** — imported from `.archi-ext` archives and
+  loaded from the installed package contents.
 
-```bash
-node extensions/build-archives.mjs
-```
+Available actions:
 
-Generated archives are written to `extensions/dist/` and are ignored by Git.
+| Action | Notes |
+| --- | --- |
+| Add extension | Create a new editable source extension. |
+| Import package | Install a `.archi-ext` archive (shows a trust warning). |
+| Enable / disable | Per extension; disabled extensions don't load. |
+| Save + Reload | Save edited source and re-run the extension. |
+| Export | Save any extension as a `.archi-ext` archive — source extensions are wrapped into a package on export. |
+| Convert to source | Turn a package-owned extension into an editable source extension. |
+| Delete / uninstall | Removes the extension and its private storage. |
+| Reload extensions | Re-run all enabled extensions. |
 
-Import a generated `.archi-ext` file through the app's **Extensions** panel.
-Imports show a trust warning because packages run local extension code with full
-access to the current model and browser profile.
+Errors raised while loading or running an extension are listed per extension
+in the panel.
 
-## Package Layout
-
-Typical package:
+## Package layout
 
 ```text
-manifest.json
-main.js
+manifest.json      (required)
+main.js            (required — the manifest's "main" entry)
 README.md
 data/config.json
 assets/icon.svg
 ```
-
-`manifest.json` and the manifest `main` file are required.
 
 ## Manifest
 
@@ -77,33 +86,32 @@ assets/icon.svg
       }
     ],
     "events": [
-      {
-        "name": "selection.changed"
-      }
+      { "name": "selection.changed" }
     ]
   }
 }
 ```
 
-Static `contributes` metadata documents expected runtime contributions. The
-actual runtime behavior still comes from `main.js`.
+`contributes` is descriptive metadata — it documents what the extension is
+expected to register, but the actual runtime behavior comes from the code in
+`main.js` calling the [[Extension API|Extension-API]].
 
-## Validation Rules
+## Validation rules
 
 Package import validates:
 
-- `schemaVersion` must be `2`
-- `id`, `name`, `version`, and `main` must be non-empty strings
-- package paths must be relative, normalized, and use `/`
-- paths cannot contain `..`, `.`, empty segments, leading `/`, or backslashes
-- `manifest.json` must exist
-- the manifest `main` file must exist and be UTF-8 text
-- installed package records are bounded by file count and stored content size
-- oversized compressed archives are rejected before decompression
+- `schemaVersion` must be `2`,
+- `id`, `name`, `version`, and `main` must be non-empty strings,
+- file paths must be relative, normalized, and use `/` — no `..`, `.`, empty
+  segments, leading `/`, or backslashes,
+- `manifest.json` must exist, and the `main` file must exist and be UTF-8
+  text,
+- at most 200 files per package and 5,000,000 characters of stored content in
+  total.
 
 ## Assets
 
-Package-owned extensions can read files:
+Package-owned extensions read their bundled files through `app.assets`:
 
 ```js
 var readme = app.assets.text("README.md");
@@ -111,43 +119,33 @@ var config = app.assets.json("data/config.json");
 var iconUrl = app.assets.url("assets/icon.svg");
 ```
 
-Binary assets are stored as base64 records in the installed package and exposed
-as data URLs through `app.assets.url()`.
+Binary assets are stored base64-encoded and exposed as `data:` URLs through
+`app.assets.url()`.
 
-## Import, Export, And Source Packages
+## Bundled examples
 
-The **Extensions** panel supports:
+The repository ships five example packages under `extensions/`. Build the
+importable archives with:
 
-- importing `.archi-ext` package archives
-- uninstalling imported packages
-- exporting installed packages
-- exporting source extensions as package archives
-- converting a package main file to editable source
-- reloading enabled extensions
+```bash
+node extensions/build-archives.mjs
+```
 
-Source extensions remain editable in the browser. Package-owned extensions are
-loaded from imported package contents.
+The `.archi-ext` files land in `extensions/dist/` (git-ignored); import them
+through the Extensions panel.
 
-Converting a package to source keeps only the package `main` file. The app warns
-when bundled files would be lost because `app.assets.*` only works for
-package-owned extensions.
+| Package | Demonstrates |
+| --- | --- |
+| **ELK Layout** (`examples.elk-layout`) | The `app.layout.elk` automatic-layout API, menu commands, a settings panel, packaged JSON defaults, and private storage. |
+| **Model Audit Dashboard** (`examples.model-audit-dashboard`) | Commands, toolbar button, menu item, a panel, packaged audit rules, dialogs, and private storage. |
+| **Selection Workbench** (`examples.selection-workbench`) | Selection and context-menu commands, event handling, and a storage-backed selection history panel. |
+| **Package Showcase** (`examples.package-showcase`) | Manifest and package metadata access plus bundled README/JSON/SVG assets. |
+| **Event Log Console** (`examples.event-log-console`) | The full event bridge (app, model, view, tree, selection), a live log panel, and clear/open commands. |
 
-## Example Packages
-
-The repo includes these example packages:
-
-- `model-audit-dashboard` - commands, toolbar, menu, panel, packaged JSON rules,
-  SVG asset, dialogs, and private storage.
-- `selection-workbench` - selection commands, context menu integration, event
-  handling, private storage, and panel rendering.
-- `package-showcase` - package metadata, manifest access, bundled README, JSON,
-  and SVG asset APIs.
-- `event-log-console` - event bridge listeners, event storage, panel rendering,
-  and clear/open commands.
-- `elk-layout` - app-hosted ELK layout API usage, context-menu commands, a
-  dockable settings panel, packaged JSON defaults, and private storage.
+The example sources are small and readable — they double as templates for
+your own extensions.
 
 Related pages:
 
-- [[Extension API|Extension-API]]
-- [[Development|Development]]
+- [[Extension API|Extension-API]] — the `app` API reference.
+- [[Development]] — building the examples from the repository.

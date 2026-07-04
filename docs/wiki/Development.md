@@ -1,62 +1,77 @@
 # Development
 
-## Repository Layout
+How to work on Archi Online itself. For contribution guidelines, see
+[CONTRIBUTING.md](https://github.com/ThomasRohde/archi-online/blob/main/CONTRIBUTING.md)
+in the repository.
+
+## Prerequisites
+
+- Node.js 22+ and npm.
+
+## Repository layout
 
 ```text
-src/model/        ArchiMate metamodel, rules, store, ops, XML I/O
-src/canvas/       SVG view editor, figures, geometry, interactions
+src/model/        pure-TS domain core: metamodel, rules, store, ops, .archimate XML I/O
+src/canvas/       SVG view editor: figures, geometry, interactions
 src/ui/           dock shell, toolbar, panels, menus, Monaco integration
 src/scripting/    jArchi-compatible wrappers, selectors, globals, runner
-src/extensions/   extension registry, runtime, package import/export
-src/persistence/  file open/save and IndexedDB autosave
+src/extensions/   extension registry, runtime, app API, package import/export
+src/persistence/  file open/save, IndexedDB autosave, key-value storage
+src/settings/     app settings model and store
 tests/            Vitest suites
-tools/            generation and project utility scripts
+tools/            code generation and project utility scripts
 extensions/       example extension package sources
-docs/wiki/        GitHub Wiki source pages
+docs/wiki/        source for these wiki pages
 ```
 
 ## Commands
 
 ```bash
 npm install
-npm run dev
-npm test
-npm run typecheck
-npm run lint
-npm run build
-npm run docs:check
+npm run dev          # dev server on http://localhost:5173
+npm test             # vitest (single file: npx vitest run tests/ops.test.ts)
+npm run typecheck    # tsc -b --noEmit
+npm run lint         # eslint
+npm run build        # typecheck + production build into dist/
+npm run preview      # serve the production build
+npm run docs:check   # validate wiki page links
+npm run ci:check     # docs + lint + typecheck + tests + audit + build
 ```
 
-`npm run build` runs TypeScript project checks and writes a static production
-site to `dist/`.
+## Architecture ground rules
 
-## Generated Rules
+- **All model mutations go through `src/model/ops.ts`.** Each operation wraps
+  a transaction that records Immer patches for undo/redo. Scripts and
+  extensions batch their operations into single undo steps.
+- **Fidelity to desktop Archi is the spec.** Figures, icons, colors,
+  relationship rules, and file-format behavior are ported from Archi's Java
+  source, not approximated. See [[Archi Compatibility|Archi-Compatibility]].
+- **`.archimate` round-trip must stay lossless** — `tests/archimate-xml.test.ts`
+  verifies against the real Archisurance fixture.
+- **`src/model/` and `src/scripting/` stay free of React imports** so the
+  domain core remains portable and testable.
 
-Relationship rules are generated from Archi's relationship matrix:
+## Generated relationship rules
+
+The allowed-relationship matrix is generated from Archi's own data file:
 
 ```bash
 node tools/generate-rules.mjs
 ```
 
-Run this only when `tools/data/relationships.xml` changes. It regenerates
-`src/model/data/relations-matrix.ts`.
+This regenerates `src/model/data/relations-matrix.ts` from
+`tools/data/relationships.xml`. Run it only when the source XML changes, and
+never edit the generated file by hand.
 
 ## Testing
 
-Test files live under `tests/**/*.test.ts`.
+Test files live under `tests/**/*.test.ts`. The suites cover the metamodel
+rules, model operations and undo/redo, `.archimate` XML parse/serialize,
+file save/open behavior, settings persistence, the jArchi scripting
+wrappers, the extension runtime and package validation, and the example
+extension packages.
 
-Core suites cover:
-
-- metamodel rules
-- model operations and undo/redo
-- `.archimate` XML parse/serialize
-- file save/open behavior
-- settings persistence and validation
-- jArchi scripting wrappers
-- extension runtime and package validation
-- example extension package sources
-
-Before handing off changes, run:
+Before handing off changes:
 
 ```bash
 npm test
@@ -64,42 +79,28 @@ npm run typecheck
 npm run build
 ```
 
-For docs changes, also run:
+or simply `npm run ci:check` for the full gate.
 
-```bash
-npm run docs:check
-```
+## Example extensions
 
-## Extension Examples
-
-Build example extension archives:
+Build the example `.archi-ext` archives (see
+[[Extension Packages|Extension-Packages]]):
 
 ```bash
 node extensions/build-archives.mjs
 ```
 
-Generated archives are written to `extensions/dist/` and ignored by Git.
+Archives are written to `extensions/dist/` and are git-ignored.
 
-## Documentation Workflow
+## Documentation
 
-Wiki source lives in `docs/wiki/`. The files are named for GitHub Wiki pages:
-
-- `Home.md`
-- `_Sidebar.md`
-- `Scripting-API.md`
-- `Extension-API.md`
-
-Check wiki links:
+These wiki pages are maintained in the main repository under `docs/wiki/`, so
+documentation changes are reviewed like code changes. After editing:
 
 ```bash
-npm run docs:check
+npm run docs:check          # validate links
+npm run docs:publish-wiki   # copy the pages to the GitHub wiki
 ```
 
-Publish to GitHub Wiki after a GitHub remote exists:
-
-```bash
-npm run docs:publish-wiki
-```
-
-See [[Publishing GitHub Wiki|Publishing-GitHub-Wiki]].
-
+Details of the publishing helper live in the repository at
+[docs/wiki-publishing.md](https://github.com/ThomasRohde/archi-online/blob/main/docs/wiki-publishing.md).

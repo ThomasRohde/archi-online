@@ -1,81 +1,99 @@
 # Getting Started
 
-## Requirements
+This page takes you from a fresh checkout to a saved `.archimate` model.
 
-- Node.js and npm for local development.
-- A modern Chromium-family browser is recommended because the app uses browser
-  file APIs where available.
+## What you need
 
-Install dependencies and start the dev server:
+- **Node.js 22+** and npm to run the app locally.
+- A modern browser. Chromium-family browsers (Chrome, Edge) are recommended:
+  they support the File System Access API, which lets **Save** write straight
+  back to the file you opened. Other browsers work too — saving falls back to
+  a normal file download.
+
+## Run the app
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the URL shown by Vite, usually:
+Open the URL Vite prints, usually `http://localhost:5173`.
 
-```text
-http://localhost:5173
-```
-
-Build the production static site:
+To build and serve the production static site instead:
 
 ```bash
-npm run build
+npm run build     # typecheck + build into dist/
+npm run preview   # serve the built site locally
 ```
 
-The build output is written to `dist/`.
+The build output in `dist/` is a fully static site — you can host it on any
+static file server.
 
-## Create A Model
+## Your first model
 
-1. Click **New** in the toolbar.
-2. Add elements from the **Palette** into a view.
-3. Create relationships using relationship tools or the magic connector.
-4. Save the model with **Save** or **Save As...**.
+1. Click **New** in the toolbar. A new model appears in the **Models** tree
+   with the standard ArchiMate top-level folders (Strategy, Business,
+   Application, Technology & Physical, Motivation, Implementation & Migration,
+   Other, Relations, Views).
+2. Right-click the **Views** folder and choose **New ArchiMate View**, or use
+   the welcome screen's shortcut. Double-click a view in the tree to open it
+   as an editor tab.
+3. Drag elements from the **Palette** onto the canvas. The palette groups
+   element types by ArchiMate layer, with notes, groups, and relationship
+   tools at the top.
+4. Draw a relationship: pick a relationship tool, then drag from one element
+   to another. The canvas gives live feedback — targets that the ArchiMate
+   metamodel forbids are rejected. If you're not sure which relationship to
+   use, pick the **magic connector**: draw the connection first and choose
+   from the list of valid relationship types afterwards.
+5. Select any object and edit its name, documentation, key-value properties,
+   and appearance in the **Properties** panel.
+6. Press `Ctrl+S` (or click **Save**) and choose where to store the
+   `.archimate` file.
 
-New models start with the standard ArchiMate top-level folders. Views open as
-dockable tabs in the center editor area.
+That file opens directly in desktop Archi — see
+[[Archi Compatibility|Archi-Compatibility]].
 
-## Open And Save `.archimate` Files
+## Opening and saving files
 
-Use **Open...** to load an existing `.archimate` file. Archi Online reads and
-writes native ArchiMate exchange XML compatible with desktop Archi.
+- **Open…** (`Ctrl+O`) loads an existing `.archimate` file, including models
+  created with desktop Archi.
+- **Save** (`Ctrl+S`) writes back to the file you opened when the browser
+  supports the File System Access API. Otherwise — or when browser policy
+  blocks file handles — the app saves via a regular download.
+- **Save As…** always lets you pick a new target.
 
-Saving uses the File System Access API when the browser and organization policy
-allow it. If the browser blocks native save handles, the app falls back to a
-download-style save flow.
+The status area on the toolbar shows the model name, the file name (or
+*unsaved*), and a `•` marker when there are unsaved changes. Closing the tab
+with unsaved changes triggers a browser confirmation prompt.
 
-## Browser-Local Data
+## Where your work lives
 
-Archi Online keeps several kinds of data in the current browser profile:
+Two different kinds of storage are involved:
 
-- autosave model state
-- dock layout
-- app settings
-- script library entries
-- local source extensions
-- imported `.archi-ext` packages
-- private extension storage
+| Data | Where it lives |
+| --- | --- |
+| The model itself | `.archimate` files you open and save |
+| Autosave snapshot of the open model | Browser IndexedDB |
+| Window/panel layout | Browser IndexedDB |
+| App settings | Browser IndexedDB |
+| Script library | Browser IndexedDB |
+| Extensions and imported `.archi-ext` packages | Browser IndexedDB |
+| Private extension storage | Browser IndexedDB |
 
-This data is local to the browser/profile. It is not stored in `.archimate`
-files and is not synced by the app.
+The app autosaves the open model shortly after every change and restores it
+the next time you open the app in the same browser profile. Autosave is a
+crash safety net, not a substitute for saving: browser data can be cleared by
+the browser or the user, and it never leaves the machine. Export anything you
+care about as a `.archimate` file.
 
-## Recommended First Tour
+Browser-local data (settings, scripts, extensions, layout) is never written
+into `.archimate` files.
 
-1. Create a model.
-2. Open a view from the **Models** tree.
-3. Drag two elements from **Palette** into the canvas.
-4. Connect them with a relationship.
-5. Select an object and edit name, documentation, properties, and appearance in
-   **Properties**.
-6. Open **Settings** and adjust grid size or default object dimensions.
-7. Open **Scripting**, run a small script, and undo the script as one step.
-8. Open **Extensions** and inspect or import example extension packages.
+## Next steps
 
-Related pages:
-
-- [[User Guide|User-Guide]]
-- [[Scripting API|Scripting-API]]
-- [[Extension Packages|Extension-Packages]]
-
+- [[User Guide|User-Guide]] — every panel, tool, setting, and shortcut.
+- [[Scripting API|Scripting-API]] — automate the model from the **Scripting**
+  panel.
+- [[Extension Packages|Extension-Packages]] — try the bundled example
+  extensions, including ELK automatic layout.

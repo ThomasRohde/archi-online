@@ -1,50 +1,58 @@
-# Archi Online Wiki
+# Archi Online
 
-Archi Online is a browser-only ArchiMate modeler built with Vite, React, and
-TypeScript. It edits native `.archimate` models, keeps autosave data in the
-current browser profile, and adds JavaScript scripting plus browser-local
-extensions on top of the core modeling workflow.
+Archi Online is a web-based [ArchiMate®](https://www.opengroup.org/archimate-forum)
+modeler — a browser clone of the desktop [Archi](https://www.archimatetool.com/)
+tool. It reads and writes native `.archimate` files, so models move freely
+between Archi Online and desktop Archi, and it adds a jArchi-compatible
+JavaScript scripting API plus a local extension system on top of the core
+modeling workflow.
 
-This wiki source is stored in the main repository under `docs/wiki/`. When the
-project is published to GitHub, these files can be copied into the repository's
-GitHub Wiki with `npm run docs:publish-wiki`.
+Everything runs in your browser. There is no backend, no account, and no
+server-side storage: models live in `.archimate` files you choose, and the app
+autosaves your working state to the browser's IndexedDB so you can pick up
+where you left off.
 
-## Start Here
+## Highlights
 
-- [[Getting Started|Getting-Started]] - run the app, create/open/save models,
-  and understand browser storage.
-- [[User Guide|User-Guide]] - app shell, panels, canvas editing, settings,
-  files, shortcuts, and extensions.
-- [[Scripting API|Scripting-API]] - jArchi-style selectors, model wrappers,
-  view automation, and examples.
-- [[Extension API|Extension-API]] - trusted browser-local extension API for
-  commands, menus, toolbar buttons, panels, events, dialogs, storage, views,
-  and selection.
-- [[Extension Packages|Extension-Packages]] - `.archi-ext` package format,
-  import/export, bundled assets, and examples.
-- [[Development|Development]] - repo layout, commands, tests, and release
-  checks.
-- [[Publishing GitHub Wiki|Publishing-GitHub-Wiki]] - how to publish this
-  directory into GitHub Wiki pages later.
+- **Full ArchiMate 3.2 metamodel** — every element and relationship type, with
+  Archi's official allowed-relationship matrix enforced live while you draw.
+- **IDE-style workspace** — views open as draggable tabs; split editors
+  side-by-side, float or maximize groups, and the layout persists across
+  sessions.
+- **Rich diagram editor** — custom SVG canvas with drag/resize/nesting, grid
+  snapping, marquee selection, copy/paste, a *magic connector*, manual
+  bendpoints, notes, groups, and view references.
+- **Lossless `.archimate` round-trip** — verified against Archi's Archisurance
+  example model.
+- **jArchi-style scripting** — `$()` selectors, model and view automation, a
+  Monaco editor with API IntelliSense, and a script library with `.ajs`
+  import/export. Each script run is a single undo step.
+- **Extensions** — browser-local plugins that add commands, menus, toolbar
+  buttons, dockable panels, and event handlers, including a bundled ELK
+  automatic-layout extension. Extensions ship as portable `.archi-ext`
+  packages.
 
-## What Runs Where
+## Where to go next
 
-Archi Online has no application backend. The app is a static site, and all model
-editing, XML parsing, scripting, extension loading, autosave, and settings live
-in the browser.
+| If you want to… | Read |
+| --- | --- |
+| Run the app and build your first model | [[Getting Started\|Getting-Started]] |
+| Learn the workspace, canvas, and settings | [[User Guide\|User-Guide]] |
+| Exchange models with desktop Archi | [[Archi Compatibility\|Archi-Compatibility]] |
+| Automate your model with JavaScript | [[Scripting API\|Scripting-API]] |
+| Build an extension | [[Extension API\|Extension-API]] and [[Extension Packages\|Extension-Packages]] |
+| Contribute to the project | [[Development]] |
 
-- Model files are explicit `.archimate` files chosen by the user.
-- Autosave uses IndexedDB for the current browser profile.
-- Settings, script snippets, extensions, extension packages, and layout state
-  are browser/profile-local preferences.
-- Browser-local preferences are not exported into `.archimate` files.
-- Script and extension model edits still use the normal model operation and
-  transaction system, so undo/redo and dirty-state behavior match canvas edits.
+## Privacy and scope
 
-## Current Scope
+Archi Online is designed for local, trusted use. All data stays in your
+browser profile:
 
-The app is intended for local, trusted use in the current browser/profile. The
-extension system is not a remote marketplace, account sync service, or untrusted
-sandbox. Installed extensions are user-controlled local scripts or imported
-local packages.
+- Models are explicit `.archimate` files that you open and save yourself.
+- Autosave state, settings, the script library, extensions, and the window
+  layout live in the browser's IndexedDB for the current profile only.
+- Nothing browser-local is ever written into `.archimate` files, and the app
+  never uploads your model anywhere.
 
+Scripts and extensions are user-controlled local code — there is no remote
+marketplace and no sandbox. Only run code you trust.

@@ -1,143 +1,194 @@
 # User Guide
 
-## App Shell
+A tour of the whole application: the workspace, every panel, the canvas, the
+settings, and the keyboard shortcuts.
 
-The app uses an IDE-style dock layout. Views open as center tabs, while tool
-panels can be moved, split, closed, floated, or restored.
+## The workspace
+
+Archi Online uses an IDE-style docking layout (dockview). Views open as tabs
+in the center editor area; tool panels dock around them.
+
+You can:
+
+- drag tabs to split the editor area and put views side-by-side,
+- move, close, or float any panel,
+- maximize a group and restore it,
+- reopen closed panels from the toolbar **Views ▾** menu,
+- reset everything with **Views ▾ → Reset Layout**.
+
+The layout persists across sessions in the current browser profile.
 
 Core panels:
 
-- **Models** - model tree, folders, views, elements, and relationships.
-- **Palette** - ArchiMate element and relationship tools.
-- **Properties** - selected item details, properties, and appearance.
-- **Settings** - browser-local editing preferences.
-- **Extensions** - local source extensions and imported packages.
-- **Scripting** - jArchi-style script library and editor.
+- **Models** — the model tree: folders, elements, relationships, and views.
+- **Palette** — element and relationship tools for the active view.
+- **Properties** — details and appearance of the current selection.
+- **Settings** — browser-local editing preferences.
+- **Scripting** — the jArchi-style script library, editor, and console.
+- **Extensions** — manage local extensions and `.archi-ext` packages.
 
-Use the toolbar **Views** menu to reopen panels or reset the layout.
+Extensions can contribute additional dockable panels; they appear in the
+**Views ▾** menu like the built-in ones.
 
 ## Toolbar
 
-The toolbar contains:
+| Control | What it does |
+| --- | --- |
+| **New** | Create a new unsaved model (asks before discarding unsaved changes). |
+| **Open…** | Open a `.archimate` file (`Ctrl+O`). |
+| **Save** / **Save As…** | Save through a file handle or download fallback (`Ctrl+S`). |
+| **Undo** / **Redo** | Step through model transactions; the tooltip names the operation. |
+| *status area* | Model name, file name (or *unsaved*), and a `•` dirty marker. |
+| *extension buttons* | Toolbar buttons contributed by extensions. |
+| **Extensions ▾** | Extension menu items, plus registered extension commands that don't already appear in an extension menu. |
+| **Views ▾** | Reopen panels (open ones are check-marked) and reset the layout. |
+| **?** | Keyboard shortcut reference. |
 
-- **New** - create a new unsaved model.
-- **Open...** - open a `.archimate` file.
-- **Save** - save through a file handle or download fallback.
-- **Save As...** - choose a new save target.
-- **Undo** and **Redo** - model transactions.
-- **Extensions** - extension menu items and commands not already shown in an
-  extension menu.
-- **Views** - show or reopen dock panels.
-- **?** - keyboard shortcut reference.
+## Models tree
 
-The file status area shows the current model name, file name, and dirty marker.
+The **Models** panel shows the model: folders, elements, relationships, and
+views.
 
-## Model Tree
+- **Open a view** — double-click it, or right-click → **Open View**.
+- **Create content** — right-click a folder: **New Element** offers the
+  element types belonging to that folder's layer, **New ArchiMate View**
+  appears under the Views folder, and **New Folder** creates a subfolder.
+- **Rename** — `F2` or the context menu; the model root can be renamed too.
+- **Delete** — removes the selected items from the model. Deleting a concept
+  also removes its visual objects from all views and cascades any
+  relationships that depended on it, as one undo step. Multi-select works
+  (`Delete 3 items`).
+- **Drag onto a view** — drop elements or relationships from the tree onto an
+  open view to add them to the diagram. Dropping a *view* onto another view
+  creates a view reference.
 
-The **Models** tree contains folders, elements, relationships, and views.
+Extensions can add items to the tree's context menu.
 
-Common actions:
+## Palette
 
-- Open a view from the context menu or by activation.
-- Rename with F2 or inline editing.
-- Delete selected model items from the model.
-- Drag model concepts onto a view.
-- Use extension-provided context menu actions when installed.
+From top to bottom:
 
-Deleting from the model removes the selected concept and cascades affected view
-objects and relationships through the normal model operations.
+- **Select / move** — the default tool (`Escape` returns to it).
+- **Magic connector** — draw a connection first, then pick from the
+  relationship types that ArchiMate allows between the two endpoints.
+- **Relationship tools** — one per ArchiMate relationship type.
+- **Note** and **Group** — plain annotation objects.
+- **Element types** — grouped by layer: Strategy, Business, Application,
+  Technology, Physical, Motivation, Implementation & Migration, and Other
+  (including Junction).
 
-## Canvas Editing
+Drag an element type onto the canvas to create a new element, or click a
+relationship tool and drag between two diagram objects. While drawing a
+relationship, invalid targets are rejected based on the official ArchiMate
+allowed-relationship matrix.
 
-The SVG view editor supports:
+## Canvas editing
 
-- selection and marquee selection
-- drag movement
-- resize handles
-- nesting inside groups or other containers
-- grid snapping
-- copy and paste
-- direct edit rename
-- note, group, and view-reference objects
-- relationship creation
-- magic connector relationship selection
-- manual bendpoints
-- zoom and pan
+The view editor is a custom SVG canvas. It supports:
 
-Manual bendpoints are created by dragging a connection. Double-click a bendpoint
-to remove it.
+- **Selection** — click, `Ctrl`-click to add or toggle, marquee-drag over
+  empty space (hold `Ctrl` to add to the current selection), `Ctrl+A` for all.
+- **Move and resize** — drag objects or their resize handles. Grid snapping
+  applies by default; hold `Alt` to bypass it for one drag. Arrow keys nudge
+  the selection by 1 px, `Shift`+arrows by one grid step.
+- **Nesting** — drop an element inside a group or another element to nest it;
+  child bounds stay relative to the parent.
+- **Copy / paste** — `Ctrl+C` / `Ctrl+V` for diagram objects.
+- **Direct edit** — `F2` or double-click to rename in place.
+- **Notes, groups, view references** — notes and groups come from the
+  palette; view references are created by dragging a view from the tree.
+- **Bendpoints** — drag anywhere on a connection to add a manual bendpoint;
+  double-click a bendpoint to remove it.
+- **Zoom** — `Ctrl+wheel`, `Ctrl+=` / `Ctrl+-`, `Ctrl+0` for 100%, `Home` to
+  fit the diagram to the window. Zoom is per view.
+- **Pan / scroll** — middle-drag or `Space`+drag to pan; wheel and
+  `Shift`+wheel to scroll.
+
+Deleting on the canvas removes objects *from the view* only; the underlying
+concepts stay in the model. Delete from the Models tree to remove a concept
+from the model itself.
+
+## Properties panel
+
+The **Properties** panel follows the current selection in the tree or on the
+canvas. Depending on what is selected it edits:
+
+- **Name** and **Documentation**.
+- **Properties** — the ArchiMate key-value property list.
+- **Appearance** (diagram objects) — fill color, line color, font color,
+  opacity, text alignment, and text position.
+- **Figure** (elements with two notations) — switch between the default
+  box-with-icon figure and the classic ArchiMate shape.
+- **Relationship specifics** — access type (access relationships), influence
+  strength (influence relationships, e.g. `++`), and directed (association
+  relationships).
+- **Junction type** — AND / OR.
+- **Viewpoint** (views) — the view's declared viewpoint.
+
+All of these are model data: edits create normal undo steps and mark the
+model dirty. Selecting multiple objects shows the selection count; appearance
+edits apply to the whole selection where they make sense.
 
 ## Settings
 
-Settings are app-global for the current browser/profile. They are stored outside
-the model and never written to `.archimate` files.
+**Settings** are app-wide preferences for the current browser profile. They
+are stored in IndexedDB, never in `.archimate` files, and changing them
+affects *future* edits only — existing objects keep their stored bounds and
+style. Each row has a reset button, and **Reset all** restores the defaults.
 
-Settings currently cover:
+| Section | Settings (defaults) |
+| --- | --- |
+| Canvas snapping | Snap to grid (on); grid size (12 px) — also the `Shift`+arrow nudge step. |
+| New object defaults | Text align (center) and text position (center) for new objects; default sizes for elements (120×55), junctions (15), notes (185×80), groups (400×140), and view references (200×140). |
+| Canvas interaction | Drop offset (16 px), paste offset (16 px), minimum node size (20 px), move drag threshold (4 px), bendpoint drag threshold (5 px). |
+| Viewport | Zoom limits (0.1–4), wheel zoom factor (1.1), button zoom factor (1.2), fit-to-window maximum zoom (1.5) and padding (24 px). |
 
-- canvas snapping and grid size
-- default text alignment and text position for new objects
-- default dimensions for elements, junctions, notes, groups, and view references
-- drop and paste offsets
-- resize minimums and drag thresholds
-- viewport zoom limits and fit padding
+Values are validated and clamped to sensible ranges when loaded or edited.
 
-Changing a setting affects future editing behavior. Existing model objects keep
-their stored bounds and style.
+## Files and autosave
 
-## Properties
+`.archimate` files are the durable, portable format — the same XML desktop
+Archi uses. Saving prefers a native browser file handle (write-in-place) and
+falls back to a download when the browser or organization policy blocks file
+handles. See [[Getting Started|Getting-Started]] for the storage overview and
+[[Archi Compatibility|Archi-Compatibility]] for exchange details.
 
-The **Properties** panel follows the current tree or view selection.
+Autosave writes the open model to IndexedDB shortly after every change and
+restores it on the next launch, including the dirty flag and file name. It
+protects against crashes and accidental tab closes within the same browser
+profile — it is not a backup.
 
-It can edit:
+## Keyboard shortcuts
 
-- name and documentation
-- key-value properties
-- fill, line, and font colors
-- opacity
-- text alignment and text position
-
-Properties are model data when they belong to model items or diagram objects, so
-changes create normal undo entries and mark the model dirty.
-
-## Files And Autosave
-
-`.archimate` files are the durable model exchange format. Autosave protects work
-inside the current browser/profile but is not a substitute for saving a model
-file.
-
-The save flow tries native browser file handles first. If browser or
-organization policy blocks that path, the app saves by download fallback.
-
-## Keyboard Shortcuts
+Open this table anytime with the **?** toolbar button.
 
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl+S` / `Ctrl+O` | Save / open model |
-| `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` or `Ctrl+Shift+Z` | Redo |
 | `Ctrl+C` / `Ctrl+V` | Copy / paste diagram objects |
 | `Ctrl+A` | Select all on the active view |
-| `Delete` | Delete from view or model tree |
+| `Delete` | Delete from view (canvas) or from model (tree) |
 | `F2` or double-click | Rename |
-| Arrow keys | Nudge selection by 1px |
-| Shift+arrow | Nudge selection by grid step |
-| `Ctrl+wheel`, `Ctrl+=`, `Ctrl+-` | Zoom canvas |
-| `Ctrl+0` | Zoom to 100 percent |
+| Arrow keys | Nudge selection by 1 px |
+| `Shift`+arrows | Nudge selection by one grid step |
+| `Ctrl+wheel`, `Ctrl+=`, `Ctrl+-` | Zoom canvas (per view) |
+| `Ctrl+0` | Zoom to 100% |
 | `Home` | Fit diagram to window |
-| Middle-drag or Space+drag | Pan canvas |
-| Wheel / Shift+wheel | Scroll canvas |
-| Alt while dragging | Disable grid snap |
-| `Escape` | Cancel tool or clear selection |
-| `Ctrl+Enter` in editor | Run script |
+| Middle-drag or `Space`+drag | Pan canvas |
+| Wheel / `Shift`+wheel | Scroll canvas |
+| `Alt` while dragging | Disable grid snap |
+| `Escape` | Cancel tool / clear selection |
+| `Ctrl+Enter` (script editor) | Run script |
 | Double-click bendpoint | Remove bendpoint |
 
-## Scripts And Extensions
+On macOS, `Cmd` works in place of `Ctrl` for save/open/undo/redo.
 
-Use **Scripting** for one-off or saved jArchi-style model automation. Use
-**Extensions** for browser/profile-local features that contribute commands,
-menus, toolbar buttons, dock panels, and event handlers.
+## Scripts and extensions
 
-Related pages:
-
-- [[Scripting API|Scripting-API]]
-- [[Extension API|Extension-API]]
-- [[Extension Packages|Extension-Packages]]
+- The **Scripting** panel runs jArchi-style JavaScript against the open
+  model — one script run is one undo step. See [[Scripting API|Scripting-API]].
+- The **Extensions** panel manages browser-local extensions that add
+  commands, menus, toolbar buttons, panels, and event handlers. See
+  [[Extension API|Extension-API]] and [[Extension Packages|Extension-Packages]].

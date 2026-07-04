@@ -60,20 +60,22 @@ Archi's relationship matrix (`tools/data/relationships.xml`).
 
 ## Documentation
 
-User and API documentation is maintained in `docs/wiki/` using GitHub Wiki page
-filenames:
+User and API documentation lives on the
+[project wiki](https://github.com/ThomasRohde/archi-online/wiki). The wiki
+source is maintained in `docs/wiki/` so documentation changes are reviewed
+like code:
 
 - [Wiki home](docs/wiki/Home.md)
 - [Getting started](docs/wiki/Getting-Started.md)
 - [User guide](docs/wiki/User-Guide.md)
+- [Archi compatibility](docs/wiki/Archi-Compatibility.md)
 - [Scripting API](docs/wiki/Scripting-API.md)
 - [Extension API](docs/wiki/Extension-API.md)
 - [Extension packages](docs/wiki/Extension-Packages.md)
-- [Publishing to GitHub Wiki](docs/wiki/Publishing-GitHub-Wiki.md)
+- [Development](docs/wiki/Development.md)
 
-Run `npm run docs:check` before publishing docs. Once the GitHub Wiki has been
-initialized with its first page, `npm run docs:publish-wiki` copies these pages
-to the repository wiki.
+Run `npm run docs:check` after editing, then `npm run docs:publish-wiki` to
+push the pages to the GitHub Wiki (see [docs/wiki-publishing.md](docs/wiki-publishing.md)).
 
 ## GitHub Publication
 

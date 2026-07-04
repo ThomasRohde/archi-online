@@ -1,0 +1,1 @@
+[Archi Online](https://github.com/ThomasRohde/archi-online) · MIT License · ArchiMate® is a registered trademark of The Open Group. This project is not affiliated with The Open Group or the Archi project.
