@@ -58,6 +58,14 @@ npm run build      # typecheck + production build (static site in dist/)
 `tools/generate-rules.mjs` regenerates `src/model/data/relations-matrix.ts` from
 Archi's relationship matrix (`tools/data/relationships.xml`).
 
+## Sharing Example
+
+A public gist-hosted example model is available for testing the read-only
+viewer and share-link flow:
+
+- [Archi Online Capability Model gist](https://gist.github.com/ThomasRohde/d76393598cc8ee09c27f6e829581297e)
+- [Open the model in the hosted viewer](https://bitter-mill-c9qn.here.now/?mode=viewer#gist=d76393598cc8ee09c27f6e829581297e)
+
 ## Documentation
 
 User and API documentation lives on the
