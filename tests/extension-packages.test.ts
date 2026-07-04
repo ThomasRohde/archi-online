@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
 import {
   createArchiveBytesForPackage,
@@ -27,6 +27,7 @@ import {
   packageConversionWarning,
   packageImportWarning,
 } from '../src/extensions/package-conversion';
+import { memoryKeyValueStore, setDefaultKeyValueStoreForTests } from '../src/persistence/keyval';
 
 function packageFixture(now = 100): InstalledExtensionPackage {
   return makeInstalledPackage({
@@ -63,60 +64,28 @@ function packageFixture(now = 100): InstalledExtensionPackage {
   });
 }
 
-function storage(initial?: string) {
-  const data = new Map<string, string>();
-  if (initial !== undefined) data.set(EXTENSION_PACKAGES_STORAGE_KEY, initial);
-  return {
-    data,
-    getItem(key: string) {
-      return data.get(key) ?? null;
-    },
-    setItem(key: string, value: string) {
-      data.set(key, value);
-    },
-  };
+function storage(initial?: unknown) {
+  return memoryKeyValueStore(
+    initial === undefined ? undefined : [[EXTENSION_PACKAGES_STORAGE_KEY, initial]],
+  );
 }
 
 function throwingStorage() {
   return {
-    getItem() {
-      return null;
+    async get<T>() {
+      return undefined as T | undefined;
     },
-    setItem() {
+    async set() {
       throw new DOMException('quota exceeded', 'QuotaExceededError');
     },
+    async del() {},
   };
 }
 
-function browserStorage() {
-  const data = new Map<string, string>();
-  return {
-    get length() {
-      return data.size;
-    },
-    clear() {
-      data.clear();
-    },
-    getItem(key: string) {
-      return data.get(key) ?? null;
-    },
-    key(index: number) {
-      return [...data.keys()][index] ?? null;
-    },
-    removeItem(key: string) {
-      data.delete(key);
-    },
-    setItem(key: string, value: string) {
-      data.set(key, value);
-    },
-  };
-}
-
-beforeEach(() => {
-  vi.stubGlobal('localStorage', browserStorage());
-  localStorage.clear();
-  useExtensionStore.getState().setExtensions([]);
-  useExtensionPackageStore.getState().setPackages([]);
+beforeEach(async () => {
+  setDefaultKeyValueStoreForTests(memoryKeyValueStore());
+  await useExtensionStore.getState().setExtensions([]);
+  await useExtensionPackageStore.getState().setPackages([]);
 });
 
 describe('extension package validation', () => {
@@ -212,35 +181,35 @@ describe('extension package validation', () => {
 });
 
 describe('extension package store and runtime loading', () => {
-  it('persists valid installed packages and falls back for invalid JSON', () => {
+  it('persists valid installed packages and falls back for unreadable records', async () => {
     const pkg = packageFixture();
     const s = storage();
 
-    persistInstalledPackages([pkg], s);
+    await persistInstalledPackages([pkg], s);
 
-    expect(loadInstalledPackages(s)).toEqual([pkg]);
-    expect(loadInstalledPackages(storage('{broken'))).toEqual([]);
+    await expect(loadInstalledPackages(s)).resolves.toEqual([pkg]);
+    await expect(loadInstalledPackages(storage('{broken'))).resolves.toEqual([]);
   });
 
-  it('surfaces localStorage persistence failures', () => {
+  it('surfaces IndexedDB persistence failures', async () => {
     const pkg = packageFixture();
 
-    expect(() => persistInstalledPackages([pkg], throwingStorage())).toThrow(
+    await expect(persistInstalledPackages([pkg], throwingStorage())).rejects.toThrow(
       /Could not persist extension packages/,
     );
   });
 
-  it('ignores unknown persisted fields and invalid package entries', () => {
+  it('ignores unknown persisted fields and invalid package entries', async () => {
     const pkg = packageFixture();
-    const raw = JSON.stringify([
+    const raw = [
       { ...pkg, unknown: 'ignored' },
       { id: 'broken' },
-    ]);
+    ];
 
-    expect(loadInstalledPackages(storage(raw))).toEqual([pkg]);
+    await expect(loadInstalledPackages(storage(raw))).resolves.toEqual([pkg]);
   });
 
-  it('preserves unreadable persisted package records across unrelated writes', () => {
+  it('preserves unreadable persisted package records across unrelated writes', async () => {
     const pkg = packageFixture();
     const futurePackage = {
       id: 'local.future-package',
@@ -250,20 +219,20 @@ describe('extension package store and runtime loading', () => {
       updatedAt: 1,
       files: { 'main.js': { encoding: 'utf8', content: '' } },
     };
-    const s = storage(JSON.stringify([futurePackage, pkg]));
+    const s = storage([futurePackage, pkg]);
 
-    expect(loadInstalledPackages(s)).toEqual([pkg]);
-    persistInstalledPackages([{ ...pkg, enabled: false, updatedAt: 101 }], s);
+    await expect(loadInstalledPackages(s)).resolves.toEqual([pkg]);
+    await persistInstalledPackages([{ ...pkg, enabled: false, updatedAt: 101 }], s);
 
-    const written = JSON.parse(s.data.get(EXTENSION_PACKAGES_STORAGE_KEY) ?? '[]');
+    const written = s.data.get(EXTENSION_PACKAGES_STORAGE_KEY) as unknown[];
     expect(written).toHaveLength(2);
     expect(written[0]).toEqual(futurePackage);
     expect(written[1]).toMatchObject({ id: pkg.id, enabled: false });
   });
 
-  it('loads enabled packages through the existing extension runtime registry', () => {
+  it('loads enabled packages through the existing extension runtime registry', async () => {
     const registry = createExtensionRegistry();
-    useExtensionPackageStore.getState().setPackages([packageFixture()]);
+    await useExtensionPackageStore.getState().setPackages([packageFixture()]);
 
     reloadEnabledExtensions(registry);
 
@@ -272,10 +241,10 @@ describe('extension package store and runtime loading', () => {
     ]);
   });
 
-  it('falls back to an enabled package when a same-id source override is disabled', () => {
+  it('falls back to an enabled package when a same-id source override is disabled', async () => {
     const registry = createExtensionRegistry();
     const pkg = packageFixture();
-    useExtensionStore.getState().setExtensions([
+    await useExtensionStore.getState().setExtensions([
       {
         id: pkg.id,
         name: 'Disabled override',
@@ -287,7 +256,7 @@ describe('extension package store and runtime loading', () => {
         origin: 'override',
       },
     ]);
-    useExtensionPackageStore.getState().setPackages([pkg]);
+    await useExtensionPackageStore.getState().setPackages([pkg]);
 
     reloadEnabledExtensions(registry);
 

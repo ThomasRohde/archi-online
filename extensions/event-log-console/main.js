@@ -7,8 +7,8 @@ app.extension({
 var config = app.assets.json('data/events.json');
 var panel = null;
 
-function readEvents() {
-  return app.storage.get('events') || [];
+async function readEvents() {
+  return (await app.storage.get('events')) || [];
 }
 
 function simplify(payload) {
@@ -19,19 +19,19 @@ function simplify(payload) {
   }
 }
 
-function recordEvent(name, payload) {
+async function recordEvent(name, payload) {
   var entry = {
     name: name,
     time: new Date().toISOString(),
     payload: simplify(payload)
   };
-  app.storage.set('events', [entry].concat(readEvents()).slice(0, config.limit));
-  renderPanel();
+  await app.storage.set('events', [entry].concat(await readEvents()).slice(0, config.limit));
+  await renderPanel();
 }
 
-function renderPanel() {
+async function renderPanel() {
   if (!panel) return;
-  var events = readEvents();
+  var events = await readEvents();
   panel.replaceChildren();
   panel.style.fontFamily = 'system-ui, sans-serif';
   panel.style.fontSize = '13px';
@@ -85,7 +85,7 @@ function renderPanel() {
 
 config.events.forEach(function (name) {
   app.events.on(name, function (payload) {
-    recordEvent(name, payload);
+    return recordEvent(name, payload);
   });
 });
 
@@ -98,9 +98,9 @@ app.commands.register('examples.event-log-console.open', {
 
 app.commands.register('examples.event-log-console.clear', {
   title: 'Clear event log',
-  run: function () {
-    app.storage.set('events', []);
-    renderPanel();
+  run: async function () {
+    await app.storage.set('events', []);
+    await renderPanel();
   }
 });
 
@@ -120,7 +120,7 @@ app.panels.register('examples.event-log-console.panel', {
   title: 'Event Log',
   render: function (container) {
     panel = container;
-    renderPanel();
+    void renderPanel();
     return function () {
       panel = null;
     };

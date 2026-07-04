@@ -45,7 +45,7 @@ export interface ExtensionMenuItem {
 export interface ExtensionPanel {
   id: string;
   title: string;
-  render(container: HTMLElement): void | (() => void);
+  render(container: HTMLElement): void | Promise<void> | (() => void);
 }
 
 export interface ExtensionRuntimeError {

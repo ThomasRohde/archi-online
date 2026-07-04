@@ -1,10 +1,9 @@
 import { create } from 'zustand';
+import { defaultKeyValueStore, type AsyncKeyValueStore } from '../persistence/keyval';
 import type { InstalledExtensionPackage } from './package-types';
 import { makeInstalledPackage } from './package-validation';
 
 export const EXTENSION_PACKAGES_STORAGE_KEY = 'archi-online.extension-packages.v2';
-
-type ExtensionPackageStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
 interface ParsedInstalledPackages {
   packages: InstalledExtensionPackage[];
@@ -17,15 +16,6 @@ interface PersistOptions {
 }
 
 let retainedInstalledPackageRecords: unknown[] = [];
-
-function storageOrNull(): ExtensionPackageStorage | null {
-  if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return null;
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return null;
-  }
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -87,14 +77,12 @@ function parseInstalledPackages(value: unknown): ParsedInstalledPackages {
   return { packages, retained };
 }
 
-export function loadInstalledPackages(
-  storage: ExtensionPackageStorage | null = storageOrNull(),
-): InstalledExtensionPackage[] {
-  if (!storage) return [];
+export async function loadInstalledPackages(
+  storage: AsyncKeyValueStore = defaultKeyValueStore(),
+): Promise<InstalledExtensionPackage[]> {
   try {
-    const raw = storage.getItem(EXTENSION_PACKAGES_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = parseInstalledPackages(JSON.parse(raw));
+    const raw = await storage.get<unknown>(EXTENSION_PACKAGES_STORAGE_KEY);
+    const parsed = parseInstalledPackages(raw);
     retainedInstalledPackageRecords = parsed.retained;
     return parsed.packages;
   } catch {
@@ -103,12 +91,11 @@ export function loadInstalledPackages(
   }
 }
 
-export function persistInstalledPackages(
+export async function persistInstalledPackages(
   packages: InstalledExtensionPackage[],
-  storage: ExtensionPackageStorage | null = storageOrNull(),
+  storage: AsyncKeyValueStore = defaultKeyValueStore(),
   options: PersistOptions = {},
-): void {
-  if (!storage) return;
+): Promise<void> {
   try {
     const normalized = normalizeInstalledPackages(packages);
     const normalizedIds = new Set(normalized.map((pkg) => pkg.id));
@@ -119,7 +106,7 @@ export function persistInstalledPackages(
           const id = rawPackageId(record);
           return id && !dropIds.has(id) && !normalizedIds.has(id);
         });
-    storage.setItem(EXTENSION_PACKAGES_STORAGE_KEY, JSON.stringify([...retained, ...normalized]));
+    await storage.set(EXTENSION_PACKAGES_STORAGE_KEY, [...retained, ...normalized]);
     retainedInstalledPackageRecords = retained;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -129,44 +116,58 @@ export function persistInstalledPackages(
 
 interface ExtensionPackageStoreState {
   packages: InstalledExtensionPackage[];
-  setPackages(packages: InstalledExtensionPackage[]): void;
-  upsertPackage(pkg: InstalledExtensionPackage): void;
-  removePackage(id: string): void;
-  setPackageEnabled(id: string, enabled: boolean): void;
+  setPackages(packages: InstalledExtensionPackage[]): Promise<void>;
+  upsertPackage(pkg: InstalledExtensionPackage): Promise<void>;
+  removePackage(id: string): Promise<void>;
+  setPackageEnabled(id: string, enabled: boolean): Promise<void>;
 }
 
-function commit(
+async function commit(
   packages: InstalledExtensionPackage[],
   options: PersistOptions = {},
-): InstalledExtensionPackage[] {
+): Promise<InstalledExtensionPackage[]> {
   const normalized = normalizeInstalledPackages(packages);
-  persistInstalledPackages(normalized, undefined, options);
+  await persistInstalledPackages(normalized, undefined, options);
   return normalized;
 }
 
 export const useExtensionPackageStore = create<ExtensionPackageStoreState>((set) => ({
-  packages: loadInstalledPackages(),
-  setPackages: (packages) => set({ packages: commit(packages, { retainUnreadable: false }) }),
-  upsertPackage: (pkg) =>
-    set((state) => ({
-      packages: commit(
+  packages: [],
+  setPackages: async (packages) => {
+    set({ packages: await commit(packages, { retainUnreadable: false }) });
+  },
+  upsertPackage: async (pkg) => {
+    const state = useExtensionPackageStore.getState();
+    set({
+      packages: await commit(
         [
           ...state.packages.filter((existing) => existing.id !== pkg.id),
           { ...pkg, updatedAt: Date.now() },
         ],
         { dropRetainedIds: [pkg.id] },
       ),
-    })),
-  removePackage: (id) =>
-    set((state) => ({
-      packages: commit(state.packages.filter((pkg) => pkg.id !== id), { dropRetainedIds: [id] }),
-    })),
-  setPackageEnabled: (id, enabled) =>
-    set((state) => ({
-      packages: commit(
+    });
+  },
+  removePackage: async (id) => {
+    const state = useExtensionPackageStore.getState();
+    set({
+      packages: await commit(state.packages.filter((pkg) => pkg.id !== id), {
+        dropRetainedIds: [id],
+      }),
+    });
+  },
+  setPackageEnabled: async (id, enabled) => {
+    const state = useExtensionPackageStore.getState();
+    set({
+      packages: await commit(
         state.packages.map((pkg) =>
           pkg.id === id ? { ...pkg, enabled, updatedAt: Date.now() } : pkg,
         ),
       ),
-    })),
+    });
+  },
 }));
+
+export async function hydrateExtensionPackageStore(): Promise<void> {
+  useExtensionPackageStore.setState({ packages: await loadInstalledPackages() });
+}

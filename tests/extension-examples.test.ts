@@ -1,10 +1,12 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { zipSync } from 'fflate';
+import { extensionStorageKey } from '../src/extensions/app-api';
 import { readExtensionArchive } from '../src/extensions/package-archive';
 import { createExtensionRegistry } from '../src/extensions/registry';
 import { runInstalledPackage } from '../src/extensions/runtime';
+import { memoryKeyValueStore, setDefaultKeyValueStoreForTests } from '../src/persistence/keyval';
 
 const examplesRoot = join(process.cwd(), 'extensions');
 const exampleIds = [
@@ -39,34 +41,16 @@ async function loadExample(folderName: string) {
   return { pkg, registry };
 }
 
-function browserStorage() {
-  const data = new Map<string, string>();
-  return {
-    get length() {
-      return data.size;
-    },
-    clear() {
-      data.clear();
-    },
-    getItem(key: string) {
-      return data.get(key) ?? null;
-    },
-    key(index: number) {
-      return [...data.keys()][index] ?? null;
-    },
-    removeItem(key: string) {
-      data.delete(key);
-    },
-    setItem(key: string, value: string) {
-      data.set(key, value);
-    },
-  };
+let persistenceStore = memoryKeyValueStore();
+
+async function flushPanelRender() {
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
 describe('example extension packages', () => {
   beforeEach(() => {
-    vi.stubGlobal('localStorage', browserStorage());
-    localStorage.clear();
+    persistenceStore = memoryKeyValueStore();
+    setDefaultKeyValueStoreForTests(persistenceStore);
   });
 
   it('defines the expected example package folders', () => {
@@ -91,9 +75,9 @@ describe('example extension packages', () => {
 
   it('renders stored ELK dropdown values after panel re-render', async () => {
     const { registry } = await loadExample('elk-layout');
-    localStorage.setItem(
-      'archi-online.extension-storage.v1.examples.elk-layout',
-      JSON.stringify({
+    await persistenceStore.set(
+      extensionStorageKey('examples.elk-layout'),
+      {
         options: {
           scope: 'selection',
           direction: 'down',
@@ -101,7 +85,7 @@ describe('example extension packages', () => {
           nodeSpacing: 40,
           layerSpacing: 80,
         },
-      }),
+      },
     );
     const panel = registry
       .getSnapshot()
@@ -109,6 +93,7 @@ describe('example extension packages', () => {
     const container = document.createElement('div');
 
     panel?.render(container);
+    await flushPanelRender();
 
     expect([...container.querySelectorAll('select')].map((select) => select.value)).toEqual([
       'selection',
@@ -128,6 +113,7 @@ describe('example extension packages', () => {
     const container = document.createElement('div');
 
     panel?.render(container);
+    await flushPanelRender();
 
     expect(container.querySelector('img')).toBeNull();
     expect(container.textContent).toContain('<img src=x');
@@ -145,6 +131,7 @@ describe('example extension packages', () => {
     const container = document.createElement('div');
 
     panel?.render(container);
+    await flushPanelRender();
 
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('svg')).toBeNull();

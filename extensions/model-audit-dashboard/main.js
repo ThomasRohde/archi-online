@@ -37,7 +37,7 @@ function documentationSample(selector) {
   }).length;
 }
 
-function auditModel() {
+function collectAudit() {
   var result = {
     time: new Date().toISOString(),
     concepts: count('element'),
@@ -58,13 +58,18 @@ function auditModel() {
     result.warnings.push(result.unnamedConcepts + ' concepts have empty names.');
   }
 
-  app.storage.set('lastAudit', result);
-  renderAuditPanel();
   return result;
 }
 
-function lastAudit() {
-  return app.storage.get('lastAudit') || auditModel();
+async function auditModel() {
+  var result = collectAudit();
+  await app.storage.set('lastAudit', result);
+  await renderAuditPanel();
+  return result;
+}
+
+async function lastAudit() {
+  return (await app.storage.get('lastAudit')) || collectAudit();
 }
 
 function statusColor(result) {
@@ -73,9 +78,9 @@ function statusColor(result) {
   return '#b02a2a';
 }
 
-function renderAuditPanel() {
+async function renderAuditPanel() {
   if (!auditPanel) return;
-  var result = lastAudit();
+  var result = await lastAudit();
   auditPanel.replaceChildren();
   auditPanel.style.fontFamily = 'system-ui, sans-serif';
   auditPanel.style.fontSize = '13px';
@@ -144,15 +149,17 @@ function renderAuditPanel() {
   var button = document.createElement('button');
   button.textContent = 'Run again';
   button.style.marginTop = '12px';
-  button.onclick = auditModel;
+  button.onclick = function () {
+    void auditModel();
+  };
   auditPanel.appendChild(button);
 }
 
 app.commands.register('examples.model-audit-dashboard.run', {
   title: 'Run model audit',
   description: 'Count model content and store the latest audit result.',
-  run: function () {
-    var result = auditModel();
+  run: async function () {
+    var result = await auditModel();
     return app.dialogs.info(
       'Model audit',
       result.warnings.length === 0
@@ -185,7 +192,7 @@ app.panels.register('examples.model-audit-dashboard.panel', {
   title: 'Model Audit',
   render: function (container) {
     auditPanel = container;
-    renderAuditPanel();
+    void renderAuditPanel();
     return function () {
       auditPanel = null;
     };

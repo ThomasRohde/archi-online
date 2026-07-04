@@ -211,33 +211,37 @@ export function ExtensionsPanel() {
   };
 
   const save = () => {
-    const next = draftRecord();
-    if (!next) return;
-    upsert(next);
+    void (async () => {
+      const next = draftRecord();
+      if (!next) return;
+      await upsert(next);
+    })();
   };
 
   const reload = () => {
-    if (!current) return;
-    if (current.origin === 'package') {
-      if (current.packageRecord.enabled) runInstalledPackage(current.packageRecord);
-      else extensionRegistry.clearExtension(current.packageRecord.id);
-      return;
-    }
-    const next = draftRecord();
-    if (!next) return;
-    upsert(next);
-    if (next.enabled) runExtensionRecord(next);
-    else extensionRegistry.clearExtension(next.id);
+    void (async () => {
+      if (!current) return;
+      if (current.origin === 'package') {
+        if (current.packageRecord.enabled) runInstalledPackage(current.packageRecord);
+        else extensionRegistry.clearExtension(current.packageRecord.id);
+        return;
+      }
+      const next = draftRecord();
+      if (!next) return;
+      await upsert(next);
+      if (next.enabled) runExtensionRecord(next);
+      else extensionRegistry.clearExtension(next.id);
+    })();
   };
 
-  const toggleEnabled = (item: ExtensionListItem, enabled: boolean) => {
+  const toggleEnabled = async (item: ExtensionListItem, enabled: boolean) => {
     if (item.origin === 'package') {
-      setPackageEnabled(item.packageRecord.id, enabled);
+      await setPackageEnabled(item.packageRecord.id, enabled);
       if (enabled) runInstalledPackage({ ...item.packageRecord, enabled });
       else extensionRegistry.clearExtension(item.packageRecord.id);
       return;
     }
-    setEnabled(item.record.id, enabled);
+    await setEnabled(item.record.id, enabled);
     if (enabled) runExtensionRecord({ ...item.record, enabled });
     else extensionRegistry.clearExtension(item.record.id);
   };
@@ -256,7 +260,7 @@ export function ExtensionsPanel() {
         uniqueExtensionId(extensionName, items.map((item) => item.record)),
         extensionName,
       );
-      upsert(record);
+      await upsert(record);
       setSelectedKey(`source:${record.id}`);
       runExtensionRecord(record);
     })();
@@ -280,9 +284,9 @@ export function ExtensionsPanel() {
           intent: replacing ? 'danger' : 'default',
         });
         if (!confirmed) return;
-        upsertPackage(pkg);
+        await upsertPackage(pkg);
         extensionRegistry.clearExtension(pkg.id);
-        if (existingSource) remove(existingSource.id);
+        if (existingSource) await remove(existingSource.id);
         setSelectedKey(`package:${pkg.id}`);
         if (pkg.enabled) runInstalledPackage(pkg);
       } catch (error) {
@@ -327,8 +331,8 @@ export function ExtensionsPanel() {
         updatedAt: Date.now(),
       };
       extensionRegistry.clearExtension(record.id);
-      removePackage(record.id);
-      upsert(record);
+      await removePackage(record.id);
+      await upsert(record);
       setSelectedKey(`source:${record.id}`);
       if (record.enabled) runExtensionRecord(record);
     })();
@@ -347,9 +351,9 @@ export function ExtensionsPanel() {
       });
       if (!confirmed) return;
       extensionRegistry.clearExtension(current.record.id);
-      if (isPackage) removePackage(current.record.id);
-      else remove(current.record.id);
-      clearExtensionStorage(current.record.id);
+      if (isPackage) await removePackage(current.record.id);
+      else await remove(current.record.id);
+      await clearExtensionStorage(current.record.id);
       const next = items.find((item) => item.key !== current.key) ?? null;
       setSelectedKey(next?.key ?? null);
     })();
@@ -402,7 +406,7 @@ export function ExtensionsPanel() {
               checked={item.record.enabled}
               onChange={(event) => {
                 event.stopPropagation();
-                toggleEnabled(item, event.target.checked);
+                void toggleEnabled(item, event.target.checked);
               }}
               onClick={(event) => event.stopPropagation()}
               title={item.record.enabled ? 'Disable extension' : 'Enable extension'}

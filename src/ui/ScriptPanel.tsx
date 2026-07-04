@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { get, set } from 'idb-keyval';
 import { newId } from '../model/id';
 import { useStore } from '../model/store';
+import { defaultKeyValueStore } from '../persistence/keyval';
 import { BUILT_IN_SCRIPTS } from '../scripting/example-scripts';
 import { runScript, type ConsoleEntry } from '../scripting/runner';
 import { showConfirmDialog, showPromptDialog } from './AppDialog';
@@ -17,13 +17,13 @@ interface Script {
 const SCRIPTS_KEY = 'archi-online.scripts';
 
 async function loadScripts(): Promise<Script[]> {
-  const scripts = await get<Script[]>(SCRIPTS_KEY);
+  const scripts = await defaultKeyValueStore().get<Script[]>(SCRIPTS_KEY);
   if (scripts && scripts.length > 0) {
     const existingNames = new Set(scripts.map((script) => script.name));
     const missingBuiltIns = BUILT_IN_SCRIPTS.filter((script) => !existingNames.has(script.name));
     if (missingBuiltIns.length === 0) return scripts;
     const merged = [...scripts, ...missingBuiltIns];
-    await set(SCRIPTS_KEY, merged);
+    await defaultKeyValueStore().set(SCRIPTS_KEY, merged);
     return merged;
   }
   return BUILT_IN_SCRIPTS.map((script) => ({ ...script }));
@@ -57,7 +57,10 @@ export function ScriptPanel() {
   const persist = (next: Script[]) => {
     setScripts(next);
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => void set(SCRIPTS_KEY, next), 500);
+    saveTimer.current = window.setTimeout(
+      () => void defaultKeyValueStore().set(SCRIPTS_KEY, next),
+      500,
+    );
   };
 
   const updateCode = (code: string) => {

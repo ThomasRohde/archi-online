@@ -7,6 +7,7 @@ import {
 } from 'dockview-react';
 import { extensionRegistry } from '../extensions/registry';
 import { closeView, useStore } from '../model/store';
+import { defaultKeyValueStore } from '../persistence/keyval';
 import { registerLayoutBus } from './layout-bus';
 import {
   GroupControls,
@@ -43,13 +44,21 @@ export function DockLayout() {
   // One-time init per dockview instance, after startup restore finished.
   useEffect(() => {
     if (!api || !booted || ready) return;
-    syncing = true;
-    try {
+    let cancelled = false;
+    const init = async () => {
       let restored = false;
-      const raw = localStorage.getItem(LAYOUT_KEY);
+      let raw: Parameters<DockviewApi['fromJSON']>[0] | undefined;
+      try {
+        raw = await defaultKeyValueStore().get<Parameters<DockviewApi['fromJSON']>[0]>(LAYOUT_KEY);
+      } catch (e) {
+        console.warn('layout restore failed', e);
+      }
+      if (cancelled) return;
+      syncing = true;
+      try {
       if (raw) {
         try {
-          api.fromJSON(JSON.parse(raw));
+          api.fromJSON(raw);
           restored = true;
         } catch (e) {
           console.warn('layout restore failed', e);
@@ -72,17 +81,22 @@ export function DockLayout() {
         ? api.activePanel.id.slice(VIEW_PREFIX.length)
         : (openIds[openIds.length - 1] ?? null);
       useStore.setState({ openViewIds: openIds, activeViewId: active });
-    } finally {
-      syncing = false;
-    }
-    setReady(true);
+      } finally {
+        syncing = false;
+      }
+      if (!cancelled) setReady(true);
+    };
+    void init();
+    return () => {
+      cancelled = true;
+    };
   }, [api, booted, ready]);
 
   // Expose the layout bus for the toolbar Views menu.
   useEffect(() => {
     if (!api || !ready) return;
     const reset = () => {
-      localStorage.removeItem(LAYOUT_KEY);
+      void defaultKeyValueStore().del(LAYOUT_KEY);
       syncing = true;
       try {
         api.clear();
@@ -156,7 +170,9 @@ export function DockLayout() {
         // A maximized group serializes as a degenerate layout; skip until restored.
         if (api.hasMaximizedGroup()) return;
         try {
-          localStorage.setItem(LAYOUT_KEY, JSON.stringify(api.toJSON()));
+          void defaultKeyValueStore().set(LAYOUT_KEY, api.toJSON()).catch(() => {
+            /* quota/serialization issues are non-fatal */
+          });
         } catch {
           /* quota/serialization issues are non-fatal */
         }
