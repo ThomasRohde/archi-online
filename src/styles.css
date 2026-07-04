@@ -1200,6 +1200,58 @@ body {
   padding: 16px;
 }
 
+.presentation-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: #ffffff;
+  display: flex;
+}
+
+.presentation-mode .view-editor {
+  flex: 1;
+}
+
+.presentation-hud {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(30, 30, 30, 0.78);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  transition: opacity 0.3s;
+  user-select: none;
+}
+
+.presentation-hud.hud-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.presentation-hud-count {
+  opacity: 0.7;
+}
+
+.presentation-hud-close {
+  border: none;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  opacity: 0.8;
+}
+
+.presentation-hud-close:hover {
+  opacity: 1;
+}
+
 .app-dialog {
   width: min(430px, 100%);
   max-height: min(80vh, 560px);

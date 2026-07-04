@@ -18,6 +18,7 @@ import { copyViewPngToClipboard } from '../canvas/export/view-image';
 import { showAlertDialog, showConfirmDialog, showPromptDialog } from './AppDialog';
 import { showContextMenu, SEPARATOR, type MenuItem } from './ContextMenu';
 import { ExportImageDialog } from './ExportImageDialog';
+import { PresentationMode } from './PresentationMode';
 import { layoutBus } from './layout-bus';
 
 const SHORTCUTS: [string, string][] = [
@@ -36,6 +37,8 @@ const SHORTCUTS: [string, string][] = [
   ['Escape', 'Cancel tool / clear selection'],
   ['Ctrl+Enter (editor)', 'Run script'],
   ['Double-click bendpoint', 'Remove bendpoint'],
+  ['Ctrl+F (model tree)', 'Filter the model tree'],
+  ['←/→, PgUp/PgDn (presentation)', 'Previous / next view'],
 ];
 
 export async function confirmDiscardChanges(): Promise<boolean> {
@@ -182,6 +185,7 @@ async function copyActiveViewImage(): Promise<void> {
 export function Toolbar() {
   const [showHelp, setShowHelp] = useState(false);
   const [showExportImage, setShowExportImage] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   const extensionSnapshot = useSyncExternalStore(
     (listener) => extensionRegistry.subscribe(listener),
     () => extensionRegistry.getSnapshot(),
@@ -266,6 +270,14 @@ export function Toolbar() {
       >
         Export ▾
       </button>
+      <button
+        className="tb-btn"
+        title="Presentation mode — full-screen view walkthrough"
+        disabled={!hasActiveView}
+        onClick={() => setPresenting(true)}
+      >
+        Present
+      </button>
       <div className="toolbar-sep" />
       <button
         className="tb-btn"
@@ -331,6 +343,7 @@ export function Toolbar() {
         ?
       </button>
       {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
+      {presenting && <PresentationMode onClose={() => setPresenting(false)} />}
       {showHelp &&
         createPortal(
           <div className="modal-backdrop" onClick={() => setShowHelp(false)}>
