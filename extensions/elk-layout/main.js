@@ -51,7 +51,15 @@ async function lastResult() {
 }
 
 function statusText(result) {
-  if (!result) return 'No layout has been applied yet.';
+  if (
+    !result ||
+    typeof result.nodeCount !== 'number' ||
+    typeof result.connectionCount !== 'number' ||
+    typeof result.elapsedMs !== 'number' ||
+    typeof result.scope !== 'string'
+  ) {
+    return 'No layout has been applied yet.';
+  }
   return 'Laid out ' + result.nodeCount + ' nodes and ' + result.connectionCount
     + ' connections in ' + Math.round(result.elapsedMs) + ' ms using ' + result.scope + ' scope.';
 }
@@ -78,10 +86,15 @@ function addSelect(container, labelText, value, values, onChange) {
   var row = document.createElement('div');
   row.style.display = 'grid';
   row.style.gap = '4px';
+  row.style.alignContent = 'start';
+  row.style.gridAutoRows = 'max-content';
   addLabel(row, labelText);
 
   var select = document.createElement('select');
   select.style.width = '100%';
+  select.style.boxSizing = 'border-box';
+  select.style.height = '32px';
+  select.style.font = 'inherit';
   values.forEach(function (entry) {
     var option = document.createElement('option');
     option.value = entry.value;
@@ -100,6 +113,8 @@ function addNumber(container, labelText, value, min, max, onChange) {
   var row = document.createElement('div');
   row.style.display = 'grid';
   row.style.gap = '4px';
+  row.style.alignContent = 'start';
+  row.style.gridAutoRows = 'max-content';
   addLabel(row, labelText);
 
   var input = document.createElement('input');
@@ -109,6 +124,9 @@ function addNumber(container, labelText, value, min, max, onChange) {
   input.step = '1';
   input.value = String(value);
   input.style.width = '100%';
+  input.style.boxSizing = 'border-box';
+  input.style.height = '32px';
+  input.style.font = 'inherit';
   input.onchange = function () {
     onChange(clamp(Number(input.value), value, min, max));
   };
@@ -124,6 +142,11 @@ async function renderPanel() {
   panel.style.fontSize = '13px';
   panel.style.display = 'grid';
   panel.style.gap = '12px';
+  panel.style.alignContent = 'start';
+  panel.style.gridAutoRows = 'max-content';
+  panel.style.width = '100%';
+  panel.style.maxWidth = '520px';
+  panel.style.boxSizing = 'border-box';
 
   var title = document.createElement('div');
   var titleStrong = document.createElement('strong');
@@ -174,9 +197,11 @@ async function renderPanel() {
   var buttons = document.createElement('div');
   buttons.style.display = 'flex';
   buttons.style.gap = '8px';
+  buttons.style.alignItems = 'center';
 
   var apply = document.createElement('button');
   apply.textContent = 'Apply';
+  apply.style.height = '32px';
   apply.onclick = function () {
     readOptions().then(applyLayout).catch(function (error) {
       return app.dialogs.info('ELK layout failed', error && error.message ? error.message : String(error));
@@ -186,6 +211,7 @@ async function renderPanel() {
 
   var reset = document.createElement('button');
   reset.textContent = 'Reset';
+  reset.style.height = '32px';
   reset.onclick = function () {
     writeOptions(config.defaults).then(renderPanel);
   };

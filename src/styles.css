@@ -499,6 +499,12 @@ body {
   overflow: auto;
   padding: 10px;
   background: var(--panel-bg);
+  box-sizing: border-box;
+}
+
+.extension-panel-content {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .model-tree {

@@ -40,5 +40,9 @@ export function ExtensionPanelHost(props: IDockviewPanelProps<{ panelId: string 
   }, [panel, props.params.panelId]);
 
   if (!panel) return <div className="empty-hint">Extension panel is not registered.</div>;
-  return <div className="extension-panel-host" ref={ref} />;
+  return (
+    <div className="extension-panel-host">
+      <div className="extension-panel-content" ref={ref} />
+    </div>
+  );
 }

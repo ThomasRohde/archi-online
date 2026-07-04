@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 type DialogIntent = 'default' | 'danger' | 'error';
@@ -125,6 +125,26 @@ export function AppDialogHost() {
   const primaryRef = useRef<HTMLButtonElement>(null);
   const active = queue[0] ?? null;
 
+  const closeActive = useCallback(() => {
+    setQueue((current) => current.slice(1));
+  }, []);
+
+  const confirmActive = useCallback(() => {
+    if (!active) return;
+    if (active.kind === 'alert') active.resolve();
+    else if (active.kind === 'confirm') active.resolve(true);
+    else active.resolve(inputValue);
+    closeActive();
+  }, [active, closeActive, inputValue]);
+
+  const cancelActive = useCallback(() => {
+    if (!active) return;
+    if (active.kind === 'alert') active.resolve();
+    else if (active.kind === 'confirm') active.resolve(false);
+    else active.resolve(null);
+    closeActive();
+  }, [active, closeActive]);
+
   useEffect(() => {
     const hostPresenter = (request: DialogRequest) => {
       setQueue((current) => [...current, request]);
@@ -157,25 +177,9 @@ export function AppDialogHost() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [active]);
+  }, [active, cancelActive]);
 
   if (!active) return null;
-
-  const closeActive = () => setQueue((current) => current.slice(1));
-
-  const confirmActive = () => {
-    if (active.kind === 'alert') active.resolve();
-    else if (active.kind === 'confirm') active.resolve(true);
-    else active.resolve(inputValue);
-    closeActive();
-  };
-
-  function cancelActive() {
-    if (active.kind === 'alert') active.resolve();
-    else if (active.kind === 'confirm') active.resolve(false);
-    else active.resolve(null);
-    closeActive();
-  }
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();

@@ -102,6 +102,42 @@ describe('example extension packages', () => {
     ]);
   });
 
+  it('renders the ELK panel as a top-aligned form with intrinsic control heights', async () => {
+    const { registry } = await loadExample('elk-layout');
+    const panel = registry
+      .getSnapshot()
+      .panels.find((candidate) => candidate.id === 'examples.elk-layout.panel');
+    const container = document.createElement('div');
+
+    panel?.render(container);
+    await flushPanelRender();
+
+    expect(container.style.alignContent).toBe('start');
+    expect(container.style.gridAutoRows).toBe('max-content');
+    expect(container.style.maxWidth).toBe('520px');
+    expect([...container.querySelectorAll('select, input')].map((control) => (
+      (control as HTMLElement).style.height
+    ))).toEqual(['32px', '32px', '32px', '32px', '32px']);
+  });
+
+  it('does not show undefined values for stale ELK result storage', async () => {
+    const { registry } = await loadExample('elk-layout');
+    await persistenceStore.set(extensionStorageKey('examples.elk-layout'), {
+      lastResult: {},
+    });
+    const panel = registry
+      .getSnapshot()
+      .panels.find((candidate) => candidate.id === 'examples.elk-layout.panel');
+    const container = document.createElement('div');
+
+    panel?.render(container);
+    await flushPanelRender();
+
+    expect(container.textContent).toContain('No layout has been applied yet.');
+    expect(container.textContent).not.toContain('undefined');
+    expect(container.textContent).not.toContain('NaN');
+  });
+
   it('renders event log payloads as text instead of HTML', async () => {
     const { registry } = await loadExample('event-log-console');
     await registry.emitEvent('model.opened', {
