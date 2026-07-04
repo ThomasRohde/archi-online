@@ -37,6 +37,8 @@ Extensions can contribute additional dockable panels; they appear in the
 | **New** | Create a new unsaved model (asks before discarding unsaved changes). |
 | **Open…** | Open a `.archimate` file (`Ctrl+O`). |
 | **Save** / **Save As…** | Save through a file handle or download fallback (`Ctrl+S`). |
+| **Import/Export ▾** | View image export (PNG/SVG/clipboard), ArchiMate Open Exchange import/export, and CSV import/export. See [[Import & Export|Import-and-Export]]. |
+| **Present** | Full-screen, chrome-free walkthrough of the model's views (arrow keys to step, `Esc` to exit). |
 | **Undo** / **Redo** | Step through model transactions; the tooltip names the operation. |
 | *status area* | Model name, file name (or *unsaved*), and a `•` dirty marker. |
 | *extension buttons* | Toolbar buttons contributed by extensions. |
@@ -49,6 +51,11 @@ Extensions can contribute additional dockable panels; they appear in the
 The **Models** panel shows the model: folders, elements, relationships, and
 views.
 
+- **Search / filter** — the box at the top of the panel filters the tree by
+  name as you type; the dropdown narrows to a category (elements,
+  relationships, views, folders) or a specific concept type. Matches are
+  shown with their ancestor folders. `Ctrl+F` focuses the box (from inside
+  the tree); `Esc` clears it.
 - **Open a view** — double-click it, or right-click → **Open View**.
 - **Create content** — right-click a folder: **New Element** offers the
   element types belonging to that folder's layer, **New ArchiMate View**

@@ -73,6 +73,11 @@ export function renderViewSvg(
     const svg = container.querySelector('svg');
     const content = svg?.querySelector('g[data-export-content]');
     if (!svg || !content) throw new Error('View render failed');
+    // Labels render through <foreignObject> on the live canvas, but SVG
+    // images containing foreignObject taint canvases (breaking PNG export)
+    // and most external SVG consumers don't render them. Replace each label
+    // with native <text> lines at the browser-computed positions.
+    inlineForeignObjectText(svg);
     const bbox = (options.measure ?? defaultMeasure)(content as SVGGraphicsElement);
     const width = Math.max(1, Math.ceil(bbox.width + margin * 2));
     const height = Math.max(1, Math.ceil(bbox.height + margin * 2));
@@ -96,6 +101,107 @@ export function renderViewSvg(
     root.unmount();
     container.remove();
   }
+}
+
+interface TextLine {
+  text: string;
+  /** Client (viewport) coordinates of the line box. */
+  left: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Replace every foreignObject label with native <text>/<tspan> markup.
+ * Line breaks and positions come from the browser's own layout (per-char
+ * Range rects), so wrapping matches the canvas exactly. Falls back to a
+ * single unwrapped line where Range measurement is unavailable (test DOMs).
+ */
+function inlineForeignObjectText(svg: SVGSVGElement): void {
+  for (const fo of [...svg.querySelectorAll('foreignObject')]) {
+    const div = fo.firstElementChild as HTMLElement | null;
+    const parent = fo.parentNode;
+    if (!div || !parent) {
+      fo.remove();
+      continue;
+    }
+
+    const style = div.style;
+    const fontSize = parseFloat(style.fontSize) || 12;
+    const lines = measureTextLines(div);
+
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('fill', style.color || '#000000');
+    text.setAttribute('font-family', style.fontFamily || EXPORT_FONT_STACK);
+    text.setAttribute('font-size', String(fontSize));
+    if (style.fontWeight && style.fontWeight !== '400') {
+      text.setAttribute('font-weight', style.fontWeight);
+    }
+    if (style.fontStyle && style.fontStyle !== 'normal') {
+      text.setAttribute('font-style', style.fontStyle);
+    }
+
+    if (lines.length > 0) {
+      // Map client coordinates into the parent <g>'s user space.
+      const ctm = (parent as SVGGraphicsElement).getScreenCTM?.();
+      const inv = ctm ? ctm.inverse() : null;
+      const toUser = (x: number, y: number) =>
+        inv ? { x: inv.a * x + inv.c * y + inv.e, y: inv.b * x + inv.d * y + inv.f } : { x, y };
+      text.setAttribute('dominant-baseline', 'central');
+      for (const line of lines) {
+        const p = toUser(line.left, (line.top + line.bottom) / 2);
+        const tspan = document.createElementNS(SVG_NS, 'tspan');
+        tspan.setAttribute('x', p.x.toFixed(2));
+        tspan.setAttribute('y', p.y.toFixed(2));
+        tspan.textContent = line.text;
+        text.appendChild(tspan);
+      }
+    } else {
+      // Measurement unavailable: one unwrapped line inside the label box.
+      const x = Number(fo.getAttribute('x') ?? 0) + 4;
+      const y = Number(fo.getAttribute('y') ?? 0) + 3 + fontSize;
+      text.setAttribute('x', String(x));
+      text.setAttribute('y', String(y));
+      text.textContent = div.textContent ?? '';
+    }
+
+    parent.insertBefore(text, fo);
+    fo.remove();
+  }
+}
+
+/** The wrapped line boxes of a label div, from per-character Range rects. */
+function measureTextLines(div: HTMLElement): TextLine[] {
+  const lines: TextLine[] = [];
+  const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  if (typeof range.getBoundingClientRect !== 'function') return lines; // test DOMs
+  let current: TextLine | null = null;
+
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const content = node.textContent ?? '';
+    for (let i = 0; i < content.length; i++) {
+      range.setStart(node, i);
+      range.setEnd(node, i + 1);
+      const rect = range.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue; // unmeasurable (or collapsed)
+      const midY = (rect.top + rect.bottom) / 2;
+      if (current && midY >= current.top && midY <= current.bottom) {
+        current.text += content[i];
+        if (rect.width > 0) {
+          current.left = Math.min(current.left, rect.left);
+          current.top = Math.min(current.top, rect.top);
+          current.bottom = Math.max(current.bottom, rect.bottom);
+        }
+      } else {
+        if (current) lines.push(current);
+        current = { text: content[i], left: rect.left, top: rect.top, bottom: rect.bottom };
+      }
+    }
+  }
+  if (current) lines.push(current);
+  for (const line of lines) line.text = line.text.replace(/\s+$/, '').replace(/^\s+/, '');
+  return lines.filter((l) => l.text !== '');
 }
 
 /** Rasterize a view to a PNG blob at the requested scale. */

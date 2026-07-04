@@ -72,6 +72,13 @@ describe('renderViewSvg', () => {
     expect(rendered.svg).not.toContain('resize-handle');
   });
 
+  it('contains no foreignObject (labels are native SVG text)', () => {
+    // foreignObject taints canvases during PNG rasterization and is not
+    // rendered by most external SVG consumers.
+    expect(rendered.svg).not.toContain('foreignObject');
+    expect(rendered.svg).toContain('<text');
+  });
+
   it('throws for an unknown view', () => {
     expect(() => renderViewSvg(model, 'nope', { measure: () => bbox })).toThrow(/View not found/);
   });
