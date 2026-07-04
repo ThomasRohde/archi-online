@@ -1,10 +1,10 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { StandaloneIcon } from '../canvas/figures/icons';
 import { extensionRegistry } from '../extensions/registry';
 import {
   ELEMENT_TYPES,
   ELEMENT_TYPE_MAP,
-  relationshipLabel,
+  RELATIONSHIP_TYPES,
   type ElementType,
   type Layer,
 } from '../model/metamodel';
@@ -24,6 +24,7 @@ import {
   SEPARATOR,
   type MenuItem,
 } from './ContextMenu';
+import { computeVisibleTreeItems, treeItemLabel, type TreeTypeFilter } from './tree-filter';
 
 const FOLDER_LAYERS: Record<string, Layer[]> = {
   strategy: ['strategy'],
@@ -153,6 +154,8 @@ export function ModelTree() {
   const model = useStore((s) => s.model);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [filterText, setFilterText] = useState('');
+  const [filterType, setFilterType] = useState<TreeTypeFilter>('all');
 
   if (!model) {
     return <div className="model-tree empty-hint">No model open.<br />Use File → New to create one.</div>;
@@ -164,6 +167,10 @@ export function ModelTree() {
       setCollapsed={setCollapsed}
       renamingId={renamingId}
       setRenamingId={setRenamingId}
+      filterText={filterText}
+      setFilterText={setFilterText}
+      filterType={filterType}
+      setFilterType={setFilterType}
     />
   );
 }
@@ -174,13 +181,31 @@ function ModelTreeInner({
   setCollapsed,
   renamingId,
   setRenamingId,
+  filterText,
+  setFilterText,
+  filterType,
+  setFilterType,
 }: {
   model: ModelState;
   collapsed: Set<string>;
   setCollapsed: (s: Set<string>) => void;
   renamingId: string | null;
   setRenamingId: (id: string | null) => void;
+  filterText: string;
+  setFilterText: (text: string) => void;
+  filterType: TreeTypeFilter;
+  setFilterType: (type: TreeTypeFilter) => void;
 }) {
+  const filterInputRef = useRef<HTMLInputElement>(null);
+  const visible = useMemo(
+    () => computeVisibleTreeItems(model, filterText, filterType),
+    [model, filterText, filterType],
+  );
+  const filtering = visible !== null;
+  const clearFilter = () => {
+    setFilterText('');
+    setFilterType('all');
+  };
   const toggle = (id: string) => {
     const next = new Set(collapsed);
     if (next.has(id)) next.delete(id);
@@ -209,20 +234,7 @@ function ModelTreeInner({
     void extensionRegistry.emitEvent('tree.contextMenu', trigger);
   };
 
-  const itemLabel = (id: string): string => {
-    const el = model.elements[id];
-    if (el) return el.name;
-    const rel = model.relationships[id];
-    if (rel) {
-      const src = model.elements[rel.sourceId] ?? model.relationships[rel.sourceId];
-      const tgt = model.elements[rel.targetId] ?? model.relationships[rel.targetId];
-      const base = rel.name !== '' ? rel.name : relationshipLabel(rel.type);
-      return `${base} (${src?.name ?? '?'} → ${tgt?.name ?? '?'})`;
-    }
-    const view = model.views[id];
-    if (view) return view.name;
-    return '?';
-  };
+  const itemLabel = (id: string): string => treeItemLabel(model, id);
 
   const conceptMenu = (id: string): MenuItem[] => {
     const sel = useStore.getState().selection;
@@ -290,11 +302,16 @@ function ModelTreeInner({
   const renderFolder = (folderId: string, depth: number): ReactNode => {
     const folder = model.folders[folderId];
     if (!folder) return null;
-    const isCollapsed = collapsed.has(folderId);
+    if (filtering && !visible.has(folderId)) return null;
+    // While filtering, matches must be reachable: ignore collapse state.
+    const isCollapsed = !filtering && collapsed.has(folderId);
     const subfolders = [...folder.folderIds].sort((a, b) =>
       (model.folders[a]?.name ?? '').localeCompare(model.folders[b]?.name ?? ''),
     );
-    const items = [...folder.itemIds].sort((a, b) => itemLabel(a).localeCompare(itemLabel(b)));
+    const allItems = filtering
+      ? folder.itemIds.filter((id) => visible.has(id))
+      : folder.itemIds;
+    const items = [...allItems].sort((a, b) => itemLabel(a).localeCompare(itemLabel(b)));
     return (
       <div key={folderId}>
         <div onClick={() => toggle(folderId)}>
@@ -393,6 +410,12 @@ function ModelTreeInner({
       className="model-tree"
       tabIndex={0}
       onKeyDown={(e) => {
+        if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+          e.preventDefault();
+          filterInputRef.current?.focus();
+          return;
+        }
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
         const sel = useStore.getState().selection;
         if (e.key === 'Delete' && sel.source === 'tree' && sel.ids.length > 0) {
           deleteItems(sel.ids);
@@ -402,6 +425,54 @@ function ModelTreeInner({
         }
       }}
     >
+      <div className="tree-filter">
+        <input
+          ref={filterInputRef}
+          className="tree-filter-input"
+          type="search"
+          placeholder="Filter (Ctrl+F)"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              clearFilter();
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+        />
+        <select
+          className="tree-filter-type"
+          title="Filter by type"
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value as TreeTypeFilter)}
+        >
+          <option value="all">All</option>
+          <option value="elements">Elements</option>
+          <option value="relationships">Relationships</option>
+          <option value="views">Views</option>
+          <option value="folders">Folders</option>
+          <optgroup label="Element types">
+            {ELEMENT_TYPES.map((d) => (
+              <option key={d.type} value={d.type}>
+                {d.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Relationship types">
+            {RELATIONSHIP_TYPES.map((d) => (
+              <option key={d.type} value={d.type}>
+                {d.label}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+        {(filterText !== '' || filterType !== 'all') && (
+          <button className="tree-filter-clear" title="Clear filter" onClick={clearFilter}>
+            ✕
+          </button>
+        )}
+      </div>
       <TreeRow
         id={model.info.id}
         depth={0}
@@ -412,6 +483,9 @@ function ModelTreeInner({
         onRenamed={finishRename(model.info.id)}
       />
       {model.rootFolderIds.map((fid) => renderFolder(fid, 1))}
+      {filtering && visible.size === 0 && (
+        <div className="tree-filter-empty">No matches.</div>
+      )}
     </div>
   );
 }

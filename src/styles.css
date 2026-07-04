@@ -535,6 +535,54 @@ body {
   padding: 2px 0;
 }
 
+.tree-filter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--panel-bg, #f6f6f6);
+  border-bottom: 1px solid var(--border, #ddd);
+}
+
+.tree-filter-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 3px;
+}
+
+.tree-filter-type {
+  max-width: 110px;
+  font-size: 12px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.tree-filter-clear {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: #777;
+  padding: 2px 4px;
+}
+
+.tree-filter-clear:hover {
+  color: #222;
+}
+
+.tree-filter-empty {
+  padding: 10px;
+  font-size: 12px;
+  color: #888;
+}
+
 .tree-row {
   display: flex;
   align-items: center;
