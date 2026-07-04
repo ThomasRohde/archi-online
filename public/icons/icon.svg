@@ -1,7 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect x="32" y="96" width="448" height="320" rx="64" fill="#2a6cc4"/>
-  <g fill="none" stroke="#ffffff" stroke-width="46" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M178 364 L256 158 L334 364"/>
-    <path d="M212 302 H300"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3f83d9"/>
+      <stop offset="1" stop-color="#1c4c92"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="104" fill="url(#bg)"/>
+  <!-- open model block: base -->
+  <polygon points="116,198 256,279 256,419 116,338" fill="#d9e7f8"/>
+  <polygon points="396,198 256,279 256,419 396,338" fill="#aecaee"/>
+  <polygon points="256,117 396,198 256,279 116,198" fill="#7ea4dc"/>
+  <!-- floating lid carrying a small model graph -->
+  <polygon points="256,87 396,168 256,249 116,168" fill="#ffffff"/>
+  <g stroke="#2a6cc4" stroke-width="6">
+    <line x1="206" y1="147" x2="310" y2="153"/>
+    <line x1="206" y1="147" x2="262" y2="211"/>
+    <line x1="310" y1="153" x2="262" y2="211"/>
+  </g>
+  <g fill="#2a6cc4">
+    <circle cx="206" cy="147" r="13"/>
+    <circle cx="310" cy="153" r="13"/>
+    <circle cx="262" cy="211" r="13"/>
   </g>
 </svg>
