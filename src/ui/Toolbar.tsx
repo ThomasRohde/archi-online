@@ -3,8 +3,14 @@ import { createPortal } from 'react-dom';
 import { autoListedExtensionCommands } from '../extensions/command-visibility';
 import { extensionRegistry } from '../extensions/registry';
 import { serializeArchimate } from '../model/io/archimate-xml';
+import {
+  ELEMENTS_FILENAME,
+  PROPERTIES_FILENAME,
+  RELATIONS_FILENAME,
+  type CsvImportFiles,
+} from '../model/io/csv';
 import { serializeExchange } from '../model/io/exchange-xml';
-import { createEmptyModel } from '../model/ops';
+import { createEmptyModel, importCsv } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
 import {
   openModelFromDisk,
@@ -23,6 +29,7 @@ import {
 import { copyViewPngToClipboard } from '../canvas/export/view-image';
 import { showAlertDialog, showConfirmDialog, showPromptDialog } from './AppDialog';
 import { showContextMenu, SEPARATOR, type MenuItem } from './ContextMenu';
+import { ExportCsvDialog } from './ExportCsvDialog';
 import { ExportImageDialog } from './ExportImageDialog';
 import { PresentationMode } from './PresentationMode';
 import { layoutBus } from './layout-bus';
@@ -193,6 +200,41 @@ async function exportModelToExchange(): Promise<void> {
   }
 }
 
+/** Pick 1–3 Archi CSV files (elements/relations/properties, matched by file
+ * name) and import them into the current model as one undo step. */
+function importCsvFromDisk(): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv';
+  input.multiple = true;
+  input.onchange = async () => {
+    const files = [...(input.files ?? [])];
+    if (files.length === 0) return;
+    const byRole: CsvImportFiles = {};
+    for (const file of files) {
+      const base = file.name.replace(/\.[^.]*$/, '');
+      if (base.endsWith(ELEMENTS_FILENAME)) byRole.elements = await file.text();
+      else if (base.endsWith(RELATIONS_FILENAME)) byRole.relations = await file.text();
+      else if (base.endsWith(PROPERTIES_FILENAME)) byRole.properties = await file.text();
+    }
+    try {
+      if (!byRole.elements && !byRole.relations && !byRole.properties) {
+        throw new Error(
+          'No matching files — names must end with "elements", "relations", or "properties" (e.g. elements.csv).',
+        );
+      }
+      importCsv(byRole);
+    } catch (error) {
+      await showAlertDialog({
+        title: 'Could not import CSV',
+        message: errorMessage(error),
+        intent: 'error',
+      });
+    }
+  };
+  input.click();
+}
+
 async function copyActiveViewImage(): Promise<void> {
   const s = useStore.getState();
   if (!s.model || !s.activeViewId) return;
@@ -210,6 +252,7 @@ async function copyActiveViewImage(): Promise<void> {
 export function Toolbar() {
   const [showHelp, setShowHelp] = useState(false);
   const [showExportImage, setShowExportImage] = useState(false);
+  const [showExportCsv, setShowExportCsv] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const extensionSnapshot = useSyncExternalStore(
     (listener) => extensionRegistry.subscribe(listener),
@@ -241,6 +284,16 @@ export function Toolbar() {
     {
       label: 'Model to Open Exchange (.xml)…',
       onClick: () => void exportModelToExchange(),
+    },
+    {
+      label: 'Model to CSV…',
+      onClick: () => setShowExportCsv(true),
+    },
+    SEPARATOR,
+    {
+      label: 'Import CSV into model…',
+      disabled: readOnly,
+      onClick: () => importCsvFromDisk(),
     },
   ];
   const extensionMenuItems: MenuItem[] = extensionSnapshot.menus['extensions.menu'].map((item) => ({
@@ -291,14 +344,14 @@ export function Toolbar() {
       </button>
       <button
         className="tb-btn"
-        title="Export view or model"
+        title="Import or export images, Open Exchange, and CSV"
         disabled={!hasModel}
         onClick={(e) => {
           const rect = (e.target as HTMLElement).getBoundingClientRect();
           showContextMenu(rect.left, rect.bottom + 4, exportMenuItems);
         }}
       >
-        Export ▾
+        Import/Export ▾
       </button>
       <button
         className="tb-btn"
@@ -373,6 +426,7 @@ export function Toolbar() {
         ?
       </button>
       {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
+      {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}
       {presenting && <PresentationMode onClose={() => setPresenting(false)} />}
       {showHelp &&
         createPortal(

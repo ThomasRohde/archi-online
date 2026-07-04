@@ -147,6 +147,34 @@ export async function saveBlobToDisk(
   return true;
 }
 
+/**
+ * Save several files at once: one directory pick when the browser supports
+ * it, otherwise a download per file. Returns false when the user cancelled.
+ */
+export async function saveFilesToDisk(
+  files: { name: string; content: string }[],
+): Promise<boolean> {
+  if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
+    let dir: FileSystemDirectoryHandle;
+    try {
+      dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (error) {
+      if (isUserCancelledFileDialog(error)) return false;
+      for (const f of files) downloadBlob(new Blob([f.content], { type: 'text/csv' }), f.name);
+      return true;
+    }
+    for (const f of files) {
+      const handle = await dir.getFileHandle(f.name, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(f.content);
+      await writable.close();
+    }
+    return true;
+  }
+  for (const f of files) downloadBlob(new Blob([f.content], { type: 'text/csv' }), f.name);
+  return true;
+}
+
 function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

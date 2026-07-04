@@ -1186,6 +1186,21 @@ body {
   flex: 1;
 }
 
+.export-prefix-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 3px;
+}
+
+.export-hint {
+  font-size: 11px;
+  color: #888;
+  margin: 6px 0 0;
+}
+
 .tb-btn.primary {
   background: #2a6cc4;
   border-color: #2a6cc4;

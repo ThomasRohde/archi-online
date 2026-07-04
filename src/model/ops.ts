@@ -2,6 +2,7 @@
 // implementation modules so undo/redo, UI, and scripting behave uniformly.
 
 export * from './ops/concepts';
+export * from './ops/csv-import';
 export * from './ops/deletion';
 export * from './ops/layout';
 export * from './ops/movement';
