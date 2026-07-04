@@ -13,14 +13,22 @@ class DelimiterMismatchError extends CsvParseError {}
 
 export function parseCsvRecords(text: string): string[][] {
   let lastError: Error = new CsvParseError('Failed to parse CSV');
+  let bestRecords: string[][] | null = null;
+  let bestColumnCount = -1;
   for (const delimiter of CSV_DELIMITERS) {
     try {
-      return parseWithDelimiter(text, delimiter);
+      const records = parseWithDelimiter(text, delimiter);
+      const columnCount = Math.max(0, ...records.map((record) => record.length));
+      if (columnCount > bestColumnCount) {
+        bestRecords = records;
+        bestColumnCount = columnCount;
+      }
     } catch (error) {
       if (!(error instanceof DelimiterMismatchError)) throw error;
       lastError = error;
     }
   }
+  if (bestRecords) return bestRecords;
   throw lastError;
 }
 

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseArchimate } from '../src/model/io/archimate-xml';
 import { isExchangeXml, parseExchange, serializeExchange } from '../src/model/io/exchange-xml';
+import { createEmptyModel } from '../src/model/ops/concepts';
 import type { ModelState } from '../src/model/types';
 
 const fixture = (name: string) => readFileSync(join(__dirname, 'fixtures', name), 'utf8');
@@ -195,5 +196,83 @@ describe('Open Exchange round-trip of Archisurance', () => {
         expect(roundTripped.elements[el.id]).toBeTruthy();
       }
     }
+  });
+});
+
+describe('Open Exchange round-trip of editable non-concept properties', () => {
+  it('preserves folder, group, and note properties', () => {
+    const m = createEmptyModel('Properties');
+    m.info.id = 'model-props';
+
+    const business = folderOfType(m, 'business');
+    m.elements.actor = {
+      id: 'actor',
+      kind: 'element',
+      type: 'BusinessActor',
+      name: 'Actor',
+      documentation: '',
+      properties: [],
+      folderId: business.id,
+    };
+    business.itemIds.push('actor');
+
+    const diagrams = folderOfType(m, 'diagrams');
+    m.folders['folder-props'] = {
+      id: 'folder-props',
+      kind: 'folder',
+      name: 'Folder Props',
+      documentation: '',
+      properties: [{ key: 'folder-key', value: 'folder-value' }],
+      parentId: diagrams.id,
+      folderIds: [],
+      itemIds: ['view-props'],
+    };
+    diagrams.folderIds.push('folder-props');
+
+    m.views['view-props'] = {
+      id: 'view-props',
+      kind: 'view',
+      name: 'Property View',
+      documentation: '',
+      properties: [],
+      folderId: 'folder-props',
+      childIds: ['group-props', 'note-props'],
+    };
+    m.nodes['group-props'] = {
+      id: 'group-props',
+      viewId: 'view-props',
+      parentId: 'view-props',
+      bounds: { x: 10, y: 20, width: 200, height: 120 },
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'group',
+      name: 'Group Props',
+      documentation: '',
+      properties: [{ key: 'group-key', value: 'group-value' }],
+    };
+    m.nodes['note-props'] = {
+      id: 'note-props',
+      viewId: 'view-props',
+      parentId: 'view-props',
+      bounds: { x: 250, y: 20, width: 150, height: 80 },
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'note',
+      content: 'Note Props',
+      properties: [{ key: 'note-key', value: 'note-value' }],
+    };
+
+    const back = parseExchange(serializeExchange(m));
+    const backFolder = Object.values(back.folders).find((f) => f.name === 'Folder Props');
+
+    expect(backFolder?.properties).toEqual([{ key: 'folder-key', value: 'folder-value' }]);
+    expect(back.nodes['group-props']).toMatchObject({
+      properties: [{ key: 'group-key', value: 'group-value' }],
+    });
+    expect(back.nodes['note-props']).toMatchObject({
+      properties: [{ key: 'note-key', value: 'note-value' }],
+    });
   });
 });

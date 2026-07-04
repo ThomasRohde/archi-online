@@ -235,7 +235,7 @@ export function parseExchange(xml: string): ModelState {
           nodeType: 'group',
           name: childText(nodeEl, 'label', true) ?? '',
           documentation: childText(nodeEl, 'documentation', false) ?? '',
-          properties: [],
+          properties: readProperties(nodeEl),
         };
       } else if (typeName === 'Label' && viewRefEl) {
         const refNode: DiagramNode = { ...base, nodeType: 'ref', refViewId: '' };
@@ -249,7 +249,7 @@ export function parseExchange(xml: string): ModelState {
           ...base,
           nodeType: 'note',
           content: childText(nodeEl, 'label', false) ?? '',
-          properties: [],
+          properties: readProperties(nodeEl),
         };
       }
 
@@ -435,27 +435,38 @@ export function parseExchange(xml: string): ModelState {
     for (const el of itemHierarchy(itemEl)) {
       const name = childText(el, 'label', true) ?? '';
       const documentation = childText(el, 'documentation', true) ?? '';
+      const properties = readProperties(el);
       const topLevel = topLevelFolder(el);
       if (topLevel) {
         topLevel.documentation = documentation;
+        topLevel.properties = properties;
       } else {
-        folder = createSubFolder(folder, name, documentation);
+        folder = createSubFolder(folder, name, documentation, properties);
       }
     }
     return folder;
   }
 
-  function createSubFolder(parent: Folder, name: string, documentation: string): Folder {
+  function createSubFolder(
+    parent: Folder,
+    name: string,
+    documentation: string,
+    properties: Property[],
+  ): Folder {
     for (const subId of parent.folderIds) {
       const sub = state.folders[subId];
-      if (sub && sub.name === name) return sub;
+      if (sub && sub.name === name) {
+        sub.documentation = documentation;
+        sub.properties = properties;
+        return sub;
+      }
     }
     const folder: Folder = {
       id: newId(),
       kind: 'folder',
       name,
       documentation,
-      properties: [],
+      properties,
       parentId: parent.id,
       folderIds: [],
       itemIds: [],

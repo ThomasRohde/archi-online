@@ -57,13 +57,16 @@ export async function openModelFromHandle(handle: FileSystemFileHandle): Promise
 }
 
 export function loadModelText(text: string, fileName: string): 'archimate' | 'exchange' {
-  setCurrentFileHandle(null);
   if (isExchangeXml(text)) {
     // Like desktop Archi, an Open Exchange file imports as a new, unsaved model.
-    replaceModel(parseExchange(text), null, true);
+    const model = parseExchange(text);
+    setCurrentFileHandle(null);
+    replaceModel(model, null, true);
     return 'exchange';
   }
-  replaceModel(parseArchimate(text), fileName, false);
+  const model = parseArchimate(text);
+  setCurrentFileHandle(null);
+  replaceModel(model, fileName, false);
   return 'archimate';
 }
 

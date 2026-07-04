@@ -60,7 +60,7 @@ export function serializeExchange(state: ModelState): string {
 
   writeElements(state, out);
   writeRelationships(state, out, propertyDefs);
-  writeOrganizations(state, out);
+  writeOrganizations(state, out, propertyDefs);
   writePropertyDefinitions(out, propertyDefs);
   writeViews(state, out, propertyDefs);
 
@@ -133,26 +133,36 @@ function writeRelationships(
   if (rows.length > 0) out.push('  <relationships>\n', ...rows, '  </relationships>\n');
 }
 
-function writeOrganizations(state: ModelState, out: string[]): void {
+function writeOrganizations(
+  state: ModelState,
+  out: string[],
+  propertyDefs: Map<string, string>,
+): void {
   const rows: string[] = [];
   for (const fid of state.rootFolderIds) {
     const folder = state.folders[fid];
     if (!folder || (folder.itemIds.length === 0 && folder.folderIds.length === 0)) continue;
-    rows.push(folderItem(state, folder, '    '));
+    rows.push(folderItem(state, folder, '    ', propertyDefs));
   }
   if (rows.length > 0) out.push('  <organizations>\n', ...rows, '  </organizations>\n');
 }
 
-function folderItem(state: ModelState, folder: Folder, indent: string): string {
+function folderItem(
+  state: ModelState,
+  folder: Folder,
+  indent: string,
+  propertyDefs: Map<string, string>,
+): string {
   const inner = indent + '  ';
   const children: string[] = [];
   if (folder.name !== '') children.push(textTag(inner, 'label', folder.name));
   if (folder.documentation !== '') {
     children.push(textTag(inner, 'documentation', folder.documentation));
   }
+  children.push(...propertiesTags(inner, folder.properties, propertyDefs));
   for (const sub of folder.folderIds) {
     const subFolder = state.folders[sub];
-    if (subFolder) children.push(folderItem(state, subFolder, inner));
+    if (subFolder) children.push(folderItem(state, subFolder, inner, propertyDefs));
   }
   for (const itemId of folder.itemIds) {
     children.push(tag(inner, 'item', [['identifierRef', exchangeId(itemId)]]));
@@ -204,7 +214,7 @@ function writeViews(state: ModelState, out: string[], propertyDefs: Map<string, 
     }
     children.push(...propertiesTags('        ', view.properties, propertyDefs));
     for (const nodeId of view.childIds) {
-      children.push(nodeTag(state, nodeId, absBounds, offset, '        '));
+      children.push(nodeTag(state, nodeId, absBounds, offset, propertyDefs, '        '));
     }
     children.push(...connectionTags(state, viewId, absBounds, offset));
     out.push(tag('      ', 'view', attrs, children));
@@ -217,6 +227,7 @@ function nodeTag(
   nodeId: string,
   absBounds: Map<string, Bounds>,
   offset: Point,
+  propertyDefs: Map<string, string>,
   indent: string,
 ): string {
   const node = state.nodes[nodeId];
@@ -241,19 +252,21 @@ function nodeTag(
     ];
     children.push(styleTag(state, node, inner));
     for (const cid of node.childIds) {
-      children.push(nodeTag(state, cid, absBounds, offset, inner));
+      children.push(nodeTag(state, cid, absBounds, offset, propertyDefs, inner));
     }
   } else if (node.nodeType === 'group') {
     attrs = [['identifier', exchangeId(node.id)], ...boundsAttrs, ['xsi:type', 'Container']];
     if (node.name !== '') children.push(textTag(inner, 'label', node.name));
     if (node.documentation !== '') children.push(textTag(inner, 'documentation', node.documentation));
+    children.push(...propertiesTags(inner, node.properties, propertyDefs));
     children.push(styleTag(state, node, inner));
     for (const cid of node.childIds) {
-      children.push(nodeTag(state, cid, absBounds, offset, inner));
+      children.push(nodeTag(state, cid, absBounds, offset, propertyDefs, inner));
     }
   } else if (node.nodeType === 'note') {
     attrs = [['identifier', exchangeId(node.id)], ['xsi:type', 'Label'], ...boundsAttrs];
     if (node.content !== '') children.push(textTag(inner, 'label', node.content));
+    children.push(...propertiesTags(inner, node.properties, propertyDefs));
     children.push(styleTag(state, node, inner));
   } else {
     // View reference exports as a Label with a viewRef child (per Archi).
@@ -472,8 +485,7 @@ function itemsRecursive(state: ModelState, folder: Folder): string[] {
 
 /**
  * All unique property keys in the model, sorted, mapped to "propid-N" ids in
- * sorted order (Archi uses a TreeMap over the whole model's contents,
- * including keys on folders and diagram objects that are never re-exported).
+ * sorted order (Archi uses a TreeMap over the whole model's contents).
  */
 function collectPropertyDefinitions(state: ModelState): Map<string, string> {
   const keys = new Set<string>();

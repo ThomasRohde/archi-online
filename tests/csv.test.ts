@@ -26,6 +26,17 @@ describe('parseCsvRecords', () => {
     expect(parseCsvRecords('"a"\t"b"')).toEqual([['a', 'b']]);
   });
 
+  it('auto-detects unquoted semicolon and tab delimiters', () => {
+    expect(parseCsvRecords('a;b\r\nc;d')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
+    expect(parseCsvRecords('a\tb\r\nc\td')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
+  });
+
   it('skips comment lines and tolerates a BOM', () => {
     expect(parseCsvRecords('﻿# comment\r\n"a","b"')).toEqual([['a', 'b']]);
   });
