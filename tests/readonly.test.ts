@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { addElement, createEmptyModel, renameItem } from '../src/model/ops';
+import {
+  addElement,
+  addElementNodeToView,
+  addRelationship,
+  addView,
+  createEmptyModel,
+  renameItem,
+} from '../src/model/ops';
 import {
   redo,
   replaceModel,
@@ -11,11 +18,24 @@ import {
   undo,
   useStore,
 } from '../src/model/store';
+import { ViewEditor } from '../src/canvas/ViewEditor';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
 import { ViewerShell } from '../src/ui/ViewerShell';
 
 function state() {
   return useStore.getState();
+}
+
+function dispatchPointerDown(target: Element): void {
+  const event = new MouseEvent('pointerdown', {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    clientX: 40,
+    clientY: 40,
+  }) as PointerEvent;
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  target.dispatchEvent(event);
 }
 
 describe('read-only store mode', () => {
@@ -82,6 +102,69 @@ describe('read-only UI', () => {
     expect(nameInput?.value).toBe('Actor');
     expect(nameInput?.disabled).toBe(true);
     expect(host.textContent).not.toContain('Appearance');
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it('selects view nodes and relationships in the read-only viewer', async () => {
+    replaceModel(createEmptyModel('Viewer'), null, false);
+    const processId = addElement('BusinessProcess', 'Process');
+    const objectId = addElement('BusinessObject', 'Object');
+    const relationshipId = addRelationship('AccessRelationship', processId, objectId, 'Reads');
+    expect(relationshipId).not.toBeNull();
+    const viewId = addView('View');
+    const sourceNodeId = addElementNodeToView(viewId, processId, viewId, {
+      x: 20,
+      y: 20,
+      width: 120,
+      height: 55,
+    });
+    addElementNodeToView(viewId, objectId, viewId, {
+      x: 220,
+      y: 20,
+      width: 120,
+      height: 55,
+    });
+    const connectionId = Object.values(state().model!.connections).find(
+      (conn) => conn.relationshipId === relationshipId,
+    )?.id;
+    expect(connectionId).toBeDefined();
+    replaceModel(state().model, null, false, { readOnly: true });
+
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(
+        createElement(
+          'div',
+          null,
+          createElement(ViewEditor, { viewId, readOnly: true }),
+          createElement(PropertiesPanel),
+        ),
+      );
+    });
+
+    const node = host.querySelector(`[data-node-id="${sourceNodeId}"]`);
+    expect(node).not.toBeNull();
+    await act(async () => {
+      dispatchPointerDown(node!);
+    });
+    expect(state().selection).toEqual({ source: 'view', ids: [sourceNodeId] });
+    expect(host.querySelector<HTMLInputElement>('.properties-panel input.prop-input')?.value).toBe(
+      'Process',
+    );
+
+    const connection = host.querySelector(`[data-conn-id="${connectionId}"]`);
+    expect(connection).not.toBeNull();
+    await act(async () => {
+      dispatchPointerDown(connection!);
+    });
+    expect(state().selection).toEqual({ source: 'view', ids: [connectionId] });
+    expect(host.querySelector<HTMLInputElement>('.properties-panel input.prop-input')?.value).toBe(
+      'Reads',
+    );
 
     await act(async () => {
       root.unmount();

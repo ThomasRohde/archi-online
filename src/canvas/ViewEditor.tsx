@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { useStore } from '../model/store';
+import { setSelection, useStore } from '../model/store';
 import type { Bounds } from '../model/types';
 import { ConnectionView } from './ConnectionView';
 import { connectionPolyline, type Point } from './geometry';
@@ -28,6 +28,21 @@ export function ViewEditor({ viewId, readOnly: readOnlyProp }: ViewEditorProps) 
   const readOnlyStore = useStore((s) => s.readOnly);
   const readOnly = readOnlyProp ?? readOnlyStore;
   return readOnly ? <ReadOnlyViewEditor viewId={viewId} /> : <EditableViewEditor viewId={viewId} />;
+}
+
+function readOnlyHitTarget(
+  target: EventTarget | null,
+  root: SVGSVGElement,
+): { id: string } | null {
+  let el = target instanceof Element ? target : null;
+  while (el && el !== root) {
+    const nodeId = el.getAttribute('data-node-id');
+    if (nodeId) return { id: nodeId };
+    const connId = el.getAttribute('data-conn-id');
+    if (connId) return { id: connId };
+    el = el.parentElement;
+  }
+  return null;
 }
 
 function EditableViewEditor({ viewId }: { viewId: string }) {
@@ -157,6 +172,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
 
 function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
   const model = useStore((s) => s.model);
+  const selection = useStore((s) => s.selection);
   const svgRef = useRef<SVGSVGElement>(null);
   const panRef = useRef<{
     pointerId: number;
@@ -184,6 +200,8 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
 
   if (!model || !view) return null;
 
+  const viewSelected = selection.source === 'view' ? new Set(selection.ids) : new Set<string>();
+
   const stopPan = (pointerId: number, target: SVGSVGElement) => {
     if (panRef.current?.pointerId !== pointerId) return;
     if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
@@ -198,6 +216,11 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
         style={{ cursor: 'default' }}
         tabIndex={0}
         onPointerDown={(event) => {
+          if (event.button === 0) {
+            const hit = readOnlyHitTarget(event.target, event.currentTarget);
+            setSelection('view', hit ? [hit.id] : []);
+            return;
+          }
           if (event.button !== 1) return;
           event.preventDefault();
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -246,7 +269,7 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
                   conn={conn}
                   rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
                   points={connectionPolyline(src, tgt, conn.bendpoints)}
-                  selected={false}
+                  selected={viewSelected.has(conn.id)}
                 />
               );
             })}
