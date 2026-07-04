@@ -1,5 +1,6 @@
 import { emitModelSaved } from '../extensions/events';
 import { parseArchimate, serializeArchimate } from '../model/io/archimate-xml';
+import { isExchangeXml, parseExchange } from '../model/io/exchange-xml';
 import {
   currentFileHandle,
   replaceModel,
@@ -10,7 +11,7 @@ import {
 const PICKER_TYPES = [
   {
     description: 'ArchiMate model',
-    accept: { 'application/xml': ['.archimate' as const] },
+    accept: { 'application/xml': ['.archimate' as const, '.xml' as const] },
   },
 ];
 
@@ -47,14 +48,23 @@ export async function openModelFromDisk(): Promise<void> {
  * keeping the handle so silent Ctrl+S re-save works. */
 export async function openModelFromHandle(handle: FileSystemFileHandle): Promise<void> {
   const file = await handle.getFile();
-  loadModelText(await file.text(), file.name);
-  setCurrentFileHandle(handle); // after loadModelText, which clears the handle
+  const format = loadModelText(await file.text(), file.name);
+  // Open Exchange imports become a new unsaved model — never keep the .xml
+  // handle, or Ctrl+S would overwrite it with .archimate content.
+  if (format === 'archimate') {
+    setCurrentFileHandle(handle); // after loadModelText, which clears the handle
+  }
 }
 
-export function loadModelText(text: string, fileName: string): void {
-  const model = parseArchimate(text);
-  replaceModel(model, fileName, false);
+export function loadModelText(text: string, fileName: string): 'archimate' | 'exchange' {
   setCurrentFileHandle(null);
+  if (isExchangeXml(text)) {
+    // Like desktop Archi, an Open Exchange file imports as a new, unsaved model.
+    replaceModel(parseExchange(text), null, true);
+    return 'exchange';
+  }
+  replaceModel(parseArchimate(text), fileName, false);
+  return 'archimate';
 }
 
 export async function saveModelToDisk(saveAs = false): Promise<void> {

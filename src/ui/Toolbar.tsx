@@ -3,9 +3,15 @@ import { createPortal } from 'react-dom';
 import { autoListedExtensionCommands } from '../extensions/command-visibility';
 import { extensionRegistry } from '../extensions/registry';
 import { serializeArchimate } from '../model/io/archimate-xml';
+import { serializeExchange } from '../model/io/exchange-xml';
 import { createEmptyModel } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
-import { openModelFromDisk, saveModelToDisk } from '../persistence/files';
+import {
+  openModelFromDisk,
+  sanitizeFileName,
+  saveBlobToDisk,
+  saveModelToDisk,
+} from '../persistence/files';
 import { getStoredGitHubToken, setStoredGitHubToken } from '../persistence/github';
 import {
   INLINE_SHARE_THRESHOLD,
@@ -168,6 +174,25 @@ async function runShareModel(): Promise<void> {
   }
 }
 
+async function exportModelToExchange(): Promise<void> {
+  const s = useStore.getState();
+  if (!s.model) return;
+  try {
+    const xml = serializeExchange(s.model);
+    await saveBlobToDisk(
+      new Blob([xml], { type: 'application/xml' }),
+      `${sanitizeFileName(s.model.info.name)}.xml`,
+      { description: 'ArchiMate Open Exchange', accept: { 'application/xml': ['.xml'] } },
+    );
+  } catch (error) {
+    await showAlertDialog({
+      title: 'Could not export model',
+      message: errorMessage(error),
+      intent: 'error',
+    });
+  }
+}
+
 async function copyActiveViewImage(): Promise<void> {
   const s = useStore.getState();
   if (!s.model || !s.activeViewId) return;
@@ -211,6 +236,11 @@ export function Toolbar() {
       label: 'Copy view as image',
       disabled: !hasActiveView,
       onClick: () => void copyActiveViewImage(),
+    },
+    SEPARATOR,
+    {
+      label: 'Model to Open Exchange (.xml)…',
+      onClick: () => void exportModelToExchange(),
     },
   ];
   const extensionMenuItems: MenuItem[] = extensionSnapshot.menus['extensions.menu'].map((item) => ({
