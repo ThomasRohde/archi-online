@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseArchimate, serializeArchimate } from '../src/model/io/archimate-xml';
+import { addView, createElementOnView, createEmptyModel } from '../src/model/ops';
+import { openView, replaceModel } from '../src/model/store';
 import { isViewerLocation, viewerRouteKey } from '../src/App';
 import { memoryKeyValueStore } from '../src/persistence/keyval';
 import {
@@ -13,7 +17,8 @@ import {
   parseShareFragment,
   rememberGistId,
 } from '../src/persistence/share';
-import { shareDecisionForInline } from '../src/ui/Toolbar';
+import { AppDialogHost } from '../src/ui/AppDialog';
+import { shareDecisionForInline, shareModel } from '../src/ui/Toolbar';
 
 const archisuranceXml = readFileSync(
   join(__dirname, 'fixtures', 'Archisurance.archimate'),
@@ -27,6 +32,22 @@ function response(body: string, init: ResponseInit = {}) {
     ...init,
   });
 }
+
+async function render(element: React.ReactElement): Promise<{ host: HTMLDivElement; root: Root }> {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => {
+    root.render(element);
+  });
+  return { host, root };
+}
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+  replaceModel(null, null);
+  document.body.innerHTML = '';
+});
 
 describe('share link encoding', () => {
   it('round-trips a model through an inline fragment payload', () => {
@@ -123,5 +144,50 @@ describe('share link encoding', () => {
     expect(shareDecisionForInline(100)).toBe('inline');
     expect(shareDecisionForInline(INLINE_SHARE_THRESHOLD)).toBe('inline');
     expect(shareDecisionForInline(INLINE_SHARE_THRESHOLD + 1)).toBe('gist');
+  });
+
+  it('copies a share link that opens the active view without displaying the URL', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const { host, root } = await render(createElement(AppDialogHost));
+    replaceModel(createEmptyModel('Shared Active View'), null);
+    addView('Empty View');
+    const activeViewId = addView('Populated View');
+    openView(activeViewId);
+    createElementOnView('BusinessActor', activeViewId, activeViewId, {
+      x: 40,
+      y: 50,
+      width: 120,
+      height: 55,
+    });
+
+    let sharePromise!: Promise<void>;
+    await act(async () => {
+      sharePromise = shareModel();
+    });
+    const copiedUrl = writeText.mock.calls[0]?.[0] ?? '';
+    const dialogText = document.body.textContent ?? '';
+    const okButton = document.querySelector<HTMLButtonElement>('.app-dialog-btn.primary');
+    expect(okButton).not.toBeNull();
+    await act(async () => {
+      okButton!.click();
+      await sharePromise;
+      root.unmount();
+    });
+    host.remove();
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('?mode=viewer#'));
+    expect(parseShareFragment(new URL(copiedUrl).hash)).toMatchObject({
+      kind: 'inline',
+      initialViewId: activeViewId,
+    });
+    await expect(loadSharedModelFromLocation({ hash: new URL(copiedUrl).hash })).resolves.toMatchObject({
+      initialViewId: activeViewId,
+    });
+    expect(dialogText).toContain('The share URL has been copied to the clipboard.');
+    expect(dialogText).not.toContain(copiedUrl);
   });
 });

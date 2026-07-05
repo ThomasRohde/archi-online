@@ -21,9 +21,9 @@ export interface InlineShare {
 }
 
 export type ShareFragment =
-  | { kind: 'inline'; payload: string }
-  | { kind: 'gist'; gistId: string }
-  | { kind: 'raw'; url: string }
+  | { kind: 'inline'; payload: string; initialViewId?: string }
+  | { kind: 'gist'; gistId: string; initialViewId?: string }
+  | { kind: 'raw'; url: string; initialViewId?: string }
   | { kind: 'none' };
 
 export interface DecodedInlineModel {
@@ -36,6 +36,7 @@ export interface LoadedSharedModel {
   model: ModelState;
   fileName: string;
   sourceLabel: string;
+  initialViewId?: string;
 }
 
 export class ShareLinkError extends Error {
@@ -48,10 +49,11 @@ export class ShareLinkError extends Error {
 export function encodeModelToInlineShare(
   model: ModelState,
   baseHref = viewerBaseHref(),
+  initialViewId?: string,
 ): InlineShare {
   const xml = serializeArchimate(model);
   const payload = bytesToBase64Url(deflateSync(new TextEncoder().encode(xml)));
-  const href = `${baseHref}?mode=viewer#m=${payload}`;
+  const href = `${baseHref}?mode=viewer#${shareFragment({ m: payload, view: initialViewId })}`;
   return {
     kind: 'inline',
     payload,
@@ -76,12 +78,13 @@ export function decodeInlineSharePayload(payload: string): DecodedInlineModel {
 export function parseShareFragment(hash: string): ShareFragment {
   const raw = hash.startsWith('#') ? hash.slice(1) : hash;
   const params = new URLSearchParams(raw);
+  const initialViewId = params.get('view') || undefined;
   const payload = params.get('m');
-  if (payload) return { kind: 'inline', payload };
+  if (payload) return { kind: 'inline', payload, initialViewId };
   const gistId = params.get('gist');
-  if (gistId) return { kind: 'gist', gistId };
+  if (gistId) return { kind: 'gist', gistId, initialViewId };
   const rawUrl = params.get('raw');
-  if (rawUrl) return { kind: 'raw', url: rawUrl };
+  if (rawUrl) return { kind: 'raw', url: rawUrl, initialViewId };
   return { kind: 'none' };
 }
 
@@ -96,24 +99,29 @@ export async function loadSharedModelFromLocation(
       ...decoded,
       fileName: `${safeFileName(decoded.model.info.name)}.archimate`,
       sourceLabel: 'shared link',
+      initialViewId: existingViewId(decoded.model, source.initialViewId),
     };
   }
   if (source.kind === 'gist') {
     const xml = await fetchGistArchimateXml(source.gistId, fetchImpl);
+    const model = parseArchimate(xml);
     return {
       xml,
-      model: parseArchimate(xml),
+      model,
       fileName: `gist-${source.gistId}.archimate`,
       sourceLabel: `gist ${source.gistId}`,
+      initialViewId: existingViewId(model, source.initialViewId),
     };
   }
   if (source.kind === 'raw') {
     const xml = await fetchRawArchimateXml(source.url, fetchImpl);
+    const model = parseArchimate(xml);
     return {
       xml,
-      model: parseArchimate(xml),
+      model,
       fileName: source.url.split('/').pop() || 'shared.archimate',
       sourceLabel: source.url,
+      initialViewId: existingViewId(model, source.initialViewId),
     };
   }
   throw new ShareLinkError('This URL does not contain a shared ArchiMate model.');
@@ -147,12 +155,20 @@ export async function rememberGistId(
   await store.set(MODEL_GIST_ASSOCIATIONS_KEY, { ...map, [modelId]: gistId });
 }
 
-export function gistShareHref(gistId: string, baseHref = viewerBaseHref()): string {
-  return `${baseHref}?mode=viewer#gist=${encodeURIComponent(gistId)}`;
+export function gistShareHref(
+  gistId: string,
+  baseHref = viewerBaseHref(),
+  initialViewId?: string,
+): string {
+  return `${baseHref}?mode=viewer#${shareFragment({ gist: gistId, view: initialViewId })}`;
 }
 
-export function rawShareHref(rawUrl: string, baseHref = viewerBaseHref()): string {
-  return `${baseHref}?mode=viewer#raw=${encodeURIComponent(rawUrl)}`;
+export function rawShareHref(
+  rawUrl: string,
+  baseHref = viewerBaseHref(),
+  initialViewId?: string,
+): string {
+  return `${baseHref}?mode=viewer#${shareFragment({ raw: rawUrl, view: initialViewId })}`;
 }
 
 function viewerBaseHref(): string {
@@ -177,6 +193,19 @@ function base64UrlToBytes(value: string): Uint8Array {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
+}
+
+function shareFragment(values: { m?: string; gist?: string; raw?: string; view?: string }): string {
+  const params = new URLSearchParams();
+  if (values.m) params.set('m', values.m);
+  if (values.gist) params.set('gist', values.gist);
+  if (values.raw) params.set('raw', values.raw);
+  if (values.view) params.set('view', values.view);
+  return params.toString();
+}
+
+function existingViewId(model: ModelState, viewId: string | undefined): string | undefined {
+  return viewId && model.views[viewId] ? viewId : undefined;
 }
 
 function safeFileName(name: string): string {

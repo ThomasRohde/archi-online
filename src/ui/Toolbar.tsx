@@ -117,17 +117,18 @@ export async function saveModel(saveAs = false): Promise<void> {
 async function copyShareLink(href: string): Promise<void> {
   await navigator.clipboard.writeText(href);
   await showAlertDialog({
-    title: 'Share link copied',
-    message: href,
+    title: 'Share URL copied',
+    message: 'The share URL has been copied to the clipboard.',
     details: 'Anyone with this link can read the model data contained in the link or referenced gist.',
   });
 }
 
 export async function shareModel(): Promise<void> {
-  const model = useStore.getState().model;
+  const { activeViewId, model } = useStore.getState();
   if (!model) return;
+  const initialViewId = activeViewId && model.views[activeViewId] ? activeViewId : undefined;
 
-  const inline = encodeModelToInlineShare(model);
+  const inline = encodeModelToInlineShare(model, undefined, initialViewId);
   if (shareDecisionForInline(inline.encodedLength) === 'inline') {
     await copyShareLink(inline.href);
     return;
@@ -177,7 +178,7 @@ export async function shareModel(): Promise<void> {
     fileName,
     public: makePublic,
   });
-  await copyShareLink(gistShareHref(saved.id));
+  await copyShareLink(gistShareHref(saved.id, undefined, initialViewId));
 }
 
 async function runShareModel(): Promise<void> {

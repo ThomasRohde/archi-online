@@ -144,7 +144,7 @@ async function bootViewerRuntime(
     const loaded = await loadSharedModelFromLocation(window.location);
     if (routeKey !== viewerRouteKey(new URL(window.location.href))) return;
     replaceModel(loaded.model, loaded.fileName, false, { readOnly: true });
-    const firstView = Object.keys(loaded.model.views)[0];
+    const firstView = loaded.initialViewId ?? Object.keys(loaded.model.views)[0];
     if (firstView) openView(firstView);
     useStore.setState({ booted: true });
     setMode({ kind: 'viewer-loaded', sourceLabel: loaded.sourceLabel });
