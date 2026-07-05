@@ -8,6 +8,7 @@ import {
   createRelationshipOnView,
   deleteItems,
   renameItem,
+  setNodeStyle,
 } from '../src/model/ops';
 import { redo, replaceModel, runBatch, undo, useStore } from '../src/model/store';
 
@@ -107,5 +108,54 @@ describe('model ops + undo/redo', () => {
     expect(useStore.getState().undoStack).toHaveLength(1);
     undo();
     expect(Object.keys(model().elements)).toHaveLength(0);
+  });
+
+  it('applies connection appearance through one undoable style operation', () => {
+    const actor = addElement('BusinessActor');
+    const role = addElement('BusinessRole');
+    const rel = addRelationship('AssignmentRelationship', actor, role)!;
+    const viewId = addView('V');
+    addElementNodeToView(viewId, actor, viewId, { x: 0, y: 0, width: 120, height: 55 });
+    addElementNodeToView(viewId, role, viewId, { x: 200, y: 0, width: 120, height: 55 });
+    const connId = Object.values(model().connections).find((conn) => conn.relationshipId === rel)!.id;
+    const undoDepth = useStore.getState().undoStack.length;
+
+    setNodeStyle([connId], {
+      lineColor: '#123456',
+      fontColor: '#abcdef',
+      font: '1|Segoe UI|11|1|',
+      lineWidth: 3,
+      textPosition: 2,
+    });
+
+    expect(useStore.getState().undoStack).toHaveLength(undoDepth + 1);
+    expect(model().connections[connId]).toMatchObject({
+      lineColor: '#123456',
+      fontColor: '#abcdef',
+      font: '1|Segoe UI|11|1|',
+      lineWidth: 3,
+      textPosition: 2,
+    });
+
+    undo();
+    expect(model().connections[connId].lineColor).toBeUndefined();
+    expect(model().connections[connId].fontColor).toBeUndefined();
+    expect(model().connections[connId].font).toBeUndefined();
+    expect(model().connections[connId].lineWidth).toBeUndefined();
+    expect(model().connections[connId].textPosition).toBeUndefined();
+
+    redo();
+    expect(model().connections[connId]).toMatchObject({
+      lineColor: '#123456',
+      fontColor: '#abcdef',
+      font: '1|Segoe UI|11|1|',
+      lineWidth: 3,
+      textPosition: 2,
+    });
+
+    setNodeStyle([connId], { lineColor: undefined, fontColor: undefined });
+    expect(model().connections[connId].lineColor).toBeUndefined();
+    expect(model().connections[connId].fontColor).toBeUndefined();
+    expect(model().connections[connId].font).toBe('1|Segoe UI|11|1|');
   });
 });

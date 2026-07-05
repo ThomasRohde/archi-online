@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react';
-import { ELEMENT_TYPE_MAP } from '../model/metamodel';
 import {
   renameItem,
   setDocumentation,
   setJunctionType,
-  setNodeStyle,
   setProperties,
   setRelationshipAttrs,
   setViewpoint,
-  type NodeStyle,
 } from '../model/ops';
 import { useStore } from '../model/store';
 import type { Property } from '../model/types';
+import { AppearanceTab } from './properties/AppearanceTab';
 import { conceptName, resolveTarget, type Target } from './properties/target';
 
 type Tab = 'main' | 'properties' | 'appearance';
@@ -66,42 +64,6 @@ function CommitInput({
   );
 }
 
-function ColorRow({
-  label,
-  value,
-  fallback,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  value: string | undefined;
-  fallback: string;
-  onChange: (v: string | undefined) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="prop-row">
-      <label>{label}</label>
-      <div className="color-row">
-        <input
-          type="color"
-          value={value ?? fallback}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        <button
-          className="tb-btn small"
-          disabled={disabled || value === undefined}
-          title="Reset to default"
-          onClick={() => onChange(undefined)}
-        >
-          Default
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function PropertiesTable({ target, readOnly }: { target: Target; readOnly: boolean }) {
   const props = target.properties ?? [];
   const commit = (next: Property[]) => {
@@ -148,100 +110,9 @@ function PropertiesTable({ target, readOnly }: { target: Target; readOnly: boole
   );
 }
 
-function AppearanceTab({ target, readOnly }: { target: Target; readOnly: boolean }) {
-  if (target.styleIds.length === 0) {
-    return <div className="empty-hint">Select objects on a view to edit their appearance.</div>;
-  }
-  const apply = (style: NodeStyle) => setNodeStyle(target.styleIds, style);
-  const node = target.node;
-  const conn = target.connection;
-  const defaultFill =
-    node?.nodeType === 'element'
-      ? ELEMENT_TYPE_MAP[
-          (useStore.getState().model?.elements[node.elementId]?.type ?? 'BusinessActor')
-        ].fill
-      : '#ffffff';
-  return (
-    <div className="prop-form">
-      {(node || target.count > 1) && (
-        <>
-          <ColorRow
-            label="Fill color"
-            value={node?.fillColor}
-            fallback={defaultFill}
-            disabled={readOnly}
-            onChange={(v) => apply({ fillColor: v })}
-          />
-          <div className="prop-row">
-            <label>Opacity</label>
-            <input
-              type="range"
-              min={0}
-              max={255}
-              value={node?.alpha ?? 255}
-              disabled={readOnly}
-              onChange={(e) => apply({ alpha: parseInt(e.target.value, 10) })}
-            />
-          </div>
-        </>
-      )}
-      <ColorRow
-        label="Line color"
-        value={node?.lineColor ?? conn?.lineColor}
-        fallback="#5c5c5c"
-        disabled={readOnly}
-        onChange={(v) => apply({ lineColor: v })}
-      />
-      <ColorRow
-        label="Font color"
-        value={node?.fontColor ?? conn?.fontColor}
-        fallback="#000000"
-        disabled={readOnly}
-        onChange={(v) => apply({ fontColor: v })}
-      />
-      {node?.nodeType === 'element' && (
-        <div className="prop-row">
-          <label>Figure</label>
-          <select
-            value={node.figureType ?? 0}
-            disabled={readOnly}
-            onChange={(e) => apply({ figureType: parseInt(e.target.value, 10) })}
-          >
-            <option value={0}>Default (box + icon)</option>
-            <option value={1}>ArchiMate notation shape</option>
-          </select>
-        </div>
-      )}
-      {node && (
-        <>
-          <div className="prop-row">
-            <label>Text align</label>
-            <select
-              value={node.textAlignment ?? 2}
-              disabled={readOnly}
-              onChange={(e) => apply({ textAlignment: parseInt(e.target.value, 10) })}
-            >
-              <option value={1}>Left</option>
-              <option value={2}>Center</option>
-              <option value={4}>Right</option>
-            </select>
-          </div>
-          <div className="prop-row">
-            <label>Text position</label>
-            <select
-              value={node.textPosition ?? 1}
-              disabled={readOnly}
-              onChange={(e) => apply({ textPosition: parseInt(e.target.value, 10) })}
-            >
-              <option value={0}>Top</option>
-              <option value={1}>Center</option>
-              <option value={2}>Bottom</option>
-            </select>
-          </div>
-        </>
-      )}
-    </div>
-  );
+function targetTitle(target: Target): string {
+  if (target.count === 1 && target.name) return `${target.name} (${target.typeLabel})`;
+  return target.typeLabel;
 }
 
 export function PropertiesPanel() {
@@ -259,125 +130,129 @@ export function PropertiesPanel() {
 
   return (
     <div className="properties-panel">
-      <div className="prop-type">{target.typeLabel}</div>
-      <div className="prop-tabs">
-        {(['main', 'properties', ...(readOnly ? [] : ['appearance'])] as Tab[]).map((t) => (
-          <button
-            key={t}
-            className={'prop-tab' + (tab === t ? ' active' : '')}
-            onClick={() => setTab(t)}
-          >
-            {t === 'main' ? 'Main' : t === 'properties' ? 'Properties' : 'Appearance'}
-          </button>
-        ))}
-      </div>
-      {tab === 'main' && (
-        <div className="prop-form">
-          {target.count === 1 && (
-            <>
-              <div className="prop-row">
-                <label>Name</label>
-                <CommitInput
-                  value={target.name ?? ''}
-                  disabled={readOnly || !target.nameEditable}
-                  onCommit={(v) => target.conceptId && renameItem(target.conceptId, v)}
-                />
-              </div>
-              {target.documentation !== undefined && (
-                <div className="prop-row">
-                  <label>Documentation</label>
-                  <CommitInput
-                  multiline
-                  value={target.documentation}
-                  disabled={readOnly}
-                  onCommit={(v) => target.conceptId && setDocumentation(target.conceptId, v)}
-                />
-                </div>
-              )}
-              {target.relationship?.type === 'AccessRelationship' && (
-                <div className="prop-row">
-                  <label>Access type</label>
-                  <select
-                  value={target.relationship.accessType ?? 0}
-                  disabled={readOnly}
-                  onChange={(e) =>
-                      setRelationshipAttrs(target.relationship!.id, {
-                        accessType: parseInt(e.target.value, 10),
-                      })
-                    }
-                  >
-                    <option value={0}>Write</option>
-                    <option value={1}>Read</option>
-                    <option value={2}>Access</option>
-                    <option value={3}>Read/Write</option>
-                  </select>
-                </div>
-              )}
-              {target.relationship?.type === 'InfluenceRelationship' && (
-                <div className="prop-row">
-                  <label>Strength</label>
-                  <CommitInput
-                  value={target.relationship.strength ?? ''}
-                  placeholder="e.g. ++ or --"
-                  disabled={readOnly}
-                  onCommit={(v) => setRelationshipAttrs(target.relationship!.id, { strength: v })}
-                />
-                </div>
-              )}
-              {target.relationship?.type === 'AssociationRelationship' && (
-                <div className="prop-row">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={target.relationship.directed ?? false}
-                      disabled={readOnly}
-                      onChange={(e) =>
-                        setRelationshipAttrs(target.relationship!.id, { directed: e.target.checked })
-                      }
-                    />{' '}
-                    Directed
-                  </label>
-                </div>
-              )}
-              {target.junctionElementId && (
-                <div className="prop-row">
-                  <label>Junction type</label>
-                  <select
-                    value={target.junctionType}
-                    disabled={readOnly}
-                    onChange={(e) =>
-                      setJunctionType(target.junctionElementId!, e.target.value as 'and' | 'or')
-                    }
-                  >
-                    <option value="and">And</option>
-                    <option value="or">Or</option>
-                  </select>
-                </div>
-              )}
-              {target.viewId && (
-                <div className="prop-row">
-                  <label>Viewpoint</label>
-                  <CommitInput
-                    value={target.viewpoint ?? ''}
-                    placeholder="e.g. layered"
-                    disabled={readOnly}
-                    onCommit={(v) => setViewpoint(target.viewId!, v)}
-                  />
-                </div>
-              )}
-              {target.relationship && (
-                <div className="prop-hint">
-                  {conceptName(model, target.relationship.sourceId)} →{' '}
-                  {conceptName(model, target.relationship.targetId)}
-                </div>
-              )}
-            </>
-          )}
-          {target.count > 1 && <div className="empty-hint">{target.typeLabel}</div>}
+      <div className="prop-type">{targetTitle(target)}</div>
+      <div className="prop-body">
+        <div className="prop-tabs">
+          {(['main', 'properties', ...(readOnly ? [] : ['appearance'])] as Tab[]).map((t) => (
+            <button
+              key={t}
+              className={'prop-tab' + (tab === t ? ' active' : '')}
+              onClick={() => setTab(t)}
+            >
+              {t === 'main' ? 'Main' : t === 'properties' ? 'Properties' : 'Appearance'}
+            </button>
+          ))}
         </div>
-      )}
-      {tab === 'properties' && <PropertiesTable target={target} readOnly={readOnly} />}
-      {tab === 'appearance' && !readOnly && <AppearanceTab target={target} readOnly={readOnly} />}
+        <div className="prop-content">
+          {tab === 'main' && (
+            <div className="prop-form">
+              {target.count === 1 && (
+                <>
+                  <div className="prop-row">
+                    <label>Name</label>
+                    <CommitInput
+                      value={target.name ?? ''}
+                      disabled={readOnly || !target.nameEditable}
+                      onCommit={(v) => target.conceptId && renameItem(target.conceptId, v)}
+                    />
+                  </div>
+                  {target.documentation !== undefined && (
+                    <div className="prop-row">
+                      <label>Documentation</label>
+                      <CommitInput
+                        multiline
+                        value={target.documentation}
+                        disabled={readOnly}
+                        onCommit={(v) => target.conceptId && setDocumentation(target.conceptId, v)}
+                      />
+                    </div>
+                  )}
+                  {target.relationship?.type === 'AccessRelationship' && (
+                    <div className="prop-row">
+                      <label>Access type</label>
+                      <select
+                        value={target.relationship.accessType ?? 0}
+                        disabled={readOnly}
+                        onChange={(e) =>
+                          setRelationshipAttrs(target.relationship!.id, {
+                            accessType: parseInt(e.target.value, 10),
+                          })
+                        }
+                      >
+                        <option value={0}>Write</option>
+                        <option value={1}>Read</option>
+                        <option value={2}>Access</option>
+                        <option value={3}>Read/Write</option>
+                      </select>
+                    </div>
+                  )}
+                  {target.relationship?.type === 'InfluenceRelationship' && (
+                    <div className="prop-row">
+                      <label>Strength</label>
+                      <CommitInput
+                        value={target.relationship.strength ?? ''}
+                        placeholder="e.g. ++ or --"
+                        disabled={readOnly}
+                        onCommit={(v) => setRelationshipAttrs(target.relationship!.id, { strength: v })}
+                      />
+                    </div>
+                  )}
+                  {target.relationship?.type === 'AssociationRelationship' && (
+                    <div className="prop-row">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={target.relationship.directed ?? false}
+                          disabled={readOnly}
+                          onChange={(e) =>
+                            setRelationshipAttrs(target.relationship!.id, { directed: e.target.checked })
+                          }
+                        />{' '}
+                        Directed
+                      </label>
+                    </div>
+                  )}
+                  {target.junctionElementId && (
+                    <div className="prop-row">
+                      <label>Junction type</label>
+                      <select
+                        value={target.junctionType}
+                        disabled={readOnly}
+                        onChange={(e) =>
+                          setJunctionType(target.junctionElementId!, e.target.value as 'and' | 'or')
+                        }
+                      >
+                        <option value="and">And</option>
+                        <option value="or">Or</option>
+                      </select>
+                    </div>
+                  )}
+                  {target.viewId && (
+                    <div className="prop-row">
+                      <label>Viewpoint</label>
+                      <CommitInput
+                        value={target.viewpoint ?? ''}
+                        placeholder="e.g. layered"
+                        disabled={readOnly}
+                        onCommit={(v) => setViewpoint(target.viewId!, v)}
+                      />
+                    </div>
+                  )}
+                  {target.relationship && (
+                    <div className="prop-hint">
+                      {conceptName(model, target.relationship.sourceId)} →{' '}
+                      {conceptName(model, target.relationship.targetId)}
+                    </div>
+                  )}
+                </>
+              )}
+              {target.count > 1 && <div className="empty-hint">{target.typeLabel}</div>}
+            </div>
+          )}
+          {tab === 'properties' && <PropertiesTable target={target} readOnly={readOnly} />}
+          {tab === 'appearance' && !readOnly && <AppearanceTab target={target} readOnly={readOnly} />}
+        </div>
+      </div>
     </div>
   );
 }
