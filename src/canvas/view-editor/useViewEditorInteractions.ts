@@ -8,9 +8,11 @@ import type {
   RefObject,
 } from 'react';
 import { relationshipLabel } from '../../model/metamodel';
+import { C4_ELEMENT_TYPES } from '../../model/c4';
 import {
   addGroupToView,
   addNoteToView,
+  createC4ElementOnView,
   commitMove,
   createElementOnView,
   createRelationshipOnView,
@@ -174,7 +176,12 @@ export function useViewEditorInteractions({
     const hit = hitFromEvent(e);
     const tool = useStore.getState().activeTool;
 
-    if (tool.kind === 'create-element' || tool.kind === 'create-note' || tool.kind === 'create-group') {
+    if (
+      tool.kind === 'create-element' ||
+      tool.kind === 'create-c4-element' ||
+      tool.kind === 'create-note' ||
+      tool.kind === 'create-group'
+    ) {
       const parentId = containerAt(model, viewId, absBounds, p, new Set()) ?? viewId;
       const parentAbs = parentId === viewId ? { x: 0, y: 0 } : absBounds.get(parentId)!;
       const textDefaults = defaultTextStyle(settings);
@@ -192,6 +199,26 @@ export function useViewEditorInteractions({
           parentId,
           bounds,
           undefined,
+          textDefaults,
+        );
+        setSelection('view', [nodeId]);
+        setActiveTool({ kind: 'select' });
+        setTimeout(() => startEdit(nodeId), 0);
+      } else if (tool.kind === 'create-c4-element') {
+        const def = defaultElementSize(C4_ELEMENT_TYPES[tool.c4Kind], settings);
+        const bounds = {
+          x: snap(p.x - parentAbs.x - def.width / 2, e.altKey),
+          y: snap(p.y - parentAbs.y - def.height / 2, e.altKey),
+          width: Math.max(def.width, 150),
+          height: Math.max(def.height, 72),
+        };
+        const { nodeId } = createC4ElementOnView(
+          tool.c4Kind,
+          viewId,
+          parentId,
+          bounds,
+          undefined,
+          tool.c4Properties,
           textDefaults,
         );
         setSelection('view', [nodeId]);

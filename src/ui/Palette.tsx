@@ -1,12 +1,38 @@
 import type { ReactNode } from 'react';
 import { StandaloneIcon } from '../canvas/figures/icons';
 import {
+  C4_ELEMENT_KIND_LABELS,
+  C4_ELEMENT_TYPES,
+  C4_PALETTE_KINDS,
+  C4_PROPERTY_KEYS,
+  c4ViewType,
+  type C4ElementKind,
+} from '../model/c4';
+import {
   ELEMENT_TYPES,
   LAYERS,
   RELATIONSHIP_TYPES,
   type RelationshipType,
 } from '../model/metamodel';
 import { setActiveTool, useStore, type Tool } from '../model/store';
+
+interface C4PaletteEntry {
+  kind: C4ElementKind;
+  title: string;
+  properties?: Record<string, string>;
+}
+
+const C4_TOOLBOX: C4PaletteEntry[] = [
+  ...C4_PALETTE_KINDS.map((kind) => ({
+    kind,
+    title: `C4 ${C4_ELEMENT_KIND_LABELS[kind]}`,
+  })),
+  {
+    kind: 'container',
+    title: 'C4 Database',
+    properties: { [C4_PROPERTY_KEYS.tags]: 'database' },
+  },
+];
 
 function relGlyph(type: RelationshipType): ReactNode {
   const line = (dash?: string, x1 = 3, x2 = 21) => (
@@ -96,6 +122,12 @@ function relGlyph(type: RelationshipType): ReactNode {
 function toolEq(a: Tool, b: Tool): boolean {
   if (a.kind !== b.kind) return false;
   if ('type' in a && 'type' in b) return a.type === b.type;
+  if ('c4Kind' in a && 'c4Kind' in b) {
+    return (
+      a.c4Kind === b.c4Kind &&
+      JSON.stringify(a.c4Properties ?? {}) === JSON.stringify(b.c4Properties ?? {})
+    );
+  }
   return true;
 }
 
@@ -113,6 +145,10 @@ function ToolButton({ tool, title, children }: { tool: Tool; title: string; chil
 }
 
 export function Palette() {
+  const activeC4ViewType = useStore((s) => {
+    if (!s.model || !s.activeViewId) return undefined;
+    return c4ViewType(s.model.views[s.activeViewId]);
+  });
   return (
     <div className="palette">
       <ToolButton tool={{ kind: 'select' }} title="Select / move (Esc)">
@@ -133,6 +169,29 @@ export function Palette() {
         </ToolButton>
       ))}
       <div className="pal-sep" />
+      {activeC4ViewType && (
+        <div className="pal-layer">
+          <div className="pal-sep" title="C4" />
+          {C4_TOOLBOX.map((entry, index) => {
+            const type = C4_ELEMENT_TYPES[entry.kind];
+            return (
+              <ToolButton
+                key={`${entry.title}-${index}`}
+                tool={{
+                  kind: 'create-c4-element',
+                  c4Kind: entry.kind,
+                  ...(entry.properties ? { c4Properties: entry.properties } : {}),
+                }}
+                title={entry.title}
+              >
+                <span className="pal-el c4-pal-el" style={{ color: '#333' }}>
+                  <StandaloneIcon type={type} size={15} />
+                </span>
+              </ToolButton>
+            );
+          })}
+        </div>
+      )}
       <ToolButton tool={{ kind: 'create-note' }} title="Note">
         <svg viewBox="0 0 16 16" width="16" height="16">
           <path d="M2.5,2.5 H13.5 V10 L10,13.5 H2.5 Z M13.5,10 H10 V13.5" fill="none" stroke="currentColor" />

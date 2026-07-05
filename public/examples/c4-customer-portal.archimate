@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="C4 Customer Portal Example" id="id-c4-customer-portal-model" version="5.0.0">
+  <folder name="Strategy" id="id-folder-strategy" type="strategy"/>
+  <folder name="Business" id="id-folder-business" type="business">
+    <element xsi:type="archimate:BusinessActor" name="Customer" id="id-c4-customer">
+      <documentation>A person buying products and managing their account.</documentation>
+      <property key="c4.kind">
+        <value>person</value>
+      </property>
+    </element>
+  </folder>
+  <folder name="Application" id="id-folder-application" type="application">
+    <element xsi:type="archimate:ApplicationComponent" name="Customer Portal" id="id-c4-customer-portal">
+      <documentation>The software system under design.</documentation>
+      <property key="c4.kind">
+        <value>software-system</value>
+      </property>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Web Application" id="id-c4-web-application">
+      <documentation>Delivers the browser experience for customers.</documentation>
+      <property key="c4.kind">
+        <value>container</value>
+      </property>
+      <property key="c4.technology">
+        <value>React, TypeScript</value>
+      </property>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="API Application" id="id-c4-api-application">
+      <documentation>Handles customer journeys, order orchestration, and integrations.</documentation>
+      <property key="c4.kind">
+        <value>container</value>
+      </property>
+      <property key="c4.technology">
+        <value>Node.js, Express</value>
+      </property>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Customer Database" id="id-c4-customer-database">
+      <documentation>Stores customer profiles, baskets, and order state.</documentation>
+      <property key="c4.kind">
+        <value>container</value>
+      </property>
+      <property key="c4.technology">
+        <value>PostgreSQL</value>
+      </property>
+      <property key="c4.tags">
+        <value>database</value>
+      </property>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Payment Gateway" id="id-c4-payment-gateway">
+      <documentation>External provider that authorizes and captures card payments.</documentation>
+      <property key="c4.kind">
+        <value>software-system</value>
+      </property>
+      <property key="c4.external">
+        <value>true</value>
+      </property>
+    </element>
+  </folder>
+  <folder name="Technology &amp; Physical" id="id-folder-technology" type="technology"/>
+  <folder name="Motivation" id="id-folder-motivation" type="motivation"/>
+  <folder name="Implementation &amp; Migration" id="id-folder-implementation" type="implementation_migration"/>
+  <folder name="Other" id="id-folder-other" type="other"/>
+  <folder name="Relations" id="id-folder-relations" type="relations">
+    <element xsi:type="archimate:TriggeringRelationship" name="Uses" id="id-c4-rel-customer-web" source="id-c4-customer" target="id-c4-web-application">
+      <property key="c4.technology">
+        <value>HTTPS</value>
+      </property>
+    </element>
+    <element xsi:type="archimate:TriggeringRelationship" name="Calls API" id="id-c4-rel-web-api" source="id-c4-web-application" target="id-c4-api-application">
+      <property key="c4.technology">
+        <value>HTTPS/JSON</value>
+      </property>
+    </element>
+    <element xsi:type="archimate:TriggeringRelationship" name="Reads from and writes to" id="id-c4-rel-api-db" source="id-c4-api-application" target="id-c4-customer-database">
+      <property key="c4.technology">
+        <value>SQL/TCP</value>
+      </property>
+    </element>
+    <element xsi:type="archimate:TriggeringRelationship" name="Takes payments with" id="id-c4-rel-api-payment" source="id-c4-api-application" target="id-c4-payment-gateway">
+      <property key="c4.technology">
+        <value>HTTPS/JSON</value>
+      </property>
+    </element>
+  </folder>
+  <folder name="Views" id="id-folder-diagrams" type="diagrams">
+    <element xsi:type="archimate:ArchimateDiagramModel" name="C4 Container - Customer Portal" id="id-c4-view-container" connectionRouterType="1">
+      <child xsi:type="archimate:Note" id="id-c4-note-title" fillColor="#FFFFFF" lineColor="#FFFFFF" fontColor="#253149" borderType="2" textAlignment="1" textPosition="0">
+        <bounds x="60" y="30" width="1300" height="64"/>
+        <content>Customer Portal - C4 Container View
+Browser, API, database, and external payment provider shown with C4 visuals on an ArchiMate model.</content>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-c4-node-customer" fillColor="#08427B" lineColor="#052E56" fontColor="#FFFFFF" archimateElement="id-c4-customer">
+        <bounds x="70" y="250" width="190" height="92"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-customer-web" source="id-c4-node-customer" target="id-c4-node-web" lineColor="#4A5568" fontColor="#253149" archimateRelationship="id-c4-rel-customer-web"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-c4-node-portal" fillColor="#F7FBFF" lineColor="#8DB9DD" fontColor="#253149" archimateElement="id-c4-customer-portal">
+        <bounds x="330" y="125" width="720" height="390"/>
+        <child xsi:type="archimate:DiagramObject" id="id-c4-node-web" targetConnections="id-c4-conn-customer-web" fillColor="#1168BD" lineColor="#0D4F91" fontColor="#FFFFFF" archimateElement="id-c4-web-application">
+          <bounds x="60" y="115" width="230" height="112"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-web-api" source="id-c4-node-web" target="id-c4-node-api" lineColor="#4A5568" fontColor="#253149" archimateRelationship="id-c4-rel-web-api"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-c4-node-api" targetConnections="id-c4-conn-web-api" fillColor="#1168BD" lineColor="#0D4F91" fontColor="#FFFFFF" archimateElement="id-c4-api-application">
+          <bounds x="430" y="115" width="230" height="112"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-api-db" source="id-c4-node-api" target="id-c4-node-db" lineColor="#4A5568" fontColor="#253149" archimateRelationship="id-c4-rel-api-db"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-api-payment" source="id-c4-node-api" target="id-c4-node-payment" lineColor="#4A5568" fontColor="#253149" archimateRelationship="id-c4-rel-api-payment"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-c4-node-db" targetConnections="id-c4-conn-api-db" fillColor="#1168BD" lineColor="#0D4F91" fontColor="#FFFFFF" archimateElement="id-c4-customer-database">
+          <bounds x="430" y="265" width="230" height="112"/>
+        </child>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-c4-node-payment" targetConnections="id-c4-conn-api-payment" fillColor="#999999" lineColor="#6B7280" fontColor="#FFFFFF" archimateElement="id-c4-payment-gateway">
+        <bounds x="1130" y="240" width="230" height="112"/>
+      </child>
+      <child xsi:type="archimate:Note" id="id-c4-note-legend" fillColor="#FFFFFF" lineColor="#CBD5E1" fontColor="#253149">
+        <bounds x="60" y="560" width="520" height="130"/>
+        <content>C4 Container View
+Blue elements are internal; grey elements are external.
+Database containers render as cylinders.
+Dashed boxes are parent boundaries.
+Relationships are directed and labeled with intent plus optional [technology/protocol].</content>
+        <property key="c4.legend">
+          <value>true</value>
+        </property>
+      </child>
+      <documentation>C4 container view stored as normal ArchiMate concepts with c4.* properties.</documentation>
+      <property key="c4.viewType">
+        <value>container</value>
+      </property>
+      <property key="c4.scopeId">
+        <value>id-c4-customer-portal</value>
+      </property>
+    </element>
+  </folder>
+  <purpose>Example model showing the built-in C4 profile conventions in native Archi .archimate XML.</purpose>
+  <property key="generatedBy">
+    <value>Built-in C4 modeling mode</value>
+  </property>
+</archimate:model>

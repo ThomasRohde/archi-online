@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
+  C4_ELEMENT_KIND_LABELS,
+  C4_ELEMENT_KINDS,
+  C4_PROPERTY_KEYS,
+  C4_VIEW_TYPE_LABELS,
+  C4_VIEW_TYPES,
+  c4KindForConcept,
+  c4PropertyValue,
+  c4ViewType,
+  setC4PropertyValue,
+} from '../model/c4';
+import {
   renameItem,
   setDocumentation,
   setJunctionType,
@@ -8,7 +19,7 @@ import {
   setViewpoint,
 } from '../model/ops';
 import { useStore } from '../model/store';
-import type { Property } from '../model/types';
+import type { ModelState, Property } from '../model/types';
 import { AppearanceTab } from './properties/AppearanceTab';
 import { conceptName, resolveTarget, type Target } from './properties/target';
 
@@ -113,6 +124,148 @@ function PropertiesTable({ target, readOnly }: { target: Target; readOnly: boole
 function targetTitle(target: Target): string {
   if (target.count === 1 && target.name) return `${target.name} (${target.typeLabel})`;
   return target.typeLabel;
+}
+
+function C4Fields({
+  model,
+  target,
+  readOnly,
+}: {
+  model: ModelState;
+  target: Target;
+  readOnly: boolean;
+}) {
+  if (target.count !== 1 || !target.conceptId || !target.properties) return null;
+  const element = model.elements[target.conceptId];
+  const relationship = model.relationships[target.conceptId];
+  const view = model.views[target.conceptId];
+  if (!element && !relationship && !view) return null;
+
+  const commit = (key: string, value: string | undefined) => {
+    if (readOnly) return;
+    setProperties(target.conceptId!, setC4PropertyValue(target.properties ?? [], key, value));
+  };
+  const technology = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.technology) ?? '';
+  const tags = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.tags) ?? '';
+  const external = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.external) === 'true';
+  const instanceOf = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.instanceOf) ?? '';
+  const order = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.order) ?? '';
+  const scopeId = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.scopeId) ?? '';
+
+  return (
+    <div className="prop-section">
+      <div className="prop-section-title">C4 Profile</div>
+      {element && (
+        <>
+          <div className="prop-row">
+            <label>C4 type</label>
+            <select
+              value={c4KindForConcept(element) ?? ''}
+              disabled={readOnly}
+              onChange={(e) => commit(C4_PROPERTY_KEYS.kind, e.target.value)}
+            >
+              <option value="">None</option>
+              {C4_ELEMENT_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {C4_ELEMENT_KIND_LABELS[kind]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="prop-row">
+            <label>Technology</label>
+            <CommitInput
+              value={technology}
+              placeholder="e.g. React, PostgreSQL, HTTPS"
+              disabled={readOnly}
+              onCommit={(v) => commit(C4_PROPERTY_KEYS.technology, v)}
+            />
+          </div>
+          <div className="prop-row">
+            <label>Tags</label>
+            <CommitInput
+              value={tags}
+              placeholder="e.g. database, external"
+              disabled={readOnly}
+              onCommit={(v) => commit(C4_PROPERTY_KEYS.tags, v)}
+            />
+          </div>
+          <div className="prop-row">
+            <label>Instance of</label>
+            <CommitInput
+              value={instanceOf}
+              placeholder="Referenced C4 element name or id"
+              disabled={readOnly}
+              onCommit={(v) => commit(C4_PROPERTY_KEYS.instanceOf, v)}
+            />
+          </div>
+          <div className="prop-row">
+            <label>
+              <input
+                type="checkbox"
+                checked={external}
+                disabled={readOnly}
+                onChange={(e) =>
+                  commit(C4_PROPERTY_KEYS.external, e.target.checked ? 'true' : undefined)
+                }
+              />{' '}
+              External
+            </label>
+          </div>
+        </>
+      )}
+      {relationship && (
+        <>
+          <div className="prop-row">
+            <label>Technology</label>
+            <CommitInput
+              value={technology}
+              placeholder="e.g. HTTPS/JSON"
+              disabled={readOnly}
+              onCommit={(v) => commit(C4_PROPERTY_KEYS.technology, v)}
+            />
+          </div>
+          <div className="prop-row">
+            <label>Dynamic order</label>
+            <CommitInput
+              value={order}
+              placeholder="e.g. 1"
+              disabled={readOnly}
+              onCommit={(v) => commit(C4_PROPERTY_KEYS.order, v)}
+            />
+          </div>
+        </>
+      )}
+      {view && (
+        <>
+          <div className="prop-row">
+            <label>C4 view</label>
+            <select
+              value={c4ViewType(view) ?? ''}
+              disabled={readOnly}
+              onChange={(e) => commit(C4_PROPERTY_KEYS.viewType, e.target.value)}
+            >
+              <option value="">None</option>
+              {C4_VIEW_TYPES.map((viewType) => (
+                <option key={viewType} value={viewType}>
+                  {C4_VIEW_TYPE_LABELS[viewType]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="prop-row">
+            <label>Scope id</label>
+            <CommitInput
+              value={scopeId}
+              placeholder="Element id/name that scopes this view"
+              disabled={readOnly}
+              onCommit={(v) => commit(C4_PROPERTY_KEYS.scopeId, v)}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function PropertiesPanel() {
@@ -244,6 +397,7 @@ export function PropertiesPanel() {
                       {conceptName(model, target.relationship.targetId)}
                     </div>
                   )}
+                  <C4Fields model={model} target={target} readOnly={readOnly} />
                 </>
               )}
               {target.count > 1 && <div className="empty-hint">{target.typeLabel}</div>}

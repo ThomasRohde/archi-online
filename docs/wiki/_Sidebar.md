@@ -4,6 +4,7 @@
 
 * [[Getting Started|Getting-Started]]
 * [[User Guide|User-Guide]]
+* [[C4 Modeling|C4-Modeling]]
 * [[Import & Export|Import-and-Export]]
 * [[Archi Compatibility|Archi-Compatibility]]
 

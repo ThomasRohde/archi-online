@@ -1,4 +1,5 @@
 import { useStore } from '../../model/store';
+import type { C4ViewType } from '../../model/c4';
 import type { Bounds, ModelState } from '../../model/types';
 import type { Point } from '../geometry';
 import { NodeFigure } from '../figures/NodeFigure';
@@ -11,6 +12,7 @@ export function NodeView({
   dropParentId,
   connectSource,
   connectHover,
+  c4ViewType,
 }: {
   model: ModelState;
   nodeId: string;
@@ -19,6 +21,7 @@ export function NodeView({
   dropParentId: string | null;
   connectSource: string | null;
   connectHover: { id: string; valid: boolean } | null;
+  c4ViewType?: C4ViewType;
 }) {
   const node = model.nodes[nodeId];
   const selected = useStore(
@@ -40,7 +43,14 @@ export function NodeView({
 
   return (
     <g transform={`translate(${x},${y})`} data-node-id={nodeId} opacity={delta ? 0.75 : 1}>
-      <NodeFigure node={node} element={element} refView={refView} width={width} height={height} />
+      <NodeFigure
+        node={node}
+        element={element}
+        refView={refView}
+        width={width}
+        height={height}
+        c4ViewType={c4ViewType}
+      />
       {(selected || highlight || invalid) && (
         <rect
           x={-1.5}
@@ -63,6 +73,7 @@ export function NodeView({
           dropParentId={dropParentId}
           connectSource={connectSource}
           connectHover={connectHover}
+          c4ViewType={c4ViewType}
         />
       ))}
     </g>

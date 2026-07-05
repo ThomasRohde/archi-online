@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { C4_PROPERTY_KEYS, c4KindForConcept, c4PropertyValue, c4ViewType } from '../src/model/c4';
 import { parseArchimate, serializeArchimate } from '../src/model/io/archimate-xml';
 import { createEmptyModel } from '../src/model/ops';
 import type { ModelState } from '../src/model/types';
@@ -8,6 +9,10 @@ import type { ModelState } from '../src/model/types';
 const archisurance = readFileSync(join(__dirname, 'fixtures', 'Archisurance.archimate'), 'utf8');
 const archiOnlineCapabilityModel = readFileSync(
   join(__dirname, '..', 'public', 'examples', 'archi-online-capability-model.archimate'),
+  'utf8',
+);
+const c4CustomerPortalModel = readFileSync(
+  join(__dirname, '..', 'public', 'examples', 'c4-customer-portal.archimate'),
   'utf8',
 );
 
@@ -86,6 +91,33 @@ describe('Archi Online capability model example', () => {
     expect(viewNames).toContain('02 - Application Component Map');
     expect(viewNames).toContain('03 - Share and Read-only Viewer Flow');
     expect(viewNames).toContain('04 - Runtime and Persistence Context');
+  });
+
+  it('has no dangling references', () => {
+    expectReferencesResolve(m);
+  });
+});
+
+describe('C4 customer portal example', () => {
+  const m = parseArchimate(c4CustomerPortalModel);
+
+  it('loads as standard ArchiMate with C4 profile metadata', () => {
+    expect(m.info.name).toBe('C4 Customer Portal Example');
+    expect(Object.keys(m.elements)).toHaveLength(6);
+    expect(Object.keys(m.relationships)).toHaveLength(4);
+    expect(Object.keys(m.views)).toHaveLength(1);
+
+    const view = Object.values(m.views)[0];
+    expect(c4ViewType(view)).toBe('container');
+    expect(Object.values(m.elements).map((element) => [element.name, c4KindForConcept(element)]))
+      .toContainEqual(['Web Application', 'container']);
+    expect(Object.values(m.elements).map((element) => [
+      element.name,
+      c4PropertyValue(element.properties, C4_PROPERTY_KEYS.external),
+    ])).toContainEqual(['Payment Gateway', 'true']);
+    expect(Object.values(m.relationships).map((relationship) =>
+      c4PropertyValue(relationship.properties, C4_PROPERTY_KEYS.technology),
+    )).toContain('HTTPS/JSON');
   });
 
   it('has no dangling references', () => {

@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react';
+import { c4ViewType } from '../model/c4';
 import { setSelection, useStore } from '../model/store';
 import type { Bounds } from '../model/types';
 import { ConnectionView } from './ConnectionView';
@@ -84,6 +85,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
 
   if (!model || !view) return null;
 
+  const activeC4ViewType = c4ViewType(view);
   const { moveDelta, dropParentId, resizeOverride, liveAbs } = deriveLiveViewState(
     model,
     viewId,
@@ -124,6 +126,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
               dropParentId={dropParentId}
               connectSource={inter.kind === 'connect' ? inter.sourceNodeId : null}
               connectHover={connectHover}
+              c4ViewType={activeC4ViewType}
             />
           ))}
           <g>
@@ -139,6 +142,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
                   rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
                   points={connectionPolyline(src, tgt, bendpoints)}
                   selected={viewSelected.has(conn.id)}
+                  c4ViewType={activeC4ViewType}
                 />
               );
             })}
@@ -200,6 +204,7 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
 
   if (!model || !view) return null;
 
+  const activeC4ViewType = c4ViewType(view);
   const viewSelected = selection.source === 'view' ? new Set(selection.ids) : new Set<string>();
 
   const stopPan = (pointerId: number, target: SVGSVGElement) => {
@@ -256,6 +261,7 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
               dropParentId={null}
               connectSource={null}
               connectHover={null}
+              c4ViewType={activeC4ViewType}
             />
           ))}
           <g>
@@ -270,6 +276,7 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
                   rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
                   points={connectionPolyline(src, tgt, conn.bendpoints)}
                   selected={viewSelected.has(conn.id)}
+                  c4ViewType={activeC4ViewType}
                 />
               );
             })}

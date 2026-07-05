@@ -7,6 +7,7 @@ import {
 } from 'immer';
 import type { ModelState } from './types';
 import type { ElementType, RelationshipType } from './metamodel';
+import type { C4ElementKind } from './c4';
 
 enablePatches();
 
@@ -19,6 +20,7 @@ export interface Transaction {
 export type Tool =
   | { kind: 'select' }
   | { kind: 'create-element'; type: ElementType }
+  | { kind: 'create-c4-element'; c4Kind: C4ElementKind; c4Properties?: Record<string, string> }
   | { kind: 'create-relationship'; type: RelationshipType }
   | { kind: 'magic-connector' }
   | { kind: 'create-note' }

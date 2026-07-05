@@ -1,4 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react';
+import {
+  c4ElementLabelParts,
+  c4VisualStyleForElement,
+  type C4ElementLabelParts,
+  type C4ViewType,
+  type C4VisualStyle,
+} from '../../model/c4';
 import { ELEMENT_TYPE_MAP, type ElementType } from '../../model/metamodel';
 import type { ArchimateElement, DiagramNode, DiagramView } from '../../model/types';
 import { parseFont } from '../geometry';
@@ -208,10 +215,11 @@ export interface FigureProps {
   refView?: DiagramView;
   width: number;
   height: number;
+  c4ViewType?: C4ViewType;
 }
 
 /** The visual shape + label of one diagram node (position handled by parent <g>). */
-export function NodeFigure({ node, element, refView, width: w, height: h }: FigureProps) {
+export function NodeFigure({ node, element, refView, width: w, height: h, c4ViewType }: FigureProps) {
   const font = parseFont(node.font);
   const alpha = (node.alpha ?? 255) / 255;
   const lineAlpha = (node.lineAlpha ?? 255) / 255;
@@ -272,6 +280,152 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
     return (
       <g color={stroke}>
         <NodeIcon type={type} width={w} />
+      </g>
+    );
+  }
+
+  function c4ElementTypeLine(parts: C4ElementLabelParts): string {
+    return parts.technology
+      ? `[${parts.kindLabel}: ${parts.technology}]`
+      : `[${parts.kindLabel}]`;
+  }
+
+  function c4StructuredLabel(
+    parts: C4ElementLabelParts,
+    color: string,
+    inset: number,
+    extraTop = 0,
+  ) {
+    return (
+      <foreignObject
+        x={inset}
+        y={inset + extraTop}
+        width={Math.max(0, w - inset * 2)}
+        height={Math.max(0, h - inset * 2 - extraTop)}
+      >
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            fontFamily: font.family + ', sans-serif',
+            fontSize: font.sizePx,
+            color,
+            overflow: 'hidden',
+            lineHeight: 1.2,
+            wordBreak: 'break-word',
+            pointerEvents: 'none',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ fontWeight: 700, maxWidth: '100%' }}>{parts.name}</div>
+          <div style={{ fontSize: Math.max(10, font.sizePx - 1), marginTop: 3, maxWidth: '100%' }}>
+            {c4ElementTypeLine(parts)}
+          </div>
+          {parts.description && (
+            <div style={{ fontSize: Math.max(10, font.sizePx - 2), marginTop: 6, maxWidth: '100%' }}>
+              {parts.description}
+            </div>
+          )}
+        </div>
+      </foreignObject>
+    );
+  }
+
+  function c4BoundaryLabel(parts: C4ElementLabelParts, color: string) {
+    return (
+      <text
+        x={12}
+        y={22}
+        fontFamily={font.family + ', sans-serif'}
+        fontSize={Math.max(11, font.sizePx)}
+        fontWeight={700}
+        fill={color}
+        style={{ pointerEvents: 'none', userSelect: 'none' }}
+      >
+        {parts.kindLabel}: {parts.name}
+      </text>
+    );
+  }
+
+  function c4DatabaseBody(fill: string, lineColor: string, visual: C4VisualStyle) {
+    const capH = Math.min(24, Math.max(14, h * 0.24));
+    return (
+      <g>
+        <path
+          data-c4-shape={visual.shape}
+          d={`M0,${capH / 2} V${h - capH / 2} C0,${h + capH / 2} ${w},${h + capH / 2} ${w},${h - capH / 2} V${capH / 2} C${w},${capH * 1.5} 0,${capH * 1.5} 0,${capH / 2} Z`}
+          fill={fill}
+          fillOpacity={alpha}
+          stroke={lineColor}
+          strokeOpacity={lineAlpha}
+        />
+        <ellipse
+          cx={w / 2}
+          cy={capH / 2}
+          rx={w / 2}
+          ry={capH / 2}
+          fill={fill}
+          fillOpacity={alpha}
+          stroke={lineColor}
+          strokeOpacity={lineAlpha}
+        />
+      </g>
+    );
+  }
+
+  function c4Figure(element: ArchimateElement, visual: C4VisualStyle) {
+    const parts = c4ElementLabelParts(element);
+    if (!parts) return null;
+    const fill = node.fillColor ?? visual.fillColor;
+    const lineColor = node.lineColor ?? visual.lineColor;
+    const textColor = node.fontColor ?? visual.fontColor;
+
+    if (visual.shape === 'boundary') {
+      return (
+        <g>
+          <rect
+            data-c4-shape={visual.shape}
+            width={w}
+            height={h}
+            rx={6}
+            ry={6}
+            fill={fill}
+            fillOpacity={alpha}
+            stroke={lineColor}
+            strokeOpacity={lineAlpha}
+            strokeDasharray="8 5"
+          />
+          {c4BoundaryLabel(parts, textColor)}
+        </g>
+      );
+    }
+
+    const body =
+      visual.shape === 'database' ? (
+        c4DatabaseBody(fill, lineColor, visual)
+      ) : (
+        <rect
+          data-c4-shape={visual.shape}
+          width={w}
+          height={h}
+          rx={4}
+          ry={4}
+          fill={fill}
+          fillOpacity={alpha}
+          stroke={lineColor}
+          strokeOpacity={lineAlpha}
+        />
+      );
+
+    return (
+      <g>
+        {body}
+        {c4StructuredLabel(parts, textColor, 10)}
       </g>
     );
   }
@@ -362,6 +516,9 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
   }
 
   // ---- element nodes -----------------------------------------------------
+  const c4Visual = c4ViewType && element ? c4VisualStyleForElement(element, node) : undefined;
+  if (c4Visual && element) return c4Figure(element, c4Visual);
+
   const type = element?.type ?? 'BusinessActor';
   const def = ELEMENT_TYPE_MAP[type];
   const figureType = node.nodeType === 'element' ? (node.figureType ?? 0) : 0;
@@ -486,8 +643,12 @@ export function NodeFigure({ node, element, refView, width: w, height: h }: Figu
       const bodyX = tabW / 2;
       body = (
         <g>
-          <path
-            d={`M${bodyX},20 V0 H${w} V${h} H${bodyX} V32 M${bodyX},8 V14`}
+          <rect
+            data-figure-part="component-body"
+            x={bodyX}
+            y={0}
+            width={w - bodyX}
+            height={h}
             {...common}
           />
           <rect x={0} y={8} width={tabW} height={6} {...common} />

@@ -11,7 +11,10 @@ export function parseProperties(el: Element): Property[] {
   const props: Property[] = [];
   for (const child of el.children) {
     if (child.localName === 'property') {
-      props.push({ key: child.getAttribute('key') ?? '', value: child.getAttribute('value') ?? '' });
+      props.push({
+        key: child.getAttribute('key') ?? '',
+        value: child.getAttribute('value') ?? childText(child, 'value'),
+      });
     }
   }
   return props;

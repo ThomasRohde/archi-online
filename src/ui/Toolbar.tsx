@@ -2,6 +2,12 @@ import { useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { autoListedExtensionCommands } from '../extensions/command-visibility';
 import { extensionRegistry } from '../extensions/registry';
+import {
+  C4_VIEW_TYPE_LABELS,
+  C4_VIEW_TYPES,
+  c4ViewType,
+  validateC4View,
+} from '../model/c4';
 import { serializeArchimate } from '../model/io/archimate-xml';
 import {
   ELEMENTS_FILENAME,
@@ -10,8 +16,13 @@ import {
   type CsvImportFiles,
 } from '../model/io/csv';
 import { serializeExchange } from '../model/io/exchange-xml';
-import { createEmptyModel, importCsv } from '../model/ops';
-import { redo, replaceModel, undo, useStore } from '../model/store';
+import {
+  createC4TemplateView,
+  createEmptyModel,
+  importCsv,
+  insertOrUpdateC4Legend,
+} from '../model/ops';
+import { openView, redo, replaceModel, setSelection, undo, useStore } from '../model/store';
 import {
   openModelFromDisk,
   sanitizeFileName,
@@ -249,6 +260,26 @@ async function copyActiveViewImage(): Promise<void> {
   }
 }
 
+async function validateActiveC4View(): Promise<void> {
+  const s = useStore.getState();
+  if (!s.model || !s.activeViewId) return;
+  const issues = validateC4View(s.model, s.activeViewId);
+  await showAlertDialog({
+    title: issues.length === 0 ? 'C4 validation passed' : 'C4 validation warnings',
+    message:
+      issues.length === 0
+        ? 'No C4 issues were found in the active view.'
+        : `${issues.length} issue${issues.length === 1 ? '' : 's'} found in the active C4 view.`,
+    details: issues.map((issue) => issue.message).join('\n'),
+  });
+}
+
+function createAndOpenC4View(viewType: (typeof C4_VIEW_TYPES)[number]): void {
+  const id = createC4TemplateView(viewType);
+  setSelection('tree', [id]);
+  openView(id);
+}
+
 export function Toolbar() {
   const [showHelp, setShowHelp] = useState(false);
   const [showExportImage, setShowExportImage] = useState(false);
@@ -269,6 +300,10 @@ export function Toolbar() {
   const modelName = useStore((s) => s.model?.info.name);
   const readOnly = useStore((s) => s.readOnly);
   const hasActiveView = useStore((s) => s.activeViewId !== null);
+  const activeC4ViewType = useStore((s) => {
+    if (!s.model || !s.activeViewId) return undefined;
+    return c4ViewType(s.model.views[s.activeViewId]);
+  });
   const exportMenuItems: MenuItem[] = [
     {
       label: 'View as image…',
@@ -307,6 +342,30 @@ export function Toolbar() {
       onClick: () => void extensionRegistry.runCommand(command.id),
     });
   }
+  const c4MenuItems: MenuItem[] = [
+    {
+      label: 'New C4 View',
+      disabled: readOnly,
+      children: C4_VIEW_TYPES.map((viewType) => ({
+        label: C4_VIEW_TYPE_LABELS[viewType],
+        onClick: () => createAndOpenC4View(viewType),
+      })),
+    },
+    SEPARATOR,
+    {
+      label: 'Insert or Update Legend',
+      disabled: readOnly || !activeC4ViewType,
+      onClick: () => {
+        const activeViewId = useStore.getState().activeViewId;
+        if (activeViewId) insertOrUpdateC4Legend(activeViewId);
+      },
+    },
+    {
+      label: 'Validate Active C4 View',
+      disabled: !activeC4ViewType,
+      onClick: () => void validateActiveC4View(),
+    },
+  ];
 
   return (
     <div className="toolbar">
@@ -360,6 +419,17 @@ export function Toolbar() {
         onClick={() => setPresenting(true)}
       >
         Present
+      </button>
+      <button
+        className="tb-btn"
+        title="Create and validate C4 views"
+        disabled={!hasModel}
+        onClick={(e) => {
+          const rect = (e.target as HTMLElement).getBoundingClientRect();
+          showContextMenu(rect.left, rect.bottom + 4, c4MenuItems);
+        }}
+      >
+        C4 ▾
       </button>
       <div className="toolbar-sep" />
       <button

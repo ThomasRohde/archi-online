@@ -15,6 +15,12 @@ import { attachConnection, attachNode } from './draft';
 export interface DiagramNodeDefaults {
   textAlignment?: number;
   textPosition?: number;
+  fillColor?: string;
+  lineColor?: string;
+  fontColor?: string;
+  font?: string;
+  alpha?: number;
+  lineAlpha?: number;
 }
 
 /**

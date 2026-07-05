@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { StandaloneIcon } from '../canvas/figures/icons';
 import { extensionRegistry } from '../extensions/registry';
+import { C4_VIEW_TYPE_LABELS, C4_VIEW_TYPES } from '../model/c4';
 import {
   ELEMENT_TYPES,
   ELEMENT_TYPE_MAP,
@@ -12,6 +13,7 @@ import {
   addElement,
   addFolder,
   addView,
+  createC4TemplateView,
   deleteItems,
   moveItemsToFolder,
   renameItem,
@@ -282,6 +284,17 @@ function ModelTreeInner({
           openView(id);
           setRenamingId(id);
         },
+      });
+      items.push({
+        label: 'New C4 View',
+        children: C4_VIEW_TYPES.map((viewType) => ({
+          label: C4_VIEW_TYPE_LABELS[viewType],
+          onClick: () => {
+            const id = createC4TemplateView(viewType, folder.id);
+            setSelection('tree', [id]);
+            openView(id);
+          },
+        })),
       });
     }
     items.push({

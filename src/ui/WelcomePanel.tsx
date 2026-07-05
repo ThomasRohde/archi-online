@@ -4,10 +4,10 @@ import { openView, replaceModel, useStore } from '../model/store';
 import { showAlertDialog } from './AppDialog';
 import { newModel, openModel } from './Toolbar';
 
-async function loadExample(): Promise<void> {
-  const res = await fetch(import.meta.env.BASE_URL + 'examples/Archisurance.archimate');
+async function loadExample(fileName = 'Archisurance.archimate'): Promise<void> {
+  const res = await fetch(import.meta.env.BASE_URL + `examples/${fileName}`);
   const model = parseArchimate(await res.text());
-  replaceModel(model, 'Archisurance.archimate', false);
+  replaceModel(model, fileName, false);
 }
 
 function errorMessage(error: unknown): string {
@@ -53,6 +53,20 @@ export function WelcomePanel() {
             }
           >
             Load Archisurance example
+          </button>
+          <button
+            className="welcome-btn"
+            onClick={() =>
+              void loadExample('c4-customer-portal.archimate').catch((error) =>
+                showAlertDialog({
+                  title: 'Could not load example',
+                  message: errorMessage(error),
+                  intent: 'error',
+                }),
+              )
+            }
+          >
+            Load C4 example
           </button>
         </div>
       </div>
