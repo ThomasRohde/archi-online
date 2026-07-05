@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
-import { replaceModel, setCurrentFileHandle, useStore } from '../src/model/store';
-import { saveModelToDisk } from '../src/persistence/files';
+import {
+  currentFileHandle,
+  replaceModel,
+  setCurrentFileHandle,
+  useStore,
+} from '../src/model/store';
+import { loadModelText, saveModelToDisk } from '../src/persistence/files';
 
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -91,5 +96,14 @@ describe('file persistence', () => {
     expect(click).not.toHaveBeenCalled();
     expect(useStore.getState().dirty).toBe(true);
     expect(useStore.getState().fileName).toBeNull();
+  });
+
+  it('keeps the existing save handle when opening invalid XML fails', () => {
+    const handle = { name: 'existing.archimate' } as FileSystemFileHandle;
+    setCurrentFileHandle(handle);
+
+    expect(() => loadModelText('<archimate:model', 'broken.archimate')).toThrow();
+
+    expect(currentFileHandle).toBe(handle);
   });
 });

@@ -11,6 +11,7 @@ export interface NodeStyle {
   textAlignment?: number | undefined;
   textPosition?: number | undefined;
   figureType?: number | undefined;
+  lineWidth?: number | undefined;
 }
 
 export function setNodeStyle(ids: string[], style: NodeStyle): void {
@@ -18,14 +19,18 @@ export function setNodeStyle(ids: string[], style: NodeStyle): void {
     for (const id of ids) {
       const node = draft.nodes[id];
       if (node) {
-        Object.assign(node, style);
+        const nodeStyle = { ...style };
+        delete nodeStyle.lineWidth;
+        Object.assign(node, nodeStyle);
         continue;
       }
       const conn = draft.connections[id];
       if (conn) {
-        if (style.lineColor !== undefined) conn.lineColor = style.lineColor;
-        if (style.fontColor !== undefined) conn.fontColor = style.fontColor;
-        if (style.font !== undefined) conn.font = style.font;
+        if ('lineColor' in style) conn.lineColor = style.lineColor;
+        if ('fontColor' in style) conn.fontColor = style.fontColor;
+        if ('font' in style) conn.font = style.font;
+        if ('lineWidth' in style) conn.lineWidth = style.lineWidth;
+        if ('textPosition' in style) conn.textPosition = style.textPosition;
       }
     }
   });

@@ -3,9 +3,21 @@ import { createPortal } from 'react-dom';
 import { autoListedExtensionCommands } from '../extensions/command-visibility';
 import { extensionRegistry } from '../extensions/registry';
 import { serializeArchimate } from '../model/io/archimate-xml';
-import { createEmptyModel } from '../model/ops';
+import {
+  ELEMENTS_FILENAME,
+  PROPERTIES_FILENAME,
+  RELATIONS_FILENAME,
+  type CsvImportFiles,
+} from '../model/io/csv';
+import { serializeExchange } from '../model/io/exchange-xml';
+import { createEmptyModel, importCsv } from '../model/ops';
 import { redo, replaceModel, undo, useStore } from '../model/store';
-import { openModelFromDisk, saveModelToDisk } from '../persistence/files';
+import {
+  openModelFromDisk,
+  sanitizeFileName,
+  saveBlobToDisk,
+  saveModelToDisk,
+} from '../persistence/files';
 import { getStoredGitHubToken, setStoredGitHubToken } from '../persistence/github';
 import {
   INLINE_SHARE_THRESHOLD,
@@ -14,8 +26,12 @@ import {
   gistShareHref,
   saveShareGistForModel,
 } from '../persistence/share';
+import { copyViewPngToClipboard } from '../canvas/export/view-image';
 import { showAlertDialog, showConfirmDialog, showPromptDialog } from './AppDialog';
 import { showContextMenu, SEPARATOR, type MenuItem } from './ContextMenu';
+import { ExportCsvDialog } from './ExportCsvDialog';
+import { ExportImageDialog } from './ExportImageDialog';
+import { PresentationMode } from './PresentationMode';
 import { layoutBus } from './layout-bus';
 
 const SHORTCUTS: [string, string][] = [
@@ -34,6 +50,8 @@ const SHORTCUTS: [string, string][] = [
   ['Escape', 'Cancel tool / clear selection'],
   ['Ctrl+Enter (editor)', 'Run script'],
   ['Double-click bendpoint', 'Remove bendpoint'],
+  ['Ctrl+F (model tree)', 'Filter the model tree'],
+  ['←/→, PgUp/PgDn (presentation)', 'Previous / next view'],
 ];
 
 export async function confirmDiscardChanges(): Promise<boolean> {
@@ -163,8 +181,79 @@ async function runShareModel(): Promise<void> {
   }
 }
 
+async function exportModelToExchange(): Promise<void> {
+  const s = useStore.getState();
+  if (!s.model) return;
+  try {
+    const xml = serializeExchange(s.model);
+    await saveBlobToDisk(
+      new Blob([xml], { type: 'application/xml' }),
+      `${sanitizeFileName(s.model.info.name)}.xml`,
+      { description: 'ArchiMate Open Exchange', accept: { 'application/xml': ['.xml'] } },
+    );
+  } catch (error) {
+    await showAlertDialog({
+      title: 'Could not export model',
+      message: errorMessage(error),
+      intent: 'error',
+    });
+  }
+}
+
+/** Pick 1–3 Archi CSV files (elements/relations/properties, matched by file
+ * name) and import them into the current model as one undo step. */
+function importCsvFromDisk(): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv';
+  input.multiple = true;
+  input.onchange = async () => {
+    const files = [...(input.files ?? [])];
+    if (files.length === 0) return;
+    const byRole: CsvImportFiles = {};
+    for (const file of files) {
+      const base = file.name.replace(/\.[^.]*$/, '');
+      if (base.endsWith(ELEMENTS_FILENAME)) byRole.elements = await file.text();
+      else if (base.endsWith(RELATIONS_FILENAME)) byRole.relations = await file.text();
+      else if (base.endsWith(PROPERTIES_FILENAME)) byRole.properties = await file.text();
+    }
+    try {
+      if (!byRole.elements && !byRole.relations && !byRole.properties) {
+        throw new Error(
+          'No matching files — names must end with "elements", "relations", or "properties" (e.g. elements.csv).',
+        );
+      }
+      importCsv(byRole);
+    } catch (error) {
+      await showAlertDialog({
+        title: 'Could not import CSV',
+        message: errorMessage(error),
+        intent: 'error',
+      });
+    }
+  };
+  input.click();
+}
+
+async function copyActiveViewImage(): Promise<void> {
+  const s = useStore.getState();
+  if (!s.model || !s.activeViewId) return;
+  try {
+    await copyViewPngToClipboard(s.model, s.activeViewId);
+  } catch (error) {
+    await showAlertDialog({
+      title: 'Could not copy image',
+      message: errorMessage(error),
+      intent: 'error',
+    });
+  }
+}
+
 export function Toolbar() {
   const [showHelp, setShowHelp] = useState(false);
+  const [showExportImage, setShowExportImage] = useState(false);
+  const [showExportCsv, setShowExportCsv] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   const extensionSnapshot = useSyncExternalStore(
     (listener) => extensionRegistry.subscribe(listener),
     () => extensionRegistry.getSnapshot(),
@@ -179,6 +268,34 @@ export function Toolbar() {
   const hasModel = useStore((s) => s.model !== null);
   const modelName = useStore((s) => s.model?.info.name);
   const readOnly = useStore((s) => s.readOnly);
+  const hasActiveView = useStore((s) => s.activeViewId !== null);
+  const exportMenuItems: MenuItem[] = [
+    {
+      label: 'View as image…',
+      disabled: !hasActiveView,
+      onClick: () => setShowExportImage(true),
+    },
+    {
+      label: 'Copy view as image',
+      disabled: !hasActiveView,
+      onClick: () => void copyActiveViewImage(),
+    },
+    SEPARATOR,
+    {
+      label: 'Model to Open Exchange (.xml)…',
+      onClick: () => void exportModelToExchange(),
+    },
+    {
+      label: 'Model to CSV…',
+      onClick: () => setShowExportCsv(true),
+    },
+    SEPARATOR,
+    {
+      label: 'Import CSV into model…',
+      disabled: readOnly,
+      onClick: () => importCsvFromDisk(),
+    },
+  ];
   const extensionMenuItems: MenuItem[] = extensionSnapshot.menus['extensions.menu'].map((item) => ({
     label: item.label,
     danger: item.danger,
@@ -224,6 +341,25 @@ export function Toolbar() {
         onClick={() => void runShareModel()}
       >
         Share…
+      </button>
+      <button
+        className="tb-btn"
+        title="Import or export images, Open Exchange, and CSV"
+        disabled={!hasModel}
+        onClick={(e) => {
+          const rect = (e.target as HTMLElement).getBoundingClientRect();
+          showContextMenu(rect.left, rect.bottom + 4, exportMenuItems);
+        }}
+      >
+        Import/Export ▾
+      </button>
+      <button
+        className="tb-btn"
+        title="Presentation mode — full-screen view walkthrough"
+        disabled={!hasActiveView}
+        onClick={() => setPresenting(true)}
+      >
+        Present
       </button>
       <div className="toolbar-sep" />
       <button
@@ -289,6 +425,9 @@ export function Toolbar() {
       <button className="tb-btn" title="Keyboard shortcuts" onClick={() => setShowHelp(true)}>
         ?
       </button>
+      {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
+      {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}
+      {presenting && <PresentationMode onClose={() => setPresenting(false)} />}
       {showHelp &&
         createPortal(
           <div className="modal-backdrop" onClick={() => setShowHelp(false)}>

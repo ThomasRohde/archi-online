@@ -74,8 +74,9 @@ export const TOOL_PANELS: ToolPanelDef[] = [
         id: 'properties',
         component: 'properties',
         title: 'Properties',
-        position: { direction: 'right' },
-        initialWidth: 300,
+        position: api.getPanel('scripts')
+          ? { referencePanel: 'scripts', direction: 'within' }
+          : { direction: 'below' },
       }),
   },
   {
@@ -86,9 +87,7 @@ export const TOOL_PANELS: ToolPanelDef[] = [
         id: 'settings',
         component: 'settings',
         title: 'Settings',
-        position: api.getPanel('properties')
-          ? { referencePanel: 'properties', direction: 'within' }
-          : { direction: 'right' },
+        position: { direction: 'right' },
         initialWidth: 340,
       }),
   },
@@ -146,16 +145,23 @@ export function buildDefaultLayout(api: DockviewApi): void {
     position: { referencePanel: 'welcome', direction: 'left' },
   });
   api.addPanel({
+    id: 'scripts',
+    component: 'scripts',
+    title: 'Scripting',
+    position: { referencePanel: 'welcome', direction: 'below' },
+    initialHeight: 230,
+  });
+  api.addPanel({
     id: 'properties',
     component: 'properties',
     title: 'Properties',
-    position: { referencePanel: 'welcome', direction: 'right' },
+    position: { referencePanel: 'scripts', direction: 'within' },
   });
   api.addPanel({
     id: 'settings',
     component: 'settings',
     title: 'Settings',
-    position: { referencePanel: 'properties', direction: 'within' },
+    position: { referencePanel: 'welcome', direction: 'right' },
   });
   api.addPanel({
     id: 'extensions',
@@ -163,17 +169,23 @@ export function buildDefaultLayout(api: DockviewApi): void {
     title: 'Extensions',
     position: { referencePanel: 'settings', direction: 'within' },
   });
-  api.addPanel({
-    id: 'scripts',
-    component: 'scripts',
-    title: 'Scripting',
-    position: { referencePanel: 'welcome', direction: 'below' },
-    initialHeight: 230,
-  });
   api.getPanel('models')?.api.setSize({ width: 250 });
   api.getPanel('palette')?.api.setSize({ width: 88 });
-  api.getPanel('properties')?.api.setSize({ width: 300 });
   api.getPanel('properties')?.api.setActive();
+}
+
+export function ensurePropertiesDockedWithScripts(api: DockviewApi): void {
+  const properties = api.getPanel('properties');
+  const scripts = api.getPanel('scripts');
+  if (!properties || !scripts || properties.api.group === scripts.api.group) return;
+
+  const activePanelId = api.activePanel?.id;
+  properties.api.moveTo({
+    group: scripts.api.group,
+    position: 'center',
+    skipSetActive: true,
+  });
+  if (activePanelId) api.getPanel(activePanelId)?.api.setActive();
 }
 
 /** Re-add open store views that have no dockview panel (used by reset). */

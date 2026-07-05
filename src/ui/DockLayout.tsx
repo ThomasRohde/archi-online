@@ -18,6 +18,7 @@ import {
   buildDefaultLayout,
   centerPosition,
   components,
+  ensurePropertiesDockedWithScripts,
   restoreViewPanels,
 } from './dock/layout-config';
 
@@ -59,6 +60,7 @@ export function DockLayout() {
       if (raw) {
         try {
           api.fromJSON(raw);
+          ensurePropertiesDockedWithScripts(api);
           restored = true;
         } catch (e) {
           console.warn('layout restore failed', e);

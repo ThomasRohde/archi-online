@@ -1,5 +1,6 @@
 import { emitModelSaved } from '../extensions/events';
 import { parseArchimate, serializeArchimate } from '../model/io/archimate-xml';
+import { isExchangeXml, parseExchange } from '../model/io/exchange-xml';
 import {
   currentFileHandle,
   replaceModel,
@@ -10,7 +11,7 @@ import {
 const PICKER_TYPES = [
   {
     description: 'ArchiMate model',
-    accept: { 'application/xml': ['.archimate' as const] },
+    accept: { 'application/xml': ['.archimate' as const, '.xml' as const] },
   },
 ];
 
@@ -47,14 +48,26 @@ export async function openModelFromDisk(): Promise<void> {
  * keeping the handle so silent Ctrl+S re-save works. */
 export async function openModelFromHandle(handle: FileSystemFileHandle): Promise<void> {
   const file = await handle.getFile();
-  loadModelText(await file.text(), file.name);
-  setCurrentFileHandle(handle); // after loadModelText, which clears the handle
+  const format = loadModelText(await file.text(), file.name);
+  // Open Exchange imports become a new unsaved model — never keep the .xml
+  // handle, or Ctrl+S would overwrite it with .archimate content.
+  if (format === 'archimate') {
+    setCurrentFileHandle(handle); // after loadModelText, which clears the handle
+  }
 }
 
-export function loadModelText(text: string, fileName: string): void {
+export function loadModelText(text: string, fileName: string): 'archimate' | 'exchange' {
+  if (isExchangeXml(text)) {
+    // Like desktop Archi, an Open Exchange file imports as a new, unsaved model.
+    const model = parseExchange(text);
+    setCurrentFileHandle(null);
+    replaceModel(model, null, true);
+    return 'exchange';
+  }
   const model = parseArchimate(text);
-  replaceModel(model, fileName, false);
   setCurrentFileHandle(null);
+  replaceModel(model, fileName, false);
+  return 'archimate';
 }
 
 export async function saveModelToDisk(saveAs = false): Promise<void> {
@@ -101,6 +114,79 @@ export async function saveModelToDisk(saveAs = false): Promise<void> {
   }
 }
 
+export interface BlobSaveType {
+  description: string;
+  accept: Record<string, `.${string}`[]>;
+}
+
+/**
+ * Save an arbitrary blob (exported image, exchange file, CSV) to disk via
+ * the save picker when available, falling back to a download. Does not touch
+ * model dirty/fileName state. Returns false when the user cancelled.
+ */
+export async function saveBlobToDisk(
+  blob: Blob,
+  suggestedName: string,
+  type: BlobSaveType,
+): Promise<boolean> {
+  if (supportsSaveFsAccess()) {
+    let handle: FileSystemFileHandle;
+    try {
+      handle = await window.showSaveFilePicker({ suggestedName, types: [type] });
+    } catch (error) {
+      if (isUserCancelledFileDialog(error)) return false;
+      if (shouldDownloadAfterSaveError(error)) {
+        downloadBlob(blob, suggestedName);
+        return true;
+      }
+      throw error;
+    }
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return true;
+  }
+  downloadBlob(blob, suggestedName);
+  return true;
+}
+
+/**
+ * Save several files at once: one directory pick when the browser supports
+ * it, otherwise a download per file. Returns false when the user cancelled.
+ */
+export async function saveFilesToDisk(
+  files: { name: string; content: string }[],
+): Promise<boolean> {
+  if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
+    let dir: FileSystemDirectoryHandle;
+    try {
+      dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (error) {
+      if (isUserCancelledFileDialog(error)) return false;
+      for (const f of files) downloadBlob(new Blob([f.content], { type: 'text/csv' }), f.name);
+      return true;
+    }
+    for (const f of files) {
+      const handle = await dir.getFileHandle(f.name, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(f.content);
+      await writable.close();
+    }
+    return true;
+  }
+  for (const f of files) downloadBlob(new Blob([f.content], { type: 'text/csv' }), f.name);
+  return true;
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function downloadModel(xml: string, fileName: string): void {
   const blob = new Blob([xml], { type: 'application/xml' });
   const url = URL.createObjectURL(blob);
@@ -132,6 +218,6 @@ function domExceptionName(error: unknown): string {
   return '';
 }
 
-function sanitizeFileName(name: string): string {
+export function sanitizeFileName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'model';
 }

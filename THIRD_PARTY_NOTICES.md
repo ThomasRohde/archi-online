@@ -20,6 +20,11 @@ Derived material in this repository:
   matrix.
 - `src/canvas/figures/icons.tsx` contains TypeScript/SVG transcriptions of
   Archi element icon geometry from Archi figure classes.
+- `src/model/io/exchange-xml/` is a TypeScript port of Archi's Open Exchange
+  format import/export (`org.opengroup.archimate.xmlexchange` plugin).
+- `tests/fixtures/exchange-sample1.xml` and
+  `tests/fixtures/exchange-bendpoint.xml` are Open Exchange test files from
+  Archi's `org.opengroup.archimate.xmlexchange.tests` plugin.
 
 The MIT permission notice is included in `LICENSE`.
 
