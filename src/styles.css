@@ -543,8 +543,9 @@ body {
   position: sticky;
   top: 0;
   z-index: 1;
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px;
+  align-items: stretch;
   gap: 4px;
   padding: 4px 6px;
   background: var(--panel-bg, #f6f6f6);
@@ -552,23 +553,29 @@ body {
 }
 
 .tree-filter-input {
+  grid-column: 1 / -1;
   flex: 1;
   min-width: 0;
+  width: 100%;
   font-size: 12px;
   padding: 2px 6px;
   border: 1px solid var(--border, #ccc);
   border-radius: 3px;
+  box-sizing: border-box;
 }
 
 .tree-filter-type {
-  max-width: 110px;
+  width: 100%;
+  max-width: none;
   font-size: 12px;
   border: 1px solid var(--border, #ccc);
   border-radius: 3px;
   background: #fff;
+  min-width: 0;
 }
 
 .tree-filter-clear {
+  width: 22px;
   border: none;
   background: none;
   cursor: pointer;

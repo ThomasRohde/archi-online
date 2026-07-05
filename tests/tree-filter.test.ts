@@ -7,6 +7,13 @@ import { computeVisibleTreeItems, treeItemLabel } from '../src/ui/tree-filter';
 const archisurance = readFileSync(join(__dirname, 'fixtures', 'Archisurance.archimate'), 'utf8');
 const model = parseArchimate(archisurance);
 
+function cssBlock(css: string, selector: string): string {
+  const match = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 's')
+    .exec(css);
+  expect(match, `Expected CSS block for "${selector}"`).toBeTruthy();
+  return match![1];
+}
+
 describe('computeVisibleTreeItems', () => {
   it('is inactive (null) with no text and no type filter', () => {
     expect(computeVisibleTreeItems(model, '', 'all')).toBeNull();
@@ -69,5 +76,16 @@ describe('computeVisibleTreeItems', () => {
     const visible = computeVisibleTreeItems(model, 'zzz-no-such-thing-zzz', 'all')!;
     expect(visible).not.toBeNull();
     expect(visible.size).toBe(0);
+  });
+});
+
+describe('model tree filter layout', () => {
+  it('places the type dropdown below the search box with enough width for long labels', () => {
+    const css = readFileSync('src/styles.css', 'utf8');
+
+    expect(cssBlock(css, '.tree-filter')).toMatch(/display:\s*grid;/);
+    expect(cssBlock(css, '.tree-filter-input')).toMatch(/grid-column:\s*1\s*\/\s*-1;/);
+    expect(cssBlock(css, '.tree-filter-type')).toMatch(/width:\s*100%;/);
+    expect(cssBlock(css, '.tree-filter-type')).toMatch(/max-width:\s*none;/);
   });
 });
