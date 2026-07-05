@@ -102,6 +102,29 @@ describe('dock layout config', () => {
     });
   });
 
+  it('reopens Navigator with Models when Models is present and keeps it out of the default layout', () => {
+    const { api, added } = createDockApi();
+
+    buildDefaultLayout(api as never);
+    TOOL_PANELS.find((panel) => panel.id === 'navigator')!.add(api as never);
+
+    const navigator = added.find((panel) => panel.id === 'navigator');
+    expect(navigator?.component).toBe('navigator');
+    expect(navigator?.title).toBe('Navigator');
+    expect(navigator?.position).toEqual({ referencePanel: 'models', direction: 'within' });
+    expect(added.filter((panel) => panel.id === 'navigator')).toHaveLength(1);
+  });
+
+  it('reopens Navigator on the left when Models is unavailable', () => {
+    const { api, added } = createDockApi();
+
+    TOOL_PANELS.find((panel) => panel.id === 'navigator')!.add(api as never);
+
+    expect(added.find((panel) => panel.id === 'navigator')?.position).toEqual({
+      direction: 'left',
+    });
+  });
+
   it('migrates restored Properties into the Scripting group without stealing focus', () => {
     const { api, added } = createDockApi();
     api.addPanel({

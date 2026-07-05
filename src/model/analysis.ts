@@ -6,14 +6,31 @@ function byNameThenId<T extends { id: string; name: string }>(a: T, b: T): numbe
 
 /** All relationships whose source or target is conceptId, source-first then target, each sorted by name. */
 export function modelRelations(state: ModelState, conceptId: string): ArchimateRelationship[] {
-  const relationships = Object.values(state.relationships);
-  const outgoing = relationships
+  const outgoing = outgoingRelationships(state, conceptId);
+  const incoming = incomingRelationships(state, conceptId).filter(
+    (relationship) => relationship.sourceId !== conceptId,
+  );
+  return [...outgoing, ...incoming];
+}
+
+/** Relationships where conceptId is the source, sorted by name. */
+export function outgoingRelationships(
+  state: ModelState,
+  conceptId: string,
+): ArchimateRelationship[] {
+  return Object.values(state.relationships)
     .filter((relationship) => relationship.sourceId === conceptId)
     .sort(byNameThenId);
-  const incoming = relationships
-    .filter((relationship) => relationship.targetId === conceptId && relationship.sourceId !== conceptId)
+}
+
+/** Relationships where conceptId is the target, sorted by name. */
+export function incomingRelationships(
+  state: ModelState,
+  conceptId: string,
+): ArchimateRelationship[] {
+  return Object.values(state.relationships)
+    .filter((relationship) => relationship.targetId === conceptId)
     .sort(byNameThenId);
-  return [...outgoing, ...incoming];
 }
 
 /** Views containing the element or relationship, sorted by name. */

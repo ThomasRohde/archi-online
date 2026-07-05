@@ -9,6 +9,7 @@ import { useStore } from '../../model/store';
 import { ExtensionPanelHost } from '../ExtensionPanelHost';
 import { ExtensionsPanel } from '../ExtensionsPanel';
 import { ModelTree } from '../ModelTree';
+import { NavigatorPanel } from '../NavigatorPanel';
 import { Palette } from '../Palette';
 import { PropertiesPanel } from '../PropertiesPanel';
 import { SettingsPanel } from '../SettingsPanel';
@@ -47,6 +48,20 @@ export const TOOL_PANELS: ToolPanelDef[] = [
         component: 'models',
         title: 'Models',
         position: { direction: 'left' },
+        initialWidth: 260,
+      }),
+  },
+  {
+    id: 'navigator',
+    title: 'Navigator',
+    add: (api) =>
+      api.addPanel({
+        id: 'navigator',
+        component: 'navigator',
+        title: 'Navigator',
+        position: api.getPanel('models')
+          ? { referencePanel: 'models', direction: 'within' }
+          : { direction: 'left' },
         initialWidth: 260,
       }),
   },
@@ -229,6 +244,11 @@ export const components: Record<string, React.FunctionComponent<IDockviewPanelPr
   properties: () => (
     <div className="dock-panel">
       <PropertiesPanel />
+    </div>
+  ),
+  navigator: () => (
+    <div className="dock-panel">
+      <NavigatorPanel />
     </div>
   ),
   settings: () => (
