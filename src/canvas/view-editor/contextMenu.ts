@@ -1,8 +1,11 @@
 import {
   addGroupToView,
   addNoteToView,
+  alignableNodeIds,
+  alignNodes,
   deleteItems,
   deleteViewObjects,
+  matchSize,
   reorderNode,
   setConnectionBendpoints,
 } from '../../model/ops';
@@ -178,6 +181,25 @@ export function showViewObjectContextMenu({
       danger: true,
       onClick: () => deleteItems(conceptIds),
     });
+  }
+  const alignIds = alignableNodeIds(model, ids);
+  if (alignIds.length >= 2) {
+    items.push(SEPARATOR);
+    items.push({
+      label: 'Align',
+      children: [
+        { label: 'Align Left', onClick: () => alignNodes(alignIds, 'left') },
+        { label: 'Align Center', onClick: () => alignNodes(alignIds, 'center') },
+        { label: 'Align Right', onClick: () => alignNodes(alignIds, 'right') },
+        { label: 'Align Top', onClick: () => alignNodes(alignIds, 'top') },
+        { label: 'Align Middle', onClick: () => alignNodes(alignIds, 'middle') },
+        { label: 'Align Bottom', onClick: () => alignNodes(alignIds, 'bottom') },
+      ],
+    });
+    items.push(SEPARATOR);
+    items.push({ label: 'Match Width', onClick: () => matchSize(alignIds, 'width') });
+    items.push({ label: 'Match Height', onClick: () => matchSize(alignIds, 'height') });
+    items.push({ label: 'Match Size', onClick: () => matchSize(alignIds, 'both') });
   }
   const trigger = {
     x: clientX,
