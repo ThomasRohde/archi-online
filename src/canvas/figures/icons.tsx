@@ -595,19 +595,10 @@ export const ARCHI_ICONS: Partial<Record<ElementType, ArchiIcon>> = {
     ),
   },
   Junction: {
-    // palette/tree only: the canvas junction figure is a plain dot
-    right: 18,
-    top: 0,
-    box: [1, 1, 16, 14],
-    glyph: (
-      <g {...S}>
-        <rect x="2" y="2" width="2" height="2" />
-        <rect x="2" y="12" width="2" height="2" />
-        <rect x="14" y="7" width="2" height="2" />
-        <path d="M4 4 L6 6 M10 8 L14 8 M4 12 L6 10" />
-        <ellipse cx="8" cy="8" rx="3" ry="3" fill="currentColor" stroke="none" />
-      </g>
-    ),
+    right: 15,
+    top: 6,
+    box: [0, 0, 12, 12],
+    glyph: <circle data-junction-icon="dot" cx="6" cy="6" r="4" fill="currentColor" stroke="none" />,
   },
 };
 

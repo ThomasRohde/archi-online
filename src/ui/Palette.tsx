@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { StandaloneIcon } from '../canvas/figures/icons';
 import {
   C4_ELEMENT_KIND_LABELS,
-  C4_ELEMENT_TYPES,
   C4_PALETTE_KINDS,
   C4_PROPERTY_KEYS,
   c4ViewType,
@@ -22,6 +21,8 @@ interface C4PaletteEntry {
   properties?: Record<string, string>;
 }
 
+type C4PaletteIcon = C4ElementKind | 'database';
+
 const C4_TOOLBOX: C4PaletteEntry[] = [
   ...C4_PALETTE_KINDS.map((kind) => ({
     kind,
@@ -33,6 +34,82 @@ const C4_TOOLBOX: C4PaletteEntry[] = [
     properties: { [C4_PROPERTY_KEYS.tags]: 'database' },
   },
 ];
+
+function isDatabaseEntry(entry: C4PaletteEntry): boolean {
+  return entry.properties?.[C4_PROPERTY_KEYS.tags]?.toLowerCase().split(/[,\s]+/).includes('database') ?? false;
+}
+
+function c4PaletteIcon(entry: C4PaletteEntry): C4PaletteIcon {
+  return isDatabaseEntry(entry) ? 'database' : entry.kind;
+}
+
+function C4PaletteGlyph({ icon }: { icon: C4PaletteIcon }) {
+  const fill = icon === 'person' ? '#08427B' : '#1168BD';
+  const stroke = icon === 'person' ? '#052E56' : '#0D4F91';
+  const white = '#fff';
+  switch (icon) {
+    case 'person':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <circle cx="9" cy="4.2" r="2.4" fill={fill} stroke={stroke} strokeWidth="1.1" />
+          <path d="M9 6.8 V12.2 M5.2 9 H12.8 M9 12.2 L5.8 16 M9 12.2 L12.2 16" fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      );
+    case 'software-system':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <rect x="2.2" y="3.2" width="13.6" height="11.6" rx="1.8" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <path d="M5 6.2 H13 M5 9 H10.8" stroke={white} strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      );
+    case 'container':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <rect x="2.4" y="4" width="13.2" height="10" rx="1.8" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <path d="M2.8 7 H15.2" stroke={white} strokeWidth="1.2" />
+          <rect x="5" y="9.2" width="3.2" height="2.8" rx="0.5" fill={white} opacity="0.9" />
+        </svg>
+      );
+    case 'component':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <rect x="5.2" y="3" width="10" height="12" rx="1.6" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <rect x="2.6" y="5.2" width="4.6" height="2.8" rx="0.5" fill={white} stroke={stroke} strokeWidth="1" />
+          <rect x="2.6" y="10" width="4.6" height="2.8" rx="0.5" fill={white} stroke={stroke} strokeWidth="1" />
+        </svg>
+      );
+    case 'deployment-node':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <path d="M4 5.5 L7 2.8 H14 V12.5 L11 15.2 H4 Z" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <path d="M4 5.5 H11 V15.2 M11 5.5 L14 2.8 M11 5.5 V15.2" fill="none" stroke={white} strokeWidth="1.1" opacity="0.95" />
+        </svg>
+      );
+    case 'infrastructure-node':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <path d="M6.2 13.8 H13.1 C15 13.8 16 12.7 16 11.2 C16 9.7 14.8 8.6 13.3 8.7 C12.7 6.1 10.8 4.2 8.2 4.2 C5.6 4.2 3.7 6 3.5 8.4 C2.1 8.8 1.4 9.8 1.4 11.1 C1.4 12.8 2.7 13.8 4.5 13.8 Z" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <path d="M6 10.8 H11.8" stroke={white} strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+      );
+    case 'database':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <path d="M4 5.2 C4 3.7 14 3.7 14 5.2 V13 C14 14.5 4 14.5 4 13 Z" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <ellipse cx="9" cy="5.2" rx="5" ry="1.8" fill={white} stroke={stroke} strokeWidth="1.1" />
+          <path d="M4 9 C4 10.5 14 10.5 14 9" fill="none" stroke={white} strokeWidth="1.1" opacity="0.95" />
+        </svg>
+      );
+    case 'software-system-instance':
+    case 'container-instance':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <rect x="3" y="5" width="10" height="9" rx="1.6" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <rect x="5" y="3" width="10" height="9" rx="1.6" fill="none" stroke={stroke} strokeWidth="1.2" />
+        </svg>
+      );
+  }
+}
 
 function relGlyph(type: RelationshipType): ReactNode {
   const line = (dash?: string, x1 = 3, x2 = 21) => (
@@ -172,24 +249,21 @@ export function Palette() {
       {activeC4ViewType && (
         <div className="pal-layer">
           <div className="pal-sep" title="C4" />
-          {C4_TOOLBOX.map((entry, index) => {
-            const type = C4_ELEMENT_TYPES[entry.kind];
-            return (
-              <ToolButton
-                key={`${entry.title}-${index}`}
-                tool={{
-                  kind: 'create-c4-element',
-                  c4Kind: entry.kind,
-                  ...(entry.properties ? { c4Properties: entry.properties } : {}),
-                }}
-                title={entry.title}
-              >
-                <span className="pal-el c4-pal-el" style={{ color: '#333' }}>
-                  <StandaloneIcon type={type} size={15} />
-                </span>
-              </ToolButton>
-            );
-          })}
+          {C4_TOOLBOX.map((entry, index) => (
+            <ToolButton
+              key={`${entry.title}-${index}`}
+              tool={{
+                kind: 'create-c4-element',
+                c4Kind: entry.kind,
+                ...(entry.properties ? { c4Properties: entry.properties } : {}),
+              }}
+              title={entry.title}
+            >
+              <span className="pal-el c4-pal-el">
+                <C4PaletteGlyph icon={c4PaletteIcon(entry)} />
+              </span>
+            </ToolButton>
+          ))}
         </div>
       )}
       <ToolButton tool={{ kind: 'create-note' }} title="Note">
@@ -208,17 +282,24 @@ export function Palette() {
         return (
           <div key={layer} className="pal-layer">
             <div className="pal-sep" title={label} />
-            {defs.map((d) => (
-              <ToolButton
-                key={d.type}
-                tool={{ kind: 'create-element', type: d.type }}
-                title={`${d.label} (${label})`}
-              >
-                <span className="pal-el" style={{ background: d.fill, color: '#333' }}>
-                  <StandaloneIcon type={d.type} size={15} />
-                </span>
-              </ToolButton>
-            ))}
+            {defs.map((d) => {
+              const isJunction = d.type === 'Junction';
+              return (
+                <ToolButton
+                  key={d.type}
+                  tool={{ kind: 'create-element', type: d.type }}
+                  title={`${d.label} (${label})`}
+                >
+                  <span
+                    className={'pal-el' + (isJunction ? ' pal-junction-el' : '')}
+                    data-palette-element={d.type}
+                    style={{ background: isJunction ? 'transparent' : d.fill, color: isJunction ? '#111' : '#333' }}
+                  >
+                    <StandaloneIcon type={d.type} size={15} />
+                  </span>
+                </ToolButton>
+              );
+            })}
           </div>
         );
       })}

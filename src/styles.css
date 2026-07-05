@@ -801,6 +801,12 @@ body {
 
 .c4-pal-el {
   background: #e7f4f5;
+  border-color: #8db9dd;
+  color: #1168bd;
+}
+
+.pal-junction-el {
+  border-color: transparent;
 }
 
 .pal-sep {

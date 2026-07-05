@@ -179,7 +179,7 @@ export function c4ElementLabelParts(element: ArchimateElement): C4ElementLabelPa
   return {
     name: element.name,
     kind,
-    kindLabel: C4_ELEMENT_KIND_LABELS[kind],
+    kindLabel: c4ElementDisplayKindLabel(element, kind),
     ...(technology ? { technology } : {}),
     ...(description ? { description } : {}),
   };
@@ -368,6 +368,12 @@ function c4Tags(element: ArchimateElement): Set<string> {
       .map((tag) => tag.trim().toLowerCase())
       .filter(Boolean),
   );
+}
+
+function c4ElementDisplayKindLabel(element: ArchimateElement, kind: C4ElementKind): string {
+  return kind === 'container' && hasC4Tag(element, 'database')
+    ? 'Database'
+    : C4_ELEMENT_KIND_LABELS[kind];
 }
 
 function hasC4Tag(element: ArchimateElement, tag: string): boolean {

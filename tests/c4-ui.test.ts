@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   C4_PROPERTY_KEYS,
   C4_VISUAL_DEFAULTS,
+  c4ElementLabelParts,
   c4KindForConcept,
   c4PropertyValue,
 } from '../src/model/c4';
@@ -72,6 +73,21 @@ describe('C4 UI affordances', () => {
     openView(viewId);
     const { host, root } = await render(createElement(Palette));
 
+    const expectedIcons = [
+      ['C4 Person', 'person'],
+      ['C4 Software System', 'software-system'],
+      ['C4 Container', 'container'],
+      ['C4 Component', 'component'],
+      ['C4 Deployment Node', 'deployment-node'],
+      ['C4 Infrastructure Node', 'infrastructure-node'],
+      ['C4 Database', 'database'],
+    ] as const;
+    for (const [title, icon] of expectedIcons) {
+      const button = host.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+      expect(button, `Expected ${title} palette button`).not.toBeNull();
+      expect(button?.querySelector(`[data-c4-palette-icon="${icon}"]`)).not.toBeNull();
+    }
+
     const containerButton = host.querySelector<HTMLButtonElement>('button[title="C4 Container"]');
     expect(containerButton).not.toBeNull();
 
@@ -82,6 +98,17 @@ describe('C4 UI affordances', () => {
     expect(useStore.getState().activeTool).toEqual({
       kind: 'create-c4-element',
       c4Kind: 'container',
+    });
+
+    const databaseButton = host.querySelector<HTMLButtonElement>('button[title="C4 Database"]');
+    await act(async () => {
+      databaseButton!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(useStore.getState().activeTool).toEqual({
+      kind: 'create-c4-element',
+      c4Kind: 'container',
+      c4Properties: { [C4_PROPERTY_KEYS.tags]: 'database' },
     });
 
     await act(async () => {
@@ -235,5 +262,28 @@ describe('C4 UI affordances', () => {
       lineColor: C4_VISUAL_DEFAULTS.elementLine,
       fontColor: C4_VISUAL_DEFAULTS.textOnDark,
     });
+  });
+
+  it('uses database-facing defaults for palette-created C4 database elements', () => {
+    const viewId = createC4TemplateView('container');
+    const { elementId } = createC4ElementOnView(
+      'container',
+      viewId,
+      viewId,
+      {
+        x: 10,
+        y: 10,
+        width: 180,
+        height: 90,
+      },
+      undefined,
+      { [C4_PROPERTY_KEYS.tags]: 'database' },
+    );
+    const element = model().elements[elementId];
+
+    expect(c4KindForConcept(element)).toBe('container');
+    expect(c4PropertyValue(element.properties, C4_PROPERTY_KEYS.tags)).toBe('database');
+    expect(element.name).toBe('Database');
+    expect(c4ElementLabelParts(element)?.kindLabel).toBe('Database');
   });
 });

@@ -1,4 +1,5 @@
 import {
+  C4_ELEMENT_KIND_LABELS,
   C4_ELEMENT_TYPES,
   C4_PROPERTY_KEYS,
   C4_VISUAL_DEFAULTS,
@@ -11,7 +12,7 @@ import {
   type C4ViewType,
 } from '../c4';
 import { newId } from '../id';
-import { elementLabel, type RelationshipType } from '../metamodel';
+import type { RelationshipType } from '../metamodel';
 import { validRelationshipTypes } from '../rules';
 import { transact, useStore } from '../store';
 import type {
@@ -93,7 +94,8 @@ export function createC4ElementOnView(
   const elementId = newId();
   const nodeId = newId();
   const type = C4_ELEMENT_TYPES[kind];
-  transact(`Create C4 ${elementLabel(type)}`, (draft) => {
+  const defaultName = defaultC4ElementName(kind, properties);
+  transact(`Create C4 ${defaultName}`, (draft) => {
     if (!draft.views[viewId]) return;
     const fid = folderForElementType(draft, type);
     const c4Properties = elementProperties(kind, {
@@ -104,7 +106,7 @@ export function createC4ElementOnView(
       id: elementId,
       kind: 'element',
       type,
-      name: name ?? defaultC4ElementName(kind),
+      name: name ?? defaultName,
       documentation: '',
       properties: c4Properties,
       folderId: fid,
@@ -631,13 +633,11 @@ function nodeIdForElement(draft: ModelState, viewId: string, elementId: string):
   )?.id ?? '';
 }
 
-function defaultC4ElementName(kind: C4ElementKind): string {
-  if (kind === 'person') return 'Person';
-  if (kind === 'software-system') return 'Software System';
-  if (kind === 'container') return 'Container';
-  if (kind === 'component') return 'Component';
-  if (kind === 'deployment-node') return 'Deployment Node';
-  if (kind === 'infrastructure-node') return 'Infrastructure Node';
-  if (kind === 'software-system-instance') return 'Software System Instance';
-  return 'Container Instance';
+function defaultC4ElementName(kind: C4ElementKind, properties: Record<string, string> = {}): string {
+  if (kind === 'container' && hasTagValue(properties[C4_PROPERTY_KEYS.tags], 'database')) return 'Database';
+  return C4_ELEMENT_KIND_LABELS[kind];
+}
+
+function hasTagValue(tags: string | undefined, tag: string): boolean {
+  return tags?.toLowerCase().split(/[,\s]+/).includes(tag.toLowerCase()) ?? false;
 }
