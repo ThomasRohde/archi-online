@@ -35,8 +35,8 @@ Extensions can contribute additional dockable panels; they appear in the
 | Control | What it does |
 | --- | --- |
 | **New** | Create a new unsaved model (asks before discarding unsaved changes). |
-| **Open…** | Open a `.archimate` file (`Ctrl+O`). |
-| **Save** / **Save As…** | Save through a file handle or download fallback (`Ctrl+S`). |
+| **Open…** | Open a `.archimate` model or import an ArchiMate Open Exchange `.xml` file (`Ctrl+O`). |
+| **Save** / **Save As…** | Save native `.archimate` XML through a file handle or download fallback (`Ctrl+S`). |
 | **Import/Export ▾** | View image export (PNG/SVG/clipboard), ArchiMate Open Exchange import/export, and CSV import/export. See [[Import & Export|Import-and-Export]]. |
 | **Present** | Full-screen, chrome-free walkthrough of the model's views (arrow keys to step, `Esc` to exit). |
 | **Undo** / **Redo** | Step through model transactions; the tooltip names the operation. |
@@ -155,15 +155,33 @@ Values are validated and clamped to sensible ranges when loaded or edited.
 ## Files and autosave
 
 `.archimate` files are the durable, portable format — the same XML desktop
-Archi uses. Saving prefers a native browser file handle (write-in-place) and
-falls back to a download when the browser or organization policy blocks file
-handles. See [[Getting Started|Getting-Started]] for the storage overview and
+Archi uses. **Open…** also accepts ArchiMate Open Exchange `.xml` files; they
+are imported as new, unsaved models, so the next save writes a native
+`.archimate` file rather than overwriting the interchange source.
+
+Saving prefers a native browser file handle (write-in-place) and falls back
+to a download when the browser or organization policy blocks file handles.
+See [[Getting Started|Getting-Started]] for the storage overview and
 [[Archi Compatibility|Archi-Compatibility]] for exchange details.
 
 Autosave writes the open model to IndexedDB shortly after every change and
 restores it on the next launch, including the dirty flag and file name. It
 protects against crashes and accidental tab closes within the same browser
 profile — it is not a backup.
+
+## Installed app and offline use
+
+Production builds are installable as a PWA in supporting browsers. The
+service worker precaches the editor shell, build assets, examples, icons, and
+manifest, so the installed app can launch offline after it has loaded once.
+Model files, autosave, settings, scripts, extensions, and layout still stay
+local to the current browser profile or file system.
+
+When the browser and operating system support them, the installed app exposes
+app shortcuts for **New model** and **Open model file**, a `.archimate` file
+handler, and a share target for `.archimate` or XML model files. Launched or
+shared files still pass through the same unsaved-change prompt before they
+replace the open model.
 
 ## Keyboard shortcuts
 
@@ -189,6 +207,9 @@ Open this table anytime with the **?** toolbar button.
 | `Escape` | Cancel tool / clear selection |
 | `Ctrl+Enter` (script editor) | Run script |
 | Double-click bendpoint | Remove bendpoint |
+| `Ctrl+F` (model tree) | Focus the model-tree filter |
+| `←` / `→`, `PgUp` / `PgDn`, `Space` (presentation) | Previous / next view |
+| `Home` / `End` (presentation) | First / last view |
 
 On macOS, `Cmd` works in place of `Ctrl` for save/open/undo/redo.
 

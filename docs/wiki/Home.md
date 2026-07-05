@@ -2,8 +2,8 @@
 
 Archi Online is a web-based [ArchiMate®](https://www.opengroup.org/archimate-forum)
 modeler — a browser clone of the desktop [Archi](https://www.archimatetool.com/)
-tool. It reads and writes native `.archimate` files, so models move freely
-between Archi Online and desktop Archi, and it adds a jArchi-compatible
+tool. It reads and writes native `.archimate` files, imports and exports
+ArchiMate Open Exchange and Archi CSV formats, and adds a jArchi-compatible
 JavaScript scripting API plus a local extension system on top of the core
 modeling workflow.
 
@@ -24,6 +24,11 @@ where you left off.
   bendpoints, notes, groups, and view references.
 - **Lossless `.archimate` round-trip** — verified against Archi's Archisurance
   example model.
+- **Interchange and presentation** — Open Exchange `.xml` and Archi CSV
+  import/export, view export to PNG/SVG/clipboard, and full-screen
+  presentation mode for walking through views.
+- **Fast navigation** — model-tree filtering by name, category, or specific
+  concept type, with matches shown in their folder context.
 - **jArchi-style scripting** — `$()` selectors, model and view automation, a
   Monaco editor with API IntelliSense, and a script library with `.ajs`
   import/export. Each script run is a single undo step.
@@ -31,6 +36,10 @@ where you left off.
   buttons, dockable panels, and event handlers, including a bundled ELK
   automatic-layout extension. Extensions ship as portable `.archi-ext`
   packages.
+- **Installable web app** — production builds are PWA-capable, precache the
+  app shell for offline launch after first load, and expose app shortcuts,
+  `.archimate` file handling, and a share target in browsers that support
+  those web-platform features.
 
 ## Where to go next
 
@@ -38,6 +47,7 @@ where you left off.
 | --- | --- |
 | Run the app and build your first model | [[Getting Started\|Getting-Started]] |
 | Learn the workspace, canvas, and settings | [[User Guide\|User-Guide]] |
+| Import, export, or present models | [[Import & Export\|Import-and-Export]] |
 | Exchange models with desktop Archi | [[Archi Compatibility\|Archi-Compatibility]] |
 | Automate your model with JavaScript | [[Scripting API\|Scripting-API]] |
 | Build an extension | [[Extension API\|Extension-API]] and [[Extension Packages\|Extension-Packages]] |

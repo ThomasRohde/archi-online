@@ -45,7 +45,9 @@ vendor-neutral ArchiMate 3 interchange XML.
 
 The mapping is ported from Archi's own exporter/importer, including
 viewpoints, junctions, property definitions, folder organization, absolute
-diagram coordinates, and access/influence/association attributes.
+diagram coordinates, styles, bendpoints, and access/influence/association
+attributes. Model, concept, view, folder, group, and note properties are
+carried through when the exchange format can represent them.
 
 ## CSV
 
@@ -61,10 +63,11 @@ Archi's CSV format is three files — `elements.csv`, `relations.csv`, and
   properties, exactly as Archi does.
 - **Import** — **Import/Export ▾ → Import CSV into model…** lets you select
   one to three CSV files (matched by the `elements`/`relations`/`properties`
-  suffix in their names). Objects are matched to the current model by ID:
-  existing ones are updated in place and new ones are created, with
-  relationships validated against the ArchiMate rules. The whole import is a
-  single undo step, and any error aborts it without changing the model.
+  suffix in their names). Comma, semicolon, and tab delimiters are detected
+  automatically. Objects are matched to the current model by ID: existing
+  ones are updated in place and new ones are created, with relationships
+  validated against the ArchiMate rules. The whole import is a single undo
+  step, and any error aborts it without changing the model.
 
 ## What does not leave the browser
 

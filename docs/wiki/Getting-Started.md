@@ -7,8 +7,9 @@ This page takes you from a fresh checkout to a saved `.archimate` model.
 - **Node.js 22+** and npm to run the app locally.
 - A modern browser. Chromium-family browsers (Chrome, Edge) are recommended:
   they support the File System Access API, which lets **Save** write straight
-  back to the file you opened. Other browsers work too — saving falls back to
-  a normal file download.
+  back to the file you opened. They also provide the best installed-app,
+  file-handler, and share-target support for production builds. Other
+  browsers work too — saving falls back to a normal file download.
 
 ## Run the app
 
@@ -28,6 +29,23 @@ npm run preview   # serve the built site locally
 
 The build output in `dist/` is a fully static site — you can host it on any
 static file server.
+
+## Install the app
+
+When Archi Online is served from a production build, supported browsers can
+install it as a standalone app. After the first load, the service worker
+precaches the app shell, hashed build assets, workers, examples, icons, and
+manifest so the editor can launch offline. Your models still live in files or
+browser storage on the current machine; nothing is uploaded by installation.
+
+On browsers and operating systems that expose the relevant PWA features, the
+installed app also provides:
+
+- **New model** and **Open model file** app shortcuts.
+- A `.archimate` file handler that opens model files into the editor.
+- A web share target for shared `.archimate` or XML model files.
+
+The exact install UI and operating-system integration are browser-dependent.
 
 ## Your first model
 
@@ -57,10 +75,12 @@ That file opens directly in desktop Archi — see
 ## Opening and saving files
 
 - **Open…** (`Ctrl+O`) loads an existing `.archimate` file, including models
-  created with desktop Archi.
+  created with desktop Archi. It also accepts ArchiMate Open Exchange `.xml`
+  files and imports them as new, unsaved models.
 - **Save** (`Ctrl+S`) writes back to the file you opened when the browser
   supports the File System Access API. Otherwise — or when browser policy
-  blocks file handles — the app saves via a regular download.
+  blocks file handles — the app saves via a regular download. Saving always
+  writes Archi's native `.archimate` format.
 - **Save As…** always lets you pick a new target.
 
 The status area on the toolbar shows the model name, the file name (or

@@ -23,6 +23,25 @@ Two details worth knowing:
 - **Browser-local data** (settings, scripts, extensions, autosave, layout) is
   never written into `.archimate` files — files stay clean for exchange.
 
+## Same interchange formats
+
+Archi Online also implements desktop Archi's interchange workflows:
+
+- **ArchiMate Open Exchange `.xml`** — **Open…** imports vendor-neutral
+  ArchiMate 3 exchange files as new, unsaved models, and **Import/Export ▾ →
+  Model to Open Exchange (.xml)…** writes the current model back to the
+  exchange format.
+- **Archi CSV** — **Import/Export ▾ → Model to CSV…** writes
+  `elements.csv`, `relations.csv`, and `properties.csv`; **Import CSV into
+  model…** updates or creates objects by ID in a single undoable operation.
+
+The Open Exchange importer/exporter preserves concepts, relationships,
+folders, views, viewpoints, diagram coordinates, styles, property definitions,
+and Archi-specific relationship attributes where the exchange format supports
+them. CSV import/export follows Archi's three-file schema and special
+relationship-property conventions. See [[Import & Export|Import-and-Export]]
+for the exact workflows.
+
 ## Same metamodel and rules
 
 - The full **ArchiMate 3.2** metamodel: every element type across Strategy,
