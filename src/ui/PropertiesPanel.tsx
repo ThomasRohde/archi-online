@@ -21,9 +21,10 @@ import {
 import { useStore } from '../model/store';
 import type { ModelState, Property } from '../model/types';
 import { AppearanceTab } from './properties/AppearanceTab';
+import { AnalysisTab } from './properties/AnalysisTab';
 import { conceptName, resolveTarget, type Target } from './properties/target';
 
-type Tab = 'main' | 'properties' | 'appearance';
+type Tab = 'main' | 'properties' | 'analysis' | 'appearance';
 
 /** Text input that keeps local state and commits on blur/Enter. */
 function CommitInput({
@@ -273,12 +274,20 @@ export function PropertiesPanel() {
   const selection = useStore((s) => s.selection);
   const readOnly = useStore((s) => s.readOnly);
   const [tab, setTab] = useState<Tab>('main');
+  const target = model ? resolveTarget(model, selection.source, selection.ids) : null;
+  const supportsAnalysis = Boolean(
+    model &&
+      target?.count === 1 &&
+      target.conceptId &&
+      (model.elements[target.conceptId] || model.relationships[target.conceptId]),
+  );
   useEffect(() => {
-    if (readOnly && tab === 'appearance') setTab('main');
-  }, [readOnly, tab]);
+    if ((readOnly && tab === 'appearance') || (tab === 'analysis' && !supportsAnalysis)) {
+      setTab('main');
+    }
+  }, [readOnly, supportsAnalysis, tab]);
 
   if (!model) return <div className="properties-panel empty-hint">No model open</div>;
-  const target = resolveTarget(model, selection.source, selection.ids);
   if (!target) return <div className="properties-panel empty-hint">Nothing selected</div>;
 
   return (
@@ -286,13 +295,24 @@ export function PropertiesPanel() {
       <div className="prop-type">{targetTitle(target)}</div>
       <div className="prop-body">
         <div className="prop-tabs">
-          {(['main', 'properties', ...(readOnly ? [] : ['appearance'])] as Tab[]).map((t) => (
+          {([
+            'main',
+            'properties',
+            ...(supportsAnalysis ? ['analysis'] : []),
+            ...(readOnly ? [] : ['appearance']),
+          ] as Tab[]).map((t) => (
             <button
               key={t}
               className={'prop-tab' + (tab === t ? ' active' : '')}
               onClick={() => setTab(t)}
             >
-              {t === 'main' ? 'Main' : t === 'properties' ? 'Properties' : 'Appearance'}
+              {t === 'main'
+                ? 'Main'
+                : t === 'properties'
+                  ? 'Properties'
+                  : t === 'analysis'
+                    ? 'Analysis'
+                    : 'Appearance'}
             </button>
           ))}
         </div>
@@ -404,6 +424,9 @@ export function PropertiesPanel() {
             </div>
           )}
           {tab === 'properties' && <PropertiesTable target={target} readOnly={readOnly} />}
+          {tab === 'analysis' && supportsAnalysis && target.conceptId && (
+            <AnalysisTab model={model} conceptId={target.conceptId} />
+          )}
           {tab === 'appearance' && !readOnly && <AppearanceTab target={target} readOnly={readOnly} />}
         </div>
       </div>

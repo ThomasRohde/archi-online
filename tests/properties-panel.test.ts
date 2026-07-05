@@ -67,6 +67,52 @@ beforeEach(() => {
 });
 
 describe('properties Appearance tab', () => {
+  it('renders the Analysis tab for concepts and navigates relation and view rows', async () => {
+    const customerId = addElement('BusinessActor', 'Customer');
+    const roleId = addElement('BusinessRole', 'Role');
+    const relationshipId = addRelationship('AssignmentRelationship', customerId, roleId, 'Assigned')!;
+    const viewId = addView('Customer view');
+    const customerNodeId = addElementNodeToView(viewId, customerId, viewId, {
+      x: 10,
+      y: 10,
+      width: 120,
+      height: 55,
+    });
+    addElementNodeToView(viewId, roleId, viewId, { x: 220, y: 10, width: 120, height: 55 });
+    setSelection('tree', [customerId]);
+    const { host, root } = await renderPropertiesPanel();
+
+    await click(Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Analysis')!);
+
+    expect(host.textContent).toContain('Model Relations');
+    expect(host.textContent).toContain('Used in Views');
+    expect(host.textContent).toContain('Assignment');
+    expect(host.textContent).toContain('Customer');
+    expect(host.textContent).toContain('Role');
+    expect(host.textContent).toContain('Customer view');
+
+    await click(
+      Array.from(host.querySelectorAll('button')).find(
+        (button) => button.textContent?.includes('Customer view'),
+      )!,
+    );
+    expect(useStore.getState().activeViewId).toBe(viewId);
+    expect(useStore.getState().selection).toEqual({ source: 'view', ids: [customerNodeId] });
+
+    setSelection('tree', [customerId]);
+    await act(async () => {});
+    await click(
+      Array.from(host.querySelectorAll('button')).find((button) =>
+        button.textContent?.includes('Assignment'),
+      )!,
+    );
+    expect(useStore.getState().selection).toEqual({ source: 'tree', ids: [relationshipId] });
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it('keeps the Properties view typography on the normal app scale', () => {
     const css = readFileSync('src/styles.css', 'utf8');
 
