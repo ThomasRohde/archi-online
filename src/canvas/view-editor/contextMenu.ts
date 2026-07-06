@@ -5,6 +5,7 @@ import {
   alignNodes,
   deleteItems,
   deleteViewObjects,
+  distributeNodes,
   matchSize,
   reorderNode,
   setConnectionBendpoints,
@@ -12,11 +13,25 @@ import {
 import { setSelection } from '../../model/store';
 import type { Bounds, ModelState } from '../../model/types';
 import {
+  alignmentAnchorMode,
   defaultGroupSize,
   defaultNoteSize,
   defaultTextStyle,
   type AppSettings,
 } from '../../settings/app-settings';
+import {
+  alignBottomIcon,
+  alignCenterIcon,
+  alignLeftIcon,
+  alignMiddleIcon,
+  alignRightIcon,
+  alignTopIcon,
+  distributeHorizontalIcon,
+  distributeVerticalIcon,
+  matchHeightIcon,
+  matchSizeIcon,
+  matchWidthIcon,
+} from './alignment-icons';
 import { extensionRegistry } from '../../extensions/registry';
 import {
   extensionMenuItems,
@@ -135,6 +150,7 @@ export function showViewObjectContextMenu({
   id,
   ids,
   model,
+  settings,
   startEdit,
 }: {
   clientX: number;
@@ -143,6 +159,7 @@ export function showViewObjectContextMenu({
   id: string;
   ids: string[];
   model: ModelState;
+  settings: AppSettings;
   startEdit: (nodeId: string) => void;
 }) {
   const items: MenuItem[] = [];
@@ -184,22 +201,44 @@ export function showViewObjectContextMenu({
   }
   const alignIds = alignableNodeIds(model, ids);
   if (alignIds.length >= 2) {
+    const anchor = alignmentAnchorMode(settings);
     items.push(SEPARATOR);
     items.push({
       label: 'Align',
       children: [
-        { label: 'Align Left', onClick: () => alignNodes(alignIds, 'left') },
-        { label: 'Align Center', onClick: () => alignNodes(alignIds, 'center') },
-        { label: 'Align Right', onClick: () => alignNodes(alignIds, 'right') },
-        { label: 'Align Top', onClick: () => alignNodes(alignIds, 'top') },
-        { label: 'Align Middle', onClick: () => alignNodes(alignIds, 'middle') },
-        { label: 'Align Bottom', onClick: () => alignNodes(alignIds, 'bottom') },
+        { label: 'Align Left', icon: alignLeftIcon, onClick: () => alignNodes(alignIds, 'left', anchor) },
+        { label: 'Align Center', icon: alignCenterIcon, onClick: () => alignNodes(alignIds, 'center', anchor) },
+        { label: 'Align Right', icon: alignRightIcon, onClick: () => alignNodes(alignIds, 'right', anchor) },
+        { label: 'Align Top', icon: alignTopIcon, onClick: () => alignNodes(alignIds, 'top', anchor) },
+        { label: 'Align Middle', icon: alignMiddleIcon, onClick: () => alignNodes(alignIds, 'middle', anchor) },
+        { label: 'Align Bottom', icon: alignBottomIcon, onClick: () => alignNodes(alignIds, 'bottom', anchor) },
       ],
     });
-    items.push(SEPARATOR);
-    items.push({ label: 'Match Width', onClick: () => matchSize(alignIds, 'width') });
-    items.push({ label: 'Match Height', onClick: () => matchSize(alignIds, 'height') });
-    items.push({ label: 'Match Size', onClick: () => matchSize(alignIds, 'both') });
+    if (alignIds.length >= 3) {
+      items.push({
+        label: 'Distribute',
+        children: [
+          {
+            label: 'Distribute Horizontally',
+            icon: distributeHorizontalIcon,
+            onClick: () => distributeNodes(alignIds, 'horizontal'),
+          },
+          {
+            label: 'Distribute Vertically',
+            icon: distributeVerticalIcon,
+            onClick: () => distributeNodes(alignIds, 'vertical'),
+          },
+        ],
+      });
+    }
+    items.push({
+      label: 'Match Size',
+      children: [
+        { label: 'Match Width', icon: matchWidthIcon, onClick: () => matchSize(alignIds, 'width', anchor) },
+        { label: 'Match Height', icon: matchHeightIcon, onClick: () => matchSize(alignIds, 'height', anchor) },
+        { label: 'Match Size', icon: matchSizeIcon, onClick: () => matchSize(alignIds, 'both', anchor) },
+      ],
+    });
   }
   const trigger = {
     x: clientX,

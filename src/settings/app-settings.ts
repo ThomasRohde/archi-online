@@ -29,11 +29,13 @@ export interface AppSettings {
   buttonZoomFactor: number;
   fitMaxZoom: number;
   fitPadding: number;
+  alignmentAnchor: number;
 }
 
 export type SettingKey = keyof AppSettings;
 export type TextAlignment = 1 | 2 | 4;
 export type TextPosition = 0 | 1 | 2;
+export type AnchorMode = 'first' | 'last';
 
 interface BaseSettingRow {
   key: SettingKey;
@@ -92,6 +94,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   buttonZoomFactor: 1.2,
   fitMaxZoom: 1.5,
   fitPadding: 24,
+  alignmentAnchor: 1,
 };
 
 export const SETTING_SECTIONS: readonly SettingSection[] = [
@@ -356,6 +359,24 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
       },
     ],
   },
+  {
+    id: 'alignment',
+    title: 'Align & distribute',
+    description: 'Reference element used by the Align and Match Size actions.',
+    rows: [
+      {
+        key: 'alignmentAnchor',
+        kind: 'select',
+        label: 'Alignment anchor',
+        description:
+          'Which element Align and Match Size snap the rest of the selection to.',
+        options: [
+          { value: 0, label: 'First selected' },
+          { value: 1, label: 'Last selected' },
+        ],
+      },
+    ],
+  },
 ];
 
 export const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS) as SettingKey[];
@@ -485,6 +506,11 @@ export function defaultTextStyle(settings: AppSettings): {
     textAlignment: settings.defaultTextAlignment,
     textPosition: settings.defaultTextPosition,
   };
+}
+
+/** Reference element for Align / Match Size: the first or last selected node. */
+export function alignmentAnchorMode(settings: AppSettings): AnchorMode {
+  return settings.alignmentAnchor === 0 ? 'first' : 'last';
 }
 
 interface SettingsState {

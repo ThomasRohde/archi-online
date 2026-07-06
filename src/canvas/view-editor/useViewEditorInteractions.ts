@@ -635,6 +635,7 @@ export function useViewEditorInteractions({
       id,
       ids,
       model,
+      settings,
       startEdit,
     });
   };

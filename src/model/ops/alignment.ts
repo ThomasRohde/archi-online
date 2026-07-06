@@ -1,8 +1,11 @@
 import { transact, useStore } from '../store';
 import { absoluteBounds, type Bounds, type DiagramNode, type ModelState } from '../types';
+import type { AnchorMode } from '../../settings/app-settings';
 
 export type AlignMode = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 export type MatchMode = 'width' | 'height' | 'both';
+export type DistributeMode = 'horizontal' | 'vertical';
+export type { AnchorMode } from '../../settings/app-settings';
 
 interface Point {
   x: number;
@@ -27,12 +30,16 @@ export function alignableNodeIds(state: ModelState, ids: string[]): string[] {
   return nodeIds.filter((id) => !hasSelectedAncestor(state, id, selected));
 }
 
-export function alignNodes(ids: string[], mode: AlignMode): void {
+/**
+ * PowerPoint-style align: snap every node to the anchor element (the first or
+ * last selected node), leaving the anchor itself in place. Width/height unchanged.
+ */
+export function alignNodes(ids: string[], mode: AlignMode, anchor: AnchorMode): void {
   const state = useStore.getState().model;
   if (!state) return;
   const geometries = selectedNodeGeometries(state, ids);
   if (geometries.length < 2) return;
-  const box = unionBounds(geometries.map((entry) => entry.absolute));
+  const box = anchorBounds(geometries, anchor);
 
   transact('Align', (draft) => {
     for (const entry of geometries) {
@@ -44,13 +51,16 @@ export function alignNodes(ids: string[], mode: AlignMode): void {
   });
 }
 
-export function matchSize(ids: string[], mode: MatchMode): void {
+/**
+ * PowerPoint-style match size: resize every node to the anchor element's
+ * width/height, keeping each node's top-left corner fixed.
+ */
+export function matchSize(ids: string[], mode: MatchMode, anchor: AnchorMode): void {
   const state = useStore.getState().model;
   if (!state) return;
   const geometries = selectedNodeGeometries(state, ids);
   if (geometries.length < 2) return;
-  const width = Math.max(...geometries.map((entry) => entry.absolute.width));
-  const height = Math.max(...geometries.map((entry) => entry.absolute.height));
+  const box = anchorBounds(geometries, anchor);
 
   transact('Match Size', (draft) => {
     for (const entry of geometries) {
@@ -58,10 +68,46 @@ export function matchSize(ids: string[], mode: MatchMode): void {
       if (!node) continue;
       const next = absoluteToRelative(entry, {
         ...entry.absolute,
-        width: mode === 'height' ? entry.absolute.width : width,
-        height: mode === 'width' ? entry.absolute.height : height,
+        width: mode === 'height' ? entry.absolute.width : box.width,
+        height: mode === 'width' ? entry.absolute.height : box.height,
       });
       applyBounds(node, next);
+    }
+  });
+}
+
+/**
+ * PowerPoint-style distribute: keep the two outermost nodes fixed and equalize
+ * the gaps between adjacent edges of the nodes in between. Needs ≥ 3 nodes.
+ */
+export function distributeNodes(ids: string[], mode: DistributeMode): void {
+  const state = useStore.getState().model;
+  if (!state) return;
+  const geometries = selectedNodeGeometries(state, ids);
+  if (geometries.length < 3) return;
+
+  const horizontal = mode === 'horizontal';
+  const pos = (b: Bounds) => (horizontal ? b.x : b.y);
+  const size = (b: Bounds) => (horizontal ? b.width : b.height);
+  const sorted = [...geometries].sort((a, b) => pos(a.absolute) - pos(b.absolute));
+
+  const totalSize = sorted.reduce((sum, entry) => sum + size(entry.absolute), 0);
+  const first = sorted[0].absolute;
+  const last = sorted[sorted.length - 1].absolute;
+  const span = pos(last) + size(last) - pos(first);
+  const gap = (span - totalSize) / (sorted.length - 1);
+
+  transact('Distribute', (draft) => {
+    let cursor = pos(first);
+    for (const entry of sorted) {
+      const node = draft.nodes[entry.id];
+      if (node) {
+        const target = horizontal
+          ? { ...entry.absolute, x: cursor }
+          : { ...entry.absolute, y: cursor };
+        applyBounds(node, absoluteToRelative(entry, target));
+      }
+      cursor += size(entry.absolute) + gap;
     }
   });
 }
@@ -80,6 +126,11 @@ function selectedNodeGeometries(state: ModelState, ids: string[]): NodeGeometry[
   });
 }
 
+function anchorBounds(geometries: NodeGeometry[], anchor: AnchorMode): Bounds {
+  const entry = anchor === 'first' ? geometries[0] : geometries[geometries.length - 1];
+  return entry.absolute;
+}
+
 function hasSelectedAncestor(state: ModelState, nodeId: string, selected: Set<string>): boolean {
   let parentId = state.nodes[nodeId]?.parentId;
   while (parentId && state.nodes[parentId]) {
@@ -87,14 +138,6 @@ function hasSelectedAncestor(state: ModelState, nodeId: string, selected: Set<st
     parentId = state.nodes[parentId].parentId;
   }
   return false;
-}
-
-function unionBounds(bounds: Bounds[]): Bounds {
-  const x = Math.min(...bounds.map((b) => b.x));
-  const y = Math.min(...bounds.map((b) => b.y));
-  const right = Math.max(...bounds.map((b) => b.x + b.width));
-  const bottom = Math.max(...bounds.map((b) => b.y + b.height));
-  return { x, y, width: right - x, height: bottom - y };
 }
 
 function alignedBounds(bounds: Bounds, box: Bounds, mode: AlignMode): Bounds {
