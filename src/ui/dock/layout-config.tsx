@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { DockviewDefaultTab } from 'dockview-react';
 import type {
   DockviewApi,
   IDockviewHeaderActionsProps,
+  IDockviewPanelHeaderProps,
   IDockviewPanelProps,
 } from 'dockview-react';
 import { ViewEditor } from '../../canvas/ViewEditor';
@@ -140,6 +142,7 @@ export const TOOL_PANELS: ToolPanelDef[] = [
         id: 'welcome',
         component: 'welcome',
         title: 'Welcome',
+        tabComponent: 'home',
         position: centerPosition(api, 'welcome'),
       }),
   },
@@ -151,6 +154,7 @@ export function buildDefaultLayout(api: DockviewApi): void {
     id: 'welcome',
     component: 'welcome',
     title: 'Welcome',
+    tabComponent: 'home',
     position: { referencePanel: 'models', direction: 'right' },
   });
   api.addPanel({
@@ -187,6 +191,48 @@ export function buildDefaultLayout(api: DockviewApi): void {
   api.getPanel('models')?.api.setSize({ width: 250 });
   api.getPanel('palette')?.api.setSize({ width: 88 });
   api.getPanel('properties')?.api.setActive();
+}
+
+/**
+ * Width bands for the side-panel groups. dockview redistributes freed space
+ * proportionally to each group's size; capping the sides keeps that space on the
+ * canvas (and neighbouring side panels) rather than ballooning the Model tree /
+ * Palette / Settings when a panel is toggled, floated, or popped out. Groups are
+ * shared (Navigator docks with Models, Extensions with Settings), so one entry per
+ * host group covers its tenants.
+ */
+const SIDE_CONSTRAINTS: Record<string, { minimumWidth: number; maximumWidth: number }> = {
+  palette: { minimumWidth: 60, maximumWidth: 160 },
+  models: { minimumWidth: 180, maximumWidth: 460 },
+  settings: { minimumWidth: 260, maximumWidth: 480 },
+};
+
+/** Clamp the side-panel groups to sensible widths. Idempotent; only clamps. */
+export function applySidePanelConstraints(api: DockviewApi): void {
+  let changed = false;
+  for (const [id, constraints] of Object.entries(SIDE_CONSTRAINTS)) {
+    const group = api.getPanel(id)?.api.group;
+    if (group) {
+      group.api.setConstraints(constraints);
+      changed = true;
+    }
+  }
+  // setConstraints only records the min/max; force a relayout so an over-max
+  // group is clamped now (freed width flows to the flexible center) rather than
+  // waiting for the next container resize.
+  if (changed) api.layout(api.width, api.height, true);
+}
+
+/**
+ * Keep a flexible occupant in the center: while a model is open, ensure the pinned
+ * Home (welcome) panel exists so closing the last view never empties the center group
+ * (which would force the freed width onto the side panels). Also migrates older
+ * persisted layouts that were saved with the welcome tab closed.
+ */
+export function ensureHomeAnchor(api: DockviewApi): void {
+  if (!useStore.getState().model) return;
+  if (api.getPanel('welcome')) return;
+  TOOL_PANELS.find((t) => t.id === 'welcome')?.add(api);
 }
 
 export function ensurePropertiesDockedWithScripts(api: DockviewApi): void {
@@ -269,6 +315,18 @@ export const components: Record<string, React.FunctionComponent<IDockviewPanelPr
   welcome: () => <WelcomePanel />,
   view: ViewPanel as React.FunctionComponent<IDockviewPanelProps>,
   'extension-panel': ExtensionPanelHost as React.FunctionComponent<IDockviewPanelProps>,
+};
+
+/** Non-closeable tab for the pinned Home (welcome) anchor. */
+function HomeTab(props: IDockviewPanelHeaderProps) {
+  return <DockviewDefaultTab {...props} hideClose />;
+}
+
+export const tabComponents: Record<
+  string,
+  React.FunctionComponent<IDockviewPanelHeaderProps>
+> = {
+  home: HomeTab,
 };
 
 /** Standard group controls: float, open-in-window, maximize/restore. */

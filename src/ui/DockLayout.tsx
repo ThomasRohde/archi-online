@@ -15,11 +15,14 @@ import {
   TOOL_PANELS,
   VIEW_PREFIX,
   Watermark,
+  applySidePanelConstraints,
   buildDefaultLayout,
   centerPosition,
   components,
+  ensureHomeAnchor,
   ensurePropertiesDockedWithScripts,
   restoreViewPanels,
+  tabComponents,
 } from './dock/layout-config';
 
 /** Set while this module itself mutates dockview, so event handlers don't echo back. */
@@ -83,6 +86,8 @@ export function DockLayout() {
         ? api.activePanel.id.slice(VIEW_PREFIX.length)
         : (openIds[openIds.length - 1] ?? null);
       useStore.setState({ openViewIds: openIds, activeViewId: active });
+      ensureHomeAnchor(api);
+      applySidePanelConstraints(api);
       } finally {
         syncing = false;
       }
@@ -104,6 +109,7 @@ export function DockLayout() {
         api.clear();
         buildDefaultLayout(api);
         restoreViewPanels(api);
+        applySidePanelConstraints(api);
       } finally {
         syncing = false;
       }
@@ -123,6 +129,8 @@ export function DockLayout() {
           return;
         }
         TOOL_PANELS.find((t) => t.id === id)?.add(api);
+        // Re-opening a side panel recreates its group; re-clamp its width.
+        applySidePanelConstraints(api);
       },
       showExtensionPanel(panelId: string) {
         const dockId = `extension:${panelId}`;
@@ -246,6 +254,7 @@ export function DockLayout() {
       className="dock-root"
       theme={themeLight}
       components={components}
+      tabComponents={tabComponents}
       watermarkComponent={Watermark}
       rightHeaderActionsComponent={GroupControls}
       onReady={onReady}
