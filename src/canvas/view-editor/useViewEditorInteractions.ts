@@ -17,6 +17,7 @@ import {
   createElementOnView,
   createRelationshipOnView,
   deleteViewObjects,
+  duplicateViewObjects,
   renameItem,
   setConnectionBendpoints,
   type MoveEntry,
@@ -569,6 +570,12 @@ export function useViewEditorInteractions({
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
       const ids = pasteNodes(viewId);
+      if (ids.length > 0) setSelection('view', ids);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && viewSel.length > 0) {
+      e.preventDefault();
+      const ids = duplicateViewObjects(viewId, viewSel, settings.pasteOffset);
       if (ids.length > 0) setSelection('view', ids);
       return;
     }

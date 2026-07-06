@@ -6,6 +6,7 @@ import {
   deleteItems,
   deleteViewObjects,
   distributeNodes,
+  duplicateViewObjects,
   matchSize,
   reorderNode,
   setConnectionBendpoints,
@@ -177,6 +178,16 @@ export function showViewObjectContextMenu({
     items.push({
       label: 'Remove All Bendpoints',
       onClick: () => setConnectionBendpoints(id, []),
+    });
+    items.push(SEPARATOR);
+  }
+  if (ids.some((i) => model.nodes[i])) {
+    items.push({
+      label: 'Duplicate (Ctrl+D)',
+      onClick: () => {
+        const newIds = duplicateViewObjects(viewId, ids, settings.pasteOffset);
+        if (newIds.length) setSelection('view', newIds);
+      },
     });
     items.push(SEPARATOR);
   }

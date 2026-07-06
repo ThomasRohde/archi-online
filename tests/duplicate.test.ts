@@ -9,6 +9,7 @@ import {
   addView,
   createEmptyModel,
   duplicateItems,
+  duplicateViewObjects,
   setProperties,
 } from '../src/model/ops';
 import { parseArchimate, serializeArchimate } from '../src/model/io/archimate-xml';
@@ -172,6 +173,70 @@ describe('duplicateItems — undo and filtering', () => {
     expect(duplicateItems([rel])).toEqual([]);
     expect(duplicateItems([folderId])).toEqual([]);
     expect(useStore.getState().undoStack).toHaveLength(undoBefore);
+  });
+});
+
+describe('duplicateViewObjects', () => {
+  it('clones selected node subtrees in place with offset, same view and concepts', () => {
+    const v = buildViewWithContent('V1');
+
+    const newIds = duplicateViewObjects(v.viewId, [v.nodeA, v.nodeB], 16);
+    const m = model();
+
+    // Two roots duplicated (nodeA carries its nested child nodeC).
+    expect(newIds).toHaveLength(2);
+    const newA = m.nodes[newIds[0]];
+    const newB = m.nodes[newIds[1]];
+    expect(newA.viewId).toBe(v.viewId);
+    expect(newB.viewId).toBe(v.viewId);
+
+    // Roots offset by 16; concepts (elementId) reused, not new.
+    const origA = m.nodes[v.nodeA];
+    expect(newA.bounds.x).toBe(origA.bounds.x + 16);
+    expect(newA.bounds.y).toBe(origA.bounds.y + 16);
+    expect((newA as ElementNode).elementId).toBe(v.a);
+    expect((newB as ElementNode).elementId).toBe(v.b);
+
+    // Nested child cloned and re-parented under the new A (not offset itself).
+    expect(newA.childIds).toHaveLength(1);
+    const newC = m.nodes[newA.childIds[0]];
+    expect(newC.parentId).toBe(newA.id);
+    expect((newC as ElementNode).elementId).toBe(v.c);
+    expect(newC.bounds).toEqual(m.nodes[v.nodeC].bounds);
+
+    // View gained 3 nodes (A, B, C) → 6 total for this view.
+    expect(Object.values(m.nodes).filter((n) => n.viewId === v.viewId)).toHaveLength(6);
+
+    // The connection between the two duplicated nodes is copied and remapped.
+    const viewConns = Object.values(m.connections).filter((c) => c.viewId === v.viewId);
+    expect(viewConns).toHaveLength(2);
+    const copyConn = viewConns.find((c) => c.id !== v.conn)!;
+    expect(copyConn.relationshipId).toBe(v.rel);
+    expect(copyConn.sourceId).toBe(newA.id);
+    expect(copyConn.targetId).toBe(newB.id);
+    expect(m.nodes[newA.id].sourceConnectionIds).toContain(copyConn.id);
+  });
+
+  it('drops a selected child when its parent is also selected (no double copy)', () => {
+    const v = buildViewWithContent('V1');
+    const newIds = duplicateViewObjects(v.viewId, [v.nodeA, v.nodeC], 16);
+    // Only nodeA is a root; nodeC rides along as its child.
+    expect(newIds).toHaveLength(1);
+    expect(Object.values(model().nodes).filter((n) => n.viewId === v.viewId)).toHaveLength(5);
+  });
+
+  it('is one undo step and ignores connection-only selections', () => {
+    const v = buildViewWithContent('V1');
+    const undoBefore = useStore.getState().undoStack.length;
+
+    expect(duplicateViewObjects(v.viewId, [v.conn], 16)).toEqual([]);
+    expect(useStore.getState().undoStack).toHaveLength(undoBefore);
+
+    const nodeCountBefore = Object.keys(model().nodes).length;
+    duplicateViewObjects(v.viewId, [v.nodeA, v.nodeB], 16);
+    expect(useStore.getState().undoStack).toHaveLength(undoBefore + 1);
+    undo();
+    expect(Object.keys(model().nodes)).toHaveLength(nodeCountBefore);
   });
 });
 

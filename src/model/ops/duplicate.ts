@@ -9,6 +9,7 @@
 import { newId } from '../id';
 import { transact, useStore } from '../store';
 import type { DiagramConnection, DiagramNode, ModelState } from '../types';
+import { alignableNodeIds } from './alignment';
 import { attachConnection, attachNode } from './draft';
 
 const COPY_SUFFIX = ' (copy)';
@@ -92,19 +93,87 @@ function duplicateView(draft: ModelState, id: string, copyId: string): void {
   };
   for (const topId of view.childIds) cloneNode(topId, copyId);
 
-  // Copy every connection of the source view whose endpoints were both cloned.
+  copyInternalConnections(draft, id, copyId, idMap);
+}
+
+/** Clone connections of `sourceViewId` whose endpoints were both cloned, into
+ *  `targetViewId`, remapping ids via `idMap`. Same relationship + bendpoints. */
+function copyInternalConnections(
+  draft: ModelState,
+  sourceViewId: string,
+  targetViewId: string,
+  idMap: Map<string, string>,
+): void {
   for (const conn of Object.values(draft.connections)) {
-    if (conn.viewId !== id) continue;
+    if (conn.viewId !== sourceViewId) continue;
     const sourceId = idMap.get(conn.sourceId);
     const targetId = idMap.get(conn.targetId);
     if (!sourceId || !targetId) continue;
     const copy: DiagramConnection = {
       ...deepClone(conn),
       id: newId(),
-      viewId: copyId,
+      viewId: targetViewId,
       sourceId,
       targetId,
     };
     attachConnection(draft, copy);
+  }
+}
+
+/**
+ * Duplicate diagram objects within a view: clone the selected node subtrees in
+ * place (offset by `offset`), keeping each root in its original container and
+ * copying connections that run between duplicated nodes. Like paste, the copies
+ * reference the same concepts/relationships — it duplicates the picture, not the
+ * model. Returns the new root node ids (selection order). One undo step.
+ */
+export function duplicateViewObjects(viewId: string, ids: string[], offset = 0): string[] {
+  const state = useStore.getState().model;
+  if (!state || !state.views[viewId]) return [];
+
+  // Roots = selected nodes with no selected ancestor (a selected container
+  // already brings its children); drops connection ids and cross-view stragglers.
+  const roots = alignableNodeIds(state, ids).filter((id) => state.nodes[id].viewId === viewId);
+  if (roots.length === 0) return [];
+
+  const rootNewIds = roots.map(() => newId());
+  const idMap = new Map<string, string>();
+
+  transact('Duplicate', (draft) => {
+    roots.forEach((rootId, i) => {
+      cloneSubtree(draft, rootId, draft.nodes[rootId].parentId, rootNewIds[i], offset, offset, idMap);
+    });
+    copyInternalConnections(draft, viewId, viewId, idMap);
+  });
+
+  const after = useStore.getState().model;
+  return rootNewIds.filter((id) => after?.nodes[id]);
+}
+
+/** Deep-clone one node and its descendants into the draft. Only the top call
+ *  applies (dx, dy); children keep their parent-relative bounds. */
+function cloneSubtree(
+  draft: ModelState,
+  oldId: string,
+  newParentId: string,
+  newNodeId: string,
+  dx: number,
+  dy: number,
+  idMap: Map<string, string>,
+): void {
+  const orig = draft.nodes[oldId];
+  idMap.set(oldId, newNodeId);
+  const node: DiagramNode = {
+    ...deepClone(orig),
+    id: newNodeId,
+    parentId: newParentId,
+    bounds: { ...orig.bounds, x: orig.bounds.x + dx, y: orig.bounds.y + dy },
+    childIds: [],
+    sourceConnectionIds: [],
+    targetConnectionIds: [],
+  };
+  attachNode(draft, node);
+  for (const childId of orig.childIds) {
+    cloneSubtree(draft, childId, newNodeId, newId(), 0, 0, idMap);
   }
 }
