@@ -1,8 +1,8 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createEmptyModel } from '../src/model/ops';
-import { replaceModel } from '../src/model/store';
+import { addView, createEmptyModel, setViewpoint } from '../src/model/ops';
+import { openView, replaceModel } from '../src/model/store';
 import { Palette } from '../src/ui/Palette';
 
 async function render(element: React.ReactElement): Promise<{ host: HTMLDivElement; root: Root }> {
@@ -29,6 +29,26 @@ describe('Palette', () => {
     expect(glyph?.classList.contains('pal-junction-el')).toBe(true);
     expect(glyph?.querySelector('[data-junction-icon="dot"]')).not.toBeNull();
     expect(glyph?.querySelector('rect')).toBeNull();
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it('greys out element entries disallowed by the active view viewpoint', async () => {
+    const viewId = addView('Restricted');
+    setViewpoint(viewId, 'application_structure');
+    openView(viewId);
+
+    const { host, root } = await render(createElement(Palette));
+    const btnFor = (type: string) =>
+      host.querySelector<HTMLElement>(`[data-palette-element="${type}"]`)?.closest('button');
+
+    // application_structure allows Application concepts, not Business ones.
+    expect(btnFor('BusinessActor')?.classList.contains('palette-item-disabled')).toBe(true);
+    expect(btnFor('ApplicationComponent')?.classList.contains('palette-item-disabled')).toBe(false);
+    // Junction is always allowed (Archi defaultList).
+    expect(btnFor('Junction')?.classList.contains('palette-item-disabled')).toBe(false);
 
     await act(async () => {
       root.unmount();

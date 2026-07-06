@@ -7,6 +7,7 @@ import {
   c4ViewType,
   type C4ElementKind,
 } from '../model/c4';
+import { isAllowedElementInViewpoint } from '../model/data/viewpoints';
 import {
   ELEMENT_TYPES,
   LAYERS,
@@ -208,13 +209,23 @@ function toolEq(a: Tool, b: Tool): boolean {
   return true;
 }
 
-function ToolButton({ tool, title, children }: { tool: Tool; title: string; children: ReactNode }) {
+function ToolButton({
+  tool,
+  title,
+  children,
+  disabled,
+}: {
+  tool: Tool;
+  title: string;
+  children: ReactNode;
+  disabled?: boolean;
+}) {
   const active = useStore((s) => toolEq(s.activeTool, tool));
   return (
     <button
-      className={'pal-btn' + (active ? ' active' : '')}
+      className={'pal-btn' + (active ? ' active' : '') + (disabled ? ' palette-item-disabled' : '')}
       title={title}
-      onClick={() => setActiveTool(active ? { kind: 'select' } : tool)}
+      onClick={disabled ? undefined : () => setActiveTool(active ? { kind: 'select' } : tool)}
     >
       {children}
     </button>
@@ -226,6 +237,9 @@ export function Palette() {
     if (!s.model || !s.activeViewId) return undefined;
     return c4ViewType(s.model.views[s.activeViewId]);
   });
+  const viewpoint = useStore((s) =>
+    s.activeViewId ? s.model?.views[s.activeViewId]?.viewpoint : undefined,
+  );
   return (
     <div className="palette">
       <ToolButton tool={{ kind: 'select' }} title="Select / move (Esc)">
@@ -284,11 +298,13 @@ export function Palette() {
             <div className="pal-sep" title={label} />
             {defs.map((d) => {
               const isJunction = d.type === 'Junction';
+              const allowed = isAllowedElementInViewpoint(viewpoint, d.type);
               return (
                 <ToolButton
                   key={d.type}
                   tool={{ kind: 'create-element', type: d.type }}
-                  title={`${d.label} (${label})`}
+                  title={allowed ? `${d.label} (${label})` : "Not allowed by this view's viewpoint"}
+                  disabled={!allowed}
                 >
                   <span
                     className={'pal-el' + (isJunction ? ' pal-junction-el' : '')}

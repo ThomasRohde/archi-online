@@ -899,6 +899,11 @@ body {
   border-color: var(--accent);
 }
 
+.palette-item-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
 .pal-el {
   display: inline-flex;
   align-items: center;
