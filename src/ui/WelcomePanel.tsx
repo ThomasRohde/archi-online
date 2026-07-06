@@ -19,6 +19,13 @@ export function WelcomePanel() {
   return (
     <div className="dock-panel">
       <div className="editor-empty welcome">
+        <img
+          className="welcome-logo"
+          src={import.meta.env.BASE_URL + 'icons/icon.svg'}
+          alt="Archi Online"
+          width={128}
+          height={128}
+        />
         <h2>Archi Online</h2>
         <p>A web-based ArchiMate® modeler, scriptable with a jArchi-style JavaScript API.</p>
         {hasModel && <p className="welcome-hint">Double-click a view in the model tree to open it.</p>}

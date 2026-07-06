@@ -1618,6 +1618,13 @@ body {
   user-select: none;
 }
 
+.welcome-logo {
+  width: 128px;
+  height: 128px;
+  margin: 0 auto 16px;
+  filter: drop-shadow(0 6px 16px rgba(28, 76, 146, 0.35));
+}
+
 .welcome h2 {
   color: var(--accent);
   margin-bottom: 4px;
