@@ -10,6 +10,7 @@ import {
   c4ViewType,
   setC4PropertyValue,
 } from '../model/c4';
+import { VIEWPOINTS } from '../model/data/viewpoints';
 import {
   renameItem,
   setDocumentation,
@@ -23,6 +24,9 @@ import type { ModelState, Property } from '../model/types';
 import { AppearanceTab } from './properties/AppearanceTab';
 import { AnalysisTab } from './properties/AnalysisTab';
 import { conceptName, resolveTarget, type Target } from './properties/target';
+
+// Well-known viewpoints for the picker, sorted by their friendly display name.
+const VIEWPOINTS_BY_NAME = [...VIEWPOINTS].sort((a, b) => a.name.localeCompare(b.name));
 
 type Tab = 'main' | 'properties' | 'analysis' | 'appearance';
 
@@ -403,12 +407,22 @@ export function PropertiesPanel() {
                   {target.viewId && (
                     <div className="prop-row">
                       <label>Viewpoint</label>
-                      <CommitInput
+                      <select
                         value={target.viewpoint ?? ''}
-                        placeholder="e.g. layered"
                         disabled={readOnly}
-                        onCommit={(v) => setViewpoint(target.viewId!, v)}
-                      />
+                        onChange={(e) => setViewpoint(target.viewId!, e.target.value)}
+                      >
+                        <option value="">None</option>
+                        {target.viewpoint &&
+                          !VIEWPOINTS_BY_NAME.some((vp) => vp.id === target.viewpoint) && (
+                            <option value={target.viewpoint}>{target.viewpoint} (unknown)</option>
+                          )}
+                        {VIEWPOINTS_BY_NAME.map((vp) => (
+                          <option key={vp.id} value={vp.id}>
+                            {vp.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
                   {target.relationship && (
