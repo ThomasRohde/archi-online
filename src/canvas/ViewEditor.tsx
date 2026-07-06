@@ -8,6 +8,7 @@ import { ConnectionView } from './ConnectionView';
 import { connectionPolyline, type Point } from './geometry';
 import { computeAbsBounds, deriveLiveViewState } from './view-editor/bounds';
 import { NodeView } from './view-editor/NodeView';
+import { isNodeGhosted } from './view-editor/viewpoint-ghost';
 import {
   BendpointHandles,
   DirectEditOverlay,
@@ -139,6 +140,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
               connectHover={connectHover}
               anchorId={anchorId}
               c4ViewType={activeC4ViewType}
+              viewpoint={view.viewpoint}
             />
           ))}
           <g>
@@ -155,6 +157,10 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
                   points={connectionPolyline(src, tgt, bendpoints)}
                   selected={viewSelected.has(conn.id)}
                   c4ViewType={activeC4ViewType}
+                  ghosted={
+                    isNodeGhosted(model, conn.sourceId, view.viewpoint) ||
+                    isNodeGhosted(model, conn.targetId, view.viewpoint)
+                  }
                 />
               );
             })}
@@ -274,6 +280,7 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
               connectSource={null}
               connectHover={null}
               c4ViewType={activeC4ViewType}
+              viewpoint={view.viewpoint}
             />
           ))}
           <g>
@@ -289,6 +296,10 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
                   points={connectionPolyline(src, tgt, conn.bendpoints)}
                   selected={viewSelected.has(conn.id)}
                   c4ViewType={activeC4ViewType}
+                  ghosted={
+                    isNodeGhosted(model, conn.sourceId, view.viewpoint) ||
+                    isNodeGhosted(model, conn.targetId, view.viewpoint)
+                  }
                 />
               );
             })}

@@ -7,6 +7,7 @@ import {
 } from '../model/c4';
 import type { ArchimateRelationship, DiagramConnection } from '../model/types';
 import { parseFont, pointAlong, type Point } from './geometry';
+import { GHOST_OPACITY } from './view-editor/viewpoint-ghost';
 
 const DEFAULT_LINE = '#5c5c5c';
 
@@ -201,9 +202,11 @@ export interface ConnectionViewProps {
   points: Point[];
   selected: boolean;
   c4ViewType?: C4ViewType;
+  /** Dim the connection because an endpoint element is outside the viewpoint. */
+  ghosted?: boolean;
 }
 
-export function ConnectionView({ conn, rel, points, selected, c4ViewType }: ConnectionViewProps) {
+export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghosted }: ConnectionViewProps) {
   if (points.length < 2) return null;
   const isC4Relationship = !!c4ViewType && !!rel;
   const color = conn.lineColor ?? (isC4Relationship ? C4_VISUAL_DEFAULTS.relationshipLine : DEFAULT_LINE);
@@ -230,7 +233,11 @@ export function ConnectionView({ conn, rel, points, selected, c4ViewType }: Conn
   const labelColor = conn.fontColor ?? (isC4Relationship ? C4_VISUAL_DEFAULTS.relationshipText : '#000000');
 
   return (
-    <g data-conn-id={conn.id}>
+    <g
+      data-conn-id={conn.id}
+      opacity={ghosted && !selected ? GHOST_OPACITY : undefined}
+      data-ghosted={ghosted && !selected ? 'true' : undefined}
+    >
       {/* fat invisible path for easy clicking */}
       <path d={d} fill="none" stroke="transparent" strokeWidth={12} />
       <path

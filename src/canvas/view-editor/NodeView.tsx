@@ -3,6 +3,7 @@ import type { C4ViewType } from '../../model/c4';
 import type { Bounds, ModelState } from '../../model/types';
 import type { Point } from '../geometry';
 import { NodeFigure } from '../figures/NodeFigure';
+import { GHOST_OPACITY, isNodeGhosted } from './viewpoint-ghost';
 
 export function NodeView({
   model,
@@ -14,6 +15,7 @@ export function NodeView({
   connectHover,
   anchorId,
   c4ViewType,
+  viewpoint,
 }: {
   model: ModelState;
   nodeId: string;
@@ -24,6 +26,7 @@ export function NodeView({
   connectHover: { id: string; valid: boolean } | null;
   anchorId?: string | null;
   c4ViewType?: C4ViewType;
+  viewpoint?: string;
 }) {
   const node = model.nodes[nodeId];
   const selected = useStore(
@@ -45,17 +48,23 @@ export function NodeView({
   // The align/match anchor (key object) gets a distinct amber outline plus
   // filled corner handles so it is clear which element the rest snaps to.
   const anchorCue = selected && anchorId === nodeId && !highlight && !invalid;
+  // Grey out element nodes whose type the view's viewpoint disallows (Archi's
+  // ghosting). Only the figure dims — the selection outline and nested child
+  // nodes keep their own opacity.
+  const ghosted = isNodeGhosted(model, nodeId, viewpoint);
 
   return (
     <g transform={`translate(${x},${y})`} data-node-id={nodeId} opacity={delta ? 0.75 : 1}>
-      <NodeFigure
-        node={node}
-        element={element}
-        refView={refView}
-        width={width}
-        height={height}
-        c4ViewType={c4ViewType}
-      />
+      <g opacity={ghosted ? GHOST_OPACITY : undefined} data-ghosted={ghosted ? 'true' : undefined}>
+        <NodeFigure
+          node={node}
+          element={element}
+          refView={refView}
+          width={width}
+          height={height}
+          c4ViewType={c4ViewType}
+        />
+      </g>
       {(selected || highlight || invalid) && (
         <rect
           x={-1.5}
@@ -97,6 +106,7 @@ export function NodeView({
           connectHover={connectHover}
           anchorId={anchorId}
           c4ViewType={c4ViewType}
+          viewpoint={viewpoint}
         />
       ))}
     </g>
