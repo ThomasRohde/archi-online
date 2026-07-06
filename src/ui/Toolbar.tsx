@@ -49,6 +49,7 @@ const SHORTCUTS: [string, string][] = [
   ['Ctrl+S / Ctrl+O', 'Save / open model'],
   ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
   ['Ctrl+C / Ctrl+V', 'Copy / paste diagram objects'],
+  ['Ctrl+D', 'Duplicate (model tree)'],
   ['Ctrl+A', 'Select all on view'],
   ['Delete', 'Delete from view (canvas) or model (tree)'],
   ['F2 or double-click', 'Rename'],

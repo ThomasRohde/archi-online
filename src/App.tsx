@@ -4,7 +4,16 @@ import { hydrateExtensionStore } from './extensions/extension-store';
 import { hydrateExtensionPackageStore } from './extensions/package-store';
 import { extensionRegistry } from './extensions/registry';
 import { reloadEnabledExtensions } from './extensions/runtime';
-import { cloneModelForEditing, openView, replaceModel, redo, undo, useStore } from './model/store';
+import { duplicateItems } from './model/ops';
+import {
+  cloneModelForEditing,
+  openView,
+  replaceModel,
+  redo,
+  setSelection,
+  undo,
+  useStore,
+} from './model/store';
 import { restoreAutosave, startAutosave } from './persistence/autosave';
 import { loadModelText, openModelFromHandle } from './persistence/files';
 import { loadSharedModelFromLocation, parseShareFragment } from './persistence/share';
@@ -206,13 +215,20 @@ export function App() {
         (e.target instanceof HTMLElement && e.target.isContentEditable);
       if (!e.ctrlKey && !e.metaKey) return;
       const key = e.key.toLowerCase();
-      if (useStore.getState().readOnly && ['s', 'o', 'z', 'y'].includes(key)) return;
+      if (useStore.getState().readOnly && ['s', 'o', 'z', 'y', 'd'].includes(key)) return;
       if (key === 's') {
         e.preventDefault();
         void saveModel(false);
       } else if (key === 'o') {
         e.preventDefault();
         void openModel();
+      } else if (!inText && key === 'd') {
+        e.preventDefault();
+        const sel = useStore.getState().selection;
+        if (sel.source === 'tree' && sel.ids.length > 0) {
+          const newIds = duplicateItems(sel.ids);
+          if (newIds.length) setSelection('tree', newIds);
+        }
       } else if (!inText && key === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();

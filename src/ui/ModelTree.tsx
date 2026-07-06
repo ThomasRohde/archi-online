@@ -15,6 +15,7 @@ import {
   addView,
   createC4TemplateView,
   deleteItems,
+  duplicateItems,
   moveItemsToFolder,
   renameItem,
 } from '../model/ops';
@@ -199,6 +200,7 @@ function ModelTreeInner({
   setFilterType: (type: TreeTypeFilter) => void;
 }) {
   const filterInputRef = useRef<HTMLInputElement>(null);
+  const readOnly = useStore((s) => s.readOnly);
   const visible = useMemo(
     () => computeVisibleTreeItems(model, filterText, filterType),
     [model, filterText, filterType],
@@ -241,8 +243,21 @@ function ModelTreeInner({
   const conceptMenu = (id: string): MenuItem[] => {
     const sel = useStore.getState().selection;
     const ids = sel.source === 'tree' && sel.ids.includes(id) ? sel.ids : [id];
+    const canDuplicate = ids.some((i) => model.elements[i] || model.views[i]);
     return [
       { label: 'Rename', onClick: () => setRenamingId(id) },
+      ...(canDuplicate
+        ? [
+            {
+              label: 'Duplicate',
+              disabled: readOnly,
+              onClick: () => {
+                const newIds = duplicateItems(ids);
+                if (newIds.length) setSelection('tree', newIds);
+              },
+            } as MenuItem,
+          ]
+        : []),
       SEPARATOR,
       {
         label: ids.length > 1 ? `Delete ${ids.length} items` : 'Delete',

@@ -6,6 +6,7 @@ export * from './ops/alignment';
 export * from './ops/c4';
 export * from './ops/csv-import';
 export * from './ops/deletion';
+export * from './ops/duplicate';
 export * from './ops/layout';
 export * from './ops/movement';
 export * from './ops/style';
