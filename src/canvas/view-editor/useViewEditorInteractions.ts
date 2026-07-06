@@ -463,7 +463,10 @@ export function useViewEditorInteractions({
         };
         setInter({ kind: 'none' });
         if (r.width < 3 && r.height < 3) {
-          if (!cur.additive) setSelection('view', []);
+          // A plain click on empty canvas selects the view itself so its
+          // properties (name, viewpoint, …) show — like clicking the diagram
+          // background in Archi. Escape still clears to nothing.
+          if (!cur.additive) setSelection('tree', [viewId]);
           break;
         }
         const hitIds: string[] = [];

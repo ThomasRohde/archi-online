@@ -241,7 +241,10 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
         onPointerDown={(event) => {
           if (event.button === 0) {
             const hit = readOnlyHitTarget(event.target, event.currentTarget);
-            setSelection('view', hit ? [hit.id] : []);
+            // Clicking empty canvas selects the view itself (its properties),
+            // like Archi's diagram background; clicking an object selects it.
+            if (hit) setSelection('view', [hit.id]);
+            else setSelection('tree', [viewId]);
             return;
           }
           if (event.button !== 1) return;
