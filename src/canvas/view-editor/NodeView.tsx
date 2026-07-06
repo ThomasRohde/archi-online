@@ -12,6 +12,7 @@ export function NodeView({
   dropParentId,
   connectSource,
   connectHover,
+  anchorId,
   c4ViewType,
 }: {
   model: ModelState;
@@ -21,6 +22,7 @@ export function NodeView({
   dropParentId: string | null;
   connectSource: string | null;
   connectHover: { id: string; valid: boolean } | null;
+  anchorId?: string | null;
   c4ViewType?: C4ViewType;
 }) {
   const node = model.nodes[nodeId];
@@ -40,6 +42,9 @@ export function NodeView({
     connectSource === nodeId ||
     (connectHover?.id === nodeId && connectHover.valid);
   const invalid = connectHover?.id === nodeId && !connectHover.valid;
+  // The align/match anchor (key object) gets a distinct amber outline plus
+  // filled corner handles so it is clear which element the rest snaps to.
+  const anchorCue = selected && anchorId === nodeId && !highlight && !invalid;
 
   return (
     <g transform={`translate(${x},${y})`} data-node-id={nodeId} opacity={delta ? 0.75 : 1}>
@@ -58,11 +63,28 @@ export function NodeView({
           width={width + 3}
           height={height + 3}
           fill="none"
-          stroke={invalid ? '#c43a3a' : highlight ? '#1d9e46' : '#2a6cc4'}
-          strokeWidth={highlight || invalid ? 2 : 1.2}
+          stroke={invalid ? '#c43a3a' : highlight ? '#1d9e46' : anchorCue ? '#e8820c' : '#2a6cc4'}
+          strokeWidth={highlight || invalid ? 2 : anchorCue ? 1.8 : 1.2}
           pointerEvents="none"
         />
       )}
+      {anchorCue &&
+        [
+          [0, 0],
+          [width, 0],
+          [0, height],
+          [width, height],
+        ].map(([cx, cy], i) => (
+          <rect
+            key={i}
+            x={cx - 3}
+            y={cy - 3}
+            width={6}
+            height={6}
+            fill="#e8820c"
+            pointerEvents="none"
+          />
+        ))}
       {node.childIds.map((cid) => (
         <NodeView
           key={cid}
@@ -73,6 +95,7 @@ export function NodeView({
           dropParentId={dropParentId}
           connectSource={connectSource}
           connectHover={connectHover}
+          anchorId={anchorId}
           c4ViewType={c4ViewType}
         />
       ))}

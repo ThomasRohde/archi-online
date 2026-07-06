@@ -1,7 +1,9 @@
 import { useMemo, useRef } from 'react';
 import { c4ViewType } from '../model/c4';
+import { alignableNodeIds } from '../model/ops';
 import { setSelection, useStore } from '../model/store';
 import type { Bounds } from '../model/types';
+import { useSettingsStore } from '../settings/app-settings';
 import { ConnectionView } from './ConnectionView';
 import { connectionPolyline, type Point } from './geometry';
 import { computeAbsBounds, deriveLiveViewState } from './view-editor/bounds';
@@ -50,6 +52,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   const model = useStore((s) => s.model);
   const selection = useStore((s) => s.selection);
   const activeTool = useStore((s) => s.activeTool);
+  const alignmentAnchor = useSettingsStore((s) => s.settings.alignmentAnchor);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const view = model?.views[viewId];
@@ -93,6 +96,14 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     inter,
   );
   const viewSelected = selection.source === 'view' ? new Set(selection.ids) : new Set<string>();
+  // The element Align / Match Size snap the rest of the selection to. Only
+  // meaningful when ≥ 2 alignable nodes are selected (matches the ops).
+  const anchorId = (() => {
+    if (selection.source !== 'view' || selection.ids.length < 2) return null;
+    const alignable = alignableNodeIds(model, selection.ids);
+    if (alignable.length < 2) return null;
+    return alignmentAnchor === 0 ? alignable[0] : alignable[alignable.length - 1];
+  })();
   const singleSelected = viewSelected.size === 1 && inter.kind === 'none' ? [...viewSelected][0] : null;
   const selectedNodeForHandles =
     singleSelected && model.nodes[singleSelected] ? singleSelected : null;
@@ -126,6 +137,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
               dropParentId={dropParentId}
               connectSource={inter.kind === 'connect' ? inter.sourceNodeId : null}
               connectHover={connectHover}
+              anchorId={anchorId}
               c4ViewType={activeC4ViewType}
             />
           ))}
