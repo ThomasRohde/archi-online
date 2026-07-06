@@ -16,6 +16,18 @@ import {
 } from '../model/metamodel';
 import { setActiveTool, useStore, type Tool } from '../model/store';
 
+/** Short section labels for the palette rail, echoing Archi's layer grouping. */
+const LAYER_ABBREV: Record<string, string> = {
+  strategy: 'STR',
+  business: 'BUS',
+  application: 'APP',
+  technology: 'TEC',
+  physical: 'PHY',
+  motivation: 'MOT',
+  implementation_migration: 'IMPL',
+  other: 'OTHER',
+};
+
 interface C4PaletteEntry {
   kind: C4ElementKind;
   title: string;
@@ -262,7 +274,7 @@ export function Palette() {
       <div className="pal-sep" />
       {activeC4ViewType && (
         <div className="pal-layer">
-          <div className="pal-sep" title="C4" />
+          <div className="pal-sep-label">C4</div>
           {C4_TOOLBOX.map((entry, index) => (
             <ToolButton
               key={`${entry.title}-${index}`}
@@ -295,7 +307,9 @@ export function Palette() {
         if (defs.length === 0) return null;
         return (
           <div key={layer} className="pal-layer">
-            <div className="pal-sep" title={label} />
+            <div className="pal-sep-label" title={label}>
+              {LAYER_ABBREV[layer] ?? label}
+            </div>
             {defs.map((d) => {
               const isJunction = d.type === 'Junction';
               const allowed = isAllowedElementInViewpoint(viewpoint, d.type);

@@ -282,6 +282,97 @@ function createAndOpenC4View(viewType: (typeof C4_VIEW_TYPES)[number]): void {
   openView(id);
 }
 
+/* Toolbar glyphs — transcribed 1:1 from the App Chrome design mockup. */
+type IconName =
+  | 'new'
+  | 'open'
+  | 'save'
+  | 'saveas'
+  | 'share'
+  | 'undo'
+  | 'redo'
+  | 'export'
+  | 'present'
+  | 'c4'
+  | 'ext'
+  | 'views'
+  | 'help';
+
+const TB_ICONS: Record<IconName, React.ReactNode> = {
+  new: <path d="M6 3h7l5 5v13H6z M13 3v5h5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />,
+  open: <path d="M3 6h6l2 2h10v11H3z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />,
+  save: <path d="M4 4h11l5 5v11H4z M9 4v5h7 M8 20v-6h8v6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />,
+  saveas: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+      <path d="M4 4h10l4 4v6.5 M4 4v16h7 M9 4v5h6" />
+      <path d="M17.5 16.5v6 M14.5 19.5h6" strokeLinecap="round" />
+    </g>
+  ),
+  share: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="6" cy="12" r="2.4" />
+      <circle cx="17" cy="5.5" r="2.4" />
+      <circle cx="17" cy="18.5" r="2.4" />
+      <path d="M8.2 10.8 14.8 6.7 M8.2 13.2 14.8 17.3" />
+    </g>
+  ),
+  undo: <path d="M9 7 5 11l4 4 M5 11h9a5 5 0 0 1 0 10h-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />,
+  redo: <path d="M15 7l4 4-4 4 M19 11h-9a5 5 0 0 0 0 10h3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />,
+  export: <path d="M12 15V4 M8 8l4-4 4 4 M4 15v5h16v-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />,
+  present: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="12" rx="1.5" />
+      <path d="M12 16v3 M8.5 20h7" />
+      <path d="M10.5 8l4 2-4 2z" fill="currentColor" stroke="none" />
+    </g>
+  ),
+  c4: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="3.5" y="3.5" width="7" height="7" />
+      <rect x="13.5" y="3.5" width="7" height="7" />
+      <rect x="3.5" y="13.5" width="7" height="7" />
+      <rect x="13.5" y="13.5" width="7" height="7" />
+    </g>
+  ),
+  ext: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+      <rect x="3.5" y="4" width="7.5" height="7.5" rx="1" />
+      <rect x="13" y="12.5" width="7.5" height="7.5" rx="1" />
+      <path d="M11 7.5h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5" />
+    </g>
+  ),
+  views: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="3" y="4" width="18" height="16" rx="1.5" />
+      <path d="M10 4v16 M3 9h7" />
+    </g>
+  ),
+  help: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.4 9.4a2.6 2.6 0 1 1 3.6 2.4c-1 .5-1 1.1-1 2.1 M12 17h.01" />
+    </g>
+  ),
+};
+
+function TbIcon({ name }: { name: IconName }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      {TB_ICONS[name]}
+    </svg>
+  );
+}
+
+/** Props for a fast custom tooltip on a toolbar icon button (see styles.css).
+ * `align: 'end'` right-anchors the tooltip for buttons near the right edge. */
+function tip(text: string, align?: 'end') {
+  return {
+    'aria-label': text,
+    'data-tip': text,
+    ...(align ? { 'data-tip-align': align } : {}),
+  };
+}
+
 export function Toolbar() {
   const [showHelp, setShowHelp] = useState(false);
   const [showExportImage, setShowExportImage] = useState(false);
@@ -296,10 +387,7 @@ export function Toolbar() {
   const canRedo = useStore((s) => s.redoStack.length > 0);
   const undoLabel = useStore((s) => s.undoStack[s.undoStack.length - 1]?.label);
   const redoLabel = useStore((s) => s.redoStack[s.redoStack.length - 1]?.label);
-  const dirty = useStore((s) => s.dirty);
-  const fileName = useStore((s) => s.fileName);
   const hasModel = useStore((s) => s.model !== null);
-  const modelName = useStore((s) => s.model?.info.name);
   const readOnly = useStore((s) => s.readOnly);
   const hasActiveView = useStore((s) => s.activeViewId !== null);
   const activeC4ViewType = useStore((s) => {
@@ -371,93 +459,98 @@ export function Toolbar() {
 
   return (
     <div className="toolbar">
+      <img
+        className="tb-logo"
+        src={import.meta.env.BASE_URL + 'icons/icon.svg'}
+        alt=""
+        width={24}
+        height={24}
+      />
       <span className="app-title">Archi Online</span>
       <div className="toolbar-sep" />
-      <button className="tb-btn" title="New model (Ctrl+Alt+N)" onClick={() => void newModel()}>
-        New
+      <button className="tb-icon" {...tip('New model (Ctrl+Alt+N)')} onClick={() => void newModel()}>
+        <TbIcon name="new" />
       </button>
-      <button className="tb-btn" title="Open .archimate file (Ctrl+O)" onClick={() => void openModel()}>
-        Open…
+      <button className="tb-icon" {...tip('Open .archimate file (Ctrl+O)')} onClick={() => void openModel()}>
+        <TbIcon name="open" />
       </button>
       <button
-        className="tb-btn"
-        title="Save model (Ctrl+S)"
+        className="tb-icon"
+        {...tip('Save model (Ctrl+S)')}
         disabled={!hasModel}
         onClick={() => saveModel(false)}
       >
-        Save
+        <TbIcon name="save" />
       </button>
       <button
-        className="tb-btn"
-        title="Save model as…"
+        className="tb-icon"
+        {...tip('Save model as…')}
         disabled={!hasModel}
         onClick={() => saveModel(true)}
       >
-        Save As…
+        <TbIcon name="saveas" />
       </button>
       <button
-        className="tb-btn"
-        title="Share model"
+        className="tb-icon"
+        {...tip('Share model')}
         disabled={!hasModel || readOnly}
         onClick={() => void runShareModel()}
       >
-        Share…
-      </button>
-      <button
-        className="tb-btn"
-        title="Import or export images, Open Exchange, and CSV"
-        disabled={!hasModel}
-        onClick={(e) => {
-          const rect = (e.target as HTMLElement).getBoundingClientRect();
-          showContextMenu(rect.left, rect.bottom + 4, exportMenuItems);
-        }}
-      >
-        Import/Export ▾
-      </button>
-      <button
-        className="tb-btn"
-        title="Presentation mode — full-screen view walkthrough"
-        disabled={!hasActiveView}
-        onClick={() => setPresenting(true)}
-      >
-        Present
-      </button>
-      <button
-        className="tb-btn"
-        title="Create and validate C4 views"
-        disabled={!hasModel}
-        onClick={(e) => {
-          const rect = (e.target as HTMLElement).getBoundingClientRect();
-          showContextMenu(rect.left, rect.bottom + 4, c4MenuItems);
-        }}
-      >
-        C4 ▾
+        <TbIcon name="share" />
       </button>
       <div className="toolbar-sep" />
       <button
-        className="tb-btn"
-        title={canUndo ? `Undo ${undoLabel} (Ctrl+Z)` : 'Undo (Ctrl+Z)'}
+        className="tb-icon"
+        {...tip(canUndo ? `Undo ${undoLabel} (Ctrl+Z)` : 'Undo (Ctrl+Z)')}
         disabled={!canUndo}
         onClick={undo}
       >
-        Undo
+        <TbIcon name="undo" />
       </button>
       <button
-        className="tb-btn"
-        title={canRedo ? `Redo ${redoLabel} (Ctrl+Y)` : 'Redo (Ctrl+Y)'}
+        className="tb-icon"
+        {...tip(canRedo ? `Redo ${redoLabel} (Ctrl+Y)` : 'Redo (Ctrl+Y)')}
         disabled={!canRedo}
         onClick={redo}
       >
-        Redo
+        <TbIcon name="redo" />
+      </button>
+      <div className="toolbar-sep" />
+      <button
+        className="tb-icon"
+        {...tip('Import or export images, Open Exchange, and CSV')}
+        disabled={!hasModel}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          showContextMenu(rect.left, rect.bottom + 4, exportMenuItems);
+        }}
+      >
+        <TbIcon name="export" />
+      </button>
+      <button
+        className="tb-icon"
+        {...tip('Presentation mode — full-screen view walkthrough')}
+        disabled={!hasActiveView}
+        onClick={() => setPresenting(true)}
+      >
+        <TbIcon name="present" />
+      </button>
+      <button
+        className="tb-icon"
+        {...tip('Create and validate C4 views')}
+        disabled={!hasModel}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          showContextMenu(rect.left, rect.bottom + 4, c4MenuItems);
+        }}
+      >
+        <TbIcon name="c4" />
       </button>
       <div className="toolbar-spacer" />
-      <span className="file-status">
-        {hasModel ? `${modelName} — ${fileName ?? 'unsaved'}${dirty ? ' •' : ''}` : ''}
-      </span>
       {extensionSnapshot.toolbarButtons.map((button) => (
         <button
           key={button.id}
-          className="tb-btn"
+          className="tb-icon tb-icon-text"
           title={button.label}
           onClick={() => void extensionRegistry.runCommand(button.command)}
         >
@@ -465,23 +558,23 @@ export function Toolbar() {
         </button>
       ))}
       <button
-        className="tb-btn"
-        title="Run extension commands"
+        className="tb-icon"
+        {...tip('Run extension commands', 'end')}
         disabled={extensionMenuItems.length === 0}
         onClick={(e) => {
-          const rect = (e.target as HTMLElement).getBoundingClientRect();
+          const rect = e.currentTarget.getBoundingClientRect();
           showContextMenu(rect.left, rect.bottom + 4, extensionMenuItems);
         }}
       >
-        Extensions ▾
+        <TbIcon name="ext" />
       </button>
       <button
-        className="tb-btn"
-        title="Show or reopen panels"
+        className="tb-icon"
+        {...tip('Show or reopen panels', 'end')}
         onClick={(e) => {
           const bus = layoutBus();
           if (!bus) return;
-          const rect = (e.target as HTMLElement).getBoundingClientRect();
+          const rect = e.currentTarget.getBoundingClientRect();
           const items: MenuItem[] = bus.getPanels().map((p) => ({
             label: p.title,
             icon: p.open ? <span className="menu-check">✓</span> : undefined,
@@ -492,10 +585,10 @@ export function Toolbar() {
           showContextMenu(rect.left, rect.bottom + 4, items);
         }}
       >
-        Views ▾
+        <TbIcon name="views" />
       </button>
-      <button className="tb-btn" title="Keyboard shortcuts" onClick={() => setShowHelp(true)}>
-        ?
+      <button className="tb-icon" {...tip('Keyboard shortcuts', 'end')} onClick={() => setShowHelp(true)}>
+        <TbIcon name="help" />
       </button>
       {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
       {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}

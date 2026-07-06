@@ -1,8 +1,9 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { c4ViewType } from '../model/c4';
 import { alignableNodeIds } from '../model/ops';
 import { setSelection, useStore } from '../model/store';
 import type { Bounds } from '../model/types';
+import { setCanvasStatus } from '../ui/canvas-status';
 import { useSettingsStore } from '../settings/app-settings';
 import { ConnectionView } from './ConnectionView';
 import { connectionPolyline, type Point } from './geometry';
@@ -87,7 +88,24 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
       spaceRef,
     });
 
+  // Publish the active view's zoom to the status bar (see canvas-status.ts).
+  const isActive = useStore((s) => s.activeViewId === viewId);
+  useEffect(() => {
+    if (isActive) setCanvasStatus({ zoom: viewport.zoom });
+  }, [isActive, viewport.zoom]);
+
   if (!model || !view) return null;
+
+  // Wrap the interaction move handler to also report the cursor position (in
+  // view coordinates) to the status bar; clear it when the pointer leaves.
+  const onCanvasPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    handlers.onPointerMove(e);
+    if (isActive) {
+      const p = toView(e.clientX, e.clientY);
+      setCanvasStatus({ x: p.x, y: p.y });
+    }
+  };
+  const onCanvasPointerLeave = () => setCanvasStatus({ x: null, y: null });
 
   const activeC4ViewType = c4ViewType(view);
   const { moveDelta, dropParentId, resizeOverride, liveAbs } = deriveLiveViewState(
@@ -119,8 +137,9 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
         style={{ cursor }}
         tabIndex={0}
         onPointerDown={handlers.onPointerDown}
-        onPointerMove={handlers.onPointerMove}
+        onPointerMove={onCanvasPointerMove}
         onPointerUp={handlers.onPointerUp}
+        onPointerLeave={onCanvasPointerLeave}
         onDoubleClick={handlers.onDoubleClick}
         onKeyDown={handlers.onKeyDown}
         onContextMenu={handlers.onContextMenu}
