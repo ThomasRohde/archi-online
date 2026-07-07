@@ -459,15 +459,6 @@ export function Toolbar() {
 
   return (
     <div className="toolbar">
-      <img
-        className="tb-logo"
-        src={import.meta.env.BASE_URL + 'icons/icon.svg'}
-        alt=""
-        width={24}
-        height={24}
-      />
-      <span className="app-title">Archi Online</span>
-      <div className="toolbar-sep" />
       <button className="tb-icon" {...tip('New model (Ctrl+Alt+N)')} onClick={() => void newModel()}>
         <TbIcon name="new" />
       </button>

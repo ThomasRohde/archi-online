@@ -12,4 +12,5 @@ coverage/
 .wiki-publish/
 .tmp-wiki-check/
 extensions/dist/
+*.stackdump
 
