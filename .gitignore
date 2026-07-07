@@ -12,5 +12,7 @@ coverage/
 .wiki-publish/
 .tmp-wiki-check/
 extensions/dist/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
 *.stackdump
 

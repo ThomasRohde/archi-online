@@ -358,7 +358,13 @@ export function GroupControls(props: IDockviewHeaderActionsProps) {
       <button
         className="group-ctl"
         title="Open in new window"
-        onClick={() => void props.containerApi.addPopoutGroup(props.group)}
+        onClick={() =>
+          void props.containerApi.addPopoutGroup(props.group, {
+            // Resolve popout.html against the deploy base (default '/', or the
+            // GitHub Pages subpath) instead of dockview's root-absolute default.
+            popoutUrl: `${import.meta.env.BASE_URL}popout.html`,
+          })
+        }
       >
         <svg viewBox="0 0 16 16" width="12" height="12">
           <path d="M7 3 H3 V13 H13 V9 M9 3 H13 V7 M13 3 L7.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.3" />

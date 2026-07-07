@@ -28,6 +28,8 @@ The API follows common jArchi patterns:
 - Run with the **Run** button or `Ctrl+Enter`. Output appears in the panel's
   console.
 
+![The Scripting panel: Monaco editor with a jArchi-style script and console output](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/scripting.png)
+
 ## Script environment
 
 Scripts receive these globals:

@@ -62,7 +62,7 @@ export function StatusBar() {
         <>
           <span className="status-sep" />
           <span>
-            {x !== null && y !== null ? `x ${Math.round(x)} y ${Math.round(y)}` : '—'}
+            {x !== null && y !== null ? `x ${Math.round(x)} y ${Math.round(y)}` : '—'}
           </span>
           <span className="status-sep" />
           <span>{Math.round((zoom as number) * 100)}%</span>

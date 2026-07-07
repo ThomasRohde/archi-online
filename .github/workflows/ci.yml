@@ -45,5 +45,8 @@ jobs:
       - name: Build app
         run: npm run build
 
+      - name: Build docs site
+        run: npm run docs:build
+
       - name: Build example extension archives
         run: node extensions/build-archives.mjs

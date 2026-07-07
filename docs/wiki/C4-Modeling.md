@@ -35,6 +35,8 @@ The C4 toolbar menu also provides:
 
 ## Visual conventions
 
+![A C4 container view: person, containers, an external system, and a database cylinder with labeled relationships](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/c4-model.png)
+
 C4 views use a Structurizr-style visual mode. The underlying model remains
 ArchiMate, but C4-tagged nodes in views with `c4.viewType` render with C4
 figures instead of ArchiMate corner icons:
@@ -129,7 +131,10 @@ dedicated views.
 ## Example
 
 The repository includes a small C4 container-view example at
-[public/examples/c4-customer-portal.archimate](../../public/examples/c4-customer-portal.archimate).
+[public/examples/c4-customer-portal.archimate](https://github.com/ThomasRohde/archi-online/blob/main/public/examples/c4-customer-portal.archimate).
+Opened in the app's full-screen **presentation mode**, it looks like this:
+
+![The C4 customer-portal example shown in full-screen presentation mode](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/presentation.png)
 
 ## References
 

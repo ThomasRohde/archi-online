@@ -68,10 +68,16 @@ viewer and share-link flow:
 
 ## Documentation
 
-User and API documentation lives on the
-[project wiki](https://github.com/ThomasRohde/archi-online/wiki). The wiki
-source is maintained in `docs/wiki/` so documentation changes are reviewed
-like code:
+The documentation site is published to GitHub Pages at
+**https://thomasrohde.github.io/archi-online/**, with a live demo of the app at
+**https://thomasrohde.github.io/archi-online/app/**. It is built with VitePress
+from the same `docs/wiki/` source and deployed by
+[`.github/workflows/docs.yml`](.github/workflows/docs.yml); see
+[docs/pages-publishing.md](docs/pages-publishing.md).
+
+The same pages also publish to the
+[project wiki](https://github.com/ThomasRohde/archi-online/wiki). The source is
+maintained in `docs/wiki/` so documentation changes are reviewed like code:
 
 - [Wiki home](docs/wiki/Home.md)
 - [Getting started](docs/wiki/Getting-Started.md)

@@ -2,6 +2,8 @@
 
 This page takes you from a fresh checkout to a saved `.archimate` model.
 
+![The Archi Online workspace with the Archisurance example open](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/workspace.png)
+
 ## What you need
 
 - **Node.js 22+** and npm to run the app locally.

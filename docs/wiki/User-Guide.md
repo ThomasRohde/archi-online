@@ -8,6 +8,8 @@ settings, and the keyboard shortcuts.
 Archi Online uses an IDE-style docking layout (dockview). Views open as tabs
 in the center editor area; tool panels dock around them.
 
+![The IDE-style workspace: model tree, palette, canvas, settings, and properties](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/workspace.png)
+
 You can:
 
 - drag tabs to split the editor area and put views side-by-side,
@@ -89,7 +91,11 @@ relationship tool and drag between two diagram objects. While drawing a
 relationship, invalid targets are rejected based on the official ArchiMate
 allowed-relationship matrix.
 
+![The magic connector offering only the relationships ArchiMate allows between two elements](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/palette-validity.png)
+
 ## Canvas editing
+
+![The Archisurance Layered View on the SVG canvas](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/canvas.png)
 
 The view editor is a custom SVG canvas. It supports:
 
@@ -116,6 +122,8 @@ concepts stay in the model. Delete from the Models tree to remove a concept
 from the model itself.
 
 ## Properties panel
+
+![The Properties panel Appearance tab: fill and line colour, opacity, text alignment, and figure](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/properties.png)
 
 The **Properties** panel follows the current selection in the tree or on the
 canvas. Depending on what is selected it edits:

@@ -6,13 +6,21 @@ import { webManifest } from './src/pwa/webmanifest';
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
+// Default build serves at the root (here.now) with the full installable PWA.
+// The GitHub Pages demo sets APP_BASE=/archi-online/app/ and disables the PWA:
+// the service worker and web manifest hardcode root-absolute paths, so the
+// subpath copy is a plain SPA (still fully functional — see docs/pages-publishing.md).
+const base = process.env.APP_BASE ?? '/';
+
 export default defineConfig({
+  base,
   define: {
     __APP_VERSION__: JSON.stringify(version),
   },
   plugins: [
     react(),
     VitePWA({
+      disable: base !== '/',
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
