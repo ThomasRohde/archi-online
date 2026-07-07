@@ -1,7 +1,7 @@
 app.extension({
   id: 'examples.selection-workbench',
   name: 'Selection Workbench',
-  version: '0.1.0'
+  version: '0.2.0'
 });
 
 var help = app.assets.json('data/help.json');

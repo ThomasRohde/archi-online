@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "examples.selection-workbench",
   "name": "Selection Workbench",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Inspect and remember selection changes from tree, view, and context menu workflows.",
   "main": "main.js",
   "contributes": {

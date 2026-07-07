@@ -1,7 +1,7 @@
 app.extension({
   id: 'examples.model-audit-dashboard',
   name: 'Model Audit Dashboard',
-  version: '0.1.0'
+  version: '0.2.0'
 });
 
 var auditRules = app.assets.json('data/audit-rules.json');

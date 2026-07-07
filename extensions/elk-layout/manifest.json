@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "examples.elk-layout",
   "name": "ELK Layout",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Apply layered ELK automatic layout to the active view or selected diagram objects.",
   "main": "main.js",
   "contributes": {
