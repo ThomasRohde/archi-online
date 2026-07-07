@@ -203,7 +203,11 @@ async function renderPanel() {
   apply.textContent = 'Apply';
   apply.style.height = '32px';
   apply.onclick = function () {
-    readOptions().then(applyLayout).catch(function (error) {
+    // Apply the live in-memory options. Reading them back from storage here races
+    // the input's change handler (which persists on blur as this button is pressed),
+    // and applyLayout would then write the stale values back, discarding whatever was
+    // just typed. The closure's options object is already current.
+    applyLayout(options).catch(function (error) {
       return app.dialogs.info('ELK layout failed', error && error.message ? error.message : String(error));
     });
   };

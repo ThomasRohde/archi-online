@@ -222,18 +222,31 @@ export async function runElkLayout(request: ElkLayoutRequest): Promise<ElkLayout
 
   const elk = await loadElk();
   const result = await elk.layout(graph) as ElkGraphResult;
+
+  // ELK positions the laid-out graph inside its own padding, so its children start
+  // at (padding.left, padding.top) rather than (0, 0). Anchor the result back to the
+  // scope's original top-left corner; otherwise each run shifts everything by the
+  // padding amount and repeated applies drift diagonally down/right.
+  const placedChildren = (result.children ?? []).filter(
+    (child) => child.id && boundsByNodeId.has(child.id),
+  );
+  const childXs = placedChildren.map((child) => child.x).filter((x): x is number => Number.isFinite(x));
+  const childYs = placedChildren.map((child) => child.y).filter((y): y is number => Number.isFinite(y));
+  const layoutOrigin: Point = {
+    x: origin.x - (childXs.length ? Math.min(...childXs) : 0),
+    y: origin.y - (childYs.length ? Math.min(...childYs) : 0),
+  };
+
   const layoutNodes = Object.fromEntries(
-    (result.children ?? [])
-      .filter((child) => child.id && boundsByNodeId.has(child.id))
-      .map((child) => {
-        const current = boundsByNodeId.get(child.id!)!;
-        return [child.id!, {
-          x: origin.x + finiteNumber(child.x, current.x - origin.x),
-          y: origin.y + finiteNumber(child.y, current.y - origin.y),
-          width: finiteNumber(child.width, current.width),
-          height: finiteNumber(child.height, current.height),
-        }];
-      }),
+    placedChildren.map((child) => {
+      const current = boundsByNodeId.get(child.id!)!;
+      return [child.id!, {
+        x: layoutOrigin.x + finiteNumber(child.x, current.x - layoutOrigin.x),
+        y: layoutOrigin.y + finiteNumber(child.y, current.y - layoutOrigin.y),
+        width: finiteNumber(child.width, current.width),
+        height: finiteNumber(child.height, current.height),
+      }];
+    }),
   );
 
   const layoutConnections =
@@ -242,7 +255,7 @@ export async function runElkLayout(request: ElkLayoutRequest): Promise<ElkLayout
       : Object.fromEntries(
           (result.edges ?? [])
             .filter((edge) => edge.id)
-            .map((edge) => [edge.id!, { route: routeFromEdge(edge, origin) }]),
+            .map((edge) => [edge.id!, { route: routeFromEdge(edge, layoutOrigin) }]),
         );
 
   request.view.layout({

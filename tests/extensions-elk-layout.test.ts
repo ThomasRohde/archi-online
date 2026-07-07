@@ -153,4 +153,47 @@ describe('ELK extension layout API', () => {
     expect(result.scope).toBe('selection');
     expect(result.nodeCount).toBe(2);
   });
+
+  it('anchors the layout to the scope origin and is stable across repeated applies', async () => {
+    const viewId = addView('Main');
+    const nodeIds: string[] = [];
+    let previousElementId: string | null = null;
+    for (let i = 0; i < 4; i++) {
+      const elementId = addElement('BusinessActor', `A${i}`);
+      const nodeId = addElementNodeToView(
+        viewId,
+        elementId,
+        viewId,
+        { x: 40 + i * 10, y: 30 + i * 10, width: 120, height: 55 },
+        false,
+      );
+      nodeIds.push(nodeId);
+      if (previousElementId) {
+        const relId = addRelationship('AssociationRelationship', previousElementId, elementId)!;
+        addConnectionToView(viewId, relId, nodeIds[i - 1], nodeId);
+      }
+      previousElementId = elementId;
+    }
+    openView(viewId);
+
+    const api = createAppApi('local.elk');
+    const boundsOf = () => nodeIds.map((id) => ({ ...model().nodes[id].bounds }));
+    const originOf = (bounds: { x: number; y: number }[]) => ({
+      x: Math.min(...bounds.map((b) => b.x)),
+      y: Math.min(...bounds.map((b) => b.y)),
+    });
+
+    const before = boundsOf();
+    const startOrigin = originOf(before);
+
+    await api.layout.elk({ scope: 'view', direction: 'right' });
+    const first = boundsOf();
+    // Top-left of the laid-out cluster stays where it started (no ELK padding offset).
+    expect(originOf(first)).toEqual(startOrigin);
+
+    await api.layout.elk({ scope: 'view', direction: 'right' });
+    const second = boundsOf();
+    // Re-applying with the same options must not drift the diagram.
+    expect(second).toEqual(first);
+  });
 });
