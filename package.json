@@ -16,10 +16,12 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
+    "sync-versions": "node tools/sync-versions.mjs",
+    "version": "node tools/sync-versions.mjs && git add extensions",
     "docs:check": "node tools/check-wiki-docs.mjs",
     "docs:publish-wiki": "node tools/publish-wiki.mjs",
     "security:audit": "npm audit",
-    "ci:check": "npm run docs:check && npm run lint && npm run typecheck && npm test && npm run security:audit && npm run build"
+    "ci:check": "node tools/sync-versions.mjs --check && npm run docs:check && npm run lint && npm run typecheck && npm test && npm run security:audit && npm run build"
   },
   "dependencies": {
     "dockview": "^7.0.2",

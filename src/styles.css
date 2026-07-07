@@ -233,6 +233,12 @@ body {
   text-overflow: ellipsis;
 }
 
+.status-version {
+  color: var(--text-dim);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
 /* Dockview integration */
 .dock-root {
   width: 100%;

@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify extension versions match package.json
+        run: node tools/sync-versions.mjs --check
+
+      - name: Build extension archives
+        run: node extensions/build-archives.mjs
+
+      - name: Publish release with extension archives
+        uses: softprops/action-gh-release@v2
+        with:
+          files: extensions/dist/*.archi-ext
+          generate_release_notes: true

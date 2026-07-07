@@ -1,4 +1,5 @@
 import { useStore } from '../model/store';
+import { APP_VERSION } from '../version';
 import { useCanvasStatus } from './canvas-status';
 import { resolveTarget } from './properties/target';
 
@@ -15,7 +16,12 @@ export function StatusBar() {
   const { zoom, x, y } = useCanvasStatus();
 
   if (!model) {
-    return <div className="status-bar" />;
+    return (
+      <div className="status-bar">
+        <span className="status-spacer" />
+        <span className="status-version">v{APP_VERSION}</span>
+      </div>
+    );
   }
 
   const target = resolveTarget(model, selection.source, selection.ids);
@@ -62,6 +68,8 @@ export function StatusBar() {
           <span>{Math.round((zoom as number) * 100)}%</span>
         </>
       )}
+      <span className="status-sep" />
+      <span className="status-version">v{APP_VERSION}</span>
     </div>
   );
 }
