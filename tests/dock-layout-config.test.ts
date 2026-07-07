@@ -178,6 +178,29 @@ describe('dock layout config', () => {
     });
   });
 
+  it('reopens Validator with Scripting when present and keeps it out of the default layout', () => {
+    const { api, added } = createDockApi();
+
+    buildDefaultLayout(api as never);
+    TOOL_PANELS.find((panel) => panel.id === 'validator')!.add(api as never);
+
+    const validator = added.find((panel) => panel.id === 'validator');
+    expect(validator?.component).toBe('validator');
+    expect(validator?.title).toBe('Validator');
+    expect(validator?.position).toEqual({ referencePanel: 'scripts', direction: 'within' });
+    expect(added.filter((panel) => panel.id === 'validator')).toHaveLength(1);
+  });
+
+  it('reopens Validator below when Scripting is unavailable', () => {
+    const { api, added } = createDockApi();
+
+    TOOL_PANELS.find((panel) => panel.id === 'validator')!.add(api as never);
+
+    expect(added.find((panel) => panel.id === 'validator')?.position).toEqual({
+      direction: 'below',
+    });
+  });
+
   it('migrates restored Properties into the Scripting group without stealing focus', () => {
     const { api, added } = createDockApi();
     api.addPanel({

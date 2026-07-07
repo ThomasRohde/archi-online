@@ -388,3 +388,8 @@ export function isAllowedElementInViewpoint(
   if (vp.elementTypes.length === 0) return true; // empty list → allow all elements
   return vp.elementTypes.includes(type);
 }
+
+/** Display name of a viewpoint id (Viewpoint.getName), or '' for none/unknown. */
+export function viewpointName(id: string | undefined): string {
+  return (id && byId.get(id)?.name) || '';
+}

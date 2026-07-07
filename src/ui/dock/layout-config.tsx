@@ -16,6 +16,7 @@ import { Palette } from '../Palette';
 import { PropertiesPanel } from '../PropertiesPanel';
 import { SettingsPanel } from '../SettingsPanel';
 import { ScriptPanel } from '../ScriptPanel';
+import { ValidatorPanel } from '../ValidatorPanel';
 import { WelcomePanel } from '../WelcomePanel';
 
 export const LAYOUT_KEY = 'archi-online.layout';
@@ -131,6 +132,20 @@ export const TOOL_PANELS: ToolPanelDef[] = [
         component: 'scripts',
         title: 'Scripting',
         position: { direction: 'below' },
+        initialHeight: 230,
+      }),
+  },
+  {
+    id: 'validator',
+    title: 'Validator',
+    add: (api) =>
+      api.addPanel({
+        id: 'validator',
+        component: 'validator',
+        title: 'Validator',
+        position: api.getPanel('scripts')
+          ? { referencePanel: 'scripts', direction: 'within' }
+          : { direction: 'below' },
         initialHeight: 230,
       }),
   },
@@ -310,6 +325,11 @@ export const components: Record<string, React.FunctionComponent<IDockviewPanelPr
   scripts: () => (
     <div className="dock-panel">
       <ScriptPanel />
+    </div>
+  ),
+  validator: () => (
+    <div className="dock-panel">
+      <ValidatorPanel />
     </div>
   ),
   welcome: () => <WelcomePanel />,
