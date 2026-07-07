@@ -45,6 +45,9 @@ import { ExportImageDialog } from './ExportImageDialog';
 import { PresentationMode } from './PresentationMode';
 import { layoutBus } from './layout-bus';
 
+/** Published documentation site (GitHub Pages). */
+const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
+
 const SHORTCUTS: [string, string][] = [
   ['Ctrl+S / Ctrl+O', 'Save / open model'],
   ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
@@ -296,6 +299,7 @@ type IconName =
   | 'c4'
   | 'ext'
   | 'views'
+  | 'docs'
   | 'help';
 
 const TB_ICONS: Record<IconName, React.ReactNode> = {
@@ -345,6 +349,12 @@ const TB_ICONS: Record<IconName, React.ReactNode> = {
     <g fill="none" stroke="currentColor" strokeWidth="1.6">
       <rect x="3" y="4" width="18" height="16" rx="1.5" />
       <path d="M10 4v16 M3 9h7" />
+    </g>
+  ),
+  docs: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
+      <path d="M12 6.5C9.8 5 6.4 5 4 5.6v12.9c2.4-.6 5.8-.6 8 .9 2.2-1.5 5.6-1.5 8-.9V5.6C17.6 5 14.2 5 12 6.5z" />
+      <path d="M12 6.5v12.8" />
     </g>
   ),
   help: (
@@ -577,6 +587,13 @@ export function Toolbar() {
         }}
       >
         <TbIcon name="views" />
+      </button>
+      <button
+        className="tb-icon"
+        {...tip('Documentation', 'end')}
+        onClick={() => window.open(DOCS_URL, '_blank', 'noopener,noreferrer')}
+      >
+        <TbIcon name="docs" />
       </button>
       <button className="tb-icon" {...tip('Keyboard shortcuts', 'end')} onClick={() => setShowHelp(true)}>
         <TbIcon name="help" />
