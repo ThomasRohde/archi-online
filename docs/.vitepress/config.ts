@@ -39,7 +39,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/wiki/Getting-Started', activeMatch: '/wiki/' },
       { text: 'Scripting', link: '/wiki/Scripting-API' },
-      { text: 'Open the app ↗', link: '/app/' },
+      { text: 'Open the app ↗', link: 'https://bitter-mill-c9qn.here.now/' },
     ],
     sidebar: [
       {

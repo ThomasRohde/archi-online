@@ -68,10 +68,9 @@ viewer and share-link flow:
 
 ## Documentation
 
-The documentation site is published to GitHub Pages at
-**https://thomasrohde.github.io/archi-online/**, with a live demo of the app at
-**https://thomasrohde.github.io/archi-online/app/**. It is built with VitePress
-from the same `docs/wiki/` source and deployed by
+The live app runs at **https://bitter-mill-c9qn.here.now/**. The documentation
+site is published to GitHub Pages at **https://thomasrohde.github.io/archi-online/**,
+built with VitePress from the same `docs/wiki/` source and deployed by
 [`.github/workflows/docs.yml`](.github/workflows/docs.yml); see
 [docs/pages-publishing.md](docs/pages-publishing.md).
 
