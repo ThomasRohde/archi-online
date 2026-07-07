@@ -5,45 +5,23 @@ The documentation website at
 [VitePress](https://vitepress.dev/) from the same Markdown that powers the
 GitHub Wiki (`docs/wiki/*.md`), and deployed by the
 [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) GitHub Actions
-workflow. A push to `main` that touches `docs/`, `src/`, `public/`, or the
-build config rebuilds and redeploys the site.
+workflow. A push to `main` that touches `docs/` (or the workflow) rebuilds and
+redeploys the site.
 
 This is maintainer process documentation — it intentionally lives in the
 repository, not on the published site (VitePress excludes it via `srcExclude`).
 
+The **app itself** is not hosted here — it runs at
+**https://bitter-mill-c9qn.here.now/** (published separately via the `here-now`
+skill; see the root `CLAUDE.md`). GitHub Pages serves the docs only; the docs'
+"Open the app" links point at here.now.
+
 ## What the site contains
-
-The Pages deployment bundles two things at one origin:
-
-| URL | Content | Vite base |
-| --- | --- | --- |
-| `/archi-online/` | The VitePress docs site | `/archi-online/` |
-| `/archi-online/app/` | A live demo of the app itself | `/archi-online/app/` |
 
 The docs pages reuse `docs/wiki/*.md`. A small markdown-it plugin
 (`docs/.vitepress/wikiLinks.ts`) rewrites GitHub-wiki `[[links]]` to normal
 links; `docs/index.md` is the VitePress hero landing page; and the
 wiki-only pages (`_Sidebar.md`, `_Footer.md`, `Home.md`) are excluded.
-
-## The app demo build (two Vite bases)
-
-The default `npm run build` targets the root (`/`) with the full installable
-PWA — that build is what ships to here.now. The workflow produces a **second**
-build for the subpath demo:
-
-```bash
-APP_BASE=/archi-online/app/ npm run build
-```
-
-`vite.config.ts` reads `APP_BASE` and, when it is not `/`, **disables the PWA**.
-The service worker and web manifest hardcode root-absolute paths, so the
-subpath copy is a plain single-page app: fully functional (canvas, scripting,
-file open/save, the bundled example models), just without offline install,
-share-target, or file-handler registration. The canonical installable PWA
-remains the root deployment.
-
-The workflow copies that `dist/` into `docs/.vitepress/dist/app/` before
-uploading the combined tree as the Pages artifact.
 
 ## Local preview
 
@@ -51,18 +29,10 @@ uploading the combined tree as the Pages artifact.
 npm run docs:dev        # VitePress dev server with hot reload
 npm run docs:build      # build to docs/.vitepress/dist (fails on dead links)
 npm run docs:preview    # serve the built site
-
-# To preview the combined site (docs + app demo) exactly as deployed:
-npm run docs:build
-APP_BASE=/archi-online/app/ npm run build
-cp -r dist docs/.vitepress/dist/app        # PowerShell: Copy-Item -Recurse dist docs/.vitepress/dist/app
-npm run docs:preview                        # app is at .../archi-online/app/
 ```
 
 `docs:build` runs VitePress's dead-link check. Internal `[[wiki links]]` are
-rewritten to `/wiki/<slug>` and must resolve to a page; the `/app/` demo path
-is allow-listed in `docs/.vitepress/config.ts` (`ignoreDeadLinks`) because it
-is injected at deploy time.
+rewritten to `/wiki/<slug>` and must resolve to a page.
 
 ## Screenshots
 

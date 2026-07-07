@@ -6,10 +6,6 @@ on:
       - main
     paths:
       - 'docs/**'
-      - 'src/**'
-      - 'public/**'
-      - 'index.html'
-      - 'vite.config.ts'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/docs.yml'
@@ -43,14 +39,6 @@ jobs:
 
       - name: Build docs site
         run: npm run docs:build
-
-      - name: Build app demo (served under /archi-online/app/)
-        run: npm run build
-        env:
-          APP_BASE: /archi-online/app/
-
-      - name: Bundle the app demo into the docs site
-        run: cp -r dist docs/.vitepress/dist/app
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

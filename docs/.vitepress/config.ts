@@ -14,8 +14,6 @@ export default defineConfig({
     'A web-based ArchiMate 3.2 modeler — a browser clone of Archi, scriptable with a jArchi-compatible JavaScript API.',
   cleanUrls: true,
   lastUpdated: true,
-  // The live app is injected into /app/ at deploy time; it is not a VitePress page.
-  ignoreDeadLinks: [/^\/app\/?/],
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}icons/icon.svg` }],
     ['meta', { name: 'theme-color', content: '#fafafa' }],
