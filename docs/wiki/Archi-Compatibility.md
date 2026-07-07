@@ -52,6 +52,10 @@ for the exact workflows.
   `relationships.xml` data file, so relationship validity — including what
   the magic connector offers — matches desktop Archi exactly.
 - **Default sizes and fill colors** for new elements follow Archi's defaults.
+- The **model Validator** ports desktop Archi's validator checkers (illegal
+  relationships, unused elements and relationships, duplicate names, viewpoint
+  violations, empty views, nested-element and junction checks), keeping Archi's
+  severities and messages. See [[User Guide|User-Guide]].
 
 ## Same figures
 

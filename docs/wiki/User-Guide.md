@@ -144,6 +144,32 @@ All of these are model data: edits create normal undo steps and mark the
 model dirty. Selecting multiple objects shows the selection count; appearance
 edits apply to the whole selection where they make sense.
 
+## Validator
+
+The **Validator** checks the whole model against a set of rules ported from
+desktop Archi's model validator. It is an opt-in panel — open it from
+**Views ▾ → Validator** (it docks with the Scripting panel).
+
+![The Validator panel listing issues grouped by severity after checking the Archisurance model](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/validator.png)
+
+Click **Validate** to run the checks over the current model — validation is on
+demand, not live, so re-click after making changes. Results are summarised as
+*N errors, N warnings, N advice* and listed in three groups:
+
+- **Errors** (⛔) — illegal relationships (a relationship type the ArchiMate
+  matrix does not allow between its two ends) and junctions whose relationships
+  are not all the same type.
+- **Warnings** (⚠️) — elements or relationships not used in any view, possible
+  duplicates (same name and type), and concepts on a view whose viewpoint does
+  not allow them.
+- **Advice** (ℹ️) — empty views, and elements visually nested inside another
+  element without a nesting-type relationship between them.
+
+Click any issue to jump to it: view issues open the view and select the
+diagram object, while element and relationship issues select the concept in
+the Models tree so the Properties panel follows. The panel is read-only and
+works in the shared read-only viewer.
+
 ## Settings
 
 **Settings** are app-wide preferences for the current browser profile. They
