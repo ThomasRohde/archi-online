@@ -20,22 +20,46 @@ hero:
       link: https://github.com/ThomasRohde/archi-online
 
 features:
-  - icon: 🧩
+  - icon:
+      src: /icons/archimate.png
+      alt: ArchiMate model structure
+      width: '48'
+      height: '48'
     title: Full ArchiMate 3.2 metamodel
     details: Every element and relationship type, with Archi's official allowed-relationship matrix enforced live while you draw.
-  - icon: 🪟
+  - icon:
+      src: /icons/idestyle.png
+      alt: IDE-style workspace
+      width: '48'
+      height: '48'
     title: IDE-style workspace
     details: Views open as draggable tabs — split editors side-by-side, float or maximize groups, and the layout persists across sessions.
-  - icon: ✏️
+  - icon:
+      src: /icons/editor.png
+      alt: Diagram editor
+      width: '48'
+      height: '48'
     title: Rich diagram editor
     details: Custom SVG canvas with drag/resize/nesting, grid snapping, marquee selection, a magic connector, manual bendpoints, notes and groups.
-  - icon: 🔁
+  - icon:
+      src: /icons/roundtrip.png
+      alt: Model round-trip
+      width: '48'
+      height: '48'
     title: Lossless .archimate round-trip
     details: Open and save native Archi files — verified against Archi's Archisurance example. Import/export Open Exchange XML and Archi CSV too.
-  - icon: 📜
+  - icon:
+      src: /icons/scripting.png
+      alt: Scripting console
+      width: '48'
+      height: '48'
     title: jArchi-style scripting
     details: '$() selectors, model and view automation, a Monaco editor with API IntelliSense, and a script library. Each run is a single undo step.'
-  - icon: 🔌
+  - icon:
+      src: /icons/extensions.png
+      alt: Extension plug and nodes
+      width: '48'
+      height: '48'
     title: Extensions & auto-layout
     details: Browser-local plugins add commands, panels and toolbar buttons — including a bundled ELK automatic-layout extension. Portable .archi-ext packages.
 ---
