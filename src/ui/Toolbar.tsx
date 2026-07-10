@@ -18,11 +18,11 @@ import {
 import { serializeExchange } from '../model/io/exchange-xml';
 import {
   createC4TemplateView,
-  createEmptyModel,
   importCsv,
   insertOrUpdateC4Legend,
 } from '../model/ops';
-import { openView, redo, replaceModel, setSelection, undo, useStore } from '../model/store';
+import { openView, redo, setSelection, undo, useStore } from '../model/store';
+import { getActiveModelSession } from '../model/workspace';
 import {
   openModelFromDisk,
   sanitizeFileName,
@@ -44,6 +44,7 @@ import { ExportCsvDialog } from './ExportCsvDialog';
 import { ExportImageDialog } from './ExportImageDialog';
 import { PresentationMode } from './PresentationMode';
 import { layoutBus } from './layout-bus';
+import { createNewModelSession } from './model-session-actions';
 
 /** Published documentation site (GitHub Pages). */
 const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
@@ -51,7 +52,7 @@ const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
 const SHORTCUTS: [string, string][] = [
   ['Ctrl+S / Ctrl+O', 'Save / open model'],
   ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
-  ['Ctrl+C / Ctrl+V', 'Copy / paste diagram objects'],
+  ['Ctrl+C / Ctrl+V', 'Copy / paste diagram objects or tree items (including across models)'],
   ['Ctrl+D', 'Duplicate (model tree or view selection)'],
   ['Ctrl+A', 'Select all on view'],
   ['Delete', 'Delete from view (canvas) or model (tree)'],
@@ -69,17 +70,6 @@ const SHORTCUTS: [string, string][] = [
   ['←/→, PgUp/PgDn (presentation)', 'Previous / next view'],
 ];
 
-export async function confirmDiscardChanges(): Promise<boolean> {
-  if (!useStore.getState().dirty) return true;
-  return showConfirmDialog({
-    title: 'Discard unsaved changes?',
-    message: 'The current model has changes that have not been saved.',
-    confirmLabel: 'Discard',
-    cancelLabel: 'Keep editing',
-    intent: 'danger',
-  });
-}
-
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -89,12 +79,10 @@ export function shareDecisionForInline(encodedLength: number): 'inline' | 'gist'
 }
 
 export async function newModel(): Promise<void> {
-  if (!(await confirmDiscardChanges())) return;
-  replaceModel(createEmptyModel('New ArchiMate Model'), null, false);
+  createNewModelSession();
 }
 
 export async function openModel(): Promise<void> {
-  if (!(await confirmDiscardChanges())) return;
   try {
     await openModelFromDisk();
   } catch (error) {
@@ -108,7 +96,8 @@ export async function openModel(): Promise<void> {
 
 export async function saveModel(saveAs = false): Promise<void> {
   try {
-    await saveModelToDisk(saveAs);
+    const session = getActiveModelSession();
+    if (session) await saveModelToDisk(session.id, saveAs);
   } catch (error) {
     await showAlertDialog({
       title: 'Could not save model',
@@ -504,7 +493,7 @@ export function Toolbar() {
         className="tb-icon"
         {...tip(canUndo ? `Undo ${undoLabel} (Ctrl+Z)` : 'Undo (Ctrl+Z)')}
         disabled={!canUndo}
-        onClick={undo}
+        onClick={() => undo()}
       >
         <TbIcon name="undo" />
       </button>
@@ -512,7 +501,7 @@ export function Toolbar() {
         className="tb-icon"
         {...tip(canRedo ? `Redo ${redoLabel} (Ctrl+Y)` : 'Redo (Ctrl+Y)')}
         disabled={!canRedo}
-        onClick={redo}
+        onClick={() => redo()}
       >
         <TbIcon name="redo" />
       </button>

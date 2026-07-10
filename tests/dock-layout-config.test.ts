@@ -4,7 +4,9 @@ import {
   applySidePanelConstraints,
   buildDefaultLayout,
   components,
+  createViewPanelId,
   ensurePropertiesDockedWithScripts,
+  parseViewPanelId,
 } from '../src/ui/dock/layout-config';
 
 interface Constraints {
@@ -89,6 +91,18 @@ function createDockApi() {
 }
 
 describe('dock layout config', () => {
+  it('uses session-scoped view panel ids', () => {
+    const first = createViewPanelId('session-one', 'shared-view');
+    const second = createViewPanelId('session-two', 'shared-view');
+
+    expect(first).not.toBe(second);
+    expect(parseViewPanelId(first)).toEqual({
+      sessionId: 'session-one',
+      viewId: 'shared-view',
+    });
+    expect(parseViewPanelId('welcome')).toBeNull();
+  });
+
   it('places Properties with the Scripting panel by default', () => {
     const { api, added } = createDockApi();
 
@@ -256,5 +270,29 @@ describe('dock layout config', () => {
     expect(added.find((panel) => panel.id === 'properties')?.group).toBe(scriptsGroup);
     expect(added.find((panel) => panel.id === 'settings')?.group).toBe(oldPropertiesGroup);
     expect(api.activePanel?.id).toBe('settings');
+  });
+});
+
+describe('active view panel synchronization', () => {
+  it('does not activate a tab for session activation or unchanged model revisions', async () => {
+    const layout = await import('../src/ui/dock/layout-config');
+    const changedActiveViewPanelId = (
+      layout as unknown as {
+        changedActiveViewPanelId?: (
+          previous: Record<string, string | null>,
+          current: Record<string, string | null>,
+          activeSessionId: string | null,
+        ) => string | null;
+      }
+    ).changedActiveViewPanelId;
+
+    expect(changedActiveViewPanelId).toBeTypeOf('function');
+    if (!changedActiveViewPanelId) return;
+    const snapshot = { first: 'view-a', second: 'view-b' };
+    expect(changedActiveViewPanelId(snapshot, { ...snapshot }, 'first')).toBeNull();
+    expect(changedActiveViewPanelId(snapshot, { ...snapshot }, 'second')).toBeNull();
+    expect(
+      changedActiveViewPanelId(snapshot, { ...snapshot, first: 'view-c' }, 'first'),
+    ).toBe(createViewPanelId('first', 'view-c'));
   });
 });

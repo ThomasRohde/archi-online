@@ -1,4 +1,6 @@
-import { create } from 'zustand';
+import { createContext, createElement, useContext, type ReactNode } from 'react';
+import { useStore as useZustandStore } from 'zustand';
+import { createStore, type StoreApi } from 'zustand/vanilla';
 import {
   enablePatches,
   produceWithPatches,
@@ -27,9 +29,7 @@ export type Tool =
   | { kind: 'create-group' };
 
 export interface SelectionState {
-  /** Where the selection was made; properties panel follows either. */
   source: 'tree' | 'view';
-  /** Selected model item ids (tree) or diagram node/connection ids (view). */
   ids: string[];
 }
 
@@ -44,9 +44,8 @@ export interface AppState {
   openViewIds: string[];
   activeViewId: string | null;
   activeTool: Tool;
-  /** Bumped on every model replacement (new/open) so editors can reset viewport. */
   modelEpoch: number;
-  /** True once startup restore (autosave) has finished; layout restore waits for it. */
+  /** Retained for viewer/test compatibility; editor boot state lives in the workspace. */
   booted: boolean;
 }
 
@@ -54,145 +53,226 @@ export interface ReplaceModelOptions {
   readOnly?: boolean;
 }
 
-export const useStore = create<AppState>(() => ({
-  model: null,
-  fileName: null,
-  dirty: false,
-  readOnly: false,
-  undoStack: [],
-  redoStack: [],
-  selection: { source: 'tree', ids: [] },
-  openViewIds: [],
-  activeViewId: null,
-  activeTool: { kind: 'select' },
-  modelEpoch: 0,
-  booted: false,
-}));
-
-/** File handle kept outside the store: not cloneable/immutable-friendly. */
-export let currentFileHandle: FileSystemFileHandle | null = null;
-export function setCurrentFileHandle(h: FileSystemFileHandle | null) {
-  currentFileHandle = h;
+export interface ModelStore extends StoreApi<AppState> {
+  transact(label: string, recipe: (draft: ModelState) => void): void;
+  runBatch<T>(label: string, fn: () => T): T;
 }
 
 const MAX_UNDO = 200;
 
-let batchDepth = 0;
-let batchLabel = '';
-let batchPatches: Patch[] = [];
-let batchInverse: Patch[] = [];
-
-/**
- * Run a mutation against the model, recording an undo transaction.
- * Nested/batched calls (see runBatch) collapse into a single transaction.
- */
-export function transact(label: string, recipe: (draft: ModelState) => void): void {
-  const state = useStore.getState();
-  if (!state.model || state.readOnly) return;
-  const [next, patches, inverse] = produceWithPatches(state.model, recipe);
-  if (patches.length === 0) return;
-  if (batchDepth > 0) {
-    batchPatches.push(...patches);
-    batchInverse.unshift(...inverse);
-    useStore.setState({ model: next, dirty: true });
-  } else {
-    useStore.setState((s) => ({
-      model: next,
-      dirty: true,
-      undoStack: [...s.undoStack, { label, patches, inverse }].slice(-MAX_UNDO),
-      redoStack: [],
-    }));
-  }
-  pruneSelection();
+function initialState(overrides: Partial<AppState> = {}): AppState {
+  return {
+    model: null,
+    fileName: null,
+    dirty: false,
+    readOnly: false,
+    undoStack: [],
+    redoStack: [],
+    selection: { source: 'tree', ids: [] },
+    openViewIds: [],
+    activeViewId: null,
+    activeTool: { kind: 'select' },
+    modelEpoch: 0,
+    booted: false,
+    ...overrides,
+  };
 }
 
-/** Group several transact() calls into one undo step (e.g. a script run). */
-export function runBatch<T>(label: string, fn: () => T): T {
-  if (batchDepth === 0) {
-    batchLabel = label;
-    batchPatches = [];
-    batchInverse = [];
-  }
-  batchDepth++;
-  try {
-    return fn();
-  } finally {
-    batchDepth--;
-    if (batchDepth === 0 && batchPatches.length > 0) {
-      const tx: Transaction = { label: batchLabel, patches: batchPatches, inverse: batchInverse };
-      useStore.setState((s) => ({
-        undoStack: [...s.undoStack, tx].slice(-MAX_UNDO),
+export function createModelStore(overrides: Partial<AppState> = {}): ModelStore {
+  const api = createStore<AppState>()(() => initialState(overrides));
+  let batchDepth = 0;
+  let batchLabel = '';
+  let batchPatches: Patch[] = [];
+  let batchInverse: Patch[] = [];
+
+  const modelStore = api as ModelStore;
+
+  modelStore.transact = (label, recipe) => {
+    const state = api.getState();
+    if (!state.model || state.readOnly) return;
+    const [next, patches, inverse] = produceWithPatches(state.model, recipe);
+    if (patches.length === 0) return;
+    if (batchDepth > 0) {
+      batchPatches.push(...patches);
+      batchInverse.unshift(...inverse);
+      api.setState({ model: next, dirty: true });
+    } else {
+      api.setState((current) => ({
+        model: next,
+        dirty: true,
+        undoStack: [...current.undoStack, { label, patches, inverse }].slice(-MAX_UNDO),
         redoStack: [],
       }));
+    }
+    pruneSelection(modelStore);
+  };
+
+  modelStore.runBatch = (label, fn) => {
+    if (batchDepth === 0) {
+      batchLabel = label;
       batchPatches = [];
       batchInverse = [];
     }
-  }
+    batchDepth++;
+    try {
+      return fn();
+    } finally {
+      batchDepth--;
+      if (batchDepth === 0 && batchPatches.length > 0) {
+        const tx: Transaction = {
+          label: batchLabel,
+          patches: batchPatches,
+          inverse: batchInverse,
+        };
+        api.setState((current) => ({
+          undoStack: [...current.undoStack, tx].slice(-MAX_UNDO),
+          redoStack: [],
+        }));
+        batchPatches = [];
+        batchInverse = [];
+      }
+    }
+  };
+
+  return modelStore;
 }
 
-export function undo(): void {
-  const s = useStore.getState();
-  if (s.readOnly) return;
-  const tx = s.undoStack[s.undoStack.length - 1];
-  if (!tx || !s.model) return;
-  useStore.setState({
-    model: applyPatches(s.model, tx.inverse),
+const emptyModelStore = createModelStore();
+let activeModelStore: ModelStore = emptyModelStore;
+
+export function setActiveModelStore(store: ModelStore | null): void {
+  activeModelStore = store ?? emptyModelStore;
+}
+
+export function getActiveModelStore(): ModelStore {
+  return activeModelStore;
+}
+
+export function resetEmptyModelStore(): void {
+  emptyModelStore.setState(initialState(), true);
+}
+
+const ModelStoreContext = createContext<ModelStore | null>(null);
+
+export function ModelStoreProvider({
+  store,
+  children,
+}: {
+  store: ModelStore;
+  children: ReactNode;
+}) {
+  return createElement(ModelStoreContext.Provider, { value: store }, children);
+}
+
+export function useModelStoreApi(): ModelStore {
+  return useContext(ModelStoreContext) ?? activeModelStore;
+}
+
+type BoundModelStoreHook = {
+  <T>(selector: (state: AppState) => T): T;
+  getState(): AppState;
+  setState: StoreApi<AppState>['setState'];
+  subscribe: StoreApi<AppState>['subscribe'];
+};
+
+function useStoreHook<T>(selector: (state: AppState) => T): T {
+  const store = useModelStoreApi();
+  return useZustandStore(store, selector);
+}
+
+const proxySetState: StoreApi<AppState>['setState'] = (partial, replace) => {
+  if (replace === true) activeModelStore.setState(partial as AppState, true);
+  else activeModelStore.setState(partial, false);
+};
+
+export const useStore = Object.assign(useStoreHook, {
+  getState: () => activeModelStore.getState(),
+  setState: proxySetState,
+  subscribe: (listener: Parameters<StoreApi<AppState>['subscribe']>[0]) =>
+    activeModelStore.subscribe(listener),
+}) as BoundModelStoreHook;
+
+function targetStore(store?: ModelStore): ModelStore {
+  return store ?? activeModelStore;
+}
+
+export function transact(
+  label: string,
+  recipe: (draft: ModelState) => void,
+  store?: ModelStore,
+): void {
+  targetStore(store).transact(label, recipe);
+}
+
+export function runBatch<T>(label: string, fn: () => T, store?: ModelStore): T {
+  return targetStore(store).runBatch(label, fn);
+}
+
+export function undo(store?: ModelStore): void {
+  const target = targetStore(store);
+  const state = target.getState();
+  if (state.readOnly) return;
+  const tx = state.undoStack[state.undoStack.length - 1];
+  if (!tx || !state.model) return;
+  target.setState({
+    model: applyPatches(state.model, tx.inverse),
     dirty: true,
-    undoStack: s.undoStack.slice(0, -1),
-    redoStack: [...s.redoStack, tx],
+    undoStack: state.undoStack.slice(0, -1),
+    redoStack: [...state.redoStack, tx],
   });
-  pruneSelection();
+  pruneSelection(target);
 }
 
-export function redo(): void {
-  const s = useStore.getState();
-  if (s.readOnly) return;
-  const tx = s.redoStack[s.redoStack.length - 1];
-  if (!tx || !s.model) return;
-  useStore.setState({
-    model: applyPatches(s.model, tx.patches),
+export function redo(store?: ModelStore): void {
+  const target = targetStore(store);
+  const state = target.getState();
+  if (state.readOnly) return;
+  const tx = state.redoStack[state.redoStack.length - 1];
+  if (!tx || !state.model) return;
+  target.setState({
+    model: applyPatches(state.model, tx.patches),
     dirty: true,
-    undoStack: [...s.undoStack, tx],
-    redoStack: s.redoStack.slice(0, -1),
+    undoStack: [...state.undoStack, tx],
+    redoStack: state.redoStack.slice(0, -1),
   });
-  pruneSelection();
+  pruneSelection(target);
 }
 
-/** Drop selection entries and open views that no longer exist (after undo/delete). */
-function pruneSelection(): void {
-  const s = useStore.getState();
-  const m = s.model;
-  if (!m) return;
+function pruneSelection(store: ModelStore): void {
+  const state = store.getState();
+  const model = state.model;
+  if (!model) return;
   const exists = (id: string) =>
-    id in m.elements ||
-    id in m.relationships ||
-    id in m.views ||
-    id in m.folders ||
-    id in m.nodes ||
-    id in m.connections;
-  const ids = s.selection.ids.filter(exists);
-  const openViewIds = s.openViewIds.filter((id) => id in m.views);
+    id in model.elements ||
+    id in model.relationships ||
+    id in model.views ||
+    id in model.folders ||
+    id in model.nodes ||
+    id in model.connections;
+  const ids = state.selection.ids.filter(exists);
+  const openViewIds = state.openViewIds.filter((id) => id in model.views);
   const activeViewId =
-    s.activeViewId && openViewIds.includes(s.activeViewId)
-      ? s.activeViewId
+    state.activeViewId && openViewIds.includes(state.activeViewId)
+      ? state.activeViewId
       : (openViewIds[openViewIds.length - 1] ?? null);
   if (
-    ids.length !== s.selection.ids.length ||
-    openViewIds.length !== s.openViewIds.length ||
-    activeViewId !== s.activeViewId
+    ids.length !== state.selection.ids.length ||
+    openViewIds.length !== state.openViewIds.length ||
+    activeViewId !== state.activeViewId
   ) {
-    useStore.setState({ selection: { ...s.selection, ids }, openViewIds, activeViewId });
+    store.setState({ selection: { ...state.selection, ids }, openViewIds, activeViewId });
   }
 }
 
-/** Replace the whole model (new / open file). Clears history and editor state. */
 export function replaceModel(
   model: ModelState | null,
   fileName: string | null,
   dirty = false,
   options: ReplaceModelOptions = {},
+  store?: ModelStore,
 ): void {
-  useStore.setState((s) => ({
+  const target = targetStore(store);
+  target.setState((state) => ({
     model,
     fileName,
     dirty,
@@ -203,35 +283,44 @@ export function replaceModel(
     openViewIds: [],
     activeViewId: null,
     activeTool: { kind: 'select' },
-    modelEpoch: s.modelEpoch + 1,
+    modelEpoch: state.modelEpoch + 1,
   }));
 }
 
-export function setSelection(source: 'tree' | 'view', ids: string[]): void {
-  useStore.setState({ selection: { source, ids } });
+export function setSelection(
+  source: 'tree' | 'view',
+  ids: string[],
+  store?: ModelStore,
+): void {
+  targetStore(store).setState({ selection: { source, ids } });
 }
 
-export function openView(viewId: string): void {
-  useStore.setState((s) => ({
-    openViewIds: s.openViewIds.includes(viewId) ? s.openViewIds : [...s.openViewIds, viewId],
+export function openView(viewId: string, store?: ModelStore): void {
+  targetStore(store).setState((state) => ({
+    openViewIds: state.openViewIds.includes(viewId)
+      ? state.openViewIds
+      : [...state.openViewIds, viewId],
     activeViewId: viewId,
   }));
 }
 
-export function closeView(viewId: string): void {
-  useStore.setState((s) => {
-    const openViewIds = s.openViewIds.filter((id) => id !== viewId);
+export function closeView(viewId: string, store?: ModelStore): void {
+  targetStore(store).setState((state) => {
+    const openViewIds = state.openViewIds.filter((id) => id !== viewId);
     return {
       openViewIds,
       activeViewId:
-        s.activeViewId === viewId ? (openViewIds[openViewIds.length - 1] ?? null) : s.activeViewId,
+        state.activeViewId === viewId
+          ? (openViewIds[openViewIds.length - 1] ?? null)
+          : state.activeViewId,
     };
   });
 }
 
-export function setActiveTool(tool: Tool): void {
-  if (useStore.getState().readOnly && tool.kind !== 'select') return;
-  useStore.setState({ activeTool: tool });
+export function setActiveTool(tool: Tool, store?: ModelStore): void {
+  const target = targetStore(store);
+  if (target.getState().readOnly && tool.kind !== 'select') return;
+  target.setState({ activeTool: tool });
 }
 
 export function cloneModelForEditing(model: ModelState): ModelState {

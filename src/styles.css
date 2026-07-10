@@ -681,6 +681,12 @@ body {
   overflow: auto;
 }
 
+.model-tree-session + .model-tree-session {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid var(--border, #ddd);
+}
+
 .properties-panel {
   flex: 1;
   min-height: 0;

@@ -4,7 +4,11 @@ import { StatusBar } from './StatusBar';
 import { Toolbar } from './Toolbar';
 
 export function AppShell() {
-  return (
+  const activeSessionId = useWorkspaceStore((state) => state.activeSessionId);
+  const session = useWorkspaceStore((state) =>
+    activeSessionId ? state.sessions[activeSessionId] : undefined,
+  );
+  const shell = (
     <div className="app-shell">
       <ContextMenuHost />
       <Toolbar />
@@ -14,4 +18,7 @@ export function AppShell() {
       <StatusBar />
     </div>
   );
+  return session ? <ModelStoreProvider store={session.store}>{shell}</ModelStoreProvider> : shell;
 }
+import { ModelStoreProvider } from '../model/store';
+import { useWorkspaceStore } from '../model/workspace';

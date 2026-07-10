@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { StandaloneIcon } from '../canvas/figures/icons';
 import { extensionRegistry } from '../extensions/registry';
 import { C4_VIEW_TYPE_LABELS, C4_VIEW_TYPES } from '../model/c4';
@@ -19,7 +27,24 @@ import {
   moveItemsToFolder,
   renameItem,
 } from '../model/ops';
-import { openView, setSelection, useStore } from '../model/store';
+import {
+  ModelStoreProvider,
+  openView,
+  setSelection,
+  useModelStoreApi,
+  useStore,
+} from '../model/store';
+import {
+  canPasteTo,
+  copyTreeItems,
+  pasteTreeItems,
+} from '../canvas/clipboard';
+import {
+  activateModelSession,
+  getModelSessionForStore,
+  useWorkspaceStore,
+  type ModelSession,
+} from '../model/workspace';
 import type { Folder, ModelState } from '../model/types';
 import {
   extensionMenuItems,
@@ -29,6 +54,11 @@ import {
 } from './ContextMenu';
 import { onRevealRequest } from './tree-bus';
 import { computeVisibleTreeItems, treeItemLabel, type TreeTypeFilter } from './tree-filter';
+import {
+  closeModelSession,
+  closeModelSessions,
+  saveModelSession,
+} from './model-session-actions';
 
 const FOLDER_LAYERS: Record<string, Layer[]> = {
   strategy: ['strategy'],
@@ -63,9 +93,13 @@ interface RowProps {
   onRenamed: (name: string | null) => void;
 }
 
+const ModelTreeActiveContext = createContext(true);
+
 function TreeRow(props: RowProps) {
+  const modelStore = useModelStoreApi();
+  const activeModel = useContext(ModelTreeActiveContext);
   const selected = useStore(
-    (s) => s.selection.source === 'tree' && s.selection.ids.includes(props.id),
+    (s) => activeModel && s.selection.source === 'tree' && s.selection.ids.includes(props.id),
   );
   const [dragOver, setDragOver] = useState(false);
 
@@ -94,30 +128,31 @@ function TreeRow(props: RowProps) {
       data-tree-id={props.id}
       draggable={props.draggable}
       onClick={(e) => {
-        const cur = useStore.getState().selection;
+        const cur = modelStore.getState().selection;
         if (e.ctrlKey && cur.source === 'tree') {
           setSelection(
             'tree',
             cur.ids.includes(props.id)
               ? cur.ids.filter((i) => i !== props.id)
               : [...cur.ids, props.id],
+            modelStore,
           );
         } else {
-          setSelection('tree', [props.id]);
+          setSelection('tree', [props.id], modelStore);
         }
       }}
       onDoubleClick={props.onDoubleClick}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        const cur = useStore.getState().selection;
+        const cur = modelStore.getState().selection;
         if (!(cur.source === 'tree' && cur.ids.includes(props.id))) {
-          setSelection('tree', [props.id]);
+          setSelection('tree', [props.id], modelStore);
         }
         props.onContextMenu?.(e.clientX, e.clientY);
       }}
       onDragStart={(e) => {
-        const cur = useStore.getState().selection;
+        const cur = modelStore.getState().selection;
         const ids =
           cur.source === 'tree' && cur.ids.includes(props.id) ? cur.ids : [props.id];
         e.dataTransfer.setData('application/x-archi-ids', JSON.stringify(ids));
@@ -157,14 +192,153 @@ function TreeRow(props: RowProps) {
 
 export function ModelTree() {
   const model = useStore((s) => s.model);
+  const order = useWorkspaceStore((s) => s.order);
+  const sessions = useWorkspaceStore((s) => s.sessions);
+  const activeSessionId = useWorkspaceStore((s) => s.activeSessionId);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [legacyRenamingId, setLegacyRenamingId] = useState<string | null>(null);
   const [filterText, setFilterText] = useState('');
   const [filterType, setFilterType] = useState<TreeTypeFilter>('all');
+
+  if (order.length > 0) {
+    const allFolderKeys = order.flatMap((sessionId) =>
+      Object.keys(sessions[sessionId]?.store.getState().model?.folders ?? {}).map(
+        (folderId) => `${sessionId}:${folderId}`,
+      ),
+    );
+    return (
+      <div
+        className="model-tree workspace-model-tree"
+        tabIndex={0}
+        onKeyDownCapture={(event) => {
+          if (event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f') {
+            event.preventDefault();
+            event.currentTarget.querySelector<HTMLInputElement>('.tree-filter-input')?.focus();
+          }
+        }}
+      >
+        {order.map((sessionId, index) => {
+          const session = sessions[sessionId];
+          return session ? (
+            <ScopedModelTree
+              key={sessionId}
+              session={session}
+              active={sessionId === activeSessionId}
+              collapsed={collapsed}
+              setCollapsed={setCollapsed}
+              filterText={filterText}
+              setFilterText={setFilterText}
+              filterType={filterType}
+              setFilterType={setFilterType}
+              showFilter={index === 0}
+              allFolderKeys={allFolderKeys}
+            />
+          ) : null;
+        })}
+      </div>
+    );
+  }
 
   if (!model) {
     return <div className="model-tree empty-hint">No model open.<br />Use File → New to create one.</div>;
   }
+  return (
+    <ModelTreeInner
+      model={model}
+      collapsed={collapsed}
+      setCollapsed={setCollapsed}
+      renamingId={legacyRenamingId}
+      setRenamingId={setLegacyRenamingId}
+      filterText={filterText}
+      setFilterText={setFilterText}
+      filterType={filterType}
+      setFilterType={setFilterType}
+      collapsePrefix="legacy"
+      active
+      dirty={useStore.getState().dirty}
+      embedded={false}
+      showFilter
+      allFolderKeys={Object.keys(model.folders).map((id) => `legacy:${id}`)}
+    />
+  );
+}
+
+function ScopedModelTree({
+  session,
+  active,
+  collapsed,
+  setCollapsed,
+  filterText,
+  setFilterText,
+  filterType,
+  setFilterType,
+  showFilter,
+  allFolderKeys,
+}: {
+  session: ModelSession;
+  active: boolean;
+  collapsed: Set<string>;
+  setCollapsed: (value: Set<string>) => void;
+  filterText: string;
+  setFilterText: (value: string) => void;
+  filterType: TreeTypeFilter;
+  setFilterType: (value: TreeTypeFilter) => void;
+  showFilter: boolean;
+  allFolderKeys: string[];
+}) {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  return (
+    <ModelStoreProvider store={session.store}>
+      <ModelTreeActiveContext.Provider value={active}>
+        <ScopedModelTreeContent
+          sessionId={session.id}
+          active={active}
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          renamingId={renamingId}
+          setRenamingId={setRenamingId}
+          filterText={filterText}
+          setFilterText={setFilterText}
+          filterType={filterType}
+          setFilterType={setFilterType}
+          showFilter={showFilter}
+          allFolderKeys={allFolderKeys}
+        />
+      </ModelTreeActiveContext.Provider>
+    </ModelStoreProvider>
+  );
+}
+
+function ScopedModelTreeContent({
+  sessionId,
+  active,
+  collapsed,
+  setCollapsed,
+  renamingId,
+  setRenamingId,
+  filterText,
+  setFilterText,
+  filterType,
+  setFilterType,
+  showFilter,
+  allFolderKeys,
+}: {
+  sessionId: string;
+  active: boolean;
+  collapsed: Set<string>;
+  setCollapsed: (value: Set<string>) => void;
+  renamingId: string | null;
+  setRenamingId: (value: string | null) => void;
+  filterText: string;
+  setFilterText: (value: string) => void;
+  filterType: TreeTypeFilter;
+  setFilterType: (value: TreeTypeFilter) => void;
+  showFilter: boolean;
+  allFolderKeys: string[];
+}) {
+  const model = useStore((state) => state.model);
+  const dirty = useStore((state) => state.dirty);
+  if (!model) return null;
   return (
     <ModelTreeInner
       model={model}
@@ -176,6 +350,12 @@ export function ModelTree() {
       setFilterText={setFilterText}
       filterType={filterType}
       setFilterType={setFilterType}
+      collapsePrefix={sessionId}
+      active={active}
+      dirty={dirty}
+      embedded
+      showFilter={showFilter}
+      allFolderKeys={allFolderKeys}
     />
   );
 }
@@ -190,6 +370,12 @@ function ModelTreeInner({
   setFilterText,
   filterType,
   setFilterType,
+  collapsePrefix,
+  active,
+  dirty,
+  embedded,
+  showFilter,
+  allFolderKeys,
 }: {
   model: ModelState;
   collapsed: Set<string>;
@@ -200,7 +386,14 @@ function ModelTreeInner({
   setFilterText: (text: string) => void;
   filterType: TreeTypeFilter;
   setFilterType: (type: TreeTypeFilter) => void;
+  collapsePrefix: string;
+  active: boolean;
+  dirty: boolean;
+  embedded: boolean;
+  showFilter: boolean;
+  allFolderKeys: string[];
 }) {
+  const modelStore = useModelStoreApi();
   const filterInputRef = useRef<HTMLInputElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const readOnly = useStore((s) => s.readOnly);
@@ -219,7 +412,8 @@ function ModelTreeInner({
   // so the handler always sees current filter/collapse state.
   useEffect(() =>
     onRevealRequest((id) => {
-      const m = useStore.getState().model;
+      if (!active) return;
+      const m = modelStore.getState().model;
       if (!m) return;
       const item = m.elements[id] ?? m.relationships[id] ?? m.views[id];
       const ancestors = new Set<string>();
@@ -229,8 +423,9 @@ function ModelTreeInner({
         f = m.folders[f]?.parentId;
       }
       if (visible !== null && !visible.has(id)) clearFilter();
-      if ([...ancestors].some((a) => collapsed.has(a))) {
-        setCollapsed(new Set([...collapsed].filter((c) => !ancestors.has(c))));
+      const ancestorKeys = new Set([...ancestors].map((id) => `${collapsePrefix}:${id}`));
+      if ([...ancestorKeys].some((key) => collapsed.has(key))) {
+        setCollapsed(new Set([...collapsed].filter((key) => !ancestorKeys.has(key))));
       }
       // The expanded row appears on a later render; retry a few frames.
       const scroll = (attempt: number) => {
@@ -242,23 +437,27 @@ function ModelTreeInner({
     }),
   );
   const toggle = (id: string) => {
+    const key = `${collapsePrefix}:${id}`;
     const next = new Set(collapsed);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
     setCollapsed(next);
   };
 
   const finishRename = (id: string) => (name: string | null) => {
     setRenamingId(null);
-    if (name !== null && name.trim() !== '') renameItem(id, name.trim());
+    if (name !== null && name.trim() !== '') renameItem(id, name.trim(), modelStore);
   };
 
   const showTreeContextMenu = (x: number, y: number, items: MenuItem[], targetId: string) => {
+    const session = getModelSessionForStore(modelStore);
     const trigger = {
       x,
       y,
+      sessionId: session?.id ?? null,
+      modelId: model.info.id,
       targetId,
-      selectionIds: useStore.getState().selection.ids,
+      selectionIds: modelStore.getState().selection.ids,
     };
     const extensionItems = extensionMenuItems('model-tree.context', trigger);
     showContextMenu(
@@ -272,7 +471,7 @@ function ModelTreeInner({
   const itemLabel = (id: string): string => treeItemLabel(model, id);
 
   const conceptMenu = (id: string): MenuItem[] => {
-    const sel = useStore.getState().selection;
+    const sel = modelStore.getState().selection;
     const ids = sel.source === 'tree' && sel.ids.includes(id) ? sel.ids : [id];
     const canDuplicate = ids.some((i) => model.elements[i] || model.views[i]);
     return [
@@ -280,11 +479,19 @@ function ModelTreeInner({
       ...(canDuplicate
         ? [
             {
+              label: 'Copy (Ctrl+C)',
+              onClick: () => copyTreeItems(modelStore, collapsePrefix, ids),
+            } as MenuItem,
+          ]
+        : []),
+      ...(canDuplicate
+        ? [
+            {
               label: 'Duplicate',
               disabled: readOnly,
               onClick: () => {
-                const newIds = duplicateItems(ids);
-                if (newIds.length) setSelection('tree', newIds);
+                const newIds = duplicateItems(ids, modelStore);
+                if (newIds.length) setSelection('tree', newIds, modelStore);
               },
             } as MenuItem,
           ]
@@ -293,13 +500,24 @@ function ModelTreeInner({
       {
         label: ids.length > 1 ? `Delete ${ids.length} items` : 'Delete',
         danger: true,
-        onClick: () => deleteItems(ids),
+        onClick: () => deleteItems(ids, modelStore),
       },
     ];
   };
 
   const folderMenu = (folder: Folder): MenuItem[] => {
     const items: MenuItem[] = [];
+    if (embedded) {
+      items.push({
+        label: 'Paste (Ctrl+V)',
+        disabled: !canPasteTo('tree') || readOnly,
+        onClick: () => {
+          const ids = pasteTreeItems(modelStore, collapsePrefix);
+          if (ids.length) setSelection('tree', ids, modelStore);
+        },
+      });
+      items.push(SEPARATOR);
+    }
     const layers = folder.folderType ? FOLDER_LAYERS[folder.folderType] : undefined;
     // find root folder type by walking up for subfolders
     let top: Folder = folder;
@@ -313,8 +531,8 @@ function ModelTreeInner({
             label: d.label,
             icon: <ElementIcon type={d.type} />,
             onClick: () => {
-              const id = addElement(d.type, undefined, folder.id);
-              setSelection('tree', [id]);
+              const id = addElement(d.type, undefined, folder.id, modelStore);
+              setSelection('tree', [id], modelStore);
               setRenamingId(id);
             },
           })),
@@ -325,9 +543,9 @@ function ModelTreeInner({
       items.push({
         label: 'New ArchiMate View',
         onClick: () => {
-          const id = addView('New View', folder.id);
-          setSelection('tree', [id]);
-          openView(id);
+          const id = addView('New View', folder.id, modelStore);
+          setSelection('tree', [id], modelStore);
+          openView(id, modelStore);
           setRenamingId(id);
         },
       });
@@ -336,9 +554,9 @@ function ModelTreeInner({
         children: C4_VIEW_TYPES.map((viewType) => ({
           label: C4_VIEW_TYPE_LABELS[viewType],
           onClick: () => {
-            const id = createC4TemplateView(viewType, folder.id);
-            setSelection('tree', [id]);
-            openView(id);
+            const id = createC4TemplateView(viewType, folder.id, modelStore);
+            setSelection('tree', [id], modelStore);
+            openView(id, modelStore);
           },
         })),
       });
@@ -346,14 +564,18 @@ function ModelTreeInner({
     items.push({
       label: 'New Folder',
       onClick: () => {
-        const id = addFolder(folder.id);
+        const id = addFolder(folder.id, 'New Folder', modelStore);
         setRenamingId(id);
       },
     });
     if (folder.parentId !== null) {
       items.push(SEPARATOR);
       items.push({ label: 'Rename', onClick: () => setRenamingId(folder.id) });
-      items.push({ label: 'Delete', danger: true, onClick: () => deleteItems([folder.id]) });
+      items.push({
+        label: 'Delete',
+        danger: true,
+        onClick: () => deleteItems([folder.id], modelStore),
+      });
     }
     return items;
   };
@@ -363,7 +585,7 @@ function ModelTreeInner({
     if (!folder) return null;
     if (filtering && !visible.has(folderId)) return null;
     // While filtering, matches must be reachable: ignore collapse state.
-    const isCollapsed = !filtering && collapsed.has(folderId);
+    const isCollapsed = !filtering && collapsed.has(`${collapsePrefix}:${folderId}`);
     const subfolders = [...folder.folderIds].sort((a, b) =>
       (model.folders[a]?.name ?? '').localeCompare(model.folders[b]?.name ?? ''),
     );
@@ -381,7 +603,7 @@ function ModelTreeInner({
             label={folder.name}
             onContextMenu={(x, y) => showTreeContextMenu(x, y, folderMenu(folder), folderId)}
             draggable={folder.parentId !== null}
-            onDropIds={(ids) => moveItemsToFolder(ids, folderId)}
+            onDropIds={(ids) => moveItemsToFolder(ids, folderId, modelStore)}
             renaming={renamingId === folderId}
             onRenamed={finishRename(folderId)}
           />
@@ -432,13 +654,13 @@ function ModelTreeInner({
                     depth={depth + 1}
                     icon={<span className="tree-view-icon">▦</span>}
                     label={view.name}
-                    onDoubleClick={() => openView(itemId)}
+                    onDoubleClick={() => openView(itemId, modelStore)}
                     onContextMenu={(x, y) =>
                       showTreeContextMenu(
                         x,
                         y,
                         [
-                          { label: 'Open View', onClick: () => openView(itemId) },
+                          { label: 'Open View', onClick: () => openView(itemId, modelStore) },
                           SEPARATOR,
                           ...conceptMenu(itemId),
                         ],
@@ -459,16 +681,52 @@ function ModelTreeInner({
     );
   };
 
-  const rootMenu: MenuItem[] = useMemo(
-    () => [{ label: 'Rename', onClick: () => setRenamingId(model.info.id) }],
-    [model.info.id, setRenamingId],
-  );
+  const rootMenu = (): MenuItem[] => {
+    const items: MenuItem[] = [{ label: 'Rename', onClick: () => setRenamingId(model.info.id) }];
+    if (!embedded) return items;
+    const workspace = useWorkspaceStore.getState();
+    return [
+      { label: 'Save', onClick: () => void saveModelSession(collapsePrefix) },
+      { label: 'Save As…', onClick: () => void saveModelSession(collapsePrefix, true) },
+      {
+        label: 'Paste (Ctrl+V)',
+        disabled: !canPasteTo('tree') || readOnly,
+        onClick: () => {
+          const ids = pasteTreeItems(modelStore, collapsePrefix);
+          if (ids.length) setSelection('tree', ids, modelStore);
+        },
+      },
+      SEPARATOR,
+      { label: 'Close Model', onClick: () => void closeModelSession(collapsePrefix) },
+      {
+        label: 'Close Other Models',
+        disabled: workspace.order.length < 2,
+        onClick: () =>
+          void closeModelSessions(workspace.order.filter((id) => id !== collapsePrefix)),
+      },
+      {
+        label: 'Close All Models',
+        onClick: () => void closeModelSessions([...workspace.order]),
+      },
+    ];
+  };
+  const rootCollapsed = !filtering && collapsed.has(`${collapsePrefix}:${model.info.id}`);
 
   return (
     <div
       ref={treeRef}
-      className="model-tree"
+      className={embedded ? 'model-tree-session' : 'model-tree'}
+      data-model-session-id={embedded ? collapsePrefix : undefined}
       tabIndex={0}
+      onPointerDownCapture={() => {
+        if (embedded) activateModelSession(collapsePrefix);
+      }}
+      onFocusCapture={() => {
+        if (embedded) activateModelSession(collapsePrefix);
+      }}
+      onClickCapture={() => {
+        if (embedded) activateModelSession(collapsePrefix);
+      }}
       onKeyDown={(e) => {
         if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
           e.preventDefault();
@@ -476,16 +734,28 @@ function ModelTreeInner({
           return;
         }
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
-        const sel = useStore.getState().selection;
+        const sel = modelStore.getState().selection;
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && sel.source === 'tree') {
+          e.preventDefault();
+          copyTreeItems(modelStore, collapsePrefix, sel.ids);
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && embedded) {
+          e.preventDefault();
+          const ids = pasteTreeItems(modelStore, collapsePrefix);
+          if (ids.length) setSelection('tree', ids, modelStore);
+          return;
+        }
         if (e.key === 'Delete' && sel.source === 'tree' && sel.ids.length > 0) {
-          deleteItems(sel.ids);
+          e.preventDefault();
+          deleteItems(sel.ids, modelStore);
         }
         if (e.key === 'F2' && sel.source === 'tree' && sel.ids.length === 1) {
           setRenamingId(sel.ids[0]);
         }
       }}
     >
-      <div className="tree-filter">
+      {showFilter && <div className="tree-filter">
         <input
           ref={filterInputRef}
           className="tree-filter-input"
@@ -546,7 +816,7 @@ function ModelTreeInner({
           className="tree-filter-btn"
           title={filtering ? 'Collapse All (unavailable while filtering)' : 'Collapse All'}
           disabled={filtering}
-          onClick={() => setCollapsed(new Set(Object.keys(model.folders)))}
+          onClick={() => setCollapsed(new Set(allFolderKeys))}
         >
           <svg viewBox="0 0 16 16" width="12" height="12">
             <path
@@ -562,17 +832,19 @@ function ModelTreeInner({
             ✕
           </button>
         )}
+      </div>}
+      <div onDoubleClick={() => toggle(model.info.id)}>
+        <TreeRow
+          id={model.info.id}
+          depth={0}
+          icon={<span className="tree-model-icon">{rootCollapsed ? '▸' : '▾'} ◈</span>}
+          label={`${model.info.name}${dirty ? ' *' : ''}`}
+          onContextMenu={(x, y) => showTreeContextMenu(x, y, rootMenu(), model.info.id)}
+          renaming={renamingId === model.info.id}
+          onRenamed={finishRename(model.info.id)}
+        />
       </div>
-      <TreeRow
-        id={model.info.id}
-        depth={0}
-        icon={<span className="tree-model-icon">◈</span>}
-        label={model.info.name}
-        onContextMenu={(x, y) => showTreeContextMenu(x, y, rootMenu, model.info.id)}
-        renaming={renamingId === model.info.id}
-        onRenamed={finishRename(model.info.id)}
-      />
-      {model.rootFolderIds.map((fid) => renderFolder(fid, 1))}
+      {!rootCollapsed && model.rootFolderIds.map((fid) => renderFolder(fid, 1))}
       {filtering && visible.size === 0 && (
         <div className="tree-filter-empty">No matches.</div>
       )}

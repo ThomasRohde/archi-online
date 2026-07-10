@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-10
+
+### Added
+
+- Desktop Archi-style multi-model workspace with independent undo, save, dirty,
+  selection, and open-view state per model
+- Cross-model copy/paste for diagram objects, elements, and whole views,
+  including tree-to-view and view-to-tree context-menu workflows
+- Desktop Archi-style view duplication and paste semantics, with explicit
+  **Paste as Reference** for shared-concept visuals
+- Full multi-model IndexedDB workspace restore and model lifecycle extension events
+
 ## [1.1.0] - 2026-07-10
 
 ### Added

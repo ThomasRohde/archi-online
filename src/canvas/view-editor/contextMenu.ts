@@ -11,7 +11,7 @@ import {
   reorderNode,
   setConnectionBendpoints,
 } from '../../model/ops';
-import { setSelection } from '../../model/store';
+import { setSelection, type ModelStore } from '../../model/store';
 import type { Bounds, ModelState } from '../../model/types';
 import {
   alignmentAnchorMode,
@@ -40,7 +40,12 @@ import {
   showContextMenu,
   type MenuItem,
 } from '../../ui/ContextMenu';
-import { hasClipboard, pasteNodes } from '../clipboard';
+import {
+  canPasteAsReferenceTo,
+  canPasteTo,
+  copyNodes,
+  pasteNodes,
+} from '../clipboard';
 import type { Point } from '../geometry';
 
 export function showEmptyCanvasContextMenu({
@@ -53,6 +58,8 @@ export function showEmptyCanvasContextMenu({
   absBounds,
   startEdit,
   settings,
+  modelStore,
+  sessionId,
   snap,
   zoomBy,
   zoomTo,
@@ -67,6 +74,8 @@ export function showEmptyCanvasContextMenu({
   absBounds: Map<string, Bounds>;
   startEdit: (nodeId: string) => void;
   settings: AppSettings;
+  modelStore: ModelStore;
+  sessionId: string;
   snap: (value: number) => number;
   zoomBy: (factor: number) => void;
   zoomTo: (zoom: number) => void;
@@ -75,13 +84,24 @@ export function showEmptyCanvasContextMenu({
   const items: MenuItem[] = [
     {
       label: 'Paste (Ctrl+V)',
-      disabled: !hasClipboard(),
+      disabled: !canPasteTo('view') || modelStore.getState().readOnly,
       onClick: () => {
-        const ids = pasteNodes(viewId, point);
-        if (ids.length > 0) setSelection('view', ids);
+        const ids = pasteNodes(viewId, point, modelStore, sessionId);
+        if (ids.length > 0) setSelection('view', ids, modelStore);
       },
     },
-    { label: 'Select All (Ctrl+A)', onClick: () => setSelection('view', [...absBounds.keys()]) },
+    {
+      label: 'Paste as Reference',
+      disabled: !canPasteAsReferenceTo(sessionId) || modelStore.getState().readOnly,
+      onClick: () => {
+        const ids = pasteNodes(viewId, point, modelStore, sessionId, 'reference');
+        if (ids.length > 0) setSelection('view', ids, modelStore);
+      },
+    },
+    {
+      label: 'Select All (Ctrl+A)',
+      onClick: () => setSelection('view', [...absBounds.keys()], modelStore),
+    },
     SEPARATOR,
     {
       label: 'New Note',
@@ -99,8 +119,9 @@ export function showEmptyCanvasContextMenu({
           },
           '',
           textDefaults,
+          modelStore,
         );
-        setSelection('view', [noteId]);
+        setSelection('view', [noteId], modelStore);
         setTimeout(() => startEdit(noteId), 0);
       },
     },
@@ -120,8 +141,9 @@ export function showEmptyCanvasContextMenu({
           },
           'Group',
           textDefaults,
+          modelStore,
         );
-        setSelection('view', [groupId]);
+        setSelection('view', [groupId], modelStore);
       },
     },
     SEPARATOR,
@@ -134,6 +156,8 @@ export function showEmptyCanvasContextMenu({
     x: clientX,
     y: clientY,
     viewId,
+    sessionId,
+    modelId: modelStore.getState().model?.info.id ?? null,
   };
   const extensionItems = extensionMenuItems('view.context', trigger);
   showContextMenu(
@@ -152,6 +176,8 @@ export function showViewObjectContextMenu({
   ids,
   model,
   settings,
+  modelStore,
+  sessionId,
   startEdit,
 }: {
   clientX: number;
@@ -161,6 +187,8 @@ export function showViewObjectContextMenu({
   ids: string[];
   model: ModelState;
   settings: AppSettings;
+  modelStore: ModelStore;
+  sessionId: string;
   startEdit: (nodeId: string) => void;
 }) {
   const items: MenuItem[] = [];
@@ -169,31 +197,41 @@ export function showViewObjectContextMenu({
     if (node.nodeType === 'element' || node.nodeType === 'group' || node.nodeType === 'note') {
       items.push({ label: 'Rename (F2)', onClick: () => startEdit(id) });
     }
-    items.push({ label: 'Bring to Front', onClick: () => reorderNode(id, 'front') });
-    items.push({ label: 'Send to Back', onClick: () => reorderNode(id, 'back') });
+    items.push({
+      label: 'Bring to Front',
+      onClick: () => reorderNode(id, 'front', modelStore),
+    });
+    items.push({
+      label: 'Send to Back',
+      onClick: () => reorderNode(id, 'back', modelStore),
+    });
     items.push(SEPARATOR);
   }
   const conn = model.connections[id];
   if (conn && conn.bendpoints.length > 0) {
     items.push({
       label: 'Remove All Bendpoints',
-      onClick: () => setConnectionBendpoints(id, []),
+      onClick: () => setConnectionBendpoints(id, [], modelStore),
     });
     items.push(SEPARATOR);
   }
   if (ids.some((i) => model.nodes[i])) {
     items.push({
+      label: 'Copy (Ctrl+C)',
+      onClick: () => copyNodes(ids, modelStore, sessionId),
+    });
+    items.push({
       label: 'Duplicate (Ctrl+D)',
       onClick: () => {
-        const newIds = duplicateViewObjects(viewId, ids, settings.pasteOffset);
-        if (newIds.length) setSelection('view', newIds);
+        const newIds = duplicateViewObjects(viewId, ids, settings.pasteOffset, modelStore);
+        if (newIds.length) setSelection('view', newIds, modelStore);
       },
     });
     items.push(SEPARATOR);
   }
   items.push({
     label: 'Delete from View (Del)',
-    onClick: () => deleteViewObjects(ids),
+    onClick: () => deleteViewObjects(ids, modelStore),
   });
   const conceptIds = ids
     .map((i) => {
@@ -207,7 +245,7 @@ export function showViewObjectContextMenu({
     items.push({
       label: 'Delete from Model',
       danger: true,
-      onClick: () => deleteItems(conceptIds),
+      onClick: () => deleteItems(conceptIds, modelStore),
     });
   }
   const alignIds = alignableNodeIds(model, ids);
@@ -217,12 +255,12 @@ export function showViewObjectContextMenu({
     items.push({
       label: 'Align',
       children: [
-        { label: 'Align Left', icon: alignLeftIcon, onClick: () => alignNodes(alignIds, 'left', anchor) },
-        { label: 'Align Center', icon: alignCenterIcon, onClick: () => alignNodes(alignIds, 'center', anchor) },
-        { label: 'Align Right', icon: alignRightIcon, onClick: () => alignNodes(alignIds, 'right', anchor) },
-        { label: 'Align Top', icon: alignTopIcon, onClick: () => alignNodes(alignIds, 'top', anchor) },
-        { label: 'Align Middle', icon: alignMiddleIcon, onClick: () => alignNodes(alignIds, 'middle', anchor) },
-        { label: 'Align Bottom', icon: alignBottomIcon, onClick: () => alignNodes(alignIds, 'bottom', anchor) },
+        { label: 'Align Left', icon: alignLeftIcon, onClick: () => alignNodes(alignIds, 'left', anchor, modelStore) },
+        { label: 'Align Center', icon: alignCenterIcon, onClick: () => alignNodes(alignIds, 'center', anchor, modelStore) },
+        { label: 'Align Right', icon: alignRightIcon, onClick: () => alignNodes(alignIds, 'right', anchor, modelStore) },
+        { label: 'Align Top', icon: alignTopIcon, onClick: () => alignNodes(alignIds, 'top', anchor, modelStore) },
+        { label: 'Align Middle', icon: alignMiddleIcon, onClick: () => alignNodes(alignIds, 'middle', anchor, modelStore) },
+        { label: 'Align Bottom', icon: alignBottomIcon, onClick: () => alignNodes(alignIds, 'bottom', anchor, modelStore) },
       ],
     });
     if (alignIds.length >= 3) {
@@ -232,12 +270,12 @@ export function showViewObjectContextMenu({
           {
             label: 'Distribute Horizontally',
             icon: distributeHorizontalIcon,
-            onClick: () => distributeNodes(alignIds, 'horizontal'),
+            onClick: () => distributeNodes(alignIds, 'horizontal', modelStore),
           },
           {
             label: 'Distribute Vertically',
             icon: distributeVerticalIcon,
-            onClick: () => distributeNodes(alignIds, 'vertical'),
+            onClick: () => distributeNodes(alignIds, 'vertical', modelStore),
           },
         ],
       });
@@ -245,9 +283,9 @@ export function showViewObjectContextMenu({
     items.push({
       label: 'Match Size',
       children: [
-        { label: 'Match Width', icon: matchWidthIcon, onClick: () => matchSize(alignIds, 'width', anchor) },
-        { label: 'Match Height', icon: matchHeightIcon, onClick: () => matchSize(alignIds, 'height', anchor) },
-        { label: 'Match Size', icon: matchSizeIcon, onClick: () => matchSize(alignIds, 'both', anchor) },
+        { label: 'Match Width', icon: matchWidthIcon, onClick: () => matchSize(alignIds, 'width', anchor, modelStore) },
+        { label: 'Match Height', icon: matchHeightIcon, onClick: () => matchSize(alignIds, 'height', anchor, modelStore) },
+        { label: 'Match Size', icon: matchSizeIcon, onClick: () => matchSize(alignIds, 'both', anchor, modelStore) },
       ],
     });
   }
@@ -255,6 +293,8 @@ export function showViewObjectContextMenu({
     x: clientX,
     y: clientY,
     viewId,
+    sessionId,
+    modelId: modelStore.getState().model?.info.id ?? null,
     targetId: id,
     selectionIds: ids,
   };

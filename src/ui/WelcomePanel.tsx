@@ -1,13 +1,16 @@
 import { parseArchimate } from '../model/io/archimate-xml';
 import { addView } from '../model/ops';
-import { openView, replaceModel, useStore } from '../model/store';
+import { openView, useStore } from '../model/store';
+import { addModelSession, type ModelSessionId } from '../model/workspace';
 import { showAlertDialog } from './AppDialog';
 import { newModel, openModel } from './Toolbar';
 
-async function loadExample(fileName = 'Archisurance.archimate'): Promise<void> {
+export async function loadExampleModel(
+  fileName = 'Archisurance.archimate',
+): Promise<ModelSessionId> {
   const res = await fetch(import.meta.env.BASE_URL + `examples/${fileName}`);
   const model = parseArchimate(await res.text());
-  replaceModel(model, fileName, false);
+  return addModelSession({ model, fileName, dirty: false });
 }
 
 function errorMessage(error: unknown): string {
@@ -50,7 +53,7 @@ export function WelcomePanel() {
           <button
             className="welcome-btn"
             onClick={() =>
-              void loadExample().catch((error) =>
+              void loadExampleModel().catch((error) =>
                 showAlertDialog({
                   title: 'Could not load example',
                   message: errorMessage(error),
@@ -64,7 +67,7 @@ export function WelcomePanel() {
           <button
             className="welcome-btn"
             onClick={() =>
-              void loadExample('c4-customer-portal.archimate').catch((error) =>
+              void loadExampleModel('c4-customer-portal.archimate').catch((error) =>
                 showAlertDialog({
                   title: 'Could not load example',
                   message: errorMessage(error),

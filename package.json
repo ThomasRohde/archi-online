@@ -1,7 +1,7 @@
 {
   "name": "archi-online",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Web-based ArchiMate modeler inspired by Archi, scriptable with a jArchi-compatible JavaScript API",
   "license": "MIT",
   "type": "module",

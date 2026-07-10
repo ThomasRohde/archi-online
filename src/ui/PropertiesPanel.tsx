@@ -19,7 +19,7 @@ import {
   setRelationshipAttrs,
   setViewpoint,
 } from '../model/ops';
-import { useStore } from '../model/store';
+import { useModelStoreApi, useStore } from '../model/store';
 import type { ModelState, Property } from '../model/types';
 import { AppearanceTab } from './properties/AppearanceTab';
 import { AnalysisTab } from './properties/AnalysisTab';
@@ -81,9 +81,10 @@ function CommitInput({
 }
 
 function PropertiesTable({ target, readOnly }: { target: Target; readOnly: boolean }) {
+  const modelStore = useModelStoreApi();
   const props = target.properties ?? [];
   const commit = (next: Property[]) => {
-    if (!readOnly) setProperties(target.conceptId!, next);
+    if (!readOnly) setProperties(target.conceptId!, next, modelStore);
   };
   if (!target.conceptId) return <div className="empty-hint">No properties for this selection.</div>;
   return (
@@ -140,6 +141,7 @@ function C4Fields({
   target: Target;
   readOnly: boolean;
 }) {
+  const modelStore = useModelStoreApi();
   if (target.count !== 1 || !target.conceptId || !target.properties) return null;
   const element = model.elements[target.conceptId];
   const relationship = model.relationships[target.conceptId];
@@ -148,7 +150,11 @@ function C4Fields({
 
   const commit = (key: string, value: string | undefined) => {
     if (readOnly) return;
-    setProperties(target.conceptId!, setC4PropertyValue(target.properties ?? [], key, value));
+    setProperties(
+      target.conceptId!,
+      setC4PropertyValue(target.properties ?? [], key, value),
+      modelStore,
+    );
   };
   const technology = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.technology) ?? '';
   const tags = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.tags) ?? '';
@@ -274,6 +280,7 @@ function C4Fields({
 }
 
 export function PropertiesPanel() {
+  const modelStore = useModelStoreApi();
   const model = useStore((s) => s.model);
   const selection = useStore((s) => s.selection);
   const readOnly = useStore((s) => s.readOnly);
@@ -330,7 +337,9 @@ export function PropertiesPanel() {
                     <CommitInput
                       value={target.name ?? ''}
                       disabled={readOnly || !target.nameEditable}
-                      onCommit={(v) => target.conceptId && renameItem(target.conceptId, v)}
+                      onCommit={(v) =>
+                        target.conceptId && renameItem(target.conceptId, v, modelStore)
+                      }
                     />
                   </div>
                   {target.documentation !== undefined && (
@@ -340,7 +349,9 @@ export function PropertiesPanel() {
                         multiline
                         value={target.documentation}
                         disabled={readOnly}
-                        onCommit={(v) => target.conceptId && setDocumentation(target.conceptId, v)}
+                        onCommit={(v) =>
+                          target.conceptId && setDocumentation(target.conceptId, v, modelStore)
+                        }
                       />
                     </div>
                   )}
@@ -353,7 +364,7 @@ export function PropertiesPanel() {
                         onChange={(e) =>
                           setRelationshipAttrs(target.relationship!.id, {
                             accessType: parseInt(e.target.value, 10),
-                          })
+                          }, modelStore)
                         }
                       >
                         <option value={0}>Write</option>
@@ -370,7 +381,9 @@ export function PropertiesPanel() {
                         value={target.relationship.strength ?? ''}
                         placeholder="e.g. ++ or --"
                         disabled={readOnly}
-                        onCommit={(v) => setRelationshipAttrs(target.relationship!.id, { strength: v })}
+                        onCommit={(v) =>
+                          setRelationshipAttrs(target.relationship!.id, { strength: v }, modelStore)
+                        }
                       />
                     </div>
                   )}
@@ -382,7 +395,11 @@ export function PropertiesPanel() {
                           checked={target.relationship.directed ?? false}
                           disabled={readOnly}
                           onChange={(e) =>
-                            setRelationshipAttrs(target.relationship!.id, { directed: e.target.checked })
+                            setRelationshipAttrs(
+                              target.relationship!.id,
+                              { directed: e.target.checked },
+                              modelStore,
+                            )
                           }
                         />{' '}
                         Directed
@@ -396,7 +413,11 @@ export function PropertiesPanel() {
                         value={target.junctionType}
                         disabled={readOnly}
                         onChange={(e) =>
-                          setJunctionType(target.junctionElementId!, e.target.value as 'and' | 'or')
+                          setJunctionType(
+                            target.junctionElementId!,
+                            e.target.value as 'and' | 'or',
+                            modelStore,
+                          )
                         }
                       >
                         <option value="and">And</option>
@@ -410,7 +431,7 @@ export function PropertiesPanel() {
                       <select
                         value={target.viewpoint ?? ''}
                         disabled={readOnly}
-                        onChange={(e) => setViewpoint(target.viewId!, e.target.value)}
+                        onChange={(e) => setViewpoint(target.viewId!, e.target.value, modelStore)}
                       >
                         <option value="">None</option>
                         {target.viewpoint &&

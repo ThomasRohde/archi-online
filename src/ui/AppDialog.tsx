@@ -31,7 +31,18 @@ interface PromptDialogRequest extends DialogBase {
   resolve: (value: string | null) => void;
 }
 
-type DialogRequest = AlertDialogRequest | ConfirmDialogRequest | PromptDialogRequest;
+interface ChoiceDialogRequest extends DialogBase {
+  kind: 'choice';
+  cancelLabel: string;
+  choices: ChoiceDialogChoice[];
+  resolve: (value: string | null) => void;
+}
+
+type DialogRequest =
+  | AlertDialogRequest
+  | ConfirmDialogRequest
+  | PromptDialogRequest
+  | ChoiceDialogRequest;
 
 export interface AlertDialogOptions {
   title: string;
@@ -57,6 +68,22 @@ export interface PromptDialogOptions {
   defaultValue?: string;
   placeholder?: string;
   confirmLabel?: string;
+  cancelLabel?: string;
+}
+
+export interface ChoiceDialogChoice<T extends string = string> {
+  label: string;
+  value: T;
+  primary?: boolean;
+  danger?: boolean;
+}
+
+export interface ChoiceDialogOptions<T extends string> {
+  title: string;
+  message?: string;
+  details?: string;
+  intent?: DialogIntent;
+  choices: ChoiceDialogChoice<T>[];
   cancelLabel?: string;
 }
 
@@ -118,6 +145,25 @@ export function showPromptDialog(options: PromptDialogOptions): Promise<string |
   });
 }
 
+export function showChoiceDialog<T extends string>(
+  options: ChoiceDialogOptions<T>,
+): Promise<T | null> {
+  return new Promise((resolve) => {
+    present({
+      id: nextDialogId++,
+      kind: 'choice',
+      title: options.title,
+      message: options.message,
+      details: options.details,
+      intent: options.intent ?? 'default',
+      confirmLabel: '',
+      cancelLabel: options.cancelLabel ?? 'Cancel',
+      choices: options.choices,
+      resolve: (value) => resolve(value as T | null),
+    });
+  });
+}
+
 export function AppDialogHost() {
   const [queue, setQueue] = useState<DialogRequest[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -133,7 +179,8 @@ export function AppDialogHost() {
     if (!active) return;
     if (active.kind === 'alert') active.resolve();
     else if (active.kind === 'confirm') active.resolve(true);
-    else active.resolve(inputValue);
+    else if (active.kind === 'prompt') active.resolve(inputValue);
+    else active.resolve(active.choices.find((choice) => choice.primary)?.value ?? active.choices[0]?.value ?? null);
     closeActive();
   }, [active, closeActive, inputValue]);
 
@@ -224,13 +271,30 @@ export function AppDialogHost() {
               {active.cancelLabel}
             </button>
           )}
-          <button
-            ref={primaryRef}
-            type="submit"
-            className={`app-dialog-btn primary ${active.intent === 'danger' ? 'danger' : ''}`}
-          >
-            {active.confirmLabel}
-          </button>
+          {active.kind === 'choice' ? (
+            active.choices.map((choice) => (
+              <button
+                key={choice.value}
+                ref={choice.primary ? primaryRef : undefined}
+                type="button"
+                className={`app-dialog-btn${choice.primary ? ' primary' : ''}${choice.danger ? ' danger' : ''}`}
+                onClick={() => {
+                  active.resolve(choice.value);
+                  closeActive();
+                }}
+              >
+                {choice.label}
+              </button>
+            ))
+          ) : (
+            <button
+              ref={primaryRef}
+              type="submit"
+              className={`app-dialog-btn primary ${active.intent === 'danger' ? 'danger' : ''}`}
+            >
+              {active.confirmLabel}
+            </button>
+          )}
         </div>
       </form>
     </div>,
@@ -240,6 +304,7 @@ export function AppDialogHost() {
 
 function dialogKicker(kind: DialogRequest['kind']): string {
   if (kind === 'prompt') return 'Input';
+  if (kind === 'choice') return 'Unsaved changes';
   if (kind === 'confirm') return 'Confirm';
   return 'Notice';
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { ViewEditor } from '../canvas/ViewEditor';
-import { openView, setSelection, useStore } from '../model/store';
+import { openView, setSelection, useModelStoreApi, useStore } from '../model/store';
 import { PropertiesPanel } from './PropertiesPanel';
 
 type ViewerShellProps =
@@ -60,13 +60,14 @@ function LoadedViewerShell({
   onOpenCopy: () => void;
 }) {
   const model = useStore((s) => s.model);
+  const store = useModelStoreApi();
   const activeViewId = useStore((s) => s.activeViewId);
   const views = useMemo(() => (model ? Object.values(model.views) : []), [model]);
 
   useEffect(() => {
     if (!model || activeViewId || views.length === 0) return;
-    openView(views[0].id);
-  }, [activeViewId, model, views]);
+    openView(views[0].id, store);
+  }, [activeViewId, model, store, views]);
 
   if (!model) {
     return (
@@ -92,8 +93,8 @@ function LoadedViewerShell({
           <select
             value={selectedViewId}
             onChange={(event) => {
-              openView(event.target.value);
-              setSelection('tree', [event.target.value]);
+              openView(event.target.value, store);
+              setSelection('tree', [event.target.value], store);
             }}
           >
             {views.map((view) => (

@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { App } from '../src/App';
-import { currentFileHandle, replaceModel, setCurrentFileHandle, useStore } from '../src/model/store';
+import { replaceModel } from '../src/model/store';
+import {
+  getActiveModelSession,
+  resetWorkspaceForTests,
+} from '../src/model/workspace';
 import { createEmptyModel } from '../src/model/ops';
 import { openModelFromHandle } from '../src/persistence/files';
 import { encodeModelToInlineShare } from '../src/persistence/share';
@@ -57,22 +61,24 @@ function fakeFileHandle(name: string, text: string): FileSystemFileHandle {
 }
 
 beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   restoreStore = setDefaultKeyValueStoreForTests(memoryKeyValueStore());
   resetLaunchQueueForTests();
   resetBootSignalForTests();
+  resetWorkspaceForTests();
   replaceModel(null, null, false);
-  setCurrentFileHandle(null);
   history.replaceState(null, '', '/');
 });
 
 afterEach(() => {
   Reflect.deleteProperty(window, 'launchQueue');
   resetLaunchQueueForTests();
-  setCurrentFileHandle(null);
+  resetWorkspaceForTests();
   restoreStore?.();
   restoreStore = undefined;
   history.replaceState(null, '', '/');
   vi.restoreAllMocks();
+  delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
 });
 
 describe('PWA launch queue', () => {
@@ -93,17 +99,16 @@ describe('PWA launch queue', () => {
 
     // Not applied yet: boot (autosave restore) has not finished.
     await new Promise((r) => setTimeout(r, 20));
-    expect(useStore.getState().fileName).toBeNull();
+    expect(getActiveModelSession()).toBeNull();
 
     signalEditorRuntimeReady();
     await vi.waitFor(() => {
-      expect(useStore.getState().fileName).toBe('launch.archimate');
+      expect(getActiveModelSession()?.store.getState().fileName).toBe('launch.archimate');
     });
-    expect(useStore.getState().model).not.toBeNull();
-    expect(useStore.getState().dirty).toBe(false);
+    expect(getActiveModelSession()?.store.getState().model).not.toBeNull();
+    expect(getActiveModelSession()?.store.getState().dirty).toBe(false);
     // Handle retained so silent Ctrl+S re-save targets the launched file.
-    expect(currentFileHandle).not.toBeNull();
-    expect(currentFileHandle?.name).toBe('launch.archimate');
+    expect(getActiveModelSession()?.fileHandle?.name).toBe('launch.archimate');
   });
 
   it('ignores launches without a file handle', async () => {
@@ -112,7 +117,7 @@ describe('PWA launch queue', () => {
     queue.fire({ files: [] });
     signalEditorRuntimeReady();
     await new Promise((r) => setTimeout(r, 20));
-    expect(useStore.getState().fileName).toBeNull();
+    expect(getActiveModelSession()).toBeNull();
   });
 
   it('opens a launched file when an existing viewer window is focused', async () => {
@@ -127,17 +132,15 @@ describe('PWA launch queue', () => {
       root.render(createElement(App));
     });
 
-    await vi.waitFor(() => {
-      expect(useStore.getState().readOnly).toBe(true);
-    });
+    await vi.waitFor(() => expect(host.textContent).toContain('Shared Viewer'));
 
     queue.fire({ files: [fakeFileHandle('launch.archimate', archisuranceXml)] });
 
     await vi.waitFor(() => {
-      expect(useStore.getState().fileName).toBe('launch.archimate');
+      expect(getActiveModelSession()?.store.getState().fileName).toBe('launch.archimate');
     });
-    expect(useStore.getState().readOnly).toBe(false);
-    expect(currentFileHandle?.name).toBe('launch.archimate');
+    expect(getActiveModelSession()?.store.getState().readOnly).toBe(false);
+    expect(getActiveModelSession()?.fileHandle?.name).toBe('launch.archimate');
 
     await act(async () => {
       root.unmount();

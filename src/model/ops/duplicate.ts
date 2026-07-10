@@ -7,7 +7,7 @@
 // while element nodes keep referencing the same concepts and connections reuse
 // the same relationships.
 import { newId } from '../id';
-import { transact, useStore } from '../store';
+import { getActiveModelStore, transact, type ModelStore } from '../store';
 import type { DiagramConnection, DiagramNode, ModelState } from '../types';
 import { alignableNodeIds } from './alignment';
 import { attachConnection, attachNode } from './draft';
@@ -26,8 +26,11 @@ function deepClone<T>(value: T): T {
  * Returns the new ids in the same order as the duplicable inputs.
  * One undo step for the whole call.
  */
-export function duplicateItems(ids: string[]): string[] {
-  const model = useStore.getState().model;
+export function duplicateItems(
+  ids: string[],
+  store: ModelStore = getActiveModelStore(),
+): string[] {
+  const model = store.getState().model;
   if (!model) return [];
 
   // Filter to elements and views, preserving input order.
@@ -43,7 +46,7 @@ export function duplicateItems(ids: string[]): string[] {
       if (draft.elements[id]) duplicateElement(draft, id, copyId);
       else if (draft.views[id]) duplicateView(draft, id, copyId);
     });
-  });
+  }, store);
 
   return newIds;
 }
@@ -123,12 +126,18 @@ function copyInternalConnections(
 /**
  * Duplicate diagram objects within a view: clone the selected node subtrees in
  * place (offset by `offset`), keeping each root in its original container and
- * copying connections that run between duplicated nodes. Like paste, the copies
- * reference the same concepts/relationships — it duplicates the picture, not the
- * model. Returns the new root node ids (selection order). One undo step.
+ * copying connections that run between duplicated nodes. Element nodes and
+ * relationship connections receive fresh model concepts, matching Desktop
+ * Archi's same-view copy semantics. Returns the new root node ids (selection
+ * order). One undo step.
  */
-export function duplicateViewObjects(viewId: string, ids: string[], offset = 0): string[] {
-  const state = useStore.getState().model;
+export function duplicateViewObjects(
+  viewId: string,
+  ids: string[],
+  offset = 0,
+  store: ModelStore = getActiveModelStore(),
+): string[] {
+  const state = store.getState().model;
   if (!state || !state.views[viewId]) return [];
 
   // Roots = selected nodes with no selected ancestor (a selected container
@@ -138,15 +147,40 @@ export function duplicateViewObjects(viewId: string, ids: string[], offset = 0):
 
   const rootNewIds = roots.map(() => newId());
   const idMap = new Map<string, string>();
+  const elementIdMap = new Map<string, string>();
+  const collectConcepts = (nodeId: string): void => {
+    const node = state.nodes[nodeId];
+    if (!node) return;
+    if (node.nodeType === 'element' && !elementIdMap.has(node.elementId)) {
+      elementIdMap.set(node.elementId, newId());
+    }
+    node.childIds.forEach(collectConcepts);
+  };
+  roots.forEach(collectConcepts);
 
   transact('Duplicate', (draft) => {
+    for (const [sourceId, copyId] of elementIdMap) {
+      const source = draft.elements[sourceId];
+      if (!source) continue;
+      draft.elements[copyId] = { ...deepClone(source), id: copyId };
+      draft.folders[source.folderId]?.itemIds.push(copyId);
+    }
     roots.forEach((rootId, i) => {
-      cloneSubtree(draft, rootId, draft.nodes[rootId].parentId, rootNewIds[i], offset, offset, idMap);
+      cloneSubtree(
+        draft,
+        rootId,
+        draft.nodes[rootId].parentId,
+        rootNewIds[i],
+        offset,
+        offset,
+        idMap,
+        elementIdMap,
+      );
     });
-    copyInternalConnections(draft, viewId, viewId, idMap);
-  });
+    copyInternalConnectionsWithFreshRelationships(draft, viewId, idMap, elementIdMap);
+  }, store);
 
-  const after = useStore.getState().model;
+  const after = store.getState().model;
   return rootNewIds.filter((id) => after?.nodes[id]);
 }
 
@@ -160,6 +194,7 @@ function cloneSubtree(
   dx: number,
   dy: number,
   idMap: Map<string, string>,
+  elementIdMap: Map<string, string>,
 ): void {
   const orig = draft.nodes[oldId];
   idMap.set(oldId, newNodeId);
@@ -171,9 +206,54 @@ function cloneSubtree(
     childIds: [],
     sourceConnectionIds: [],
     targetConnectionIds: [],
+    ...(orig.nodeType === 'element'
+      ? { elementId: elementIdMap.get(orig.elementId) ?? orig.elementId }
+      : {}),
   };
   attachNode(draft, node);
   for (const childId of orig.childIds) {
-    cloneSubtree(draft, childId, newNodeId, newId(), 0, 0, idMap);
+    cloneSubtree(draft, childId, newNodeId, newId(), 0, 0, idMap, elementIdMap);
+  }
+}
+
+function copyInternalConnectionsWithFreshRelationships(
+  draft: ModelState,
+  viewId: string,
+  nodeIdMap: Map<string, string>,
+  elementIdMap: Map<string, string>,
+): void {
+  const relationshipIdMap = new Map<string, string>();
+  for (const connection of Object.values(draft.connections)) {
+    if (connection.viewId !== viewId) continue;
+    const sourceId = nodeIdMap.get(connection.sourceId);
+    const targetId = nodeIdMap.get(connection.targetId);
+    if (!sourceId || !targetId) continue;
+
+    let relationshipId = connection.relationshipId;
+    if (relationshipId) {
+      let copyRelationshipId = relationshipIdMap.get(relationshipId);
+      if (!copyRelationshipId) {
+        const relationship = draft.relationships[relationshipId];
+        if (!relationship) continue;
+        copyRelationshipId = newId();
+        relationshipIdMap.set(relationshipId, copyRelationshipId);
+        draft.relationships[copyRelationshipId] = {
+          ...deepClone(relationship),
+          id: copyRelationshipId,
+          sourceId: elementIdMap.get(relationship.sourceId) ?? relationship.sourceId,
+          targetId: elementIdMap.get(relationship.targetId) ?? relationship.targetId,
+        };
+        draft.folders[relationship.folderId]?.itemIds.push(copyRelationshipId);
+      }
+      relationshipId = copyRelationshipId;
+    }
+
+    attachConnection(draft, {
+      ...deepClone(connection),
+      id: newId(),
+      sourceId,
+      targetId,
+      ...(relationshipId ? { relationshipId } : {}),
+    });
   }
 }

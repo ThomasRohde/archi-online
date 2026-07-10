@@ -1,4 +1,4 @@
-import { transact } from '../store';
+import { transact, type ModelStore } from '../store';
 import type { ModelState } from '../types';
 import { deleteConnectionFromDraft, deleteNodeFromDraft, removeFromFolder } from './draft';
 
@@ -45,7 +45,7 @@ function deleteFolderFromDraft(draft: ModelState, folderId: string, doomedConcep
 }
 
 /** Delete model items (elements, relationships, views, folders) with full cascade. */
-export function deleteItems(ids: string[]): void {
+export function deleteItems(ids: string[], store?: ModelStore): void {
   transact('Delete', (draft) => {
     const doomedConcepts = new Set<string>();
     for (const id of ids) {
@@ -76,10 +76,10 @@ export function deleteItems(ids: string[]): void {
       delete draft.elements[id];
       delete draft.relationships[id];
     }
-  });
+  }, store);
 }
 
-export function moveItemsToFolder(ids: string[], folderId: string): void {
+export function moveItemsToFolder(ids: string[], folderId: string, store?: ModelStore): void {
   transact('Move', (draft) => {
     const target = draft.folders[folderId];
     if (!target) return;
@@ -112,5 +112,5 @@ export function moveItemsToFolder(ids: string[], folderId: string): void {
         target.itemIds.push(id);
       }
     }
-  });
+  }, store);
 }

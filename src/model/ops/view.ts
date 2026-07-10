@@ -1,7 +1,7 @@
 import { newId } from '../id';
 import { elementLabel, relationshipLabel, type ElementType, type RelationshipType } from '../metamodel';
 import { isAllowedRelationship } from '../rules';
-import { transact, useStore } from '../store';
+import { getActiveModelStore, transact, type ModelStore } from '../store';
 import type {
   Bounds,
   ElementNode,
@@ -85,6 +85,7 @@ export function addElementNodeToView(
   bounds: Bounds,
   autoConnect = true,
   defaults: DiagramNodeDefaults = {},
+  store?: ModelStore,
 ): string {
   const id = newId();
   transact('Add to View', (draft) => {
@@ -105,7 +106,7 @@ export function addElementNodeToView(
     // UI drops auto-connect existing relationships (Archi preference default);
     // scripted view.add() does not (jArchi semantics).
     if (autoConnect) addMissingConnections(draft, viewId, id);
-  });
+  }, store);
   return id;
 }
 
@@ -117,6 +118,7 @@ export function createElementOnView(
   bounds: Bounds,
   name?: string,
   defaults: DiagramNodeDefaults = {},
+  store?: ModelStore,
 ): { elementId: string; nodeId: string } {
   const elementId = newId();
   const nodeId = newId();
@@ -146,7 +148,7 @@ export function createElementOnView(
       ...defaults,
     };
     attachNode(draft, node);
-  });
+  }, store);
   return { elementId, nodeId };
 }
 
@@ -156,8 +158,9 @@ export function createRelationshipOnView(
   viewId: string,
   sourceNodeId: string,
   targetNodeId: string,
+  store: ModelStore = getActiveModelStore(),
 ): { relationshipId: string; connectionId: string } | null {
-  const model = useStore.getState().model;
+  const model = store.getState().model;
   if (!model) return null;
   const srcNode = model.nodes[sourceNodeId];
   const tgtNode = model.nodes[targetNodeId];
@@ -192,7 +195,7 @@ export function createRelationshipOnView(
       targetId: targetNodeId,
       bendpoints: [],
     });
-  });
+  }, store);
   return { relationshipId, connectionId };
 }
 
@@ -202,6 +205,7 @@ export function addConnectionToView(
   relationshipId: string,
   sourceNodeId: string,
   targetNodeId: string,
+  store?: ModelStore,
 ): string {
   const id = newId();
   transact('Add Connection', (draft) => {
@@ -215,7 +219,7 @@ export function addConnectionToView(
       targetId: targetNodeId,
       bendpoints: [],
     });
-  });
+  }, store);
   return id;
 }
 
@@ -225,6 +229,7 @@ export function addNoteToView(
   bounds: Bounds,
   content = '',
   defaults: DiagramNodeDefaults = {},
+  store?: ModelStore,
 ): string {
   const id = newId();
   transact('Create Note', (draft) => {
@@ -242,7 +247,7 @@ export function addNoteToView(
       ...defaults,
     };
     attachNode(draft, node);
-  });
+  }, store);
   return id;
 }
 
@@ -253,6 +258,7 @@ export function addRefNodeToView(
   parentId: string,
   bounds: Bounds,
   defaults: DiagramNodeDefaults = {},
+  store?: ModelStore,
 ): string {
   const id = newId();
   transact('Add View Reference', (draft) => {
@@ -269,7 +275,7 @@ export function addRefNodeToView(
       refViewId,
       ...defaults,
     });
-  });
+  }, store);
   return id;
 }
 
@@ -279,6 +285,7 @@ export function addGroupToView(
   bounds: Bounds,
   name = 'Group',
   defaults: DiagramNodeDefaults = {},
+  store?: ModelStore,
 ): string {
   const id = newId();
   transact('Create Group', (draft) => {
@@ -297,6 +304,6 @@ export function addGroupToView(
       ...defaults,
     };
     attachNode(draft, node);
-  });
+  }, store);
   return id;
 }

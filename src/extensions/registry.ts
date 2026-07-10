@@ -1,4 +1,5 @@
 import { runBatch, useStore } from '../model/store';
+import { getActiveModelSession } from '../model/workspace';
 import type {
   ExtensionCommand,
   ExtensionCommandContext,
@@ -159,8 +160,11 @@ export class ExtensionRegistry {
     const owned = this.commands.get(id);
     if (!owned) throw new Error(`Unknown extension command: ${id}`);
     try {
-      return await runBatch(`Extension: ${owned.value.title}`, () =>
-        owned.value.run(this.createContext(owned.extensionId, trigger), args),
+      const session = getActiveModelSession();
+      return await runBatch(
+        `Extension: ${owned.value.title}`,
+        () => owned.value.run(this.createContext(owned.extensionId, trigger), args),
+        session?.store,
       );
     } catch (error) {
       this.recordError(owned.extensionId, error);
@@ -175,9 +179,12 @@ export class ExtensionRegistry {
   }
 
   private createContext(extensionId: string, trigger?: unknown): ExtensionCommandContext {
-    const state = useStore.getState();
+    const session = getActiveModelSession();
+    const state = session?.store.getState() ?? useStore.getState();
     return {
       extensionId,
+      modelSessionId: session?.id ?? null,
+      modelId: state.model?.info.id ?? null,
       activeViewId: state.activeViewId,
       selectionIds: state.selection.ids,
       trigger,

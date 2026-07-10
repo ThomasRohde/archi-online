@@ -1,4 +1,5 @@
 import { addElementNodeToView, addRefNodeToView } from '../../model/ops';
+import type { ModelStore } from '../../model/store';
 import type { Bounds, ModelState } from '../../model/types';
 import {
   defaultElementSize,
@@ -17,6 +18,7 @@ export function addDroppedItemsToView({
   point,
   snap,
   settings,
+  modelStore,
 }: {
   ids: string[];
   model: ModelState;
@@ -25,6 +27,7 @@ export function addDroppedItemsToView({
   point: Point;
   snap: (value: number) => number;
   settings: AppSettings;
+  modelStore: ModelStore;
 }): string[] {
   const parentId = containerAt(model, viewId, absBounds, point, new Set()) ?? viewId;
   const parentAbs = parentId === viewId ? { x: 0, y: 0 } : absBounds.get(parentId)!;
@@ -47,6 +50,7 @@ export function addDroppedItemsToView({
           },
           true,
           textDefaults,
+          modelStore,
         ),
       );
       i++;
@@ -64,6 +68,7 @@ export function addDroppedItemsToView({
             height: def.height,
           },
           textDefaults,
+          modelStore,
         ),
       );
       i++;

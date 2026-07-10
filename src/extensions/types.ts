@@ -11,6 +11,8 @@ export interface LocalExtensionRecord {
 
 export interface ExtensionCommandContext {
   extensionId: string;
+  modelSessionId: string | null;
+  modelId: string | null;
   activeViewId: string | null;
   selectionIds: string[];
   trigger?: unknown;
@@ -59,6 +61,8 @@ export type ExtensionEventName =
   | 'model.opened'
   | 'model.changed'
   | 'model.saved'
+  | 'model.activated'
+  | 'model.closed'
   | 'selection.changed'
   | 'view.opened'
   | 'view.activated'

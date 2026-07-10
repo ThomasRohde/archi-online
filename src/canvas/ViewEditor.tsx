@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { c4ViewType } from '../model/c4';
-import { alignableNodeIds } from '../model/ops';
-import { setSelection, useStore } from '../model/store';
+import { alignableNodeIds, deleteViewObjects, duplicateViewObjects } from '../model/ops';
+import {
+  getActiveModelStore,
+  setSelection,
+  useModelStoreApi,
+  useStore,
+} from '../model/store';
+import { getActiveModelSession } from '../model/workspace';
 import type { Bounds } from '../model/types';
 import { setCanvasStatus } from '../ui/canvas-status';
 import { useSettingsStore } from '../settings/app-settings';
@@ -51,10 +57,12 @@ function readOnlyHitTarget(
 }
 
 function EditableViewEditor({ viewId }: { viewId: string }) {
+  const modelStore = useModelStoreApi();
   const model = useStore((s) => s.model);
   const selection = useStore((s) => s.selection);
   const activeTool = useStore((s) => s.activeTool);
   const alignmentAnchor = useSettingsStore((s) => s.settings.alignmentAnchor);
+  const pasteOffset = useSettingsStore((s) => s.settings.pasteOffset);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const view = model?.views[viewId];
@@ -93,6 +101,43 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   useEffect(() => {
     if (isActive) setCanvasStatus({ zoom: viewport.zoom });
   }, [isActive, viewport.zoom]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const onWindowKeyDown = (event: KeyboardEvent) => {
+      const activeSession = getActiveModelSession();
+      const ownsActiveModel = activeSession
+        ? activeSession.store === modelStore
+        : getActiveModelStore() === modelStore;
+      if (!ownsActiveModel) return;
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        (event.target instanceof HTMLElement && event.target.isContentEditable)
+      ) {
+        return;
+      }
+      const state = modelStore.getState();
+      if (state.readOnly || state.selection.source !== 'view' || state.selection.ids.length === 0) {
+        return;
+      }
+      if (event.key === 'Delete') {
+        event.preventDefault();
+        deleteViewObjects(state.selection.ids, modelStore);
+      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+        event.preventDefault();
+        const ids = duplicateViewObjects(
+          viewId,
+          state.selection.ids,
+          pasteOffset,
+          modelStore,
+        );
+        if (ids.length > 0) setSelection('view', ids, modelStore);
+      }
+    };
+    window.addEventListener('keydown', onWindowKeyDown);
+    return () => window.removeEventListener('keydown', onWindowKeyDown);
+  }, [isActive, modelStore, pasteOffset, viewId]);
 
   if (!model || !view) return null;
 

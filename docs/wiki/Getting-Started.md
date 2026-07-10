@@ -76,7 +76,7 @@ That file opens directly in desktop Archi — see
 
 ## Opening and saving files
 
-- **Open…** (`Ctrl+O`) loads an existing `.archimate` file, including models
+- **Open…** (`Ctrl+O`) adds one or more `.archimate` files, including models
   created with desktop Archi. It also accepts ArchiMate Open Exchange `.xml`
   files and imports them as new, unsaved models.
 - **Save** (`Ctrl+S`) writes back to the file you opened when the browser
@@ -85,9 +85,10 @@ That file opens directly in desktop Archi — see
   writes Archi's native `.archimate` format.
 - **Save As…** always lets you pick a new target.
 
-The status area on the toolbar shows the model name, the file name (or
-*unsaved*), and a `•` marker when there are unsaved changes. Closing the tab
-with unsaved changes triggers a browser confirmation prompt.
+The Models panel shows every open model as a separate root and marks dirty
+models with `*`. Toolbar commands and the status area follow the active model.
+Right-click a model root to save or close that model; dirty closes offer Save,
+Don't Save, and Cancel.
 
 ## Where your work lives
 
@@ -96,15 +97,16 @@ Two different kinds of storage are involved:
 | Data | Where it lives |
 | --- | --- |
 | The model itself | `.archimate` files you open and save |
-| Autosave snapshot of the open model | Browser IndexedDB |
+| Autosave snapshot of every open model and workspace state | Browser IndexedDB |
 | Window/panel layout | Browser IndexedDB |
 | App settings | Browser IndexedDB |
 | Script library | Browser IndexedDB |
 | Extensions and imported `.archi-ext` packages | Browser IndexedDB |
 | Private extension storage | Browser IndexedDB |
 
-The app autosaves the open model shortly after every change and restores it
-the next time you open the app in the same browser profile. Autosave is a
+The app autosaves the complete multi-model workspace shortly after every
+change and restores it the next time you open the app in the same browser
+profile. Autosave is a
 crash safety net, not a substitute for saving: browser data can be cleared by
 the browser or the user, and it never leaves the machine. Export anything you
 care about as a `.archimate` file.

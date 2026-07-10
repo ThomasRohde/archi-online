@@ -2,11 +2,13 @@ import { emitModelSaved } from '../extensions/events';
 import { parseArchimate, serializeArchimate } from '../model/io/archimate-xml';
 import { isExchangeXml, parseExchange } from '../model/io/exchange-xml';
 import {
-  currentFileHandle,
-  replaceModel,
-  setCurrentFileHandle,
-  useStore,
-} from '../model/store';
+  activateModelSession,
+  addModelSession,
+  getModelSession,
+  setModelSessionFileHandle,
+  useWorkspaceStore,
+  type ModelSessionId,
+} from '../model/workspace';
 
 const PICKER_TYPES = [
   {
@@ -23,61 +25,110 @@ function supportsSaveFsAccess(): boolean {
   return typeof window !== 'undefined' && 'showSaveFilePicker' in window;
 }
 
-export async function openModelFromDisk(): Promise<void> {
+export async function openModelFromDisk(): Promise<ModelSessionId[]> {
   if (supportsOpenFsAccess()) {
     let handles: FileSystemFileHandle[];
     try {
-      handles = await window.showOpenFilePicker({ types: PICKER_TYPES });
+      handles = await window.showOpenFilePicker({ types: PICKER_TYPES, multiple: true });
     } catch {
-      return; // user cancelled
+      return []; // user cancelled
     }
-    await openModelFromHandle(handles[0]);
+    const opened: ModelSessionId[] = [];
+    const errors: unknown[] = [];
+    for (const handle of handles) {
+      try {
+        opened.push(await openModelFromHandle(handle));
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length) throw new AggregateError(errors, `Could not open ${errors.length} selected model file(s)`);
+    return opened;
   } else {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.archimate,.xml';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (file) loadModelText(await file.text(), file.name);
-    };
-    input.click();
+    input.multiple = true;
+    return new Promise<ModelSessionId[]>((resolve, reject) => {
+      let settled = false;
+      const finish = (result: ModelSessionId[] | AggregateError) => {
+        if (settled) return;
+        settled = true;
+        if (result instanceof AggregateError) reject(result);
+        else resolve(result);
+      };
+      input.onchange = () => {
+        void (async () => {
+          const opened: ModelSessionId[] = [];
+          const errors: unknown[] = [];
+          for (const file of [...(input.files ?? [])]) {
+            try {
+              opened.push(loadModelText(await file.text(), file.name).sessionId);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              errors.push(new Error(`${file.name}: ${message}`, { cause: error }));
+            }
+          }
+          finish(
+            errors.length > 0
+              ? new AggregateError(errors, `Could not open ${errors.length} selected model file(s)`)
+              : opened,
+          );
+        })();
+      };
+      input.addEventListener('cancel', () => finish([]), { once: true });
+      input.click();
+    });
   }
 }
 
 /** Open a model from a FileSystemFileHandle (picker or PWA launch queue),
  * keeping the handle so silent Ctrl+S re-save works. */
-export async function openModelFromHandle(handle: FileSystemFileHandle): Promise<void> {
+export async function openModelFromHandle(handle: FileSystemFileHandle): Promise<ModelSessionId> {
+  if (handle.isSameEntry) {
+    for (const id of useWorkspaceStore.getState().order) {
+      const existing = getModelSession(id)?.fileHandle;
+      if (existing && (await handle.isSameEntry(existing))) {
+        activateModelSession(id);
+        return id;
+      }
+    }
+  }
   const file = await handle.getFile();
-  const format = loadModelText(await file.text(), file.name);
+  const { format, sessionId } = loadModelText(await file.text(), file.name);
   // Open Exchange imports become a new unsaved model — never keep the .xml
   // handle, or Ctrl+S would overwrite it with .archimate content.
   if (format === 'archimate') {
-    setCurrentFileHandle(handle); // after loadModelText, which clears the handle
+    setModelSessionFileHandle(sessionId, handle);
   }
+  return sessionId;
 }
 
-export function loadModelText(text: string, fileName: string): 'archimate' | 'exchange' {
+export function loadModelText(
+  text: string,
+  fileName: string,
+): { format: 'archimate' | 'exchange'; sessionId: ModelSessionId } {
   if (isExchangeXml(text)) {
     // Like desktop Archi, an Open Exchange file imports as a new, unsaved model.
     const model = parseExchange(text);
-    setCurrentFileHandle(null);
-    replaceModel(model, null, true);
-    return 'exchange';
+    const sessionId = addModelSession({ model, fileName: null, dirty: true });
+    return { format: 'exchange', sessionId };
   }
   const model = parseArchimate(text);
-  setCurrentFileHandle(null);
-  replaceModel(model, fileName, false);
-  return 'archimate';
+  const sessionId = addModelSession({ model, fileName, dirty: false });
+  return { format: 'archimate', sessionId };
 }
 
-export async function saveModelToDisk(saveAs = false): Promise<void> {
-  const s = useStore.getState();
+export async function saveModelToDisk(sessionId: ModelSessionId, saveAs = false): Promise<void> {
+  const session = getModelSession(sessionId);
+  if (!session) return;
+  const s = session.store.getState();
   if (!s.model) return;
   const xml = serializeArchimate(s.model);
   const suggested = s.fileName ?? sanitizeFileName(s.model.info.name) + '.archimate';
 
-  if (supportsSaveFsAccess()) {
-    let handle = currentFileHandle;
+  if (session.fileHandle || supportsSaveFsAccess()) {
+    let handle = session.fileHandle;
     if (!handle || saveAs) {
       try {
         handle = await window.showSaveFilePicker({
@@ -87,30 +138,30 @@ export async function saveModelToDisk(saveAs = false): Promise<void> {
       } catch (error) {
         if (isUserCancelledFileDialog(error)) return;
         if (shouldDownloadAfterSaveError(error)) {
-          setCurrentFileHandle(null);
-          downloadModel(xml, suggested);
+          setModelSessionFileHandle(sessionId, null);
+          downloadModel(sessionId, xml, suggested);
           return;
         }
         throw error;
       }
-      setCurrentFileHandle(handle);
+      setModelSessionFileHandle(sessionId, handle);
     }
     try {
       const writable = await handle.createWritable();
       await writable.write(xml);
       await writable.close();
-      useStore.setState({ dirty: false, fileName: handle.name });
-      emitModelSaved();
+      session.store.setState({ dirty: false, fileName: handle.name });
+      emitModelSaved(sessionId);
     } catch (error) {
       if (shouldDownloadAfterSaveError(error)) {
-        setCurrentFileHandle(null);
-        downloadModel(xml, suggested);
+        setModelSessionFileHandle(sessionId, null);
+        downloadModel(sessionId, xml, suggested);
         return;
       }
       throw error;
     }
   } else {
-    downloadModel(xml, suggested);
+    downloadModel(sessionId, xml, suggested);
   }
 }
 
@@ -187,7 +238,7 @@ function downloadBlob(blob: Blob, fileName: string): void {
   URL.revokeObjectURL(url);
 }
 
-function downloadModel(xml: string, fileName: string): void {
+function downloadModel(sessionId: ModelSessionId, xml: string, fileName: string): void {
   const blob = new Blob([xml], { type: 'application/xml' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -195,8 +246,8 @@ function downloadModel(xml: string, fileName: string): void {
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
-  useStore.setState({ dirty: false, fileName });
-  emitModelSaved();
+  getModelSession(sessionId)?.store.setState({ dirty: false, fileName });
+  emitModelSaved(sessionId);
 }
 
 function isUserCancelledFileDialog(error: unknown): boolean {

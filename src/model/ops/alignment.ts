@@ -1,4 +1,4 @@
-import { transact, useStore } from '../store';
+import { getActiveModelStore, transact, type ModelStore } from '../store';
 import { absoluteBounds, type Bounds, type DiagramNode, type ModelState } from '../types';
 import type { AnchorMode } from '../../settings/app-settings';
 
@@ -34,8 +34,13 @@ export function alignableNodeIds(state: ModelState, ids: string[]): string[] {
  * PowerPoint-style align: snap every node to the anchor element (the first or
  * last selected node), leaving the anchor itself in place. Width/height unchanged.
  */
-export function alignNodes(ids: string[], mode: AlignMode, anchor: AnchorMode): void {
-  const state = useStore.getState().model;
+export function alignNodes(
+  ids: string[],
+  mode: AlignMode,
+  anchor: AnchorMode,
+  store: ModelStore = getActiveModelStore(),
+): void {
+  const state = store.getState().model;
   if (!state) return;
   const geometries = selectedNodeGeometries(state, ids);
   if (geometries.length < 2) return;
@@ -48,15 +53,20 @@ export function alignNodes(ids: string[], mode: AlignMode, anchor: AnchorMode): 
       const next = absoluteToRelative(entry, alignedBounds(entry.absolute, box, mode));
       applyBounds(node, next);
     }
-  });
+  }, store);
 }
 
 /**
  * PowerPoint-style match size: resize every node to the anchor element's
  * width/height, keeping each node's top-left corner fixed.
  */
-export function matchSize(ids: string[], mode: MatchMode, anchor: AnchorMode): void {
-  const state = useStore.getState().model;
+export function matchSize(
+  ids: string[],
+  mode: MatchMode,
+  anchor: AnchorMode,
+  store: ModelStore = getActiveModelStore(),
+): void {
+  const state = store.getState().model;
   if (!state) return;
   const geometries = selectedNodeGeometries(state, ids);
   if (geometries.length < 2) return;
@@ -73,15 +83,19 @@ export function matchSize(ids: string[], mode: MatchMode, anchor: AnchorMode): v
       });
       applyBounds(node, next);
     }
-  });
+  }, store);
 }
 
 /**
  * PowerPoint-style distribute: keep the two outermost nodes fixed and equalize
  * the gaps between adjacent edges of the nodes in between. Needs ≥ 3 nodes.
  */
-export function distributeNodes(ids: string[], mode: DistributeMode): void {
-  const state = useStore.getState().model;
+export function distributeNodes(
+  ids: string[],
+  mode: DistributeMode,
+  store: ModelStore = getActiveModelStore(),
+): void {
+  const state = store.getState().model;
   if (!state) return;
   const geometries = selectedNodeGeometries(state, ids);
   if (geometries.length < 3) return;
@@ -109,7 +123,7 @@ export function distributeNodes(ids: string[], mode: DistributeMode): void {
       }
       cursor += size(entry.absolute) + gap;
     }
-  });
+  }, store);
 }
 
 function selectedNodeGeometries(state: ModelState, ids: string[]): NodeGeometry[] {

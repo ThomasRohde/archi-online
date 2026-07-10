@@ -1,16 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
 import {
-  currentFileHandle,
-  replaceModel,
-  setCurrentFileHandle,
-  useStore,
-} from '../src/model/store';
-import { loadModelText, saveModelToDisk } from '../src/persistence/files';
+  getModelSession,
+  addModelSession,
+  resetWorkspaceForTests,
+  useWorkspaceStore,
+} from '../src/model/workspace';
+import {
+  loadModelText,
+  openModelFromDisk,
+  openModelFromHandle,
+  saveModelToDisk,
+} from '../src/persistence/files';
+import { serializeArchimate } from '../src/model/io/archimate-xml';
 
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
 const originalShowSaveFilePicker = window.showSaveFilePicker;
+const originalShowOpenFilePicker = window.showOpenFilePicker;
 
 function installDownloadSpies() {
   const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -55,55 +62,141 @@ function setSavePicker(picker: typeof window.showSaveFilePicker | undefined) {
   }
 }
 
+function setOpenPicker(picker: typeof window.showOpenFilePicker | undefined) {
+  if (picker) {
+    Object.defineProperty(window, 'showOpenFilePicker', {
+      configurable: true,
+      value: picker,
+    });
+  } else {
+    Reflect.deleteProperty(window, 'showOpenFilePicker');
+  }
+}
+
 beforeEach(() => {
-  replaceModel(createEmptyModel('Blocked Save'), null, true);
-  setCurrentFileHandle(null);
+  resetWorkspaceForTests();
 });
 
 afterEach(() => {
-  setCurrentFileHandle(null);
+  resetWorkspaceForTests();
   setSavePicker(originalShowSaveFilePicker);
+  setOpenPicker(originalShowOpenFilePicker);
   restoreUrlHelpers();
   vi.restoreAllMocks();
 });
 
 describe('file persistence', () => {
   it('downloads the model when the save picker is blocked by policy', async () => {
+    const sessionId = addModelSession({ model: createEmptyModel('Blocked Save'), fileName: null, dirty: true });
     const click = installDownloadSpies();
     const picker = vi
       .fn<typeof window.showSaveFilePicker>()
       .mockRejectedValue(new DOMException('Blocked by policy', 'SecurityError'));
     setSavePicker(picker);
 
-    await saveModelToDisk();
+    await saveModelToDisk(sessionId);
 
     expect(picker).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
-    expect(useStore.getState().dirty).toBe(false);
-    expect(useStore.getState().fileName).toBe('Blocked Save.archimate');
+    expect(getModelSession(sessionId)?.store.getState().dirty).toBe(false);
+    expect(getModelSession(sessionId)?.store.getState().fileName).toBe('Blocked Save.archimate');
   });
 
   it('does not download when the user cancels the save picker', async () => {
+    const sessionId = addModelSession({ model: createEmptyModel('Blocked Save'), fileName: null, dirty: true });
     const click = installDownloadSpies();
     const picker = vi
       .fn<typeof window.showSaveFilePicker>()
       .mockRejectedValue(new DOMException('The user aborted a request.', 'AbortError'));
     setSavePicker(picker);
 
-    await saveModelToDisk();
+    await saveModelToDisk(sessionId);
 
     expect(picker).toHaveBeenCalledTimes(1);
     expect(click).not.toHaveBeenCalled();
-    expect(useStore.getState().dirty).toBe(true);
-    expect(useStore.getState().fileName).toBeNull();
+    expect(getModelSession(sessionId)?.store.getState().dirty).toBe(true);
+    expect(getModelSession(sessionId)?.store.getState().fileName).toBeNull();
   });
 
-  it('keeps the existing save handle when opening invalid XML fails', () => {
+  it('does not disturb existing session handles when opening invalid XML fails', () => {
     const handle = { name: 'existing.archimate' } as FileSystemFileHandle;
-    setCurrentFileHandle(handle);
+    const sessionId = addModelSession({
+      model: createEmptyModel('Existing'),
+      fileName: handle.name,
+      fileHandle: handle,
+    });
 
     expect(() => loadModelText('<archimate:model', 'broken.archimate')).toThrow();
 
-    expect(currentFileHandle).toBe(handle);
+    expect(getModelSession(sessionId)?.fileHandle).toBe(handle);
+  });
+
+  it('saves only the requested session through its own handle', async () => {
+    const writes: string[] = [];
+    const firstHandle = {
+      name: 'first.archimate',
+      createWritable: async () => ({
+        write: async (xml: string) => writes.push(xml),
+        close: async () => {},
+      }),
+    } as unknown as FileSystemFileHandle;
+    const firstId = addModelSession({
+      model: createEmptyModel('First'),
+      fileName: firstHandle.name,
+      fileHandle: firstHandle,
+      dirty: true,
+    });
+    const secondId = addModelSession({ model: createEmptyModel('Second'), fileName: null, dirty: true });
+
+    await saveModelToDisk(firstId);
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toContain('First');
+    expect(getModelSession(firstId)?.store.getState().dirty).toBe(false);
+    expect(getModelSession(secondId)?.store.getState().dirty).toBe(true);
+  });
+
+  it('activates an already-open handle instead of opening it twice', async () => {
+    const existingHandle = { name: 'same.archimate' } as FileSystemFileHandle;
+    const existingId = addModelSession({
+      model: createEmptyModel('Existing'),
+      fileName: existingHandle.name,
+      fileHandle: existingHandle,
+    });
+    const getFile = vi.fn();
+    const incomingHandle = {
+      name: 'same.archimate',
+      isSameEntry: async (other: FileSystemFileHandle) => other === existingHandle,
+      getFile,
+    } as unknown as FileSystemFileHandle;
+
+    const openedId = await openModelFromHandle(incomingHandle);
+
+    expect(openedId).toBe(existingId);
+    expect(getFile).not.toHaveBeenCalled();
+  });
+
+  it('keeps successful legacy file-input opens and reports malformed files', async () => {
+    setOpenPicker(undefined);
+    const validXml = serializeArchimate(createEmptyModel('Valid fallback model'));
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      Object.defineProperty(this, 'files', {
+        configurable: true,
+        value: [
+          { name: 'valid.archimate', text: async () => validXml },
+          { name: 'broken.archimate', text: async () => '<archimate:model broken' },
+        ],
+      });
+      this.dispatchEvent(new Event('change'));
+    });
+
+    await expect(openModelFromDisk()).rejects.toBeInstanceOf(AggregateError);
+
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(getModelSession(useWorkspaceStore.getState().order[0])?.store.getState().model?.info.name)
+      .toBe('Valid fallback model');
+    expect(useWorkspaceStore.getState().order).toHaveLength(1);
   });
 });

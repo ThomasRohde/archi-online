@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ELEMENT_TYPE_MAP } from '../../model/metamodel';
 import { setNodeStyle, type NodeStyle } from '../../model/ops';
-import { useStore } from '../../model/store';
+import { useModelStoreApi, useStore } from '../../model/store';
 import type { Target } from './target';
 
 const DEFAULT_LINE = '#5c5c5c';
@@ -174,11 +174,12 @@ function fontOptions(currentFont: string): { label: string; value: string }[] {
 }
 
 export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: boolean }) {
+  const modelStore = useModelStoreApi();
   if (target.styleIds.length === 0) {
     return <div className="empty-hint">Select objects on a view to edit their appearance.</div>;
   }
 
-  const apply = (style: NodeStyle) => setNodeStyle(target.styleIds, style);
+  const apply = (style: NodeStyle) => setNodeStyle(target.styleIds, style, modelStore);
   const node = target.node;
   const conn = target.connection;
   const isConnection = !!conn && !node;

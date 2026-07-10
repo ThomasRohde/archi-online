@@ -8,7 +8,7 @@ import {
   type RelationshipType,
 } from '../metamodel';
 import { isAllowedRelationship } from '../rules';
-import { transact, useStore } from '../store';
+import { getActiveModelStore, transact, type ModelStore } from '../store';
 import type {
   ArchimateElement,
   ArchimateRelationship,
@@ -85,6 +85,7 @@ export function addElement(
   type: ElementType,
   name?: string,
   folderId?: string,
+  store?: ModelStore,
 ): string {
   const id = newId();
   transact(`Create ${elementLabel(type)}`, (draft) => {
@@ -100,7 +101,7 @@ export function addElement(
     };
     draft.elements[id] = el;
     draft.folders[fid].itemIds.push(id);
-  });
+  }, store);
   return id;
 }
 
@@ -111,8 +112,9 @@ export function addRelationship(
   targetId: string,
   name = '',
   folderId?: string,
+  store: ModelStore = getActiveModelStore(),
 ): string | null {
-  const model = useStore.getState().model;
+  const model = store.getState().model;
   if (!model) return null;
   const src = model.elements[sourceId] ?? model.relationships[sourceId];
   const tgt = model.elements[targetId] ?? model.relationships[targetId];
@@ -133,11 +135,11 @@ export function addRelationship(
     };
     draft.relationships[id] = rel;
     draft.folders[fid].itemIds.push(id);
-  });
+  }, store);
   return id;
 }
 
-export function addView(name = 'Default View', folderId?: string): string {
+export function addView(name = 'Default View', folderId?: string, store?: ModelStore): string {
   const id = newId();
   transact('Create View', (draft) => {
     const fid = folderId ?? defaultFolderId(draft, 'diagrams');
@@ -152,11 +154,11 @@ export function addView(name = 'Default View', folderId?: string): string {
     };
     draft.views[id] = view;
     draft.folders[fid].itemIds.push(id);
-  });
+  }, store);
   return id;
 }
 
-export function addFolder(parentId: string, name = 'New Folder'): string {
+export function addFolder(parentId: string, name = 'New Folder', store?: ModelStore): string {
   const id = newId();
   transact('Create Folder', (draft) => {
     const parent = draft.folders[parentId];
@@ -173,11 +175,11 @@ export function addFolder(parentId: string, name = 'New Folder'): string {
     };
     draft.folders[id] = folder;
     parent.folderIds.push(id);
-  });
+  }, store);
   return id;
 }
 
-export function renameItem(id: string, name: string): void {
+export function renameItem(id: string, name: string, store?: ModelStore): void {
   transact('Rename', (draft) => {
     const item =
       draft.elements[id] ?? draft.relationships[id] ?? draft.views[id] ?? draft.folders[id];
@@ -188,10 +190,10 @@ export function renameItem(id: string, name: string): void {
       if (node && node.nodeType === 'group') node.name = name;
       else if (node && node.nodeType === 'note') node.content = name;
     }
-  });
+  }, store);
 }
 
-export function setDocumentation(id: string, documentation: string): void {
+export function setDocumentation(id: string, documentation: string, store?: ModelStore): void {
   transact('Edit Documentation', (draft) => {
     const item =
       draft.elements[id] ?? draft.relationships[id] ?? draft.views[id] ?? draft.folders[id];
@@ -201,10 +203,10 @@ export function setDocumentation(id: string, documentation: string): void {
       const node = draft.nodes[id];
       if (node && node.nodeType === 'group') node.documentation = documentation;
     }
-  });
+  }, store);
 }
 
-export function setProperties(id: string, properties: Property[]): void {
+export function setProperties(id: string, properties: Property[], store?: ModelStore): void {
   transact('Edit Properties', (draft) => {
     const item =
       draft.elements[id] ?? draft.relationships[id] ?? draft.views[id] ?? draft.folders[id];
@@ -216,13 +218,14 @@ export function setProperties(id: string, properties: Property[]): void {
         node.properties = properties;
       }
     }
-  });
+  }, store);
 }
 
 /** Type-specific relationship attributes (access type, influence strength, direction). */
 export function setRelationshipAttrs(
   id: string,
   attrs: { accessType?: number; strength?: string; directed?: boolean },
+  store?: ModelStore,
 ): void {
   transact('Change Relationship', (draft) => {
     const rel = draft.relationships[id];
@@ -230,19 +233,23 @@ export function setRelationshipAttrs(
     if ('accessType' in attrs) rel.accessType = attrs.accessType === 0 ? undefined : attrs.accessType;
     if ('strength' in attrs) rel.strength = attrs.strength === '' ? undefined : attrs.strength;
     if ('directed' in attrs) rel.directed = attrs.directed ? true : undefined;
-  });
+  }, store);
 }
 
-export function setJunctionType(id: string, junctionType: 'and' | 'or'): void {
+export function setJunctionType(
+  id: string,
+  junctionType: 'and' | 'or',
+  store?: ModelStore,
+): void {
   transact('Change Junction', (draft) => {
     const el = draft.elements[id];
     if (el?.type === 'Junction') el.junctionType = junctionType;
-  });
+  }, store);
 }
 
-export function setViewpoint(viewId: string, viewpoint: string): void {
+export function setViewpoint(viewId: string, viewpoint: string, store?: ModelStore): void {
   transact('Change Viewpoint', (draft) => {
     const view = draft.views[viewId];
     if (view) view.viewpoint = viewpoint === '' ? undefined : viewpoint;
-  });
+  }, store);
 }

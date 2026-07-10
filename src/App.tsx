@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { startExtensionEventBridge } from './extensions/events';
+import { emitWorkspaceStartupEvents, startExtensionEventBridge } from './extensions/events';
 import { hydrateExtensionStore } from './extensions/extension-store';
 import { hydrateExtensionPackageStore } from './extensions/package-store';
 import { extensionRegistry } from './extensions/registry';
@@ -7,14 +7,22 @@ import { reloadEnabledExtensions } from './extensions/runtime';
 import { duplicateItems } from './model/ops';
 import {
   cloneModelForEditing,
+  createModelStore,
+  ModelStoreProvider,
   openView,
   replaceModel,
   redo,
   setSelection,
   undo,
-  useStore,
+  type ModelStore,
 } from './model/store';
-import { restoreAutosave, startAutosave } from './persistence/autosave';
+import {
+  getActiveModelSession,
+  addModelSession,
+  setWorkspaceBooted,
+  useWorkspaceStore,
+} from './model/workspace';
+import { restoreWorkspace, startAutosave } from './persistence/autosave';
 import { loadModelText, openModelFromHandle } from './persistence/files';
 import { loadSharedModelFromLocation, parseShareFragment } from './persistence/share';
 import { consumePwaAction } from './pwa/actions';
@@ -25,7 +33,7 @@ import { shouldBlockUnload } from './pwa/unload-guard';
 import { hydrateSettingsStore } from './settings/app-settings';
 import { AppDialogHost, showAlertDialog, showConfirmDialog } from './ui/AppDialog';
 import { AppShell } from './ui/AppShell';
-import { confirmDiscardChanges, newModel, openModel, saveModel } from './ui/Toolbar';
+import { newModel, openModel, saveModel } from './ui/Toolbar';
 import { ViewerShell } from './ui/ViewerShell';
 
 let editorBooted = false;
@@ -68,28 +76,43 @@ export function viewerRouteKey(url: URL): string {
   return `${url.search}${url.hash}`;
 }
 
-async function bootEditorRuntime(restoreWorkspace: boolean): Promise<void> {
+export function blocksReadOnlyShortcut(key: string): boolean {
+  return ['z', 'y', 'd'].includes(key.toLowerCase());
+}
+
+async function bootEditorRuntime(shouldRestoreWorkspace: boolean): Promise<void> {
   if (editorBooted) {
-    useStore.setState({ booted: true });
+    setWorkspaceBooted(true);
     return;
   }
   editorBooted = true;
-  await Promise.all([
-    restoreWorkspace ? restoreAutosave() : Promise.resolve(false),
+  const [restoreResult] = await Promise.all([
+    shouldRestoreWorkspace ? restoreWorkspace() : Promise.resolve({ restored: 0, failed: 0 }),
     hydrateSettingsStore(),
     hydrateExtensionStore(),
     hydrateExtensionPackageStore(),
   ]).finally(() => {
     startAutosave();
-    useStore.setState({ booted: true });
+    setWorkspaceBooted(true);
     reloadEnabledExtensions();
     if (!extensionEventBridgeStarted) {
       extensionEventBridgeStarted = true;
       startExtensionEventBridge();
     }
-    void extensionRegistry.emitEvent('app.ready');
-    signalEditorRuntimeReady();
+    void (async () => {
+      await extensionRegistry.emitEvent('app.ready');
+      await emitWorkspaceStartupEvents();
+      signalEditorRuntimeReady();
+    })();
   });
+  if (restoreResult.failed > 0) {
+    void showAlertDialog({
+      title: 'Workspace recovery',
+      message: `${restoreResult.failed} model${restoreResult.failed === 1 ? '' : 's'} could not be restored.`,
+      details: `${restoreResult.restored} model${restoreResult.restored === 1 ? '' : 's'} restored successfully.`,
+      intent: 'error',
+    });
+  }
 }
 
 /** Handle `?action=` URLs from manifest shortcuts and the share-target redirect. */
@@ -116,7 +139,6 @@ async function handlePwaAction(): Promise<void> {
       });
       return;
     }
-    if (!(await confirmDiscardChanges())) return;
     try {
       loadModelText(shared.text, shared.name);
     } catch (error) {
@@ -144,6 +166,7 @@ async function openLaunchedFile(handle: FileSystemFileHandle): Promise<void> {
 async function bootViewerRuntime(
   routeKey: string,
   setMode: (mode: AppMode) => void,
+  viewerStore: ModelStore,
 ): Promise<void> {
   try {
     if (!viewerSettingsHydrated) {
@@ -152,14 +175,14 @@ async function bootViewerRuntime(
     }
     const loaded = await loadSharedModelFromLocation(window.location);
     if (routeKey !== viewerRouteKey(new URL(window.location.href))) return;
-    replaceModel(loaded.model, loaded.fileName, false, { readOnly: true });
+    replaceModel(loaded.model, loaded.fileName, false, { readOnly: true }, viewerStore);
     const firstView = loaded.initialViewId ?? Object.keys(loaded.model.views)[0];
-    if (firstView) openView(firstView);
-    useStore.setState({ booted: true });
+    if (firstView) openView(firstView, viewerStore);
+    viewerStore.setState({ booted: true });
     setMode({ kind: 'viewer-loaded', sourceLabel: loaded.sourceLabel });
   } catch (error) {
     if (routeKey !== viewerRouteKey(new URL(window.location.href))) return;
-    useStore.setState({ booted: true });
+    viewerStore.setState({ booted: true });
     setMode({
       kind: 'viewer-error',
       message: error instanceof Error ? error.message : String(error),
@@ -175,6 +198,7 @@ function clearViewerUrl(): void {
 }
 
 export function App() {
+  const [viewerStore] = useState(() => createModelStore({ readOnly: true }));
   const [mode, setMode] = useState<AppMode>(() =>
     isViewerLocation(new URL(window.location.href))
       ? { kind: 'viewer-loading', sourceLabel: 'shared model' }
@@ -187,8 +211,8 @@ export function App() {
 
   useEffect(() => {
     if (mode.kind !== 'viewer-loading') return;
-    void bootViewerRuntime(currentViewerRouteKey, setMode);
-  }, [mode.kind, currentViewerRouteKey]);
+    void bootViewerRuntime(currentViewerRouteKey, setMode, viewerStore);
+  }, [mode.kind, currentViewerRouteKey, viewerStore]);
 
   useEffect(() => {
     const onLocationChange = () => {
@@ -215,7 +239,8 @@ export function App() {
         (e.target instanceof HTMLElement && e.target.isContentEditable);
       if (!e.ctrlKey && !e.metaKey) return;
       const key = e.key.toLowerCase();
-      if (useStore.getState().readOnly && ['s', 'o', 'z', 'y', 'd'].includes(key)) return;
+      const activeStore = getActiveModelSession()?.store;
+      if (activeStore?.getState().readOnly && blocksReadOnlyShortcut(key)) return;
       if (key === 's') {
         e.preventDefault();
         void saveModel(false);
@@ -224,23 +249,25 @@ export function App() {
         void openModel();
       } else if (!inText && key === 'd') {
         e.preventDefault();
-        const sel = useStore.getState().selection;
-        if (sel.source === 'tree' && sel.ids.length > 0) {
-          const newIds = duplicateItems(sel.ids);
-          if (newIds.length) setSelection('tree', newIds);
+        const sel = activeStore?.getState().selection;
+        if (sel?.source === 'tree' && sel.ids.length > 0) {
+          const newIds = duplicateItems(sel.ids, activeStore);
+          if (newIds.length) setSelection('tree', newIds, activeStore);
         }
       } else if (!inText && key === 'z') {
         e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
+        if (e.shiftKey) redo(activeStore);
+        else undo(activeStore);
       } else if (!inText && key === 'y') {
         e.preventDefault();
-        redo();
+        redo(activeStore);
       }
     };
     window.addEventListener('keydown', onKey);
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (useStore.getState().dirty && shouldBlockUnload()) e.preventDefault();
+      const workspace = useWorkspaceStore.getState();
+      const dirty = workspace.order.some((id) => workspace.sessions[id]?.store.getState().dirty);
+      if (dirty && shouldBlockUnload()) e.preventDefault();
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
@@ -255,12 +282,10 @@ export function App() {
         const inEditor = mode.kind === 'editor';
         if (!inEditor) {
           clearViewerUrl();
-          replaceModel(null, null, false, { readOnly: false });
-          setEditorBoot({ restoreWorkspace: false });
+          setEditorBoot({ restoreWorkspace: true });
           setMode({ kind: 'editor' });
         }
-        await bootEditorRuntime(inEditor ? editorBoot.restoreWorkspace : false);
-        if (!(await confirmDiscardChanges())) return;
+        await bootEditorRuntime(inEditor ? editorBoot.restoreWorkspace : true);
         await openLaunchedFile(handle);
       })();
     });
@@ -268,28 +293,29 @@ export function App() {
 
   const openEditorHome = () => {
     clearViewerUrl();
-    replaceModel(null, null, false, { readOnly: false });
     setEditorBoot({ restoreWorkspace: true });
     setMode({ kind: 'editor' });
   };
 
-  const openCopyInEditor = () => {
-    const model = useStore.getState().model;
+  const openCopyInEditor = async () => {
+    const model = viewerStore.getState().model;
     if (!model) return;
+    const copy = cloneModelForEditing(model);
     clearViewerUrl();
-    replaceModel(cloneModelForEditing(model), null, true, { readOnly: false });
-    setEditorBoot({ restoreWorkspace: false });
+    setEditorBoot({ restoreWorkspace: true });
     setMode({ kind: 'editor' });
+    await bootEditorRuntime(true);
+    addModelSession({ model: copy, fileName: null, dirty: true });
   };
 
   if (mode.kind === 'viewer-loading') {
-    return <ViewerShell status="loading" sourceLabel={mode.sourceLabel} onOpenEditor={openEditorHome} />;
+    return <ModelStoreProvider store={viewerStore}><ViewerShell status="loading" sourceLabel={mode.sourceLabel} onOpenEditor={openEditorHome} /></ModelStoreProvider>;
   }
   if (mode.kind === 'viewer-error') {
-    return <ViewerShell status="error" message={mode.message} onOpenEditor={openEditorHome} />;
+    return <ModelStoreProvider store={viewerStore}><ViewerShell status="error" message={mode.message} onOpenEditor={openEditorHome} /></ModelStoreProvider>;
   }
   if (mode.kind === 'viewer-loaded') {
-    return <ViewerShell status="loaded" sourceLabel={mode.sourceLabel} onOpenCopy={openCopyInEditor} />;
+    return <ModelStoreProvider store={viewerStore}><ViewerShell status="loaded" sourceLabel={mode.sourceLabel} onOpenCopy={() => void openCopyInEditor()} /></ModelStoreProvider>;
   }
 
   return (

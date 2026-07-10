@@ -14,7 +14,7 @@ import {
 import { newId } from '../id';
 import type { RelationshipType } from '../metamodel';
 import { validRelationshipTypes } from '../rules';
-import { transact, useStore } from '../store';
+import { getActiveModelStore, transact, type ModelStore } from '../store';
 import type {
   ArchimateElement,
   ArchimateRelationship,
@@ -54,7 +54,11 @@ interface C4NodeInput {
   defaults?: DiagramNodeDefaults;
 }
 
-export function createC4TemplateView(viewType: C4ViewType, folderId?: string): string {
+export function createC4TemplateView(
+  viewType: C4ViewType,
+  folderId?: string,
+  store?: ModelStore,
+): string {
   const viewId = newId();
   transact(`Create C4 ${C4_VIEW_TYPE_LABELS[viewType]} View`, (draft) => {
     const fid = folderId ?? defaultFolderId(draft, 'diagrams');
@@ -78,7 +82,7 @@ export function createC4TemplateView(viewType: C4ViewType, folderId?: string): s
 
     addLegendNode(draft, viewId, 40, 420);
     applyC4VisualDefaultsToView(draft, viewId);
-  });
+  }, store);
   return viewId;
 }
 
@@ -90,6 +94,7 @@ export function createC4ElementOnView(
   name?: string,
   properties: Record<string, string> = {},
   defaults: DiagramNodeDefaults = {},
+  store?: ModelStore,
 ): { elementId: string; nodeId: string } {
   const elementId = newId();
   const nodeId = newId();
@@ -128,11 +133,15 @@ export function createC4ElementOnView(
       ...defaults,
     };
     attachNode(draft, node);
-  });
+  }, store);
   return { elementId, nodeId };
 }
 
-export function setC4Properties(id: string, values: Partial<Record<string, string>>): void {
+export function setC4Properties(
+  id: string,
+  values: Partial<Record<string, string>>,
+  store?: ModelStore,
+): void {
   transact('Edit C4 Properties', (draft) => {
     const item = draft.elements[id] ?? draft.relationships[id] ?? draft.views[id];
     if (!item) return;
@@ -141,11 +150,14 @@ export function setC4Properties(id: string, values: Partial<Record<string, strin
       properties = setC4PropertyValue(properties, key, value);
     }
     item.properties = properties;
-  });
+  }, store);
 }
 
-export function insertOrUpdateC4Legend(viewId: string): string | null {
-  const model = useStore.getState().model;
+export function insertOrUpdateC4Legend(
+  viewId: string,
+  store: ModelStore = getActiveModelStore(),
+): string | null {
+  const model = store.getState().model;
   const viewType = model ? c4PropertyValue(model.views[viewId]?.properties, C4_PROPERTY_KEYS.viewType) : undefined;
   if (!viewType) return null;
   const legendId = newId();
@@ -163,7 +175,7 @@ export function insertOrUpdateC4Legend(viewId: string): string | null {
       return;
     }
     addLegendNode(draft, viewId, 40, Math.max(120, view.childIds.length * 70));
-  });
+  }, store);
   return legendId;
 }
 

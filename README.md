@@ -9,8 +9,9 @@ A web-based clone of the [Archi](https://www.archimatetool.com/) ArchiMate® mod
 built with TypeScript + React, and scriptable in JavaScript through a
 [jArchi](https://github.com/archimatetool/archi-scripting-plugin)-compatible API.
 
-Everything runs in the browser — no backend. Models are saved as native `.archimate`
-files that open in desktop Archi (and vice versa), with autosave to IndexedDB.
+Everything runs in the browser — no backend. Multiple models can be open at once,
+saved as native `.archimate` files that open in desktop Archi (and vice versa), with
+the complete workspace autosaved to IndexedDB.
 
 ## Features
 
@@ -21,6 +22,8 @@ files that open in desktop Archi (and vice versa), with autosave to IndexedDB.
   Scripting panels, float groups or pop them out into separate windows, maximize any
   group. Layout persists across sessions; the toolbar **Views** menu reopens closed
   panels and resets the layout
+- **Multi-model workspace** — multiple independent model roots, per-model undo/save state,
+  cross-model view tabs, tree↔view copy/paste with context-menu actions, and full workspace restore
 - **Model tree** — folders, drag-drop, context menus, inline rename
 - **View editor** — custom SVG canvas with:
   - drag/resize/nesting with grid snap, marquee selection, copy/paste

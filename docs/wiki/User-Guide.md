@@ -5,8 +5,9 @@ settings, and the keyboard shortcuts.
 
 ## The workspace
 
-Archi Online uses an IDE-style docking layout (dockview). Views open as tabs
-in the center editor area; tool panels dock around them.
+Archi Online uses an IDE-style docking layout (dockview). Multiple models can
+be open together in the Models panel. Views from any model open as tabs in the
+center editor area; tool panels follow the active model.
 
 ![The IDE-style workspace: model tree, palette, canvas, settings, and properties](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/workspace.png)
 
@@ -36,9 +37,9 @@ Extensions can contribute additional dockable panels; they appear in the
 
 | Control | What it does |
 | --- | --- |
-| **New** | Create a new unsaved model (asks before discarding unsaved changes). |
-| **Open…** | Open a `.archimate` model or import an ArchiMate Open Exchange `.xml` file (`Ctrl+O`). |
-| **Save** / **Save As…** | Save native `.archimate` XML through a file handle or download fallback (`Ctrl+S`). |
+| **New** | Add a new unsaved model to the workspace. |
+| **Open…** | Add one or more `.archimate` models, or import ArchiMate Open Exchange `.xml` files (`Ctrl+O`). |
+| **Save** / **Save As…** | Save the active model as native `.archimate` XML through its file handle or download fallback (`Ctrl+S`). |
 | **Import/Export ▾** | View image export (PNG/SVG/clipboard), ArchiMate Open Exchange import/export, and CSV import/export. See [[Import & Export|Import-and-Export]]. |
 | **Present** | Full-screen, chrome-free walkthrough of the model's views (arrow keys to step, `Esc` to exit). |
 | **Undo** / **Redo** | Step through model transactions; the tooltip names the operation. |
@@ -50,8 +51,9 @@ Extensions can contribute additional dockable panels; they appear in the
 
 ## Models tree
 
-The **Models** panel shows the model: folders, elements, relationships, and
-views.
+The **Models** panel shows every open model as a collapsible root. Clicking a
+root or item, or focusing one of its view tabs, makes that model active. An
+asterisk after a root name means that model has unsaved changes.
 
 - **Search / filter** — the box at the top of the panel filters the tree by
   name as you type; the dropdown narrows to a category (elements,
@@ -63,6 +65,16 @@ views.
   element types belonging to that folder's layer, **New ArchiMate View**
   appears under the Views folder, and **New Folder** creates a subfolder.
 - **Rename** — `F2` or the context menu; the model root can be renamed too.
+- **Save or close a model** — right-click its root. Dirty models offer
+  **Save**, **Don't Save**, and **Cancel**; Close Others/All stops at the first
+  cancellation.
+- **Copy between models** — use `Ctrl+C` or right-click → **Copy** on selected
+  diagram objects, tree elements, or whole views, activate the target model or
+  view, then use `Ctrl+V` or right-click → **Paste**. Tree elements become
+  visual objects when pasted into a view; view objects become model concepts
+  when pasted into another model tree. Cross-model paste creates fresh IDs and
+  carries the referenced concepts and relationships; custom folder structures
+  are not copied.
 - **Duplicate** — `Ctrl+D` or right-click → **Duplicate** copies the selected
   elements and views (matching desktop Archi: not relationships or folders).
   The copy gets a `(copy)` name suffix and lands in the same folder. An
@@ -120,10 +132,21 @@ The view editor is a custom SVG canvas. It supports:
   the selection by 1 px, `Shift`+arrows by one grid step.
 - **Nesting** — drop an element inside a group or another element to nest it;
   child bounds stay relative to the parent.
-- **Copy / paste** — `Ctrl+C` / `Ctrl+V` for diagram objects.
+- **Copy / paste** — `Ctrl+C` / `Ctrl+V`, or the diagram context menus. Pasting
+  a copied tree element creates a visual element; pasting a copied tree view
+  creates a view-reference object. Pasting diagram objects into another model
+  tree copies their referenced concepts and internal relationships without
+  copying the source diagram geometry. Within one model, normal diagram paste
+  matches desktop Archi: if a concept already occurs in the target view, paste
+  creates an independent copied concept; if it does not, the new visual
+  references the existing concept. Use **Paste as Reference** from the canvas
+  context menu to explicitly reuse concepts even when they already occur in
+  the target view.
 - **Duplicate** — `Ctrl+D` or right-click → **Duplicate** clones the selected
-  diagram objects in place (slightly offset). Like paste, the clones reference
-  the same underlying concepts — it duplicates the picture, not the model.
+  diagram objects in place (slightly offset). Element nodes receive independent
+  copied model concepts, and internal relationship connections receive copied
+  relationships. Notes and groups are visual-only copies; view references keep
+  pointing to the same view. The operation is one undo step.
 - **Align, match size & distribute** — right-click a multi-selection for
   **Align** (left/center/right/top/middle/bottom) and **Match Size**
   (width/height/both), which snap the selection to the *anchor* element — by
@@ -268,10 +291,10 @@ to a download when the browser or organization policy blocks file handles.
 See [[Getting Started|Getting-Started]] for the storage overview and
 [[Archi Compatibility|Archi-Compatibility]] for exchange details.
 
-Autosave writes the open model to IndexedDB shortly after every change and
-restores it on the next launch, including the dirty flag and file name. It
-protects against crashes and accidental tab closes within the same browser
-profile — it is not a backup.
+Autosave writes the complete open workspace to IndexedDB shortly after every
+change and restores all model roots, file names, dirty flags, active model,
+and open views on the next launch. It protects against crashes and accidental
+tab closes within the same browser profile — it is not a backup.
 
 ## Installed app and offline use
 
@@ -283,9 +306,8 @@ local to the current browser profile or file system.
 
 When the browser and operating system support them, the installed app exposes
 app shortcuts for **New model** and **Open model file**, a `.archimate` file
-handler, and a share target for `.archimate` or XML model files. Launched or
-shared files still pass through the same unsaved-change prompt before they
-replace the open model.
+handler, and a share target for `.archimate` or XML model files. Launched and
+shared files are added to the existing workspace instead of replacing a model.
 
 ## Keyboard shortcuts
 
@@ -296,7 +318,7 @@ Open this table anytime with the **?** toolbar button.
 | `Ctrl+S` / `Ctrl+O` | Save / open model |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` or `Ctrl+Shift+Z` | Redo |
-| `Ctrl+C` / `Ctrl+V` | Copy / paste diagram objects |
+| `Ctrl+C` / `Ctrl+V` | Copy / paste diagram objects or model-tree elements/views, including across models |
 | `Ctrl+D` | Duplicate (model-tree or view selection) |
 | `Ctrl+A` | Select all on the active view |
 | `Delete` | Delete from view (canvas) or from model (tree) |

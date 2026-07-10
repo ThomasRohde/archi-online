@@ -177,7 +177,7 @@ describe('duplicateItems — undo and filtering', () => {
 });
 
 describe('duplicateViewObjects', () => {
-  it('clones selected node subtrees in place with offset, same view and concepts', () => {
+  it('clones selected node subtrees with fresh element and relationship concepts', () => {
     const v = buildViewWithContent('V1');
 
     const newIds = duplicateViewObjects(v.viewId, [v.nodeA, v.nodeB], 16);
@@ -190,19 +190,32 @@ describe('duplicateViewObjects', () => {
     expect(newA.viewId).toBe(v.viewId);
     expect(newB.viewId).toBe(v.viewId);
 
-    // Roots offset by 16; concepts (elementId) reused, not new.
+    // Roots offset by 16; every duplicated element has a fresh model concept.
     const origA = m.nodes[v.nodeA];
     expect(newA.bounds.x).toBe(origA.bounds.x + 16);
     expect(newA.bounds.y).toBe(origA.bounds.y + 16);
-    expect((newA as ElementNode).elementId).toBe(v.a);
-    expect((newB as ElementNode).elementId).toBe(v.b);
+    expect((newA as ElementNode).elementId).not.toBe(v.a);
+    expect((newB as ElementNode).elementId).not.toBe(v.b);
+    expect(m.elements[(newA as ElementNode).elementId]).toMatchObject({
+      name: 'A',
+      type: 'BusinessActor',
+    });
+    expect(m.elements[(newB as ElementNode).elementId]).toMatchObject({
+      name: 'B',
+      type: 'BusinessRole',
+    });
 
     // Nested child cloned and re-parented under the new A (not offset itself).
     expect(newA.childIds).toHaveLength(1);
     const newC = m.nodes[newA.childIds[0]];
     expect(newC.parentId).toBe(newA.id);
-    expect((newC as ElementNode).elementId).toBe(v.c);
+    expect((newC as ElementNode).elementId).not.toBe(v.c);
+    expect(m.elements[(newC as ElementNode).elementId]).toMatchObject({
+      name: 'C',
+      type: 'BusinessFunction',
+    });
     expect(newC.bounds).toEqual(m.nodes[v.nodeC].bounds);
+    expect(Object.keys(m.elements)).toHaveLength(6);
 
     // View gained 3 nodes (A, B, C) → 6 total for this view.
     expect(Object.values(m.nodes).filter((n) => n.viewId === v.viewId)).toHaveLength(6);
@@ -211,10 +224,14 @@ describe('duplicateViewObjects', () => {
     const viewConns = Object.values(m.connections).filter((c) => c.viewId === v.viewId);
     expect(viewConns).toHaveLength(2);
     const copyConn = viewConns.find((c) => c.id !== v.conn)!;
-    expect(copyConn.relationshipId).toBe(v.rel);
+    expect(copyConn.relationshipId).not.toBe(v.rel);
     expect(copyConn.sourceId).toBe(newA.id);
     expect(copyConn.targetId).toBe(newB.id);
     expect(m.nodes[newA.id].sourceConnectionIds).toContain(copyConn.id);
+    const copyRelationship = m.relationships[copyConn.relationshipId!];
+    expect(copyRelationship.sourceId).toBe((newA as ElementNode).elementId);
+    expect(copyRelationship.targetId).toBe((newB as ElementNode).elementId);
+    expect(Object.keys(m.relationships)).toHaveLength(2);
   });
 
   it('drops a selected child when its parent is also selected (no double copy)', () => {
@@ -233,10 +250,14 @@ describe('duplicateViewObjects', () => {
     expect(useStore.getState().undoStack).toHaveLength(undoBefore);
 
     const nodeCountBefore = Object.keys(model().nodes).length;
+    const elementCountBefore = Object.keys(model().elements).length;
+    const relationshipCountBefore = Object.keys(model().relationships).length;
     duplicateViewObjects(v.viewId, [v.nodeA, v.nodeB], 16);
     expect(useStore.getState().undoStack).toHaveLength(undoBefore + 1);
     undo();
     expect(Object.keys(model().nodes)).toHaveLength(nodeCountBefore);
+    expect(Object.keys(model().elements)).toHaveLength(elementCountBefore);
+    expect(Object.keys(model().relationships)).toHaveLength(relationshipCountBefore);
   });
 });
 

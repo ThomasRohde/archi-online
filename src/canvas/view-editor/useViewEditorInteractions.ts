@@ -23,7 +23,14 @@ import {
   type MoveEntry,
 } from '../../model/ops';
 import { isAllowedRelationship, validRelationshipTypes } from '../../model/rules';
-import { openView, setActiveTool, setSelection, useStore, type Tool } from '../../model/store';
+import {
+  openView as openModelView,
+  setActiveTool as setModelActiveTool,
+  setSelection as setModelSelection,
+  useModelStoreApi,
+  type Tool,
+} from '../../model/store';
+import { getModelSessionForStore } from '../../model/workspace';
 import type { Bounds, DiagramView, ModelState } from '../../model/types';
 import {
   defaultElementSize,
@@ -73,6 +80,12 @@ export function useViewEditorInteractions({
   spaceHeld,
   spaceRef,
 }: UseViewEditorInteractionsParams) {
+  const modelStore = useModelStoreApi();
+  const sessionId = getModelSessionForStore(modelStore)?.id ?? 'legacy-single-model';
+  const setSelection = (source: 'tree' | 'view', ids: string[]) =>
+    setModelSelection(source, ids, modelStore);
+  const setActiveTool = (tool: Tool) => setModelActiveTool(tool, modelStore);
+  const openView = (id: string) => openModelView(id, modelStore);
   const settings = useSettingsStore((s) => s.settings);
   const [inter, setInter] = useState<Interaction>({ kind: 'none' });
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -109,7 +122,7 @@ export function useViewEditorInteractions({
 
   const startEdit = (nodeId: string) => {
     // Read fresh state: often called right after an op, before this render updates.
-    const m = useStore.getState().model;
+    const m = modelStore.getState().model;
     const node = m?.nodes[nodeId];
     if (!m || !node) return;
     let initial: string;
@@ -123,8 +136,8 @@ export function useViewEditorInteractions({
   const commitEdit = (text: string | null) => {
     if (edit && text !== null && model) {
       const node = model.nodes[edit.nodeId];
-      if (node?.nodeType === 'element') renameItem(node.elementId, text);
-      else if (node) renameItem(edit.nodeId, text);
+      if (node?.nodeType === 'element') renameItem(node.elementId, text, modelStore);
+      else if (node) renameItem(edit.nodeId, text, modelStore);
     }
     setEdit(null);
   };
@@ -133,7 +146,7 @@ export function useViewEditorInteractions({
     if (!model) return;
     const cur = interRef.current;
     if (cur.kind !== 'connect') return;
-    const tool = useStore.getState().activeTool;
+    const tool = modelStore.getState().activeTool;
     setInter({ kind: 'none' });
     const srcNode = model.nodes[cur.sourceNodeId];
     const tgtNode = model.nodes[targetNodeId];
@@ -142,7 +155,13 @@ export function useViewEditorInteractions({
     const tgtType = model.elements[tgtNode.elementId]?.type;
     if (!srcType || !tgtType) return;
     if (tool.kind === 'create-relationship') {
-      const res = createRelationshipOnView(tool.type, viewId, cur.sourceNodeId, targetNodeId);
+      const res = createRelationshipOnView(
+        tool.type,
+        viewId,
+        cur.sourceNodeId,
+        targetNodeId,
+        modelStore,
+      );
       if (res) setSelection('view', [res.connectionId]);
       setActiveTool({ kind: 'select' });
     } else if (tool.kind === 'magic-connector') {
@@ -153,7 +172,13 @@ export function useViewEditorInteractions({
         types.map((t) => ({
           label: relationshipLabel(t),
           onClick: () => {
-            const res = createRelationshipOnView(t, viewId, cur.sourceNodeId, targetNodeId);
+            const res = createRelationshipOnView(
+              t,
+              viewId,
+              cur.sourceNodeId,
+              targetNodeId,
+              modelStore,
+            );
             if (res) setSelection('view', [res.connectionId]);
           },
         })),
@@ -164,6 +189,7 @@ export function useViewEditorInteractions({
 
   const onPointerDown = (e: ReactPointerEvent) => {
     if (!model || !view) return;
+    svgRef.current?.focus();
     if (edit) commitEdit(null);
     if (e.button === 1 || (e.button === 0 && spaceRef.current)) {
       setInter({ kind: 'pan', startX: e.clientX, startY: e.clientY, vx: viewport.x, vy: viewport.y });
@@ -175,7 +201,7 @@ export function useViewEditorInteractions({
     svgRef.current!.setPointerCapture(e.pointerId);
     const p = toView(e.clientX, e.clientY);
     const hit = hitFromEvent(e);
-    const tool = useStore.getState().activeTool;
+    const tool = modelStore.getState().activeTool;
 
     if (
       tool.kind === 'create-element' ||
@@ -201,6 +227,7 @@ export function useViewEditorInteractions({
           bounds,
           undefined,
           textDefaults,
+          modelStore,
         );
         setSelection('view', [nodeId]);
         setActiveTool({ kind: 'select' });
@@ -221,6 +248,7 @@ export function useViewEditorInteractions({
           undefined,
           tool.c4Properties,
           textDefaults,
+          modelStore,
         );
         setSelection('view', [nodeId]);
         setActiveTool({ kind: 'select' });
@@ -238,6 +266,7 @@ export function useViewEditorInteractions({
           },
           '',
           textDefaults,
+          modelStore,
         );
         setSelection('view', [id]);
         setActiveTool({ kind: 'select' });
@@ -255,6 +284,7 @@ export function useViewEditorInteractions({
           },
           'Group',
           textDefaults,
+          modelStore,
         );
         setSelection('view', [id]);
         setActiveTool({ kind: 'select' });
@@ -294,7 +324,7 @@ export function useViewEditorInteractions({
       return;
     }
     if (hit.nodeId) {
-      const cur = useStore.getState().selection;
+      const cur = modelStore.getState().selection;
       if (e.ctrlKey && cur.source === 'view') {
         setSelection(
           'view',
@@ -307,7 +337,7 @@ export function useViewEditorInteractions({
       return;
     }
     if (hit.connId) {
-      const cur = useStore.getState().selection;
+      const cur = modelStore.getState().selection;
       if (e.ctrlKey && cur.source === 'view') {
         setSelection(
           'view',
@@ -340,7 +370,7 @@ export function useViewEditorInteractions({
           Math.hypot(p.x - cur.start.x, p.y - cur.start.y) * viewport.zoom >
           settings.moveDragThreshold
         ) {
-          const sel = useStore.getState().selection;
+          const sel = modelStore.getState().selection;
           const ids = sel.source === 'view' && sel.ids.includes(cur.nodeId) ? sel.ids : [cur.nodeId];
           const rootIds = selectionRoots(model, ids);
           if (rootIds.length > 0) {
@@ -446,7 +476,7 @@ export function useViewEditorInteractions({
           };
         });
         setInter({ kind: 'none' });
-        commitMove(entries);
+        commitMove(entries, modelStore);
         break;
       }
       case 'resize': {
@@ -465,7 +495,7 @@ export function useViewEditorInteractions({
               height: cur.currentAbs.height,
             },
           },
-        ]);
+        ], modelStore);
         break;
       }
       case 'marquee': {
@@ -487,7 +517,7 @@ export function useViewEditorInteractions({
         for (const [id, b] of absBounds) {
           if (rectsIntersect(r, b)) hitIds.push(id);
         }
-        const prev = useStore.getState().selection;
+        const prev = modelStore.getState().selection;
         setSelection(
           'view',
           cur.additive && prev.source === 'view' ? [...new Set([...prev.ids, ...hitIds])] : hitIds,
@@ -523,7 +553,7 @@ export function useViewEditorInteractions({
         const bp = toRelativeBendpoint(sp, srcC, tgtC);
         if (cur.isNew) newBps.splice(cur.index, 0, bp);
         else newBps[cur.index] = bp;
-        setConnectionBendpoints(cur.connId, newBps);
+        setConnectionBendpoints(cur.connId, newBps, modelStore);
         break;
       }
       default:
@@ -538,7 +568,7 @@ export function useViewEditorInteractions({
       const conn = model.connections[hit.connId];
       if (conn) {
         const newBps = conn.bendpoints.filter((_, i) => i !== hit.bendIndex);
-        setConnectionBendpoints(hit.connId, newBps);
+        setConnectionBendpoints(hit.connId, newBps, modelStore);
       }
       return;
     }
@@ -550,7 +580,7 @@ export function useViewEditorInteractions({
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
     if (!model || edit) return;
-    const sel = useStore.getState().selection;
+    const sel = modelStore.getState().selection;
     const viewSel = sel.source === 'view' ? sel.ids : [];
     if (e.key === 'Escape') {
       setInter({ kind: 'none' });
@@ -559,7 +589,9 @@ export function useViewEditorInteractions({
       return;
     }
     if (e.key === 'Delete' && viewSel.length > 0) {
-      deleteViewObjects(viewSel);
+      e.preventDefault();
+      e.stopPropagation();
+      deleteViewObjects(viewSel, modelStore);
       return;
     }
     if (e.key === 'F2' && viewSel.length === 1) {
@@ -592,17 +624,18 @@ export function useViewEditorInteractions({
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && viewSel.length > 0) {
-      copyNodes(viewSel);
+      copyNodes(viewSel, modelStore, sessionId);
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
-      const ids = pasteNodes(viewId);
+      const ids = pasteNodes(viewId, undefined, modelStore, sessionId);
       if (ids.length > 0) setSelection('view', ids);
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && viewSel.length > 0) {
       e.preventDefault();
-      const ids = duplicateViewObjects(viewId, viewSel, settings.pasteOffset);
+      e.stopPropagation();
+      const ids = duplicateViewObjects(viewId, viewSel, settings.pasteOffset, modelStore);
       if (ids.length > 0) setSelection('view', ids);
       return;
     }
@@ -629,6 +662,7 @@ export function useViewEditorInteractions({
             },
           };
         }),
+        modelStore,
       );
     }
   };
@@ -652,6 +686,8 @@ export function useViewEditorInteractions({
         absBounds,
         startEdit,
         settings,
+        modelStore,
+        sessionId,
         snap,
         zoomBy,
         zoomTo,
@@ -659,9 +695,9 @@ export function useViewEditorInteractions({
       });
       return;
     }
-    const sel = useStore.getState().selection;
+    const sel = modelStore.getState().selection;
     if (!(sel.source === 'view' && sel.ids.includes(id))) setSelection('view', [id]);
-    const ids = useStore.getState().selection.ids;
+    const ids = modelStore.getState().selection.ids;
     showViewObjectContextMenu({
       clientX: e.clientX,
       clientY: e.clientY,
@@ -670,6 +706,8 @@ export function useViewEditorInteractions({
       ids,
       model,
       settings,
+      modelStore,
+      sessionId,
       startEdit,
     });
   };
@@ -697,6 +735,7 @@ export function useViewEditorInteractions({
       point: p,
       snap,
       settings,
+      modelStore,
     });
     if (created.length > 0) setSelection('view', created);
   };

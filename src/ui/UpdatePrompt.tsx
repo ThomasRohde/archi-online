@@ -1,5 +1,6 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useStore } from '../model/store';
+import { useWorkspaceStore } from '../model/workspace';
 import { flushAutosaveNow } from '../persistence/autosave';
 import { bypassUnloadGuardOnce } from '../pwa/unload-guard';
 
@@ -25,7 +26,9 @@ export function UpdatePrompt() {
   if (!needRefresh) return null;
 
   const reload = async () => {
-    if (useStore.getState().dirty) await flushAutosaveNow();
+    const workspace = useWorkspaceStore.getState();
+    const anyDirty = workspace.order.some((id) => workspace.sessions[id]?.store.getState().dirty);
+    if (anyDirty || useStore.getState().dirty) await flushAutosaveNow();
     bypassUnloadGuardOnce();
     await updateServiceWorker(true);
   };

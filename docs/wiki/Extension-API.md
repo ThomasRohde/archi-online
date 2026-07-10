@@ -99,6 +99,8 @@ app.commands.register("local.audit.run", {
   description: "Count model content and report warnings.",
   run: function (context, args) {
     console.log(context.extensionId);
+    console.log(context.modelSessionId); // workspace session id | null
+    console.log(context.modelId);        // Archi model id | null
     console.log(context.activeViewId);   // string | null
     console.log(context.selectionIds);   // string[]
     console.log(context.trigger);        // set for context-menu invocations
@@ -210,12 +212,18 @@ Event names:
 | `model.opened` | A model was created, opened, or restored. |
 | `model.changed` | The model state changed. |
 | `model.saved` | The model was saved to a file or download. |
+| `model.activated` | A different open model became active. |
+| `model.closed` | An open model was closed. |
 | `selection.changed` | The tree/view selection changed. |
 | `view.opened` | A view tab was opened. |
 | `view.activated` | A view tab became active. |
 | `view.contextMenu` | The canvas context menu opened. |
 | `tree.contextMenu` | The model-tree context menu opened. |
 | `script.error` | A Scripting-panel run threw; payload is `{ message: string }`. |
+
+Model, selection, and view lifecycle payloads include `sessionId`, `modelId`,
+and `fileName` so extensions can distinguish models with colliding Archi IDs.
+Existing model and view APIs remain scoped to the active model.
 
 Event handler errors are recorded per extension and do not break other
 extensions.

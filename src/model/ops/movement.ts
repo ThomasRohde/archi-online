@@ -1,4 +1,4 @@
-import { transact } from '../store';
+import { transact, type ModelStore } from '../store';
 import type { Bounds } from '../types';
 import { deleteConnectionFromDraft, deleteNodeFromDraft } from './draft';
 
@@ -9,7 +9,7 @@ export interface MoveEntry {
 }
 
 /** Commit a drag: move and/or reparent several nodes in one undo step. */
-export function commitMove(entries: MoveEntry[]): void {
+export function commitMove(entries: MoveEntry[], store?: ModelStore): void {
   transact('Move', (draft) => {
     for (const entry of entries) {
       const node = draft.nodes[entry.id];
@@ -38,11 +38,15 @@ export function commitMove(entries: MoveEntry[]): void {
       }
       node.bounds = { ...entry.bounds };
     }
-  });
+  }, store);
 }
 
 /** Bring to front / send to back within the node's parent. */
-export function reorderNode(id: string, where: 'front' | 'back'): void {
+export function reorderNode(
+  id: string,
+  where: 'front' | 'back',
+  store?: ModelStore,
+): void {
   transact(where === 'front' ? 'Bring to Front' : 'Send to Back', (draft) => {
     const node = draft.nodes[id];
     if (!node) return;
@@ -55,10 +59,13 @@ export function reorderNode(id: string, where: 'front' | 'back'): void {
     list.splice(i, 1);
     if (where === 'front') list.push(id);
     else list.unshift(id);
-  });
+  }, store);
 }
 
-export function moveNodes(moves: { id: string; x: number; y: number }[]): void {
+export function moveNodes(
+  moves: { id: string; x: number; y: number }[],
+  store?: ModelStore,
+): void {
   transact('Move', (draft) => {
     for (const m of moves) {
       const node = draft.nodes[m.id];
@@ -67,18 +74,23 @@ export function moveNodes(moves: { id: string; x: number; y: number }[]): void {
         node.bounds.y = m.y;
       }
     }
-  });
+  }, store);
 }
 
-export function resizeNode(id: string, bounds: Bounds): void {
+export function resizeNode(id: string, bounds: Bounds, store?: ModelStore): void {
   transact('Resize', (draft) => {
     const node = draft.nodes[id];
     if (node) node.bounds = { ...bounds };
-  });
+  }, store);
 }
 
 /** Move a node under a new parent (view id or node id), with new relative bounds. */
-export function reparentNode(id: string, newParentId: string, bounds: Bounds): void {
+export function reparentNode(
+  id: string,
+  newParentId: string,
+  bounds: Bounds,
+  store?: ModelStore,
+): void {
   transact('Move', (draft) => {
     const node = draft.nodes[id];
     if (!node || id === newParentId) return;
@@ -95,15 +107,15 @@ export function reparentNode(id: string, newParentId: string, bounds: Bounds): v
     node.bounds = { ...bounds };
     if (newParentId === node.viewId) draft.views[node.viewId].childIds.push(id);
     else draft.nodes[newParentId].childIds.push(id);
-  });
+  }, store);
 }
 
 /** Delete diagram nodes/connections from the view only (concepts stay in the model). */
-export function deleteViewObjects(ids: string[]): void {
+export function deleteViewObjects(ids: string[], store?: ModelStore): void {
   transact('Delete from View', (draft) => {
     for (const id of ids) {
       if (draft.connections[id]) deleteConnectionFromDraft(draft, id);
       else if (draft.nodes[id]) deleteNodeFromDraft(draft, id);
     }
-  });
+  }, store);
 }

@@ -1,4 +1,4 @@
-import { transact } from '../store';
+import { transact, type ModelStore } from '../store';
 import type { DiagramConnection } from '../types';
 
 export interface NodeStyle {
@@ -14,7 +14,7 @@ export interface NodeStyle {
   lineWidth?: number | undefined;
 }
 
-export function setNodeStyle(ids: string[], style: NodeStyle): void {
+export function setNodeStyle(ids: string[], style: NodeStyle, store?: ModelStore): void {
   transact('Change Style', (draft) => {
     for (const id of ids) {
       const node = draft.nodes[id];
@@ -33,12 +33,16 @@ export function setNodeStyle(ids: string[], style: NodeStyle): void {
         if ('textPosition' in style) conn.textPosition = style.textPosition;
       }
     }
-  });
+  }, store);
 }
 
-export function setConnectionBendpoints(id: string, bendpoints: DiagramConnection['bendpoints']): void {
+export function setConnectionBendpoints(
+  id: string,
+  bendpoints: DiagramConnection['bendpoints'],
+  store?: ModelStore,
+): void {
   transact('Edit Bendpoints', (draft) => {
     const conn = draft.connections[id];
     if (conn) conn.bendpoints = bendpoints;
-  });
+  }, store);
 }

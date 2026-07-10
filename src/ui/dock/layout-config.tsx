@@ -7,7 +7,12 @@ import type {
   IDockviewPanelProps,
 } from 'dockview-react';
 import { ViewEditor } from '../../canvas/ViewEditor';
-import { closeView, useStore } from '../../model/store';
+import { ModelStoreProvider, closeView, useStore } from '../../model/store';
+import {
+  activateModelSession,
+  getModelSession,
+  useWorkspaceStore,
+} from '../../model/workspace';
 import { showContextMenu, type MenuItem } from '../ContextMenu';
 import { ExtensionPanelHost } from '../ExtensionPanelHost';
 import { ExtensionsPanel } from '../ExtensionsPanel';
@@ -23,6 +28,41 @@ import { WelcomePanel } from '../WelcomePanel';
 
 export const LAYOUT_KEY = 'archi-online.layout';
 export const VIEW_PREFIX = 'view:';
+
+export interface ViewPanelParams {
+  sessionId: string;
+  viewId: string;
+}
+
+export function createViewPanelId(sessionId: string, viewId: string): string {
+  return `${VIEW_PREFIX}${encodeURIComponent(sessionId)}:${encodeURIComponent(viewId)}`;
+}
+
+export function changedActiveViewPanelId(
+  previous: Record<string, string | null>,
+  current: Record<string, string | null>,
+  activeSessionId: string | null,
+): string | null {
+  if (!activeSessionId) return null;
+  const activeViewId = current[activeSessionId];
+  if (!activeViewId || previous[activeSessionId] === activeViewId) return null;
+  return createViewPanelId(activeSessionId, activeViewId);
+}
+
+export function parseViewPanelId(panelId: string): ViewPanelParams | null {
+  if (!panelId.startsWith(VIEW_PREFIX)) return null;
+  const encoded = panelId.slice(VIEW_PREFIX.length);
+  const separator = encoded.indexOf(':');
+  if (separator < 1 || separator === encoded.length - 1) return null;
+  try {
+    return {
+      sessionId: decodeURIComponent(encoded.slice(0, separator)),
+      viewId: decodeURIComponent(encoded.slice(separator + 1)),
+    };
+  } catch {
+    return null;
+  }
+}
 
 interface ToolPanelDef {
   id: string;
@@ -261,7 +301,7 @@ export function applySidePanelConstraints(api: DockviewApi): void {
  * persisted layouts that were saved with the welcome tab closed.
  */
 export function ensureHomeAnchor(api: DockviewApi): void {
-  if (!useStore.getState().model) return;
+  if (useWorkspaceStore.getState().order.length === 0 && !useStore.getState().model) return;
   if (api.getPanel('welcome')) return;
   TOOL_PANELS.find((t) => t.id === 'welcome')?.add(api);
 }
@@ -282,28 +322,40 @@ export function ensurePropertiesDockedWithScripts(api: DockviewApi): void {
 
 /** Re-add open store views that have no dockview panel (used by reset). */
 export function restoreViewPanels(api: DockviewApi): void {
-  const s = useStore.getState();
-  for (const viewId of s.openViewIds) {
-    const view = s.model?.views[viewId];
-    if (!view) continue;
-    const id = VIEW_PREFIX + viewId;
-    if (!api.getPanel(id)) {
-      api.addPanel({
-        id,
-        component: 'view',
-        title: view.name,
-        params: { viewId },
-        position: centerPosition(api, id),
-      });
+  const workspace = useWorkspaceStore.getState();
+  for (const sessionId of workspace.order) {
+    const session = workspace.sessions[sessionId];
+    const state = session?.store.getState();
+    if (!state?.model) continue;
+    for (const viewId of state.openViewIds) {
+      const view = state.model.views[viewId];
+      if (!view) continue;
+      const id = createViewPanelId(sessionId, viewId);
+      if (!api.getPanel(id)) {
+        api.addPanel({
+          id,
+          component: 'view',
+          title: `${view.name} — ${state.model.info.name}`,
+          params: { sessionId, viewId } satisfies ViewPanelParams,
+          position: centerPosition(api, id),
+        });
+      }
     }
   }
 }
 
-function ViewPanel(props: IDockviewPanelProps<{ viewId: string }>) {
+function ViewPanel(props: IDockviewPanelProps<ViewPanelParams>) {
+  const session = getModelSession(props.params.sessionId);
+  if (!session) return null;
   return (
-    <div className="view-panel">
-      <ViewEditor viewId={props.params.viewId} />
-    </div>
+    <ModelStoreProvider store={session.store}>
+      <div
+        className="view-panel"
+        onPointerDownCapture={() => activateModelSession(props.params.sessionId)}
+      >
+        <ViewEditor viewId={props.params.viewId} />
+      </div>
+    </ModelStoreProvider>
   );
 }
 
@@ -365,22 +417,41 @@ function HomeTab(props: IDockviewPanelHeaderProps) {
 
 /** Default tab; view tabs get a Close / Close Others / Close All context menu. */
 export function DefaultTab(props: IDockviewPanelHeaderProps) {
-  if (!props.api.id.startsWith(VIEW_PREFIX)) return <DockviewDefaultTab {...props} />;
-  const viewId = props.api.id.slice(VIEW_PREFIX.length);
+  const target = parseViewPanelId(props.api.id);
+  if (!target) return <DockviewDefaultTab {...props} />;
   return (
     <DockviewDefaultTab
       {...props}
       onContextMenu={(e: React.MouseEvent) => {
         e.preventDefault();
-        const open = useStore.getState().openViewIds;
+        const workspace = useWorkspaceStore.getState();
+        const open = workspace.order.flatMap((sessionId) => {
+          const session = workspace.sessions[sessionId];
+          return (session?.store.getState().openViewIds ?? []).map((viewId) => ({
+            session,
+            viewId,
+          }));
+        });
         const items: MenuItem[] = [
-          { label: 'Close', onClick: () => closeView(viewId) },
+          {
+            label: 'Close',
+            onClick: () => closeView(target.viewId, getModelSession(target.sessionId)?.store),
+          },
           {
             label: 'Close Others',
             disabled: open.length < 2,
-            onClick: () => open.filter((id) => id !== viewId).forEach(closeView),
+            onClick: () =>
+              open
+                .filter(
+                  (entry) =>
+                    entry.session?.id !== target.sessionId || entry.viewId !== target.viewId,
+                )
+                .forEach((entry) => closeView(entry.viewId, entry.session?.store)),
           },
-          { label: 'Close All', onClick: () => open.forEach(closeView) },
+          {
+            label: 'Close All',
+            onClick: () => open.forEach((entry) => closeView(entry.viewId, entry.session?.store)),
+          },
         ];
         showContextMenu(e.clientX, e.clientY, items);
       }}
