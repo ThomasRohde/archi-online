@@ -22,7 +22,7 @@ Web-based ArchiMate modeler (clone of the desktop Archi tool). React 18 + TypeSc
 
 ## Feature workflow
 
-Non-trivial features get a design doc in `docs/superpowers/specs/` and an implementation plan in `docs/superpowers/plans/` (dated filenames) before coding.
+Non-trivial features still get a short design doc and an implementation plan (dated filenames) before coding, but planning artifacts stay out of the repository: write them under `docs/superpowers/` (gitignored) and never commit them. `ARCHITECTURE.md` holds the binding architectural principles.
 
 ## Verifying UI changes
 
@@ -35,39 +35,6 @@ Gotchas when driving the browser:
 
 ## Publishing to here.now
 
-The built app is hosted at **https://bitter-mill-c9qn.here.now/** via the `here-now`
-skill (installed at `~/.agents/skills/here-now/`). Publishing is manual/on-request —
-it is **not** part of the build gate. Authenticated (permanent) publishes read the API
-key from `~/.herenow/credentials`.
-
-Workflow: build, then publish the `dist/` folder to the existing slug. Vite's base is
-`/`, so `dist/index.html` serves correctly at the here.now root.
-
-```bash
-npm run build   # produces dist/
-```
-
-**Windows gotcha — do NOT publish with Git Bash's `curl`.** Its Schannel TLS backend
-cannot complete the Cloudflare R2 upload (R2 requests a TLS renegotiation Schannel
-can't do → `curl: (43) A libcurl function was given a bad argument`; the here.now API
-calls succeed, only the storage-upload leg fails). The skill's scripts are also CRLF,
-which WSL's stock bash rejects (`set -o pipefail\r`). Publish through **WSL** (curl with
-OpenSSL), stripping CR at runtime and setting `HOME` to the Windows home so the script
-finds the credentials — the key is never passed on the command line:
-
-```bash
-wsl.exe -e bash -c '
-SK=/mnt/c/Users/thoma/.agents/skills/here-now/scripts
-tr -d "\r" < "$SK/publish.sh" > "$SK/.publish.nocr.sh"
-export HOME=/mnt/c/Users/thoma
-cd /mnt/c/Users/thoma/Projects/archi-online
-bash "$SK/.publish.nocr.sh" dist --slug bitter-mill-c9qn --client claude-code
-rc=$?; rm -f "$SK/.publish.nocr.sh"; exit $rc
-'
-```
-
-The publish needs outbound network, so it must run with the Bash sandbox disabled.
-Success shows `publish_result.auth_mode=authenticated`; verify the live site by
-fetching its root (via WSL curl) and confirming it matches `dist/index.html`. To create
-a *new* site instead of updating, drop `--slug`. `dist/` and `.herenow/` are gitignored;
-never commit `~/.herenow/credentials` or `.herenow/state.json`.
+The built app is hosted at **https://bitter-mill-c9qn.here.now/**. Publishing is
+manual/on-request — it is **not** part of the build gate. The publish procedure is
+machine-specific and lives in `CLAUDE.local.md` (gitignored).

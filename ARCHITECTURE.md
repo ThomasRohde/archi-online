@@ -1,6 +1,6 @@
 # Architectural Principles for Archi Online
 
-This guidance is for Codex and other coding agents modifying this repository. It complements the existing repository guidelines. Treat these principles as architectural constraints, not style preferences.
+This guidance is for contributors and coding agents modifying this repository. It complements the existing repository guidelines. Treat these principles as architectural constraints, not style preferences.
 
 ## 1. Product architecture: browser-first, local-first
 
@@ -101,7 +101,7 @@ This guidance is for Codex and other coding agents modifying this repository. It
 
 ## 13. Documentation and design discipline
 
-- Non-trivial features need a short design note in `docs/superpowers/specs/` and an implementation plan in `docs/superpowers/plans/` before coding.
+- Non-trivial features need a short design note and an implementation plan before coding. Planning artifacts are local working files (`docs/superpowers/` and `docs/brainstorms/` are gitignored) and are not committed.
 - User-visible behavior changes require updates in `docs/wiki/` and `npm run docs:check`.
 - Public API changes in scripting or extensions require examples and compatibility notes.
 - Architectural shortcuts are not acceptable just because tests pass. If a requested change conflicts with these principles, implement an architecture-safe alternative and explain the trade-off.
@@ -131,7 +131,7 @@ npm run ci:check
 
 If the full gate cannot run, report exactly which checks ran, which did not, and why.
 
-## 15. Codex working rules
+## 15. Agent working rules
 
 Before editing:
 

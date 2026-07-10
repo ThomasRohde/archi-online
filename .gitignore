@@ -16,3 +16,8 @@ docs/.vitepress/cache/
 docs/.vitepress/dist/
 *.stackdump
 
+
+# local agent instructions and planning artifacts
+CLAUDE.local.md
+docs/superpowers/
+docs/brainstorms/

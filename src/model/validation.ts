@@ -60,7 +60,7 @@ function isNestedType(type: RelationshipType): boolean {
   return NESTED_RELATIONSHIP_TYPES.has(type);
 }
 
-/** InvalidRelationsChecker — ErrorType. Matrix check only (LEVELUP §6.1). */
+/** InvalidRelationsChecker — ErrorType. Matrix check only. */
 function invalidRelationships(state: ModelState): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   for (const rel of Object.values(state.relationships)) {

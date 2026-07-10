@@ -24,7 +24,6 @@ export default defineConfig({
     'wiki/Home.md',
     'brainstorms/**',
     'superpowers/**',
-    'github-publication.md',
     'wiki-publishing.md',
     'pages-publishing.md',
   ],

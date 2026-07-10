@@ -54,4 +54,11 @@ Wiki source lives in `docs/wiki/`. Check docs links with:
 npm run docs:check
 ```
 
-See `docs/github-publication.md` for the repository publication runbook.
+See `docs/pages-publishing.md` (docs site) and `docs/wiki-publishing.md`
+(GitHub Wiki) for how documentation is published.
+
+## Architecture
+
+Read [ARCHITECTURE.md](ARCHITECTURE.md) before making non-trivial changes —
+it defines the architectural constraints (operation-based mutations, layer
+ownership, Archi fidelity, local-first rules) that reviews are held against.

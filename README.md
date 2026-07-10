@@ -1,5 +1,10 @@
 # Archi Online
 
+[![CI](https://github.com/ThomasRohde/archi-online/actions/workflows/ci.yml/badge.svg)](https://github.com/ThomasRohde/archi-online/actions/workflows/ci.yml)
+[![Docs](https://github.com/ThomasRohde/archi-online/actions/workflows/docs.yml/badge.svg)](https://thomasrohde.github.io/archi-online/)
+[![Release](https://img.shields.io/github/v/release/ThomasRohde/archi-online)](https://github.com/ThomasRohde/archi-online/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A web-based clone of the [Archi](https://www.archimatetool.com/) ArchiMate® modeling tool,
 built with TypeScript + React, and scriptable in JavaScript through a
 [jArchi](https://github.com/archimatetool/archi-scripting-plugin)-compatible API.
@@ -90,12 +95,12 @@ maintained in `docs/wiki/` so documentation changes are reviewed like code:
 Run `npm run docs:check` after editing, then `npm run docs:publish-wiki` to
 push the pages to the GitHub Wiki (see [docs/wiki-publishing.md](docs/wiki-publishing.md)).
 
-## GitHub Publication
+## Contributing
 
-This repository includes GitHub Actions CI, issue and pull request templates,
-community files, and a wiki publishing helper. See
-[GitHub Publication Runbook](docs/github-publication.md) before pushing the
-project to GitHub.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+development workflow and [ARCHITECTURE.md](ARCHITECTURE.md) for the
+architectural principles changes are reviewed against. Release history is in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
@@ -105,6 +110,8 @@ Some Archi compatibility data and icon geometry are derived from the Archi
 project under the MIT License. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architectural principles.
 
 - `src/model/` — pure-TS domain core: metamodel, rules, normalized Zustand store,
   Immer-patch undo/redo, operations, `.archimate` XML I/O
