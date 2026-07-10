@@ -63,6 +63,11 @@ views.
   element types belonging to that folder's layer, **New ArchiMate View**
   appears under the Views folder, and **New Folder** creates a subfolder.
 - **Rename** — `F2` or the context menu; the model root can be renamed too.
+- **Duplicate** — `Ctrl+D` or right-click → **Duplicate** copies the selected
+  elements and views (matching desktop Archi: not relationships or folders).
+  The copy gets a `(copy)` name suffix and lands in the same folder. An
+  element copy does not copy its relationships; a view copy shows the same
+  concepts as the original. One undo step, and the copies end up selected.
 - **Delete** — removes the selected items from the model. Deleting a concept
   also removes its visual objects from all views and cascades any
   relationships that depended on it, as one undo step. Multi-select works
@@ -93,6 +98,15 @@ allowed-relationship matrix.
 
 ![The magic connector offering only the relationships ArchiMate allows between two elements](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/palette-validity.png)
 
+When the active view declares a **viewpoint** (set it in the Properties panel),
+element types the viewpoint does not allow are greyed out and inert — they
+cannot be clicked or dragged. The allowed-element table is ported from desktop
+Archi's viewpoint definitions; Junction and Grouping are always allowed, and
+relationship, note, and group tools are never restricted. Clearing the
+viewpoint restores the full palette.
+
+![The palette with a viewpoint active: strategy, technology, and motivation element types greyed out](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/palette-viewpoint.png)
+
 ## Canvas editing
 
 ![The Archisurance Layered View on the SVG canvas](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/canvas.png)
@@ -107,6 +121,16 @@ The view editor is a custom SVG canvas. It supports:
 - **Nesting** — drop an element inside a group or another element to nest it;
   child bounds stay relative to the parent.
 - **Copy / paste** — `Ctrl+C` / `Ctrl+V` for diagram objects.
+- **Duplicate** — `Ctrl+D` or right-click → **Duplicate** clones the selected
+  diagram objects in place (slightly offset). Like paste, the clones reference
+  the same underlying concepts — it duplicates the picture, not the model.
+- **Align, match size & distribute** — right-click a multi-selection for
+  **Align** (left/center/right/top/middle/bottom) and **Match Size**
+  (width/height/both), which snap the selection to the *anchor* element — by
+  default the last-selected one (change it under **Settings → Align &
+  distribute**). With three or more objects, **Distribute**
+  (horizontally/vertically) equalizes the gaps between them, keeping the two
+  outermost fixed — PowerPoint semantics. Each action is one undo step.
 - **Direct edit** — `F2` or double-click to rename in place.
 - **Notes, groups, view references** — notes and groups come from the
   palette; view references are created by dragging a view from the tree.
@@ -120,6 +144,27 @@ The view editor is a custom SVG canvas. It supports:
 Deleting on the canvas removes objects *from the view* only; the underlying
 concepts stay in the model. Delete from the Models tree to remove a concept
 from the model itself.
+
+## Navigator
+
+The **Navigator** walks the relationship graph from a root concept, like
+desktop Archi's Navigator view. It is an opt-in panel — open it from
+**Views ▾ → Navigator** (it docks with the Models panel) — and works in
+read-only mode.
+
+![The Navigator panel rooted at Customer, drilled down through a Triggering relationship](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/navigator.png)
+
+- The root follows your selection: select an element or relationship in the
+  tree or on a view and the Navigator re-roots to it.
+- Expanding an element row shows its relationships — outgoing in **Down**
+  mode, incoming in **Up** mode; expanding a relationship row shows the
+  concept at the other end. Children are built lazily, so cycles in the model
+  are safe to explore.
+- **Pin** freezes the current root while you click around elsewhere; **Home**
+  re-roots to the current selection.
+- Single-click a row to select that concept in the model tree (the Properties
+  panel follows) without re-rooting; double-click an element row to make it
+  the new root.
 
 ## Outline
 
@@ -157,6 +202,16 @@ canvas. Depending on what is selected it edits:
 All of these are model data: edits create normal undo steps and mark the
 model dirty. Selecting multiple objects shows the selection count; appearance
 edits apply to the whole selection where they make sense.
+
+For a single selected element or relationship an **Analysis** tab appears —
+the same read-only queries as desktop Archi's Analysis tab:
+
+![The Analysis tab listing Customer's model relations and the views that use it](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/analysis-tab.png)
+
+- **Model Relations** — every relationship touching the concept (outgoing
+  first, then incoming). Click a row to select that relationship in the tree.
+- **Used in Views** — every view containing the concept. Click a row to open
+  the view with the concept selected on it.
 
 ## Validator
 
@@ -196,6 +251,7 @@ style. Each row has a reset button, and **Reset all** restores the defaults.
 | Canvas snapping | Snap to grid (on); grid size (12 px) — also the `Shift`+arrow nudge step. |
 | New object defaults | Text align (center) and text position (center) for new objects; default sizes for elements (120×55), junctions (15), notes (185×80), groups (400×140), and view references (200×140). |
 | Canvas interaction | Drop offset (16 px), paste offset (16 px), minimum node size (20 px), move drag threshold (4 px), bendpoint drag threshold (5 px). |
+| Align & distribute | Alignment anchor (last selected) — the element Align and Match Size snap the rest of the selection to. |
 | Viewport | Zoom limits (0.1–4), wheel zoom factor (1.1), button zoom factor (1.2), fit-to-window maximum zoom (1.5) and padding (24 px). |
 
 Values are validated and clamped to sensible ranges when loaded or edited.
@@ -241,6 +297,7 @@ Open this table anytime with the **?** toolbar button.
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` or `Ctrl+Shift+Z` | Redo |
 | `Ctrl+C` / `Ctrl+V` | Copy / paste diagram objects |
+| `Ctrl+D` | Duplicate (model-tree or view selection) |
 | `Ctrl+A` | Select all on the active view |
 | `Delete` | Delete from view (canvas) or from model (tree) |
 | `F2` or double-click | Rename |
