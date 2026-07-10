@@ -708,7 +708,7 @@ body {
   top: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 22px;
+  grid-template-columns: minmax(0, 1fr) 22px 22px 22px;
   align-items: stretch;
   gap: 4px;
   padding: 4px 6px;
@@ -750,6 +750,24 @@ body {
 
 .tree-filter-clear:hover {
   color: #222;
+}
+
+.tree-filter-btn {
+  width: 22px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #777;
+  padding: 2px 4px;
+}
+
+.tree-filter-btn:hover:not(:disabled) {
+  color: #222;
+}
+
+.tree-filter-btn:disabled {
+  color: #ccc;
+  cursor: default;
 }
 
 .tree-filter-empty {
@@ -1048,10 +1066,23 @@ body {
   line-height: 1.4;
 }
 
-.validator-message {
+.validator-text {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.validator-message {
   font-size: 12px;
   line-height: 1.4;
+  word-break: break-word;
+}
+
+.validator-where {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-dim);
   word-break: break-word;
 }
 
@@ -1627,10 +1658,6 @@ body {
 }
 
 @container (max-width: 760px) {
-  .prop-tabs {
-    flex-basis: 132px;
-  }
-
   .appearance-form {
     grid-template-columns: 1fr;
     row-gap: 0;
@@ -1645,10 +1672,6 @@ body {
   .prop-type {
     padding: 7px 8px;
     font-size: 13px;
-  }
-
-  .prop-tabs {
-    flex-basis: 104px;
   }
 
   .prop-tab {

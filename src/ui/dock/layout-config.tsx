@@ -7,7 +7,8 @@ import type {
   IDockviewPanelProps,
 } from 'dockview-react';
 import { ViewEditor } from '../../canvas/ViewEditor';
-import { useStore } from '../../model/store';
+import { closeView, useStore } from '../../model/store';
+import { showContextMenu, type MenuItem } from '../ContextMenu';
 import { ExtensionPanelHost } from '../ExtensionPanelHost';
 import { ExtensionsPanel } from '../ExtensionsPanel';
 import { ModelTree } from '../ModelTree';
@@ -360,6 +361,31 @@ export const components: Record<string, React.FunctionComponent<IDockviewPanelPr
 /** Non-closeable tab for the pinned Home (welcome) anchor. */
 function HomeTab(props: IDockviewPanelHeaderProps) {
   return <DockviewDefaultTab {...props} hideClose />;
+}
+
+/** Default tab; view tabs get a Close / Close Others / Close All context menu. */
+export function DefaultTab(props: IDockviewPanelHeaderProps) {
+  if (!props.api.id.startsWith(VIEW_PREFIX)) return <DockviewDefaultTab {...props} />;
+  const viewId = props.api.id.slice(VIEW_PREFIX.length);
+  return (
+    <DockviewDefaultTab
+      {...props}
+      onContextMenu={(e: React.MouseEvent) => {
+        e.preventDefault();
+        const open = useStore.getState().openViewIds;
+        const items: MenuItem[] = [
+          { label: 'Close', onClick: () => closeView(viewId) },
+          {
+            label: 'Close Others',
+            disabled: open.length < 2,
+            onClick: () => open.filter((id) => id !== viewId).forEach(closeView),
+          },
+          { label: 'Close All', onClick: () => open.forEach(closeView) },
+        ];
+        showContextMenu(e.clientX, e.clientY, items);
+      }}
+    />
+  );
 }
 
 export const tabComponents: Record<

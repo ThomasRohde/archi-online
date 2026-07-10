@@ -10,6 +10,7 @@ import { closeView, useStore } from '../model/store';
 import { defaultKeyValueStore } from '../persistence/keyval';
 import { registerLayoutBus } from './layout-bus';
 import {
+  DefaultTab,
   GroupControls,
   LAYOUT_KEY,
   TOOL_PANELS,
@@ -255,6 +256,7 @@ export function DockLayout() {
       theme={themeLight}
       components={components}
       tabComponents={tabComponents}
+      defaultTabComponent={DefaultTab}
       watermarkComponent={Watermark}
       rightHeaderActionsComponent={GroupControls}
       onReady={onReady}

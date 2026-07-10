@@ -28,7 +28,7 @@ export type Interaction =
     }
   | { kind: 'marquee'; start: Point; current: Point; additive: boolean }
   | { kind: 'connect'; sourceNodeId: string; current: Point; hoverNodeId: string | null }
-  | { kind: 'bend'; connId: string; index: number; current: Point; isNew: boolean };
+  | { kind: 'bend'; connId: string; index: number; start: Point; current: Point; isNew: boolean };
 
 export interface EditState {
   nodeId: string;

@@ -14,6 +14,9 @@ type PanSubscriber = (centerX: number, centerY: number) => void;
 const latestViewports = new Map<string, ViewportInfo | null>();
 const viewportSubscribers = new Map<string, Set<ViewportSubscriber>>();
 const panSubscribers = new Map<string, Set<PanSubscriber>>();
+// Latest pan request per view with no live editor yet, replayed on subscribe
+// so "open view, then pan to object" works for freshly opened views.
+const pendingPans = new Map<string, { x: number; y: number }>();
 
 export function publishViewport(viewId: string, info: ViewportInfo | null): void {
   latestViewports.set(viewId, info);
@@ -32,13 +35,23 @@ export function subscribeViewport(viewId: string, cb: ViewportSubscriber): () =>
 }
 
 export function requestPanTo(viewId: string, centerX: number, centerY: number): void {
-  for (const subscriber of panSubscribers.get(viewId) ?? []) subscriber(centerX, centerY);
+  const subscribers = panSubscribers.get(viewId);
+  if (!subscribers || subscribers.size === 0) {
+    pendingPans.set(viewId, { x: centerX, y: centerY });
+    return;
+  }
+  for (const subscriber of subscribers) subscriber(centerX, centerY);
 }
 
 export function onPanRequest(viewId: string, cb: PanSubscriber): () => void {
   const subscribers = panSubscribers.get(viewId) ?? new Set<PanSubscriber>();
   subscribers.add(cb);
   panSubscribers.set(viewId, subscribers);
+  const pending = pendingPans.get(viewId);
+  if (pending) {
+    pendingPans.delete(viewId);
+    cb(pending.x, pending.y);
+  }
   return () => {
     subscribers.delete(cb);
     if (subscribers.size === 0) panSubscribers.delete(viewId);

@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "examples.package-showcase",
   "name": "Package Showcase",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Demonstrates package manifest and bundled asset APIs.",
   "main": "main.js",
   "contributes": {

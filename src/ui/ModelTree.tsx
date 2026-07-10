@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { StandaloneIcon } from '../canvas/figures/icons';
 import { extensionRegistry } from '../extensions/registry';
 import { C4_VIEW_TYPE_LABELS, C4_VIEW_TYPES } from '../model/c4';
@@ -27,6 +27,7 @@ import {
   SEPARATOR,
   type MenuItem,
 } from './ContextMenu';
+import { onRevealRequest } from './tree-bus';
 import { computeVisibleTreeItems, treeItemLabel, type TreeTypeFilter } from './tree-filter';
 
 const FOLDER_LAYERS: Record<string, Layer[]> = {
@@ -90,6 +91,7 @@ function TreeRow(props: RowProps) {
     <div
       className={'tree-row' + (selected ? ' selected' : '') + (dragOver ? ' drag-over' : '')}
       style={{ paddingLeft: props.depth * 14 + 4 }}
+      data-tree-id={props.id}
       draggable={props.draggable}
       onClick={(e) => {
         const cur = useStore.getState().selection;
@@ -200,6 +202,7 @@ function ModelTreeInner({
   setFilterType: (type: TreeTypeFilter) => void;
 }) {
   const filterInputRef = useRef<HTMLInputElement>(null);
+  const treeRef = useRef<HTMLDivElement>(null);
   const readOnly = useStore((s) => s.readOnly);
   const visible = useMemo(
     () => computeVisibleTreeItems(model, filterText, filterType),
@@ -210,6 +213,34 @@ function ModelTreeInner({
     setFilterText('');
     setFilterType('all');
   };
+
+  // Reveal requests (e.g. clicking a Validator finding): expand the item's
+  // ancestor folders and scroll its row into view. Re-subscribed every render
+  // so the handler always sees current filter/collapse state.
+  useEffect(() =>
+    onRevealRequest((id) => {
+      const m = useStore.getState().model;
+      if (!m) return;
+      const item = m.elements[id] ?? m.relationships[id] ?? m.views[id];
+      const ancestors = new Set<string>();
+      let f: string | null | undefined = item ? item.folderId : m.folders[id]?.parentId;
+      while (f) {
+        ancestors.add(f);
+        f = m.folders[f]?.parentId;
+      }
+      if (visible !== null && !visible.has(id)) clearFilter();
+      if ([...ancestors].some((a) => collapsed.has(a))) {
+        setCollapsed(new Set([...collapsed].filter((c) => !ancestors.has(c))));
+      }
+      // The expanded row appears on a later render; retry a few frames.
+      const scroll = (attempt: number) => {
+        const row = treeRef.current?.querySelector(`[data-tree-id="${CSS.escape(id)}"]`);
+        if (row) row.scrollIntoView({ block: 'center' });
+        else if (attempt < 3) requestAnimationFrame(() => scroll(attempt + 1));
+      };
+      requestAnimationFrame(() => scroll(0));
+    }),
+  );
   const toggle = (id: string) => {
     const next = new Set(collapsed);
     if (next.has(id)) next.delete(id);
@@ -435,6 +466,7 @@ function ModelTreeInner({
 
   return (
     <div
+      ref={treeRef}
       className="model-tree"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -495,6 +527,36 @@ function ModelTreeInner({
             ))}
           </optgroup>
         </select>
+        <button
+          className="tree-filter-btn"
+          title={filtering ? 'Expand All (unavailable while filtering)' : 'Expand All'}
+          disabled={filtering}
+          onClick={() => setCollapsed(new Set())}
+        >
+          <svg viewBox="0 0 16 16" width="12" height="12">
+            <path
+              d="M4 3.5 L8 7.5 L12 3.5 M4 8.5 L8 12.5 L12 8.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+            />
+          </svg>
+        </button>
+        <button
+          className="tree-filter-btn"
+          title={filtering ? 'Collapse All (unavailable while filtering)' : 'Collapse All'}
+          disabled={filtering}
+          onClick={() => setCollapsed(new Set(Object.keys(model.folders)))}
+        >
+          <svg viewBox="0 0 16 16" width="12" height="12">
+            <path
+              d="M4 7.5 L8 3.5 L12 7.5 M4 12.5 L8 8.5 L12 12.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+            />
+          </svg>
+        </button>
         {(filterText !== '' || filterType !== 'all') && (
           <button className="tree-filter-clear" title="Clear filter" onClick={clearFilter}>
             ✕

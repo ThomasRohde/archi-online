@@ -283,7 +283,14 @@ export function useViewEditorInteractions({
     }
     if (hit.connId !== undefined && hit.bendIndex !== undefined) {
       setSelection('view', [hit.connId]);
-      setInter({ kind: 'bend', connId: hit.connId, index: hit.bendIndex, current: p, isNew: false });
+      setInter({
+        kind: 'bend',
+        connId: hit.connId,
+        index: hit.bendIndex,
+        start: p,
+        current: p,
+        isNew: false,
+      });
       return;
     }
     if (hit.nodeId) {
@@ -353,7 +360,14 @@ export function useViewEditorInteractions({
           if (!conn || !src || !tgt) break;
           const points = connectionPolyline(src, tgt, conn.bendpoints);
           const seg = closestSegment(points, cur.start);
-          setInter({ kind: 'bend', connId: cur.connId, index: seg.index, current: p, isNew: true });
+          setInter({
+            kind: 'bend',
+            connId: cur.connId,
+            index: seg.index,
+            start: cur.start,
+            current: p,
+            isNew: true,
+          });
         }
         break;
       }
@@ -395,7 +409,7 @@ export function useViewEditorInteractions({
         break;
       }
       case 'bend':
-        setInter({ ...cur, current: p });
+        setInter({ ...cur, current: { x: snap(p.x, e.altKey), y: snap(p.y, e.altKey) } });
         break;
     }
   };
@@ -493,10 +507,20 @@ export function useViewEditorInteractions({
         const tgt = absBounds.get(conn?.targetId ?? '');
         setInter({ kind: 'none' });
         if (!conn || !src || !tgt) break;
+        // A plain click on an existing bendpoint is not a drag — committing
+        // would snap it to the grid and nudge it under the cursor.
+        if (
+          !cur.isNew &&
+          Math.hypot(p.x - cur.start.x, p.y - cur.start.y) * viewport.zoom <=
+            settings.bendDragThreshold
+        ) {
+          break;
+        }
         const srcC = { x: src.x + src.width / 2, y: src.y + src.height / 2 };
         const tgtC = { x: tgt.x + tgt.width / 2, y: tgt.y + tgt.height / 2 };
         const newBps = [...conn.bendpoints];
-        const bp = toRelativeBendpoint(p, srcC, tgtC);
+        const sp = { x: snap(p.x, e.altKey), y: snap(p.y, e.altKey) };
+        const bp = toRelativeBendpoint(sp, srcC, tgtC);
         if (cur.isNew) newBps.splice(cur.index, 0, bp);
         else newBps[cur.index] = bp;
         setConnectionBendpoints(cur.connId, newBps);

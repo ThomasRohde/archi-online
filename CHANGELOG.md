@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-07-10
+
+### Added
+
+- View tab context menu with Close, Close Others, and Close All
+- Model tree Collapse All / Expand All buttons in the filter header
+- Validator findings now navigate to the problem: concept findings reveal and
+  select the item in the model tree (raising or reopening the Models panel);
+  view findings open the view, select the object, and center the canvas on it
+- Validator rows show a location hint (the containing view or folder)
+- Bendpoints snap to the grid while dragging, matching node move/resize
+  behavior (`Alt` bypasses; honors the snap-to-grid setting)
+
+### Fixed
+
+- Properties panel tab strip no longer stretches with excess vertical white
+  space at narrow panel widths
+- Clicking an existing bendpoint without dragging no longer nudges it
+
 ## [1.0.0] - 2026-07-10
 
 First stable release.
@@ -63,5 +82,6 @@ First public release: a browser-only ArchiMate 3.2 modeler with no backend.
 - App chrome redesign (icon toolbar, status bar) and versioning regime for
   app and shipped extensions
 
+[1.1.0]: https://github.com/ThomasRohde/archi-online/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ThomasRohde/archi-online/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/ThomasRohde/archi-online/releases/tag/v0.2.0
