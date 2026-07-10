@@ -3,6 +3,7 @@ import type { RefObject } from 'react';
 import type { Bounds } from '../../model/types';
 import { useSettingsStore } from '../../settings/app-settings';
 import type { Point } from '../geometry';
+import { onPanRequest, publishViewport } from '../viewport-bus';
 import type { Viewport } from './types';
 
 const viewports = new Map<string, Viewport>();
@@ -30,6 +31,22 @@ export function useCanvasViewport(
   };
   const setViewportRefFn = useRef(setViewport);
   setViewportRefFn.current = setViewport;
+
+  const publishCurrentViewport = () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const current = viewportRef.current;
+    const rect = svg.getBoundingClientRect();
+    publishViewport(viewId, {
+      x: -current.x / current.zoom,
+      y: -current.y / current.zoom,
+      zoom: current.zoom,
+      width: rect.width / current.zoom,
+      height: rect.height / current.zoom,
+    });
+  };
+  const publishCurrentViewportRef = useRef(publishCurrentViewport);
+  publishCurrentViewportRef.current = publishCurrentViewport;
 
   const toView = (clientX: number, clientY: number): Point => {
     const rect = svgRef.current!.getBoundingClientRect();
@@ -90,6 +107,37 @@ export function useCanvasViewport(
       y: (rect.height - bh * zoom) / 2 - minY * zoom,
     });
   };
+
+  useEffect(() => {
+    publishCurrentViewportRef.current();
+  }, [viewId, viewport, svgRef]);
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return () => publishViewport(viewId, null);
+
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => publishCurrentViewportRef.current());
+    resizeObserver?.observe(svg);
+    const unsubscribePan = onPanRequest(viewId, (centerX, centerY) => {
+      const current = viewportRef.current;
+      const rect = svg.getBoundingClientRect();
+      setViewportRefFn.current({
+        zoom: current.zoom,
+        x: rect.width / 2 - centerX * current.zoom,
+        y: rect.height / 2 - centerY * current.zoom,
+      });
+    });
+    publishCurrentViewportRef.current();
+
+    return () => {
+      resizeObserver?.disconnect();
+      unsubscribePan();
+      publishViewport(viewId, null);
+    };
+  }, [viewId, svgRef]);
 
   // Ctrl+wheel zoom must preventDefault to stop the browser's page zoom, but
   // React attaches onWheel passively, so use a native non-passive listener.

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_EXPORT_MARGIN,
+  contentViewBox,
   renderViewSvg,
   supportsImageClipboard,
 } from '../src/canvas/export/view-image';
@@ -81,6 +82,26 @@ describe('renderViewSvg', () => {
 
   it('throws for an unknown view', () => {
     expect(() => renderViewSvg(model, 'nope', { measure: () => bbox })).toThrow(/View not found/);
+  });
+});
+
+describe('contentViewBox', () => {
+  it('expands measured content by the export margin', () => {
+    expect(contentViewBox({ x: 12, y: 34, width: 100, height: 50 })).toEqual({
+      x: 2,
+      y: 24,
+      width: 120,
+      height: 70,
+    });
+  });
+
+  it('produces a margin-only box for empty content', () => {
+    expect(contentViewBox({ x: 0, y: 0, width: 0, height: 0 })).toEqual({
+      x: -DEFAULT_EXPORT_MARGIN,
+      y: -DEFAULT_EXPORT_MARGIN,
+      width: DEFAULT_EXPORT_MARGIN * 2,
+      height: DEFAULT_EXPORT_MARGIN * 2,
+    });
   });
 });
 

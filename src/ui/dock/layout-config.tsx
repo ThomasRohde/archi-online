@@ -12,6 +12,7 @@ import { ExtensionPanelHost } from '../ExtensionPanelHost';
 import { ExtensionsPanel } from '../ExtensionsPanel';
 import { ModelTree } from '../ModelTree';
 import { NavigatorPanel } from '../NavigatorPanel';
+import { OutlinePanel } from '../OutlinePanel';
 import { Palette } from '../Palette';
 import { PropertiesPanel } from '../PropertiesPanel';
 import { SettingsPanel } from '../SettingsPanel';
@@ -62,6 +63,20 @@ export const TOOL_PANELS: ToolPanelDef[] = [
         id: 'navigator',
         component: 'navigator',
         title: 'Navigator',
+        position: api.getPanel('models')
+          ? { referencePanel: 'models', direction: 'within' }
+          : { direction: 'left' },
+        initialWidth: 260,
+      }),
+  },
+  {
+    id: 'outline',
+    title: 'Outline',
+    add: (api) =>
+      api.addPanel({
+        id: 'outline',
+        component: 'outline',
+        title: 'Outline',
         position: api.getPanel('models')
           ? { referencePanel: 'models', direction: 'within' }
           : { direction: 'left' },
@@ -310,6 +325,11 @@ export const components: Record<string, React.FunctionComponent<IDockviewPanelPr
   navigator: () => (
     <div className="dock-panel">
       <NavigatorPanel />
+    </div>
+  ),
+  outline: () => (
+    <div className="dock-panel">
+      <OutlinePanel />
     </div>
   ),
   settings: () => (

@@ -3,6 +3,7 @@ import {
   TOOL_PANELS,
   applySidePanelConstraints,
   buildDefaultLayout,
+  components,
   ensurePropertiesDockedWithScripts,
 } from '../src/ui/dock/layout-config';
 
@@ -174,6 +175,30 @@ describe('dock layout config', () => {
     TOOL_PANELS.find((panel) => panel.id === 'navigator')!.add(api as never);
 
     expect(added.find((panel) => panel.id === 'navigator')?.position).toEqual({
+      direction: 'left',
+    });
+  });
+
+  it('reopens Outline with Models when Models is present and keeps it out of the default layout', () => {
+    const { api, added } = createDockApi();
+
+    buildDefaultLayout(api as never);
+    TOOL_PANELS.find((panel) => panel.id === 'outline')!.add(api as never);
+
+    const outline = added.find((panel) => panel.id === 'outline');
+    expect(outline?.component).toBe('outline');
+    expect(outline?.title).toBe('Outline');
+    expect(outline?.position).toEqual({ referencePanel: 'models', direction: 'within' });
+    expect(added.filter((panel) => panel.id === 'outline')).toHaveLength(1);
+    expect(typeof components.outline).toBe('function');
+  });
+
+  it('reopens Outline on the left when Models is unavailable', () => {
+    const { api, added } = createDockApi();
+
+    TOOL_PANELS.find((panel) => panel.id === 'outline')!.add(api as never);
+
+    expect(added.find((panel) => panel.id === 'outline')?.position).toEqual({
       direction: 'left',
     });
   });

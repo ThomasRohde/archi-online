@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import type { ModelState } from '../../model/types';
+import type { Bounds, ModelState } from '../../model/types';
 import { StaticViewContent } from './StaticViewSvg';
 
 /** Matches the canvas font stack in styles.css so exports render identically. */
@@ -11,6 +11,19 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** Whitespace around the diagram content, matching Archi's image export. */
 export const DEFAULT_EXPORT_MARGIN = 10;
+
+/** Convert measured SVG content bounds into the shared export/Outline viewBox. */
+export function contentViewBox(
+  bounds: Pick<Bounds, 'x' | 'y' | 'width' | 'height'>,
+  margin = DEFAULT_EXPORT_MARGIN,
+): Bounds {
+  return {
+    x: Math.floor(bounds.x) - margin,
+    y: Math.floor(bounds.y) - margin,
+    width: Math.max(1, Math.ceil(bounds.width + margin * 2)),
+    height: Math.max(1, Math.ceil(bounds.height + margin * 2)),
+  };
+}
 
 export interface ViewImageOptions {
   /** Rasterization scale for PNG export (1, 2, 4). */
@@ -79,24 +92,25 @@ export function renderViewSvg(
     // with native <text> lines at the browser-computed positions.
     inlineForeignObjectText(svg);
     const bbox = (options.measure ?? defaultMeasure)(content as SVGGraphicsElement);
-    const width = Math.max(1, Math.ceil(bbox.width + margin * 2));
-    const height = Math.max(1, Math.ceil(bbox.height + margin * 2));
-    const minX = Math.floor(bbox.x) - margin;
-    const minY = Math.floor(bbox.y) - margin;
-    svg.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
-    svg.setAttribute('width', String(width));
-    svg.setAttribute('height', String(height));
+    const box = contentViewBox(bbox, margin);
+    svg.setAttribute('viewBox', `${box.x} ${box.y} ${box.width} ${box.height}`);
+    svg.setAttribute('width', String(box.width));
+    svg.setAttribute('height', String(box.height));
     if ((options.background ?? 'white') === 'white') {
       const rect = document.createElementNS(SVG_NS, 'rect');
-      rect.setAttribute('x', String(minX));
-      rect.setAttribute('y', String(minY));
-      rect.setAttribute('width', String(width));
-      rect.setAttribute('height', String(height));
+      rect.setAttribute('x', String(box.x));
+      rect.setAttribute('y', String(box.y));
+      rect.setAttribute('width', String(box.width));
+      rect.setAttribute('height', String(box.height));
       rect.setAttribute('fill', '#ffffff');
       svg.insertBefore(rect, svg.firstChild);
     }
     const markup = new XMLSerializer().serializeToString(svg);
-    return { svg: '<?xml version="1.0" encoding="UTF-8"?>\n' + markup, width, height };
+    return {
+      svg: '<?xml version="1.0" encoding="UTF-8"?>\n' + markup,
+      width: box.width,
+      height: box.height,
+    };
   } finally {
     root.unmount();
     container.remove();

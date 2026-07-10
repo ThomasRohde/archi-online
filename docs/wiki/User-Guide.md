@@ -121,6 +121,20 @@ Deleting on the canvas removes objects *from the view* only; the underlying
 concepts stay in the model. Delete from the Models tree to remove a concept
 from the model itself.
 
+## Outline
+
+The **Outline** is an opt-in minimap of the active view. Open it from
+**Views ▾ → Outline**; it docks with the Models panel and remains available in
+read-only mode.
+
+![The Outline panel showing the full Archisurance Layered View with the visible canvas area marked in blue](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/outline.png)
+
+The blue rectangle marks the portion currently visible on the canvas and
+updates as you pan, zoom, or resize the editor. Click anywhere in the thumbnail
+to center the canvas on that point, or drag across the thumbnail to pan
+continuously. Outline navigation changes only the viewport — it does not edit
+the model, mark it dirty, or create an undo step.
+
 ## Properties panel
 
 ![The Properties panel Appearance tab: fill and line colour, opacity, text alignment, and figure](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/properties.png)
