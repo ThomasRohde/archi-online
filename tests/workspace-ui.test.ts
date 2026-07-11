@@ -3,12 +3,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addElement, createEmptyModel } from '../src/model/ops';
 import { setSelection } from '../src/model/store';
+import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
   activateModelSession,
   addModelSession,
   getModelSession,
   resetWorkspaceForTests,
-  useWorkspaceStore,
 } from '../src/model/workspace';
 import { ModelTree } from '../src/ui/ModelTree';
 

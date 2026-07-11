@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { incomingRelationships, outgoingRelationships } from '../model/analysis';
 import { relationshipLabel } from '../model/metamodel';
-import { setSelection, useStore, type AppState, type SelectionState } from '../model/store';
+import { setSelection, type AppState, type SelectionState } from '../model/store';
+import { useStore } from './store-hooks';
 import type { ArchimateRelationship, Concept, ModelState } from '../model/types';
 
 type Direction = 'out' | 'in';

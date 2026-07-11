@@ -1,6 +1,7 @@
 import { parseArchimate } from '../model/io/archimate-xml';
 import { addView } from '../model/ops';
-import { openView, useStore } from '../model/store';
+import { openView } from '../model/store';
+import { useStore } from './store-hooks';
 import { addModelSession, type ModelSessionId } from '../model/workspace';
 import { showAlertDialog } from './AppDialog';
 import { newModel, openModel } from './Toolbar';

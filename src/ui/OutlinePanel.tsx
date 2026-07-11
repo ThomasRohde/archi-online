@@ -6,7 +6,7 @@ import {
   subscribeViewport,
   type ViewportInfo,
 } from '../canvas/viewport-bus';
-import { useStore } from '../model/store';
+import { useStore } from './store-hooks';
 import type { Bounds } from '../model/types';
 
 const EMPTY_VIEW_BOX = contentViewBox({ x: 0, y: 0, width: 0, height: 0 });

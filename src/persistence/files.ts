@@ -6,7 +6,7 @@ import {
   addModelSession,
   getModelSession,
   setModelSessionFileHandle,
-  useWorkspaceStore,
+  workspaceStore,
   type ModelSessionId,
 } from '../model/workspace';
 
@@ -86,7 +86,7 @@ export async function openModelFromDisk(): Promise<ModelSessionId[]> {
  * keeping the handle so silent Ctrl+S re-save works. */
 export async function openModelFromHandle(handle: FileSystemFileHandle): Promise<ModelSessionId> {
   if (handle.isSameEntry) {
-    for (const id of useWorkspaceStore.getState().order) {
+    for (const id of workspaceStore.getState().order) {
       const existing = getModelSession(id)?.fileHandle;
       if (existing && (await handle.isSameEntry(existing))) {
         activateModelSession(id);

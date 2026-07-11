@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
-import {
-  addModelSession,
-  getModelSession,
-  resetWorkspaceForTests,
-  useWorkspaceStore,
-} from '../src/model/workspace';
+import { addModelSession, getModelSession, resetWorkspaceForTests } from '../src/model/workspace';
+import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
   closeModelSession,
   closeModelSessions,

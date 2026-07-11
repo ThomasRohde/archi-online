@@ -19,5 +19,7 @@ docs/.vitepress/dist/
 
 # local agent instructions and planning artifacts
 CLAUDE.local.md
+.claude/settings.local.json
 docs/superpowers/
 docs/brainstorms/
+/smoke-*.png

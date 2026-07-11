@@ -19,7 +19,7 @@ import {
   setRelationshipAttrs,
   setViewpoint,
 } from '../model/ops';
-import { useModelStoreApi, useStore } from '../model/store';
+import { useModelStoreApi, useStore } from './store-hooks';
 import type { ModelState, Property } from '../model/types';
 import { AppearanceTab } from './properties/AppearanceTab';
 import { AnalysisTab } from './properties/AnalysisTab';

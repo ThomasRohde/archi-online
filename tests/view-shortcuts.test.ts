@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewEditor } from '../src/canvas/ViewEditor';
 import { copyNodes } from '../src/canvas/clipboard';
 import { addElement, addView, createElementOnView, createEmptyModel } from '../src/model/ops';
-import { ModelStoreProvider, openView, setSelection } from '../src/model/store';
+import { openView, setSelection } from '../src/model/store';
+import { ModelStoreProvider } from '../src/ui/store-hooks';
 import {
   activateModelSession,
   addModelSession,

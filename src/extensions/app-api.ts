@@ -1,4 +1,4 @@
-import { openView, setSelection, useStore } from '../model/store';
+import { getActiveModelStore, openView, setSelection } from '../model/store';
 import { defaultKeyValueStore } from '../persistence/keyval';
 import { JView, JVisual, wrap } from '../scripting/jarchi';
 import { showAlertDialog, showConfirmDialog } from '../ui/AppDialog';
@@ -105,14 +105,14 @@ function requirePackage(context: AppApiRuntimeContext | undefined): InstalledExt
 }
 
 function activeView(): JView | null {
-  const appState = useStore.getState();
+  const appState = getActiveModelStore().getState();
   const viewId = appState.activeViewId;
   return viewId && appState.model?.views[viewId] ? new JView(viewId) : null;
 }
 
 function selectedVisuals(): JVisual[] {
-  if (!useStore.getState().model) return [];
-  return useStore.getState().selection.ids
+  if (!getActiveModelStore().getState().model) return [];
+  return getActiveModelStore().getState().selection.ids
     .map((id) => wrap(id))
     .filter((item): item is JVisual => item instanceof JVisual);
 }
@@ -148,26 +148,26 @@ export function createAppApi(
         return activeView();
       },
       open(id: string) {
-        const model = useStore.getState().model;
+        const model = getActiveModelStore().getState().model;
         if (!model?.views[id]) return null;
         openView(id);
         return new JView(id);
       },
       get(id: string) {
-        return useStore.getState().model?.views[id] ? new JView(id) : null;
+        return getActiveModelStore().getState().model?.views[id] ? new JView(id) : null;
       },
       all() {
-        const model = useStore.getState().model;
+        const model = getActiveModelStore().getState().model;
         return model ? Object.values(model.views).map((view) => new JView(view.id)) : [];
       },
     },
     selection: {
       ids() {
-        return [...useStore.getState().selection.ids];
+        return [...getActiveModelStore().getState().selection.ids];
       },
       items() {
-        if (!useStore.getState().model) return [];
-        return useStore.getState().selection.ids
+        if (!getActiveModelStore().getState().model) return [];
+        return getActiveModelStore().getState().selection.ids
           .map((id) => wrap(id))
           .filter((item) => item !== undefined);
       },
@@ -175,7 +175,7 @@ export function createAppApi(
         return selectedVisuals();
       },
       clear() {
-        setSelection(useStore.getState().selection.source, []);
+        setSelection(getActiveModelStore().getState().selection.source, []);
       },
     },
     layout: {
@@ -261,7 +261,7 @@ export function createAppApi(
     },
     model: {
       current() {
-        return useStore.getState().model;
+        return getActiveModelStore().getState().model;
       },
     },
   };

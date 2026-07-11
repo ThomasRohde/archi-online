@@ -8,7 +8,6 @@ import { duplicateItems } from './model/ops';
 import {
   cloneModelForEditing,
   createModelStore,
-  ModelStoreProvider,
   openView,
   replaceModel,
   redo,
@@ -16,12 +15,8 @@ import {
   undo,
   type ModelStore,
 } from './model/store';
-import {
-  getActiveModelSession,
-  addModelSession,
-  setWorkspaceBooted,
-  useWorkspaceStore,
-} from './model/workspace';
+import { ModelStoreProvider, useWorkspaceStore } from './ui/store-hooks';
+import { getActiveModelSession, addModelSession, setWorkspaceBooted } from './model/workspace';
 import { restoreWorkspace, startAutosave } from './persistence/autosave';
 import { loadModelText, openModelFromHandle } from './persistence/files';
 import { loadSharedModelFromLocation, parseShareFragment } from './persistence/share';
@@ -33,6 +28,7 @@ import { shouldBlockUnload } from './pwa/unload-guard';
 import { hydrateSettingsStore } from './settings/app-settings';
 import { AppDialogHost, showAlertDialog, showConfirmDialog } from './ui/AppDialog';
 import { AppShell } from './ui/AppShell';
+import { blocksReadOnlyShortcut } from './ui/shortcut-policy';
 import { newModel, openModel, saveModel } from './ui/Toolbar';
 import { ViewerShell } from './ui/ViewerShell';
 
@@ -55,8 +51,8 @@ if (import.meta.env.DEV) {
       );
     };
   });
-  void import('./model/store').then((store) => {
-    (window as unknown as Record<string, unknown>).__archiStore = store.useStore;
+  void import('./ui/store-hooks').then((hooks) => {
+    (window as unknown as Record<string, unknown>).__archiStore = hooks.useStore;
   });
   void import('./scripting/runner').then(({ runScript }) => {
     (window as unknown as Record<string, unknown>).__archiRunScript = (code: string) => {
@@ -74,10 +70,6 @@ export function isViewerLocation(url: URL): boolean {
 
 export function viewerRouteKey(url: URL): string {
   return `${url.search}${url.hash}`;
-}
-
-export function blocksReadOnlyShortcut(key: string): boolean {
-  return ['z', 'y', 'd'].includes(key.toLowerCase());
 }
 
 async function bootEditorRuntime(shouldRestoreWorkspace: boolean): Promise<void> {

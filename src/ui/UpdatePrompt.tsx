@@ -1,6 +1,5 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { useStore } from '../model/store';
-import { useWorkspaceStore } from '../model/workspace';
+import { useStore, useWorkspaceStore } from './store-hooks';
 import { flushAutosaveNow } from '../persistence/autosave';
 import { bypassUnloadGuardOnce } from '../pwa/unload-guard';
 

@@ -10,7 +10,8 @@ import {
   createEmptyModel,
   setViewpoint,
 } from '../src/model/ops';
-import { replaceModel, useStore } from '../src/model/store';
+import { replaceModel } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 
 function model() {
   const m = useStore.getState().model;

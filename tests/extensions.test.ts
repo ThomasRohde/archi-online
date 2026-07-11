@@ -22,7 +22,8 @@ import {
   addView,
   createEmptyModel,
 } from '../src/model/ops';
-import { openView, replaceModel, setSelection, useStore } from '../src/model/store';
+import { openView, replaceModel, setSelection } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import { memoryKeyValueStore, setDefaultKeyValueStoreForTests } from '../src/persistence/keyval';
 
 function storage(initial?: unknown) {

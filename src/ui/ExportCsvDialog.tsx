@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { serializeCsv, type CsvDelimiter } from '../model/io/csv';
-import { useStore } from '../model/store';
+import { useStore } from './store-hooks';
 import { saveFilesToDisk } from '../persistence/files';
 import { showAlertDialog } from './AppDialog';
 

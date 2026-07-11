@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-07-11
+
+### Changed
+
+- Separated the React Zustand bindings from the model and scripting layers,
+  keeping the core multi-model stores framework-agnostic
+- Routed imperative extension, persistence, and scripting integrations through
+  the vanilla active-model and workspace stores
+- Kept machine-local agent permissions and root-level smoke captures out of
+  release commits
+
 ## [1.2.0] - 2026-07-10
 
 ### Added

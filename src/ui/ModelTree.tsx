@@ -27,24 +27,14 @@ import {
   moveItemsToFolder,
   renameItem,
 } from '../model/ops';
-import {
-  ModelStoreProvider,
-  openView,
-  setSelection,
-  useModelStoreApi,
-  useStore,
-} from '../model/store';
+import { openView, setSelection } from '../model/store';
+import { ModelStoreProvider, useModelStoreApi, useStore, useWorkspaceStore } from './store-hooks';
 import {
   canPasteTo,
   copyTreeItems,
   pasteTreeItems,
 } from '../canvas/clipboard';
-import {
-  activateModelSession,
-  getModelSessionForStore,
-  useWorkspaceStore,
-  type ModelSession,
-} from '../model/workspace';
+import { activateModelSession, getModelSessionForStore, type ModelSession } from '../model/workspace';
 import type { Folder, ModelState } from '../model/types';
 import {
   extensionMenuItems,

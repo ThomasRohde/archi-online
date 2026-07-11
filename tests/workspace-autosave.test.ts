@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { addView, createEmptyModel } from '../src/model/ops';
 import { serializeArchimate } from '../src/model/io/archimate-xml';
 import { openView } from '../src/model/store';
+import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
   activateModelSession,
   addModelSession,
   getModelSession,
   resetWorkspaceForTests,
-  useWorkspaceStore,
 } from '../src/model/workspace';
 import {
   flushAutosaveNow,

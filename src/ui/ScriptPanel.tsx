@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { newId } from '../model/id';
-import { useStore } from '../model/store';
+import { useStore } from './store-hooks';
 import { defaultKeyValueStore } from '../persistence/keyval';
 import { BUILT_IN_SCRIPTS } from '../scripting/example-scripts';
 import { runScript, type ConsoleEntry } from '../scripting/runner';

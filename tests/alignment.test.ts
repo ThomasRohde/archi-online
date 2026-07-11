@@ -16,7 +16,8 @@ import {
   type AlignMode,
   type MatchMode,
 } from '../src/model/ops';
-import { replaceModel, undo, useStore } from '../src/model/store';
+import { replaceModel, undo } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import { absoluteBounds, type Bounds } from '../src/model/types';
 
 function model() {

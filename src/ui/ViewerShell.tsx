@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { ViewEditor } from '../canvas/ViewEditor';
-import { openView, setSelection, useModelStoreApi, useStore } from '../model/store';
+import { openView, setSelection } from '../model/store';
+import { useModelStoreApi, useStore } from './store-hooks';
 import { PropertiesPanel } from './PropertiesPanel';
 
 type ViewerShellProps =

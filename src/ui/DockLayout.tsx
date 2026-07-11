@@ -6,12 +6,9 @@ import {
   type DockviewReadyEvent,
 } from 'dockview-react';
 import { extensionRegistry } from '../extensions/registry';
-import { closeView, useStore } from '../model/store';
-import {
-  activateModelSession,
-  getModelSession,
-  useWorkspaceStore,
-} from '../model/workspace';
+import { closeView } from '../model/store';
+import { useStore, useWorkspaceStore } from './store-hooks';
+import { activateModelSession, getModelSession } from '../model/workspace';
 import { defaultKeyValueStore } from '../persistence/keyval';
 import { registerLayoutBus } from './layout-bus';
 import {

@@ -21,7 +21,8 @@ import {
   importCsv,
   insertOrUpdateC4Legend,
 } from '../model/ops';
-import { openView, redo, setSelection, undo, useStore } from '../model/store';
+import { openView, redo, setSelection, undo } from '../model/store';
+import { useStore } from './store-hooks';
 import { getActiveModelSession } from '../model/workspace';
 import {
   openModelFromDisk,

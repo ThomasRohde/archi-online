@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
 import { getActiveModelStore, transact } from '../src/model/store';
+import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
   activateModelSession,
   addModelSession,
@@ -9,7 +10,6 @@ import {
   getModelSession,
   removeModelSession,
   resetWorkspaceForTests,
-  useWorkspaceStore,
 } from '../src/model/workspace';
 
 beforeEach(() => {

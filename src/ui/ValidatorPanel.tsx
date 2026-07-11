@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { computeAbsBounds } from '../canvas/view-editor/bounds';
 import { requestPanTo } from '../canvas/viewport-bus';
-import { openView, setSelection, useStore } from '../model/store';
+import { openView, setSelection } from '../model/store';
+import { useStore } from './store-hooks';
 import type { ModelState } from '../model/types';
 import { validateModel, type Severity, type ValidationIssue } from '../model/validation';
 import { layoutBus } from './layout-bus';

@@ -9,15 +9,8 @@ import {
   createEmptyModel,
   renameItem,
 } from '../src/model/ops';
-import {
-  redo,
-  replaceModel,
-  setSelection,
-  setActiveTool,
-  transact,
-  undo,
-  useStore,
-} from '../src/model/store';
+import { redo, replaceModel, setSelection, setActiveTool, transact, undo } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import { ViewEditor } from '../src/canvas/ViewEditor';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
 import { ViewerShell } from '../src/ui/ViewerShell';

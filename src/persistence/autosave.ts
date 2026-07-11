@@ -3,7 +3,7 @@ import {
   activateModelSession,
   addModelSession,
   clearWorkspace,
-  useWorkspaceStore,
+  workspaceStore,
   type ModelSession,
 } from '../model/workspace';
 import type { ModelState } from '../model/types';
@@ -82,8 +82,8 @@ function syncSessionSubscriptions(sessions: Record<string, ModelSession>): void 
 /** Start debounced persistence for the complete editor workspace. Call once at startup. */
 export function startAutosave(): void {
   if (workspaceUnsubscribe) return;
-  syncSessionSubscriptions(useWorkspaceStore.getState().sessions);
-  workspaceUnsubscribe = useWorkspaceStore.subscribe((state, previous) => {
+  syncSessionSubscriptions(workspaceStore.getState().sessions);
+  workspaceUnsubscribe = workspaceStore.subscribe((state, previous) => {
     syncSessionSubscriptions(state.sessions);
     if (
       state.sessions !== previous.sessions ||
@@ -125,7 +125,7 @@ function sessionRecord(session: ModelSession, savedAt: number): WorkspaceSession
 }
 
 async function persistWorkspace(): Promise<void> {
-  const state = useWorkspaceStore.getState();
+  const state = workspaceStore.getState();
   const keyValueStore = defaultKeyValueStore();
   try {
     const preserved = keyValueStore === recoveryStore ? recoverySessions : [];
@@ -215,9 +215,9 @@ export async function restoreWorkspace(): Promise<RestoreWorkspaceResult> {
   recoverySessions = failedSessions;
   recoveryOrder = [...record.order];
 
-  const current = useWorkspaceStore.getState();
+  const current = workspaceStore.getState();
   const activationOrder = record.activationOrder.filter((id) => current.sessions[id]);
-  useWorkspaceStore.setState({ activationOrder });
+  workspaceStore.setState({ activationOrder });
   const activeSessionId =
     (record.activeSessionId && current.sessions[record.activeSessionId]
       ? record.activeSessionId

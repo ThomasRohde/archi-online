@@ -17,7 +17,8 @@ import { parseArchimate, serializeArchimate } from '../src/model/io/archimate-xm
 import { applyCsvImport, serializeCsv } from '../src/model/io/csv';
 import { createC4TemplateView } from '../src/model/ops';
 import { createEmptyModel } from '../src/model/ops/concepts';
-import { cloneModelForEditing, replaceModel, undo, useStore } from '../src/model/store';
+import { cloneModelForEditing, replaceModel, undo } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import type { ArchimateElement, ArchimateRelationship } from '../src/model/types';
 
 function model() {

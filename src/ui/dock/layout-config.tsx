@@ -7,12 +7,9 @@ import type {
   IDockviewPanelProps,
 } from 'dockview-react';
 import { ViewEditor } from '../../canvas/ViewEditor';
-import { ModelStoreProvider, closeView, useStore } from '../../model/store';
-import {
-  activateModelSession,
-  getModelSession,
-  useWorkspaceStore,
-} from '../../model/workspace';
+import { closeView } from '../../model/store';
+import { ModelStoreProvider, useStore, useWorkspaceStore } from '../store-hooks';
+import { activateModelSession, getModelSession } from '../../model/workspace';
 import { showContextMenu, type MenuItem } from '../ContextMenu';
 import { ExtensionPanelHost } from '../ExtensionPanelHost';
 import { ExtensionsPanel } from '../ExtensionsPanel';

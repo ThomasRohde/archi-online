@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ViewEditor } from '../canvas/ViewEditor';
-import { useStore } from '../model/store';
+import { useStore } from './store-hooks';
 import type { ModelState } from '../model/types';
 import { treeItemLabel } from './tree-filter';
 

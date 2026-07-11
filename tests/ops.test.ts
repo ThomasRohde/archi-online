@@ -10,7 +10,8 @@ import {
   renameItem,
   setNodeStyle,
 } from '../src/model/ops';
-import { redo, replaceModel, runBatch, undo, useStore } from '../src/model/store';
+import { redo, replaceModel, runBatch, undo } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 
 function model() {
   return useStore.getState().model!;

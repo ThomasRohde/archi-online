@@ -1,4 +1,4 @@
-import { runBatch, useStore } from '../model/store';
+import { getActiveModelStore, runBatch } from '../model/store';
 import { extensionRegistry } from '../extensions/registry';
 import { createJArchiGlobals, JCollection } from './jarchi';
 
@@ -37,7 +37,7 @@ function fmt(arg: unknown): string {
 
 /** Run a user script with jArchi-style globals. One undo step per run. */
 export function runScript(code: string, onConsole: (e: ConsoleEntry) => void): { error?: string } {
-  if (!useStore.getState().model) {
+  if (!getActiveModelStore().getState().model) {
     return { error: 'No model is open' };
   }
   const emit = (level: ConsoleEntry['level'], args: unknown[]) =>

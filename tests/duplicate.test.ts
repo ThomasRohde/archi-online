@@ -13,7 +13,8 @@ import {
   setProperties,
 } from '../src/model/ops';
 import { parseArchimate, serializeArchimate } from '../src/model/io/archimate-xml';
-import { replaceModel, undo, useStore } from '../src/model/store';
+import { replaceModel, undo } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import type { Bounds, ElementNode, ModelState } from '../src/model/types';
 
 function model(): ModelState {

@@ -1,4 +1,4 @@
-import { useStore } from '../model/store';
+import { useStore } from './store-hooks';
 import { APP_VERSION } from '../version';
 import { useCanvasStatus } from './canvas-status';
 import { resolveTarget } from './properties/target';

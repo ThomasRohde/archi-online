@@ -1,4 +1,4 @@
-import { useStore } from '../../model/store';
+import { useStore } from '../../ui/store-hooks';
 import type { C4ViewType } from '../../model/c4';
 import type { Bounds, ModelState } from '../../model/types';
 import type { Point } from '../geometry';

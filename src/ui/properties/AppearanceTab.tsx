@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ELEMENT_TYPE_MAP } from '../../model/metamodel';
 import { setNodeStyle, type NodeStyle } from '../../model/ops';
-import { useModelStoreApi, useStore } from '../../model/store';
+import { useModelStoreApi, useStore } from '../store-hooks';
 import type { Target } from './target';
 
 const DEFAULT_LINE = '#5c5c5c';

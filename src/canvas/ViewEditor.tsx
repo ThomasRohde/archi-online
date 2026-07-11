@@ -1,12 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { c4ViewType } from '../model/c4';
 import { alignableNodeIds, deleteViewObjects, duplicateViewObjects } from '../model/ops';
-import {
-  getActiveModelStore,
-  setSelection,
-  useModelStoreApi,
-  useStore,
-} from '../model/store';
+import { getActiveModelStore, setSelection } from '../model/store';
+import { useModelStoreApi, useStore } from '../ui/store-hooks';
 import { getActiveModelSession } from '../model/workspace';
 import type { Bounds } from '../model/types';
 import { setCanvasStatus } from '../ui/canvas-status';

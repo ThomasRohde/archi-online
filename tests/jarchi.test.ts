@@ -8,7 +8,8 @@ import {
   addView,
   createEmptyModel,
 } from '../src/model/ops';
-import { replaceModel, undo, useStore } from '../src/model/store';
+import { replaceModel, undo } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import { JView } from '../src/scripting/jarchi';
 import { JARCHI_CAPABILITY_TEST_SCRIPT } from '../src/scripting/example-scripts';
 import { runScript, type ConsoleEntry } from '../src/scripting/runner';

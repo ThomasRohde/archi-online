@@ -20,5 +20,4 @@ export function AppShell() {
   );
   return session ? <ModelStoreProvider store={session.store}>{shell}</ModelStoreProvider> : shell;
 }
-import { ModelStoreProvider } from '../model/store';
-import { useWorkspaceStore } from '../model/workspace';
+import { ModelStoreProvider, useWorkspaceStore } from './store-hooks';

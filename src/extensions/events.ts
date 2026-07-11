@@ -1,9 +1,5 @@
-import { useStore } from '../model/store';
-import {
-  getModelSession,
-  useWorkspaceStore,
-  type ModelSession,
-} from '../model/workspace';
+import { getActiveModelStore } from '../model/store';
+import { workspaceStore, getModelSession, type ModelSession } from '../model/workspace';
 import { extensionRegistry, type ExtensionRegistry } from './registry';
 
 function identity(session: ModelSession) {
@@ -19,7 +15,7 @@ export function startExtensionEventBridge(
   registry: ExtensionRegistry = extensionRegistry,
   modelChangedDelay = 150,
 ): () => void {
-  const workspaceAtStart = useWorkspaceStore.getState();
+  const workspaceAtStart = workspaceStore.getState();
   const sessionUnsubscribes = new Map<string, () => void>();
   const modelTimers = new Map<string, number>();
 
@@ -69,7 +65,7 @@ export function startExtensionEventBridge(
 
   Object.values(workspaceAtStart.sessions).forEach(attachSession);
   let previousWorkspace = workspaceAtStart;
-  const unsubscribeWorkspace = useWorkspaceStore.subscribe((workspace) => {
+  const unsubscribeWorkspace = workspaceStore.subscribe((workspace) => {
     for (const id of workspace.order) {
       if (previousWorkspace.sessions[id] || !workspace.sessions[id]) continue;
       const session = workspace.sessions[id];
@@ -101,8 +97,8 @@ export function startExtensionEventBridge(
   let unsubscribeLegacy: (() => void) | undefined;
   let legacyTimer: number | undefined;
   if (workspaceAtStart.order.length === 0) {
-    let previous = useStore.getState();
-    unsubscribeLegacy = useStore.subscribe((state) => {
+    let previous = getActiveModelStore().getState();
+    unsubscribeLegacy = getActiveModelStore().subscribe((state) => {
       if (state.selection !== previous.selection) {
         void registry.emitEvent('selection.changed', state.selection);
       }
@@ -120,7 +116,7 @@ export function startExtensionEventBridge(
       if (state.model !== previous.model) {
         if (legacyTimer) clearTimeout(legacyTimer);
         legacyTimer = window.setTimeout(() => {
-          void registry.emitEvent('model.changed', { dirty: useStore.getState().dirty });
+          void registry.emitEvent('model.changed', { dirty: getActiveModelStore().getState().dirty });
         }, modelChangedDelay);
       }
       previous = state;
@@ -139,7 +135,7 @@ export function startExtensionEventBridge(
 export async function emitWorkspaceStartupEvents(
   registry: ExtensionRegistry = extensionRegistry,
 ): Promise<void> {
-  const workspace = useWorkspaceStore.getState();
+  const workspace = workspaceStore.getState();
   for (const id of workspace.order) {
     const session = workspace.sessions[id];
     if (session) await registry.emitEvent('model.opened', identity(session));
@@ -154,5 +150,5 @@ export function emitModelSaved(sessionId?: string): void {
     void extensionRegistry.emitEvent('model.saved', identity(session));
     return;
   }
-  void extensionRegistry.emitEvent('model.saved', { fileName: useStore.getState().fileName });
+  void extensionRegistry.emitEvent('model.saved', { fileName: getActiveModelStore().getState().fileName });
 }

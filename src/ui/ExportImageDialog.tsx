@@ -6,7 +6,7 @@ import {
   renderViewSvg,
   supportsImageClipboard,
 } from '../canvas/export/view-image';
-import { useStore } from '../model/store';
+import { useStore } from './store-hooks';
 import { saveBlobToDisk, sanitizeFileName } from '../persistence/files';
 import { showAlertDialog } from './AppDialog';
 

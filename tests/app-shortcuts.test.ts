@@ -1,20 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { blocksReadOnlyShortcut } from '../src/ui/shortcut-policy';
 
 describe('application shortcut policy', () => {
-  it('allows Open and Save while blocking read-only model mutations', async () => {
-    const app = await import('../src/App');
-    const policy = (
-      app as unknown as {
-        blocksReadOnlyShortcut?: (key: string) => boolean;
-      }
-    ).blocksReadOnlyShortcut;
-
-    expect(policy).toBeTypeOf('function');
-    if (!policy) return;
-    expect(policy('o')).toBe(false);
-    expect(policy('s')).toBe(false);
-    expect(policy('z')).toBe(true);
-    expect(policy('y')).toBe(true);
-    expect(policy('d')).toBe(true);
+  it('allows Open and Save while blocking read-only model mutations', () => {
+    expect(blocksReadOnlyShortcut('o')).toBe(false);
+    expect(blocksReadOnlyShortcut('s')).toBe(false);
+    expect(blocksReadOnlyShortcut('z')).toBe(true);
+    expect(blocksReadOnlyShortcut('y')).toBe(true);
+    expect(blocksReadOnlyShortcut('d')).toBe(true);
   });
 });

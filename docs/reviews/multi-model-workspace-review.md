@@ -7,6 +7,27 @@ playwright-cli, including a two-session workspace built by loading the Archisura
 (which yields two models with **identical internal object IDs** — the highest-risk configuration,
 and one reachable in two clicks).
 
+> **Resolution status (verified against the shipped 1.2.0 code, 2026-07-11):** every finding below
+> was fixed before the release commit (`36e011e`). The findings are kept for their reproduction
+> recipes and as the rationale for the store-threading rule in `CLAUDE.md`/`ARCHITECTURE.md`.
+>
+> - **P1-1 / P2-4** — ops across `src/model/ops/*` now take an explicit target `ModelStore`, and
+>   session-scoped UI (tree, canvas interactions, context menus) passes its session store.
+> - **P1-2** — `pasteTransferBundle` skips visuals whose concept no longer exists
+>   (`src/model/transfer.ts` existence guards on `elementId`/`relationshipId`/`refViewId`).
+> - **P2-1** — the canvas focuses its SVG on every `pointerdown`
+>   (`useViewEditorInteractions.ts`), so shortcuts work after clicking empty canvas.
+> - **P2-2** — DockLayout only re-activates a view panel when the active session/view pair
+>   actually changed (`changedActiveViewPanelId`).
+> - **P2-3** — unrestorable session records are carried through `persistWorkspace` unchanged
+>   (`recoverySessions` in `src/persistence/autosave.ts`).
+> - **P3-1** — the model-root menu is built at open time (`rootMenu()` in `ModelTree.tsx`).
+> - **P3-2** — the read-only guard blocks only mutating keys (`blocksReadOnlyShortcut`).
+> - **P3-3** — `clearWorkspace` fully resets the fallback store (`resetEmptyModelStore`).
+> - **P3-4** — context-menu trigger payloads carry `sessionId`.
+> - **P3-5** — canvas bundles sort roots by draw order; the file-input fallback collects per-file
+>   errors and reports them.
+
 ## Executive assessment
 
 The core architecture is sound and well-tested: per-session Zustand stores created by

@@ -27,9 +27,9 @@ import {
   openView as openModelView,
   setActiveTool as setModelActiveTool,
   setSelection as setModelSelection,
-  useModelStoreApi,
   type Tool,
 } from '../../model/store';
+import { useModelStoreApi } from '../../ui/store-hooks';
 import { getModelSessionForStore } from '../../model/workspace';
 import type { Bounds, DiagramView, ModelState } from '../../model/types';
 import {

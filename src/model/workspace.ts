@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createStore } from 'zustand/vanilla';
 import { newId } from './id';
 import {
   createModelStore,
@@ -46,7 +46,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   revision: 0,
 };
 
-export const useWorkspaceStore = create<WorkspaceState>(() => ({ ...EMPTY_WORKSPACE }));
+export const workspaceStore = createStore<WorkspaceState>()(() => ({ ...EMPTY_WORKSPACE }));
 
 export function addModelSession(options: AddModelSessionOptions): ModelSessionId {
   const id = options.id ?? newId();
@@ -65,9 +65,9 @@ export function addModelSession(options: AddModelSessionOptions): ModelSessionId
     unsubscribe: () => undefined,
   };
   session.unsubscribe = store.subscribe(() => {
-    useWorkspaceStore.setState((state) => ({ revision: state.revision + 1 }));
+    workspaceStore.setState((state) => ({ revision: state.revision + 1 }));
   });
-  useWorkspaceStore.setState((state) => ({
+  workspaceStore.setState((state) => ({
     sessions: { ...state.sessions, [id]: session },
     order: [...state.order, id],
   }));
@@ -76,16 +76,16 @@ export function addModelSession(options: AddModelSessionOptions): ModelSessionId
 }
 
 export function getModelSession(id: ModelSessionId): ModelSession | undefined {
-  return useWorkspaceStore.getState().sessions[id];
+  return workspaceStore.getState().sessions[id];
 }
 
 export function getActiveModelSession(): ModelSession | null {
-  const state = useWorkspaceStore.getState();
+  const state = workspaceStore.getState();
   return state.activeSessionId ? state.sessions[state.activeSessionId] ?? null : null;
 }
 
 export function getModelSessionForStore(store: ModelStore): ModelSession | undefined {
-  return Object.values(useWorkspaceStore.getState().sessions).find(
+  return Object.values(workspaceStore.getState().sessions).find(
     (session) => session.store === store,
   );
 }
@@ -97,18 +97,18 @@ export function requireActiveModelSession(): ModelSession {
 }
 
 export function activateModelSession(id: ModelSessionId): void {
-  const state = useWorkspaceStore.getState();
+  const state = workspaceStore.getState();
   const session = state.sessions[id];
   if (!session) return;
   setActiveModelStore(session.store);
-  useWorkspaceStore.setState({
+  workspaceStore.setState({
     activeSessionId: id,
     activationOrder: [...state.activationOrder.filter((entry) => entry !== id), id],
   });
 }
 
 export function removeModelSession(id: ModelSessionId): void {
-  const state = useWorkspaceStore.getState();
+  const state = workspaceStore.getState();
   if (!state.sessions[id]) return;
   const sessions = { ...state.sessions };
   state.sessions[id].unsubscribe();
@@ -119,7 +119,7 @@ export function removeModelSession(id: ModelSessionId): void {
     state.activeSessionId === id
       ? (activationOrder[activationOrder.length - 1] ?? order[order.length - 1] ?? null)
       : state.activeSessionId;
-  useWorkspaceStore.setState({ sessions, order, activationOrder, activeSessionId });
+  workspaceStore.setState({ sessions, order, activationOrder, activeSessionId });
   setActiveModelStore(activeSessionId ? sessions[activeSessionId]?.store ?? null : null);
 }
 
@@ -127,10 +127,10 @@ export function setModelSessionFileHandle(
   id: ModelSessionId,
   fileHandle: FileSystemFileHandle | null,
 ): void {
-  const state = useWorkspaceStore.getState();
+  const state = workspaceStore.getState();
   const session = state.sessions[id];
   if (!session) return;
-  useWorkspaceStore.setState({
+  workspaceStore.setState({
     sessions: {
       ...state.sessions,
       [id]: { ...session, fileHandle },
@@ -139,14 +139,14 @@ export function setModelSessionFileHandle(
 }
 
 export function setWorkspaceBooted(booted: boolean): void {
-  useWorkspaceStore.setState({ booted });
+  workspaceStore.setState({ booted });
 }
 
 export function clearWorkspace(): void {
-  for (const session of Object.values(useWorkspaceStore.getState().sessions)) {
+  for (const session of Object.values(workspaceStore.getState().sessions)) {
     session.unsubscribe();
   }
-  useWorkspaceStore.setState({ ...EMPTY_WORKSPACE });
+  workspaceStore.setState({ ...EMPTY_WORKSPACE });
   setActiveModelStore(null);
   resetEmptyModelStore();
 }

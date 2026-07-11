@@ -1,5 +1,3 @@
-import { createContext, createElement, useContext, type ReactNode } from 'react';
-import { useStore as useZustandStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import {
   enablePatches,
@@ -151,46 +149,6 @@ export function getActiveModelStore(): ModelStore {
 export function resetEmptyModelStore(): void {
   emptyModelStore.setState(initialState(), true);
 }
-
-const ModelStoreContext = createContext<ModelStore | null>(null);
-
-export function ModelStoreProvider({
-  store,
-  children,
-}: {
-  store: ModelStore;
-  children: ReactNode;
-}) {
-  return createElement(ModelStoreContext.Provider, { value: store }, children);
-}
-
-export function useModelStoreApi(): ModelStore {
-  return useContext(ModelStoreContext) ?? activeModelStore;
-}
-
-type BoundModelStoreHook = {
-  <T>(selector: (state: AppState) => T): T;
-  getState(): AppState;
-  setState: StoreApi<AppState>['setState'];
-  subscribe: StoreApi<AppState>['subscribe'];
-};
-
-function useStoreHook<T>(selector: (state: AppState) => T): T {
-  const store = useModelStoreApi();
-  return useZustandStore(store, selector);
-}
-
-const proxySetState: StoreApi<AppState>['setState'] = (partial, replace) => {
-  if (replace === true) activeModelStore.setState(partial as AppState, true);
-  else activeModelStore.setState(partial, false);
-};
-
-export const useStore = Object.assign(useStoreHook, {
-  getState: () => activeModelStore.getState(),
-  setState: proxySetState,
-  subscribe: (listener: Parameters<StoreApi<AppState>['subscribe']>[0]) =>
-    activeModelStore.subscribe(listener),
-}) as BoundModelStoreHook;
 
 function targetStore(store?: ModelStore): ModelStore {
   return store ?? activeModelStore;

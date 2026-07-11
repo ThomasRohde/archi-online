@@ -14,7 +14,8 @@ import {
   RELATIONSHIP_TYPES,
   type RelationshipType,
 } from '../model/metamodel';
-import { setActiveTool, useStore, type Tool } from '../model/store';
+import { setActiveTool, type Tool } from '../model/store';
+import { useStore } from './store-hooks';
 
 /** Short section labels for the palette rail, echoing Archi's layer grouping. */
 const LAYER_ABBREV: Record<string, string> = {

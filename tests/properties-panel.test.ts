@@ -9,7 +9,8 @@ import {
   addView,
   createEmptyModel,
 } from '../src/model/ops';
-import { replaceModel, setSelection, useStore } from '../src/model/store';
+import { replaceModel, setSelection } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
 
 function model() {

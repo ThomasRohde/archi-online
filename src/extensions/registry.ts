@@ -1,4 +1,4 @@
-import { runBatch, useStore } from '../model/store';
+import { getActiveModelStore, runBatch } from '../model/store';
 import { getActiveModelSession } from '../model/workspace';
 import type {
   ExtensionCommand,
@@ -180,7 +180,7 @@ export class ExtensionRegistry {
 
   private createContext(extensionId: string, trigger?: unknown): ExtensionCommandContext {
     const session = getActiveModelSession();
-    const state = session?.store.getState() ?? useStore.getState();
+    const state = session?.store.getState() ?? getActiveModelStore().getState();
     return {
       extensionId,
       modelSessionId: session?.id ?? null,

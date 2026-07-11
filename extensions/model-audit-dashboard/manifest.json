@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "examples.model-audit-dashboard",
   "name": "Model Audit Dashboard",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Audit the current model for common modelling hygiene signals.",
   "main": "main.js",
   "contributes": {

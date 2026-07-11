@@ -13,7 +13,8 @@ import {
   setViewpoint,
 } from '../src/model/ops';
 import { parseArchimate } from '../src/model/io/archimate-xml';
-import { replaceModel, useStore } from '../src/model/store';
+import { replaceModel } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import type { ModelState } from '../src/model/types';
 import { validateModel, type ValidationIssue } from '../src/model/validation';
 import { ValidatorPanel } from '../src/ui/ValidatorPanel';

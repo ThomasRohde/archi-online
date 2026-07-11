@@ -10,7 +10,8 @@ import {
   createEmptyModel,
 } from '../src/model/ops';
 import { incomingRelationships, outgoingRelationships } from '../src/model/analysis';
-import { replaceModel, setSelection, useStore } from '../src/model/store';
+import { replaceModel, setSelection } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import { NavigatorPanel } from '../src/ui/NavigatorPanel';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

@@ -8,8 +8,15 @@ import {
   c4KindForConcept,
   c4PropertyValue,
 } from '../src/model/c4';
-import { addElementNodeToView, addView, createC4ElementOnView, createC4TemplateView, createEmptyModel } from '../src/model/ops';
-import { openView, replaceModel, setSelection, useStore } from '../src/model/store';
+import {
+  addElementNodeToView,
+  addView,
+  createC4ElementOnView,
+  createC4TemplateView,
+  createEmptyModel,
+} from '../src/model/ops';
+import { openView, replaceModel, setSelection } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import { ConnectionView } from '../src/canvas/ConnectionView';
 import { NodeFigure } from '../src/canvas/figures/NodeFigure';
 import { Palette } from '../src/ui/Palette';

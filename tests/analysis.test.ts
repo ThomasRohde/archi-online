@@ -7,7 +7,8 @@ import {
   addView,
   createEmptyModel,
 } from '../src/model/ops';
-import { replaceModel, useStore } from '../src/model/store';
+import { replaceModel } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import { findInView, modelRelations, viewsUsing } from '../src/model/analysis';
 
 function model() {

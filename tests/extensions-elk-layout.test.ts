@@ -10,7 +10,8 @@ import {
   createEmptyModel,
   setConnectionBendpoints,
 } from '../src/model/ops';
-import { openView, replaceModel, setSelection, useStore } from '../src/model/store';
+import { openView, replaceModel, setSelection } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 
 function model() {
   return useStore.getState().model!;
