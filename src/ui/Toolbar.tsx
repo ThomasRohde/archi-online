@@ -1,5 +1,24 @@
 import { useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  ArrowUpDown,
+  Blocks,
+  BookOpen,
+  CircleHelp,
+  FilePlus2,
+  FolderOpen,
+  Images,
+  PanelTopOpen,
+  PanelsTopLeft,
+  Presentation,
+  Redo2,
+  Save,
+  SaveAll,
+  Share2,
+  Tags,
+  Undo2,
+  type LucideIcon,
+} from 'lucide-react';
 import { autoListedExtensionCommands } from '../extensions/command-visibility';
 import { extensionRegistry } from '../extensions/registry';
 import {
@@ -260,7 +279,6 @@ function createAndOpenC4View(viewType: (typeof C4_VIEW_TYPES)[number]): void {
   openView(id);
 }
 
-/* Toolbar glyphs — transcribed 1:1 from the App Chrome design mockup. */
 type IconName =
   | 'new'
   | 'open'
@@ -272,80 +290,35 @@ type IconName =
   | 'export'
   | 'present'
   | 'c4'
+  | 'profiles'
+  | 'images'
   | 'ext'
   | 'views'
   | 'docs'
   | 'help';
 
-const TB_ICONS: Record<IconName, React.ReactNode> = {
-  new: <path d="M6 3h7l5 5v13H6z M13 3v5h5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />,
-  open: <path d="M3 6h6l2 2h10v11H3z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />,
-  save: <path d="M4 4h11l5 5v11H4z M9 4v5h7 M8 20v-6h8v6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />,
-  saveas: (
-    <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-      <path d="M4 4h10l4 4v6.5 M4 4v16h7 M9 4v5h6" />
-      <path d="M17.5 16.5v6 M14.5 19.5h6" strokeLinecap="round" />
-    </g>
-  ),
-  share: (
-    <g fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="6" cy="12" r="2.4" />
-      <circle cx="17" cy="5.5" r="2.4" />
-      <circle cx="17" cy="18.5" r="2.4" />
-      <path d="M8.2 10.8 14.8 6.7 M8.2 13.2 14.8 17.3" />
-    </g>
-  ),
-  undo: <path d="M9 7 5 11l4 4 M5 11h9a5 5 0 0 1 0 10h-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />,
-  redo: <path d="M15 7l4 4-4 4 M19 11h-9a5 5 0 0 0 0 10h3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />,
-  export: <path d="M12 15V4 M8 8l4-4 4 4 M4 15v5h16v-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />,
-  present: (
-    <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="12" rx="1.5" />
-      <path d="M12 16v3 M8.5 20h7" />
-      <path d="M10.5 8l4 2-4 2z" fill="currentColor" stroke="none" />
-    </g>
-  ),
-  c4: (
-    <g fill="none" stroke="currentColor" strokeWidth="1.6">
-      <rect x="3.5" y="3.5" width="7" height="7" />
-      <rect x="13.5" y="3.5" width="7" height="7" />
-      <rect x="3.5" y="13.5" width="7" height="7" />
-      <rect x="13.5" y="13.5" width="7" height="7" />
-    </g>
-  ),
-  ext: (
-    <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-      <rect x="3.5" y="4" width="7.5" height="7.5" rx="1" />
-      <rect x="13" y="12.5" width="7.5" height="7.5" rx="1" />
-      <path d="M11 7.5h3.5a1.5 1.5 0 0 1 1.5 1.5v3.5" />
-    </g>
-  ),
-  views: (
-    <g fill="none" stroke="currentColor" strokeWidth="1.6">
-      <rect x="3" y="4" width="18" height="16" rx="1.5" />
-      <path d="M10 4v16 M3 9h7" />
-    </g>
-  ),
-  docs: (
-    <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
-      <path d="M12 6.5C9.8 5 6.4 5 4 5.6v12.9c2.4-.6 5.8-.6 8 .9 2.2-1.5 5.6-1.5 8-.9V5.6C17.6 5 14.2 5 12 6.5z" />
-      <path d="M12 6.5v12.8" />
-    </g>
-  ),
-  help: (
-    <g fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.4 9.4a2.6 2.6 0 1 1 3.6 2.4c-1 .5-1 1.1-1 2.1 M12 17h.01" />
-    </g>
-  ),
+const TB_ICONS: Record<IconName, LucideIcon> = {
+  new: FilePlus2,
+  open: FolderOpen,
+  save: Save,
+  saveas: SaveAll,
+  share: Share2,
+  undo: Undo2,
+  redo: Redo2,
+  export: ArrowUpDown,
+  present: Presentation,
+  c4: PanelsTopLeft,
+  profiles: Tags,
+  images: Images,
+  ext: Blocks,
+  views: PanelTopOpen,
+  docs: BookOpen,
+  help: CircleHelp,
 };
 
 function TbIcon({ name }: { name: IconName }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-      {TB_ICONS[name]}
-    </svg>
-  );
+  const Icon = TB_ICONS[name];
+  return <Icon size={18} strokeWidth={1.6} aria-hidden="true" />;
 }
 
 /** Props for a fast custom tooltip on a toolbar icon button (see styles.css).
@@ -526,20 +499,20 @@ export function Toolbar() {
         <TbIcon name="c4" />
       </button>
       <button
-        className="tb-icon tb-icon-text"
+        className="tb-icon"
         {...tip('Manage specializations')}
         disabled={!hasModel || readOnly}
         onClick={() => setShowSpecializations(true)}
       >
-        Profiles
+        <TbIcon name="profiles" />
       </button>
       <button
-        className="tb-icon tb-icon-text"
+        className="tb-icon"
         {...tip('Import or place model images')}
         disabled={!hasModel || readOnly}
         onClick={() => setShowImages(true)}
       >
-        Images
+        <TbIcon name="images" />
       </button>
       <div className="toolbar-spacer" />
       {extensionSnapshot.toolbarButtons.map((button) => (
