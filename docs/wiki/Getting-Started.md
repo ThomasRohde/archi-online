@@ -64,8 +64,12 @@ The exact install UI and operating-system integration are browser-dependent.
 4. Draw a relationship: pick a relationship tool, then drag from one element
    to another. The canvas gives live feedback — targets that the ArchiMate
    metamodel forbids are rejected. If you're not sure which relationship to
-   use, pick the **magic connector**: draw the connection first and choose
-   from the list of valid relationship types afterwards.
+   use, pick the **magic connector**: connect to an existing element and choose
+   a valid forward/reverse relationship (reusing an existing semantic
+   relationship or creating a **New** one), or finish on empty canvas/a Group
+   to create a valid target and relationship together. Shift-click or
+   double-click any creation tool to keep it selected; `Escape` returns to
+   **Select / move**.
 5. Select any object and edit its name, documentation, key-value properties,
    and appearance in the **Properties** panel.
 6. Press `Ctrl+S` (or click **Save**) and choose where to store the

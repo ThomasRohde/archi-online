@@ -95,8 +95,10 @@ Extensions can add items to the tree's context menu.
 From top to bottom:
 
 - **Select / move** — the default tool (`Escape` returns to it).
-- **Magic connector** — draw a connection first, then pick from the
-  relationship types that ArchiMate allows between the two endpoints.
+- **Magic connector** — start from an element, then either choose a valid
+  forward/reverse relationship to an existing element or click empty canvas/a
+  Group to create a valid target element and relationship together. Existing
+  semantic relationships can be reused; **New** creates a distinct one.
 - **Relationship tools** — one per ArchiMate relationship type.
 - **Note** and **Group** — plain annotation objects.
 - **Element types** — grouped by layer: Strategy, Business, Application,
@@ -107,6 +109,13 @@ Drag an element type onto the canvas to create a new element, or click a
 relationship tool and drag between two diagram objects. While drawing a
 relationship, invalid targets are rejected based on the official ArchiMate
 allowed-relationship matrix.
+
+Magic Connector target-creation menus list relationships first. Hold `Ctrl`
+(`Command` on macOS) while placing the target to list elements first instead.
+The created target is selected and ready to rename in place. Palette creation
+tools are one-shot by default; Shift-click or double-click a tool to keep it
+selected for repeated use. A later single click clears the lock, and `Escape`
+always returns to **Select / move**.
 
 ![The magic connector offering only the relationships ArchiMate allows between two elements](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/palette-validity.png)
 

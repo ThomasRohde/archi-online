@@ -5,10 +5,9 @@ import {
   type AutomaticRelationshipSettings,
 } from '../automatic-relationships';
 import { createConnectionVisibilityResolver } from '../connection-visibility';
-import { isAllowedRelationshipInViewpoint } from '../data/viewpoints';
 import { newId } from '../id';
 import type { ElementType, RelationshipType } from '../metamodel';
-import { isAllowedRelationship } from '../rules';
+import { enumerateRelationshipCandidates } from '../rules';
 import { getActiveModelStore, transact, type ModelStore } from '../store';
 import { getConnectable, type Bounds, type ElementNode, type ModelState, type RefNode } from '../types';
 import { defaultFolderId, folderForElementType } from './concepts';
@@ -639,6 +638,7 @@ function analyzeChildren(
     const parentElement = staged.elements[parentNode.elementId];
     if (!childElement || !parentElement || childElement.type === 'Junction') continue;
     const allCandidates = enumerateCandidates(
+      staged,
       parentElement.id,
       parentElement.type,
       parentNode.id,
@@ -692,6 +692,7 @@ function analyzeChildren(
 }
 
 function enumerateCandidates(
+  model: ModelState,
   parentElementId: string,
   parentType: ElementType,
   parentNodeId: string,
@@ -714,12 +715,14 @@ function enumerateCandidates(
       [sourceNodeId, targetNodeId] = [targetNodeId, sourceNodeId];
       [sourceType, targetType] = [targetType, sourceType];
     }
-    if (
-      !isAllowedRelationshipInViewpoint(viewpointId, relationshipType) ||
-      !isAllowedRelationship(relationshipType, sourceType, targetType)
-    ) {
-      return;
-    }
+    const [allowed] = enumerateRelationshipCandidates(
+      { conceptId: sourceElementId, conceptType: sourceType, nodeId: sourceNodeId },
+      { conceptId: targetElementId, conceptType: targetType, nodeId: targetNodeId },
+      viewpointId,
+      [relationshipType],
+      model,
+    );
+    if (!allowed) return;
     candidates.push({
       id: `create:${direction}:${relationshipType}`,
       direction,

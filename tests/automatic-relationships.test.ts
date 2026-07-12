@@ -322,6 +322,53 @@ describe('automatic relationship analysis', () => {
     );
   });
 
+  it('uses the shared instance-aware rules for an existing Junction parent', () => {
+    const arm = requireArmFunctions();
+    if (!arm) return;
+    const store = makeStore();
+    const viewId = addViewTo(store);
+    const upstreamElementId = addElementTo(store, 'BusinessProcess', 'Upstream');
+    const parentElementId = addElementTo(store, 'Junction', 'Parent Junction');
+    const childElementId = addElementTo(store, 'BusinessProcess', 'Child');
+    addRelationship(
+      'TriggeringRelationship',
+      upstreamElementId,
+      parentElementId,
+      'Existing trigger',
+      undefined,
+      store,
+    );
+    const parentNodeId = addNodeTo(
+      store,
+      viewId,
+      parentElementId,
+      viewId,
+      { ...BOUNDS, width: 18, height: 18 },
+    );
+    const childNodeId = addNodeTo(
+      store,
+      viewId,
+      childElementId,
+      viewId,
+      { ...BOUNDS, x: 220 },
+    );
+
+    const plan = arm.analyze(
+      store.getState().model!,
+      moveInput(viewId, childNodeId, parentNodeId),
+      {
+        ...DEFAULT_SETTINGS,
+        newRelationsTypes:
+          ARM_BITS.AssignmentRelationship | ARM_BITS.TriggeringRelationship,
+        newReverseRelationsTypes: 0,
+      },
+    );
+
+    expect(plan.children[0].candidates.map((candidate) => candidate.relationshipType)).toEqual([
+      'TriggeringRelationship',
+    ]);
+  });
+
   it('reuses an existing semantic relationship and plans its missing diagram occurrence', () => {
     const arm = requireArmFunctions();
     if (!arm) return;

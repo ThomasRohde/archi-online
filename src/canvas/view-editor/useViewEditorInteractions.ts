@@ -7,16 +7,20 @@ import type {
   PointerEvent as ReactPointerEvent,
   RefObject,
 } from 'react';
-import { elementLabel, relationshipLabel } from '../../model/metamodel';
+import { elementLabel } from '../../model/metamodel';
 import { newId } from '../../model/id';
 import { C4_ELEMENT_TYPES } from '../../model/c4';
 import {
   addGroupToView,
   addImageToView,
   addNoteToView,
+  analyzeMagicConnectionTarget,
+  analyzeMagicTargetCreation,
   createC4ElementOnView,
   commitMove,
   createElementOnView,
+  createMagicConnectionOnView,
+  createMagicTargetOnView,
   createRelationshipOnView,
   createNestedConnectionVisibilityResolver,
   deleteViewObjects,
@@ -27,9 +31,10 @@ import {
   isAutomaticRelationshipTriggerEnabled,
   type MoveEntry,
 } from '../../model/ops';
-import { isAllowedRelationship, validRelationshipTypes } from '../../model/rules';
+import { isAllowedRelationship } from '../../model/rules';
 import {
   openView as openModelView,
+  finishPaletteToolUse,
   runBatch,
   setActiveTool as setModelActiveTool,
   setSelection as setModelSelection,
@@ -58,7 +63,16 @@ import {
 import { containerAt, dropTargetFor, selectionRoots } from './bounds';
 import { showEmptyCanvasContextMenu, showViewObjectContextMenu } from './contextMenu';
 import { addDroppedItemsToView, planDroppedItemsToView } from './drop';
+import {
+  buildMagicConnectionMenuItems,
+  buildMagicTargetMenuItems,
+} from './magic-connector-menu';
 import type { EditState, Interaction, Viewport } from './types';
+
+export {
+  buildMagicConnectionMenuItems,
+  buildMagicTargetMenuItems,
+};
 
 interface UseViewEditorInteractionsParams {
   model: ModelState | null;
@@ -161,48 +175,109 @@ export function useViewEditorInteractions({
     setEdit(null);
   };
 
-  const finishConnect = (targetNodeId: string, clientX: number, clientY: number) => {
-    if (!model) return;
+  const cancelEditAndSelect = () => {
+    setEdit(null);
+    setActiveTool({ kind: 'select' });
+  };
+
+  const finishConnect = (
+    targetNodeId: string | undefined,
+    clientX: number,
+    clientY: number,
+    elementFirst = false,
+  ) => {
+    const currentModel = modelStore.getState().model;
+    if (!currentModel) return;
     const cur = interRef.current;
     if (cur.kind !== 'connect') return;
     const tool = modelStore.getState().activeTool;
     setInter({ kind: 'none' });
-    const srcNode = model.nodes[cur.sourceNodeId];
-    const tgtNode = model.nodes[targetNodeId];
-    if (srcNode?.nodeType !== 'element' || tgtNode?.nodeType !== 'element') return;
-    const srcType = model.elements[srcNode.elementId]?.type;
-    const tgtType = model.elements[tgtNode.elementId]?.type;
-    if (!srcType || !tgtType) return;
+    const srcNode = currentModel.nodes[cur.sourceNodeId];
+    const tgtNode = targetNodeId ? currentModel.nodes[targetNodeId] : undefined;
+    if (srcNode?.nodeType !== 'element') return;
     if (tool.kind === 'create-relationship') {
+      if (tgtNode?.nodeType !== 'element') {
+        finishPaletteToolUse(tool, modelStore);
+        return;
+      }
       const res = createRelationshipOnView(
         tool.type,
         viewId,
         cur.sourceNodeId,
-        targetNodeId,
+        tgtNode.id,
         modelStore,
       );
       if (res) setSelection('view', [res.connectionId]);
-      setActiveTool({ kind: 'select' });
+      finishPaletteToolUse(tool, modelStore);
     } else if (tool.kind === 'magic-connector') {
-      const types = validRelationshipTypes(srcType, tgtType);
-      showContextMenu(
-        clientX,
-        clientY,
-        types.map((t) => ({
-          label: relationshipLabel(t),
-          onClick: () => {
-            const res = createRelationshipOnView(
-              t,
+      if (tgtNode?.nodeType === 'element') {
+        const analysis = analyzeMagicConnectionTarget(currentModel, {
+          viewId,
+          sourceNodeId: cur.sourceNodeId,
+          targetNodeId: tgtNode.id,
+        });
+        const items = buildMagicConnectionMenuItems(
+          analysis,
+          (option, relationshipId) => {
+            const res = createMagicConnectionOnView({
               viewId,
-              cur.sourceNodeId,
-              targetNodeId,
-              modelStore,
-            );
+              sourceNodeId: cur.sourceNodeId,
+              targetNodeId: tgtNode.id,
+              direction: option.direction,
+              relationshipType: option.relationshipType,
+              relationshipId,
+            }, modelStore);
             if (res) setSelection('view', [res.connectionId]);
           },
-        })),
-      );
-      setActiveTool({ kind: 'select' });
+        );
+        if (items.length > 0) {
+          showContextMenu(clientX, clientY, items, (reason) => {
+            if (reason === 'escape') setActiveTool({ kind: 'select' });
+          });
+        }
+      } else {
+        const point = toView(clientX, clientY);
+        const containerId =
+          tgtNode?.nodeType === 'group'
+            ? tgtNode.id
+            : (containerAt(currentModel, viewId, absBounds, point, new Set()) ?? viewId);
+        const parentId =
+          containerId === viewId || currentModel.nodes[containerId]?.nodeType === 'group'
+            ? containerId
+            : viewId;
+        const parentAbs =
+          parentId === viewId ? { x: 0, y: 0 } : (absBounds.get(parentId) ?? { x: 0, y: 0 });
+        const analysis = analyzeMagicTargetCreation(currentModel, {
+          viewId,
+          sourceNodeId: cur.sourceNodeId,
+        });
+        const items = buildMagicTargetMenuItems(analysis, elementFirst, (pair) => {
+          const size = defaultElementSize(pair.elementType, settings);
+          const result = createMagicTargetOnView({
+            viewId,
+            sourceNodeId: cur.sourceNodeId,
+            parentId,
+            bounds: {
+              x: snap(point.x - parentAbs.x - size.width / 2),
+              y: snap(point.y - parentAbs.y - size.height / 2),
+              width: size.width,
+              height: size.height,
+            },
+            elementType: pair.elementType,
+            relationshipType: pair.relationshipType,
+            defaults: defaultTextStyle(settings),
+          }, modelStore);
+          if (!result) return;
+          setSelection('view', [result.nodeId]);
+          setTimeout(() => startEdit(result.nodeId), 0);
+        });
+        if (items.length > 0) {
+          showContextMenu(clientX, clientY, items, (reason) => {
+            if (reason === 'escape') setActiveTool({ kind: 'select' });
+          });
+        }
+      }
+      finishPaletteToolUse(tool, modelStore);
     }
   };
 
@@ -267,7 +342,7 @@ export function useViewEditorInteractions({
             settings,
             modelStore,
           ).then((result) => {
-            setActiveTool({ kind: 'select' });
+            finishPaletteToolUse(tool, modelStore);
             if (!result || !modelStore.getState().model?.nodes[nodeId]) return;
             setSelection('view', [nodeId]);
             setTimeout(() => startEdit(nodeId), 0);
@@ -288,7 +363,7 @@ export function useViewEditorInteractions({
             if (tool.profileId) setConceptProfiles(created.elementId, [tool.profileId], modelStore);
           }, modelStore);
           setSelection('view', [nodeId]);
-          setActiveTool({ kind: 'select' });
+          finishPaletteToolUse(tool, modelStore);
           setTimeout(() => startEdit(nodeId), 0);
         }
       } else if (tool.kind === 'create-c4-element') {
@@ -310,7 +385,7 @@ export function useViewEditorInteractions({
           modelStore,
         );
         setSelection('view', [nodeId]);
-        setActiveTool({ kind: 'select' });
+        finishPaletteToolUse(tool, modelStore);
         setTimeout(() => startEdit(nodeId), 0);
       } else if (tool.kind === 'create-image') {
         const width = 120;
@@ -329,7 +404,7 @@ export function useViewEditorInteractions({
           modelStore,
         );
         setSelection('view', [id]);
-        setActiveTool({ kind: 'select' });
+        finishPaletteToolUse(tool, modelStore);
       } else if (tool.kind === 'create-note') {
         const def = defaultNoteSize(settings);
         const id = addNoteToView(
@@ -346,7 +421,7 @@ export function useViewEditorInteractions({
           modelStore,
         );
         setSelection('view', [id]);
-        setActiveTool({ kind: 'select' });
+        finishPaletteToolUse(tool, modelStore);
         setTimeout(() => startEdit(id), 0);
       } else {
         const def = defaultGroupSize(settings);
@@ -364,7 +439,7 @@ export function useViewEditorInteractions({
           modelStore,
         );
         setSelection('view', [id]);
-        setActiveTool({ kind: 'select' });
+        finishPaletteToolUse(tool, modelStore);
       }
       return;
     }
@@ -372,11 +447,7 @@ export function useViewEditorInteractions({
     if (tool.kind === 'create-relationship' || tool.kind === 'magic-connector') {
       const cur = interRef.current;
       if (cur.kind === 'connect') {
-        if (hit.nodeId) finishConnect(hit.nodeId, e.clientX, e.clientY);
-        else {
-          setInter({ kind: 'none' });
-          setActiveTool({ kind: 'select' });
-        }
+        finishConnect(hit.nodeId, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
       } else if (hit.nodeId && model.nodes[hit.nodeId]?.nodeType === 'element') {
         setInter({ kind: 'connect', sourceNodeId: hit.nodeId, current: p, hoverNodeId: null });
       }
@@ -634,7 +705,9 @@ export function useViewEditorInteractions({
       case 'connect': {
         const hit = hitFromEvent(e);
         if (hit.nodeId && hit.nodeId !== cur.sourceNodeId) {
-          finishConnect(hit.nodeId, e.clientX, e.clientY);
+          finishConnect(hit.nodeId, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
+        } else if (!hit.nodeId) {
+          finishConnect(undefined, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
         }
         break;
       }
@@ -874,15 +947,33 @@ export function useViewEditorInteractions({
     const tool = activeTool;
     const srcNode = model.nodes[inter.sourceNodeId];
     const tgtNode = model.nodes[inter.hoverNodeId];
-    if (srcNode?.nodeType !== 'element' || tgtNode?.nodeType !== 'element')
+    if (srcNode?.nodeType !== 'element')
       return { id: inter.hoverNodeId, valid: false };
+    if (tool.kind === 'magic-connector' && tgtNode?.nodeType === 'group') {
+      return {
+        id: inter.hoverNodeId,
+        valid: analyzeMagicTargetCreation(model, {
+          viewId,
+          sourceNodeId: inter.sourceNodeId,
+        }).pairs.length > 0,
+      };
+    }
+    if (tgtNode?.nodeType !== 'element') {
+      return tool.kind === 'magic-connector'
+        ? null
+        : { id: inter.hoverNodeId, valid: false };
+    }
     const srcType = model.elements[srcNode.elementId]?.type;
     const tgtType = model.elements[tgtNode.elementId]?.type;
     if (!srcType || !tgtType) return { id: inter.hoverNodeId, valid: false };
     const valid =
       tool.kind === 'create-relationship'
         ? isAllowedRelationship(tool.type, srcType, tgtType)
-        : validRelationshipTypes(srcType, tgtType).length > 0;
+        : analyzeMagicConnectionTarget(model, {
+            viewId,
+            sourceNodeId: inter.sourceNodeId,
+            targetNodeId: inter.hoverNodeId,
+          }).groups.some((group) => group.options.length > 0);
     return { id: inter.hoverNodeId, valid };
   })();
 
@@ -902,6 +993,7 @@ export function useViewEditorInteractions({
     edit,
     connectHover,
     commitEdit,
+    cancelEditAndSelect,
     cursor,
     handlers: {
       onPointerDown,

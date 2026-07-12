@@ -121,11 +121,13 @@ export function DirectEditOverlay({
   editNodeAbs,
   viewport,
   commitEdit,
+  cancelEdit,
 }: {
   edit: EditState | null;
   editNodeAbs: Bounds | undefined;
   viewport: Viewport;
   commitEdit: (text: string | null) => void;
+  cancelEdit: () => void;
 }) {
   if (!edit || !editNodeAbs) return null;
   return (
@@ -147,7 +149,10 @@ export function DirectEditOverlay({
           e.preventDefault();
           commitEdit((e.target as HTMLTextAreaElement).value);
         }
-        if (e.key === 'Escape') commitEdit(null);
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelEdit();
+        }
       }}
     />
   );

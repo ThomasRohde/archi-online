@@ -59,7 +59,10 @@ and atomic failure. See [[Import & Export|Import-and-Export]] for the workflows.
   types.
 - The **allowed-relationship matrix** is generated directly from Archi's own
   `relationships.xml` data file, so relationship validity — including what
-  the magic connector offers — matches desktop Archi exactly.
+  the magic connector offers — matches desktop Archi exactly. The connector
+  supports forward/reverse choices, semantic relationship reuse, atomic target
+  creation on canvas or in Groups, desktop menu polarity, and sticky palette
+  tools.
 - **Default sizes and fill colors** for new elements follow Archi's defaults.
 - The **viewpoint definitions** (which element types each ArchiMate viewpoint
   allows) are ported from Archi's `viewpoints.xml`; the palette greys out

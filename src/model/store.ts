@@ -17,15 +17,34 @@ export interface Transaction {
   inverse: Patch[];
 }
 
+type StickyCreationTool<T> = T & { sticky?: boolean };
+
 export type Tool =
   | { kind: 'select' }
-  | { kind: 'create-element'; type: ElementType; profileId?: string }
-  | { kind: 'create-c4-element'; c4Kind: C4ElementKind; c4Properties?: Record<string, string> }
-  | { kind: 'create-relationship'; type: RelationshipType }
-  | { kind: 'magic-connector' }
-  | { kind: 'create-note' }
-  | { kind: 'create-group' }
-  | { kind: 'create-image'; imagePath: string };
+  | StickyCreationTool<{ kind: 'create-element'; type: ElementType; profileId?: string }>
+  | StickyCreationTool<{
+      kind: 'create-c4-element';
+      c4Kind: C4ElementKind;
+      c4Properties?: Record<string, string>;
+    }>
+  | StickyCreationTool<{ kind: 'create-relationship'; type: RelationshipType }>
+  | StickyCreationTool<{ kind: 'magic-connector' }>
+  | StickyCreationTool<{ kind: 'create-note' }>
+  | StickyCreationTool<{ kind: 'create-group' }>
+  | StickyCreationTool<{ kind: 'create-image'; imagePath: string }>;
+
+export type CreationTool = Exclude<Tool, { kind: 'select' }>;
+
+export function isStickyCreationTool(tool: Tool): tool is CreationTool & { sticky: true } {
+  return tool.kind !== 'select' && tool.sticky === true;
+}
+
+export function setToolSticky(tool: Tool, sticky: boolean): Tool {
+  if (tool.kind === 'select') return tool;
+  const oneShot = { ...tool };
+  delete oneShot.sticky;
+  return sticky ? { ...oneShot, sticky: true } as Tool : oneShot as Tool;
+}
 
 export interface SelectionState {
   source: 'tree' | 'view';
@@ -280,6 +299,14 @@ export function setActiveTool(tool: Tool, store?: ModelStore): void {
   const target = targetStore(store);
   if (target.getState().readOnly && tool.kind !== 'select') return;
   target.setState({ activeTool: tool });
+}
+
+/** Complete one palette creation while honoring Archi's optional tool lock. */
+export function finishPaletteToolUse(tool: Tool, store?: ModelStore): void {
+  if (tool.kind === 'select' || isStickyCreationTool(tool)) return;
+  const target = targetStore(store);
+  if (target.getState().activeTool !== tool) return;
+  target.setState({ activeTool: { kind: 'select' } });
 }
 
 export function cloneModelForEditing(model: ModelState): ModelState {

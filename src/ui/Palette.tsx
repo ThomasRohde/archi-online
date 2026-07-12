@@ -14,8 +14,13 @@ import {
   RELATIONSHIP_TYPES,
   type RelationshipType,
 } from '../model/metamodel';
-import { setActiveTool, type Tool } from '../model/store';
-import { useStore } from './store-hooks';
+import {
+  isStickyCreationTool,
+  setActiveTool,
+  setToolSticky,
+  type Tool,
+} from '../model/store';
+import { useModelStoreApi, useStore } from './store-hooks';
 
 /** Short section labels for the palette rail, echoing Archi's layer grouping. */
 const LAYER_ABBREV: Record<string, string> = {
@@ -236,13 +241,40 @@ function ToolButton({
   children: ReactNode;
   disabled?: boolean;
 }) {
-  const active = useStore((s) => toolEq(s.activeTool, tool));
+  const modelStore = useModelStoreApi();
+  const activeTool = useStore((s) => s.activeTool);
+  const active = toolEq(activeTool, tool);
+  const activate = (sticky: boolean) =>
+    setActiveTool(setToolSticky(tool, sticky), modelStore);
   return (
     <button
       className={'pal-btn' + (active ? ' active' : '') + (disabled ? ' palette-item-disabled' : '')}
       title={title}
+      aria-pressed={active}
       data-profile-id={'profileId' in tool ? tool.profileId : undefined}
-      onClick={disabled ? undefined : () => setActiveTool(active ? { kind: 'select' } : tool)}
+      onClick={disabled ? undefined : (event) => {
+        if (tool.kind === 'select') {
+          setActiveTool({ kind: 'select' }, modelStore);
+        } else if (event.shiftKey || event.detail > 1) {
+          activate(true);
+        } else if (active && isStickyCreationTool(activeTool)) {
+          activate(false);
+        } else {
+          setActiveTool(
+            active ? { kind: 'select' } : setToolSticky(tool, false),
+            modelStore,
+          );
+        }
+      }}
+      onDoubleClick={disabled || tool.kind === 'select' ? undefined : (event) => {
+        event.preventDefault();
+        activate(true);
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        setActiveTool({ kind: 'select' }, modelStore);
+      }}
     >
       {children}
     </button>

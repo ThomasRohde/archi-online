@@ -84,7 +84,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   const viewportApi = useCanvasViewport(viewId, svgRef, absBounds);
   const { viewport, setViewport, toView, zoomTo, zoomBy, fitToView, spaceHeld, spaceRef } =
     viewportApi;
-  const { inter, edit, connectHover, commitEdit, cursor, handlers } =
+  const { inter, edit, connectHover, commitEdit, cancelEditAndSelect, cursor, handlers } =
     useViewEditorInteractions({
       model,
       view,
@@ -283,6 +283,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
         editNodeAbs={editNodeAbs}
         viewport={viewport}
         commitEdit={commitEdit}
+        cancelEdit={cancelEditAndSelect}
       />
       <ZoomControls viewport={viewport} zoomBy={zoomBy} zoomTo={zoomTo} fitToView={fitToView} />
     </div>

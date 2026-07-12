@@ -10,6 +10,7 @@ export * from './ops/assets';
 export * from './ops/deletion';
 export * from './ops/duplicate';
 export * from './ops/layout';
+export * from './ops/magic-connector';
 export * from './ops/metadata';
 export * from './ops/movement';
 export * from './ops/nesting';
