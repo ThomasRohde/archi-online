@@ -51,7 +51,9 @@ export function serializeArchimate(state: ModelState): string {
           ? 'archimate:Group'
           : node.nodeType === 'note'
             ? 'archimate:Note'
-            : 'archimate:DiagramModelReference';
+            : node.nodeType === 'ref'
+              ? 'archimate:DiagramModelReference'
+              : 'archimate:DiagramModelImage';
     const attrs: Attr[] = [
       ['xsi:type', xsiType],
       ['id', node.id],
@@ -69,6 +71,9 @@ export function serializeArchimate(state: ModelState): string {
       ['lineAlpha', node.lineAlpha],
       ['borderType', node.nodeType === 'group' || node.nodeType === 'note' ? node.borderType : undefined],
       ['fillColor', node.fillColor],
+      ['imagePath', node.imagePath],
+      ['imageSource', node.imageSource],
+      ['imagePosition', node.imagePosition],
       ['archimateElement', node.nodeType === 'element' ? node.elementId : undefined],
       ['type', node.nodeType === 'element' ? node.figureType : undefined],
       ['model', node.nodeType === 'ref' ? node.refViewId : undefined],

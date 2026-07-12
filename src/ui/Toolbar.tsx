@@ -8,7 +8,7 @@ import {
   c4ViewType,
   validateC4View,
 } from '../model/c4';
-import { serializeArchimate } from '../model/io/archimate-xml';
+import { serializeArchimateDocument } from '../model/io/archimate-xml';
 import {
   ELEMENTS_FILENAME,
   PROPERTIES_FILENAME,
@@ -21,7 +21,7 @@ import {
   importCsv,
   insertOrUpdateC4Legend,
 } from '../model/ops';
-import { openView, redo, setSelection, undo } from '../model/store';
+import { openView, redo, setActiveTool, setSelection, undo } from '../model/store';
 import { useStore } from './store-hooks';
 import { getActiveModelSession } from '../model/workspace';
 import {
@@ -47,6 +47,7 @@ import { PresentationMode } from './PresentationMode';
 import { layoutBus } from './layout-bus';
 import { createNewModelSession } from './model-session-actions';
 import { SpecializationsManager } from './SpecializationsManager';
+import { ImageGallery } from './ImageGallery';
 
 /** Published documentation site (GitHub Pages). */
 const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
@@ -123,7 +124,7 @@ export async function shareModel(): Promise<void> {
   if (!model) return;
   const initialViewId = activeViewId && model.views[activeViewId] ? activeViewId : undefined;
 
-  const inline = encodeModelToInlineShare(model, undefined, initialViewId);
+  const inline = await encodeModelToInlineShare(model, undefined, initialViewId);
   if (shareDecisionForInline(inline.encodedLength) === 'inline') {
     await copyShareLink(inline.href);
     return;
@@ -164,12 +165,12 @@ export async function shareModel(): Promise<void> {
         cancelLabel: 'Secret',
       });
 
-  const xml = serializeArchimate(model);
+  const documentBytes = await serializeArchimateDocument(model);
   const fileName = `${model.info.name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'model'}.archimate`;
   const saved = await saveShareGistForModel({
     token,
     modelId: model.info.id,
-    xml,
+    documentBytes,
     fileName,
     public: makePublic,
   });
@@ -380,6 +381,7 @@ export function Toolbar() {
   const [showExportCsv, setShowExportCsv] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [showSpecializations, setShowSpecializations] = useState(false);
+  const [showImages, setShowImages] = useState(false);
   const extensionSnapshot = useSyncExternalStore(
     (listener) => extensionRegistry.subscribe(listener),
     () => extensionRegistry.getSnapshot(),
@@ -547,6 +549,14 @@ export function Toolbar() {
       >
         Profiles
       </button>
+      <button
+        className="tb-icon tb-icon-text"
+        {...tip('Import or place model images')}
+        disabled={!hasModel || readOnly}
+        onClick={() => setShowImages(true)}
+      >
+        Images
+      </button>
       <div className="toolbar-spacer" />
       {extensionSnapshot.toolbarButtons.map((button) => (
         <button
@@ -605,6 +615,25 @@ export function Toolbar() {
         open={showSpecializations}
         onClose={() => setShowSpecializations(false)}
       />
+      {showImages && createPortal(
+        <div className="modal-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowImages(false);
+        }}>
+          <div className="modal image-gallery-dialog" role="dialog" aria-label="Model Images">
+            <div className="modal-title">Model Images</div>
+            <p className="prop-hint">Choose an image, then click the active view to place it.</p>
+            <ImageGallery
+              selectedPath={undefined}
+              onSelect={(path) => {
+                setActiveTool({ kind: 'create-image', imagePath: path });
+                setShowImages(false);
+              }}
+            />
+            <button className="tb-btn" onClick={() => setShowImages(false)}>Cancel</button>
+          </div>
+        </div>,
+        document.body,
+      )}
       {showHelp &&
         createPortal(
           <div className="modal-backdrop" onClick={() => setShowHelp(false)}>

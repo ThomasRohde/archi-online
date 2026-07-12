@@ -1,5 +1,6 @@
 import { transact, type ModelStore } from '../store';
 import type { ModelState } from '../types';
+import { pruneUnreferencedAssets } from '../assets';
 import { deleteConnectionFromDraft, deleteNodeFromDraft, removeFromFolder } from './draft';
 
 function deleteViewFromDraft(draft: ModelState, viewId: string): void {
@@ -58,7 +59,10 @@ export function deleteItems(ids: string[], store?: ModelStore): void {
         doomedConcepts.add(id);
       }
     }
-    if (doomedConcepts.size === 0) return;
+    if (doomedConcepts.size === 0) {
+      pruneUnreferencedAssets(draft);
+      return;
+    }
     const doomed = collectAttachedRelationships(draft, doomedConcepts);
     // Remove diagram nodes/connections that reference doomed concepts.
     for (const [id, node] of Object.entries(draft.nodes)) {
@@ -76,6 +80,7 @@ export function deleteItems(ids: string[], store?: ModelStore): void {
       delete draft.elements[id];
       delete draft.relationships[id];
     }
+    pruneUnreferencedAssets(draft);
   }, store);
 }
 

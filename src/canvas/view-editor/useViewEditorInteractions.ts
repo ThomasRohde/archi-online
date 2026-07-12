@@ -11,6 +11,7 @@ import { relationshipLabel } from '../../model/metamodel';
 import { C4_ELEMENT_TYPES } from '../../model/c4';
 import {
   addGroupToView,
+  addImageToView,
   addNoteToView,
   createC4ElementOnView,
   commitMove,
@@ -208,6 +209,7 @@ export function useViewEditorInteractions({
     if (
       tool.kind === 'create-element' ||
       tool.kind === 'create-c4-element' ||
+      tool.kind === 'create-image' ||
       tool.kind === 'create-note' ||
       tool.kind === 'create-group'
     ) {
@@ -260,6 +262,24 @@ export function useViewEditorInteractions({
         setSelection('view', [nodeId]);
         setActiveTool({ kind: 'select' });
         setTimeout(() => startEdit(nodeId), 0);
+      } else if (tool.kind === 'create-image') {
+        const width = 120;
+        const height = 80;
+        const id = addImageToView(
+          viewId,
+          parentId,
+          {
+            x: snap(p.x - parentAbs.x - width / 2, e.altKey),
+            y: snap(p.y - parentAbs.y - height / 2, e.altKey),
+            width,
+            height,
+          },
+          tool.imagePath,
+          textDefaults,
+          modelStore,
+        );
+        setSelection('view', [id]);
+        setActiveTool({ kind: 'select' });
       } else if (tool.kind === 'create-note') {
         const def = defaultNoteSize(settings);
         const id = addNoteToView(

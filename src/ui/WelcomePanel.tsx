@@ -1,4 +1,4 @@
-import { parseArchimate } from '../model/io/archimate-xml';
+import { parseArchimateDocument } from '../model/io/archimate-xml';
 import { addView } from '../model/ops';
 import { openView } from '../model/store';
 import { useStore } from './store-hooks';
@@ -10,7 +10,7 @@ export async function loadExampleModel(
   fileName = 'Archisurance.archimate',
 ): Promise<ModelSessionId> {
   const res = await fetch(import.meta.env.BASE_URL + `examples/${fileName}`);
-  const model = parseArchimate(await res.text());
+  const model = await parseArchimateDocument(new Uint8Array(await res.arrayBuffer()));
   return addModelSession({ model, fileName, dirty: false });
 }
 

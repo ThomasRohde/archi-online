@@ -56,7 +56,10 @@ function fakeFileHandle(name: string, text: string): FileSystemFileHandle {
   return {
     kind: 'file',
     name,
-    getFile: async () => ({ name, text: async () => text }) as File,
+    getFile: async () => ({
+      name,
+      arrayBuffer: async () => new TextEncoder().encode(text).buffer,
+    }) as File,
   } as unknown as FileSystemFileHandle;
 }
 
@@ -123,7 +126,7 @@ describe('PWA launch queue', () => {
   it('opens a launched file when an existing viewer window is focused', async () => {
     const queue = installLaunchQueue();
     initLaunchQueue();
-    const viewerHref = encodeModelToInlineShare(createEmptyModel('Shared Viewer')).href;
+    const viewerHref = (await encodeModelToInlineShare(createEmptyModel('Shared Viewer'))).href;
     history.replaceState(null, '', viewerHref);
 
     const host = document.createElement('div');

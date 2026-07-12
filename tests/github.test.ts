@@ -8,6 +8,7 @@ import {
   setStoredGitHubToken,
 } from '../src/persistence/github';
 import { memoryKeyValueStore } from '../src/persistence/keyval';
+import { zipSync } from 'fflate';
 
 function response(body: unknown, init: ResponseInit = {}) {
   return new Response(typeof body === 'string' ? body : JSON.stringify(body), {
@@ -44,7 +45,7 @@ describe('GitHub persistence', () => {
     const saved = await saveModelGist(
       {
         token: 'ghp_secret',
-        xml: '<model />',
+        documentBytes: new TextEncoder().encode('<model />'),
         fileName: 'model.archimate',
         public: false,
       },
@@ -79,7 +80,7 @@ describe('GitHub persistence', () => {
       {
         token: 'ghp_secret',
         gistId: 'abc123',
-        xml: '<model />',
+        documentBytes: new TextEncoder().encode('<model />'),
         fileName: 'updated.archimate',
         public: true,
       },
@@ -93,6 +94,27 @@ describe('GitHub persistence', () => {
     const body = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body));
     expect(body.public).toBeUndefined();
     expect(body.files['updated.archimate'].content).toBe('<model />');
+  });
+
+  it('stores image-bearing ZIP documents as base64 gist content', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      response({
+        id: 'zip123',
+        files: { 'model.archimate': { raw_url: 'https://gist.githubusercontent.com/raw/zip' } },
+      }),
+    );
+    const documentBytes = zipSync({ 'model.xml': new TextEncoder().encode('<model />') });
+
+    await saveModelGist({
+      token: 'ghp_secret',
+      documentBytes,
+      fileName: 'model.archimate',
+      public: false,
+    }, fetchImpl);
+
+    const body = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body));
+    const decoded = Uint8Array.from(atob(body.files['model.archimate'].content), (char) => char.charCodeAt(0));
+    expect(Array.from(decoded)).toEqual(Array.from(documentBytes));
   });
 
   it('loads the first archimate raw file from a public gist', async () => {

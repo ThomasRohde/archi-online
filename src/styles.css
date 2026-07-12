@@ -2481,3 +2481,13 @@ body {
 .specialization-image-preview { width: 44px; height: 32px; display: grid; place-items: center; }
 .specialization-image-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .specializations-error { color: var(--danger); margin-top: 10px; }
+
+.image-gallery { display: grid; gap: 8px; }
+.image-import-btn { width: fit-content; cursor: pointer; }
+.image-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.image-gallery-item { min-width: 0; height: 76px; display: grid; grid-template-rows: 1fr auto; place-items: center; padding: 4px; border: 1px solid var(--border); background: var(--panel-bg); color: inherit; }
+.image-gallery-item.selected { outline: 2px solid #2a6cc4; }
+.image-gallery-item img { max-width: 100%; max-height: 52px; object-fit: contain; image-rendering: auto; }
+.image-gallery-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.image-preview { min-height: 88px; display: grid; place-items: center; border: 1px solid var(--border); margin-bottom: 8px; }
+.image-preview img { max-width: 100%; max-height: 160px; object-fit: contain; }

@@ -216,15 +216,37 @@ export interface FigureProps {
   width: number;
   height: number;
   c4ViewType?: C4ViewType;
+  imageUrl?: string;
 }
 
 /** The visual shape + label of one diagram node (position handled by parent <g>). */
-export function NodeFigure({ node, element, refView, width: w, height: h, c4ViewType }: FigureProps) {
+export function NodeFigure({
+  node,
+  element,
+  refView,
+  width: w,
+  height: h,
+  c4ViewType,
+  imageUrl,
+}: FigureProps) {
   const font = parseFont(node.font);
   const alpha = (node.alpha ?? 255) / 255;
   const lineAlpha = (node.lineAlpha ?? 255) / 255;
   const stroke = node.lineColor ?? DEFAULT_LINE;
   const fontColor = node.fontColor ?? '#000000';
+  const imageFigure = (() => {
+    if (!imageUrl) return null;
+    const position = node.imagePosition ?? (node.nodeType === 'image' ? 9 : 2);
+    if (position === 9) {
+      return <image href={imageUrl} x={0} y={0} width={w} height={h} preserveAspectRatio="none" />;
+    }
+    const size = Math.max(1, Math.min(48, w, h));
+    const column = position % 3;
+    const row = Math.floor(position / 3);
+    const x = column === 0 ? 0 : column === 1 ? (w - size) / 2 : w - size;
+    const y = row === 0 ? 0 : row === 1 ? (h - size) / 2 : h - size;
+    return <image href={imageUrl} x={x} y={y} width={size} height={size} preserveAspectRatio="xMidYMid meet" />;
+  })();
 
   const labelStyle = (align: 'left' | 'center' | 'right', vert: 'top' | 'center' | 'bottom'): CSSProperties => ({
     width: '100%',
@@ -431,6 +453,8 @@ export function NodeFigure({ node, element, refView, width: w, height: h, c4View
   }
 
   // ---- non-element nodes -------------------------------------------------
+  if (node.nodeType === 'image') return <g>{imageFigure}</g>;
+
   if (node.nodeType === 'note') {
     const fill = node.fillColor ?? '#ffffff';
     const border = node.borderType ?? 0;
@@ -454,6 +478,7 @@ export function NodeFigure({ node, element, refView, width: w, height: h, c4View
             strokeOpacity={lineAlpha}
           />
         )}
+        {imageFigure}
         {label(node.content, { align: alignOf('left'), vert: vertOf('top') })}
       </g>
     );
@@ -467,6 +492,7 @@ export function NodeFigure({ node, element, refView, width: w, height: h, c4View
       return (
         <g>
           <rect width={w} height={h} fill={fill} fillOpacity={alpha} stroke={stroke} strokeOpacity={lineAlpha} />
+          {imageFigure}
           {label(node.name, { vert: vertOf('top') })}
         </g>
       );
@@ -480,6 +506,7 @@ export function NodeFigure({ node, element, refView, width: w, height: h, c4View
           stroke={stroke}
           strokeOpacity={lineAlpha}
         />
+        {imageFigure}
         <foreignObject x={0} y={0} width={tabW} height={tabH}>
           <div
             style={{
@@ -503,6 +530,7 @@ export function NodeFigure({ node, element, refView, width: w, height: h, c4View
     return (
       <g>
         <rect width={w} height={h} fill={fill} fillOpacity={alpha} stroke={stroke} strokeOpacity={lineAlpha} />
+        {imageFigure}
         <g transform={`translate(${w - 20}, 3)`} color={stroke} style={{ pointerEvents: 'none' }}>
           <g fill="none" stroke="currentColor" strokeWidth="1.1">
             <rect x="3" y="3" width="4.5" height="3.5" />
@@ -685,6 +713,7 @@ export function NodeFigure({ node, element, refView, width: w, height: h, c4View
   return (
     <g>
       {body}
+      {imageFigure}
       {showIcon && icon(type)}
       {label(element?.name ?? '')}
     </g>

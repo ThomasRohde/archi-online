@@ -4,6 +4,7 @@ import { ELEMENT_TYPES, RELATIONSHIP_TYPES } from '../model/metamodel';
 import { profileUsageCount, replaceProfiles } from '../model/ops';
 import type { ConceptType, ProfileDefinition } from '../model/types';
 import { useModelStoreApi, useStore } from './store-hooks';
+import { assetDataUrl } from '../model/assets';
 
 export function SpecializationsManager({
   open,
@@ -89,7 +90,9 @@ export function SpecializationsManager({
               </select>
               <span className="specialization-count">{profileUsageCount(model, profile.id)}</span>
               <div className="specialization-image-preview" title={profile.imagePath ?? 'No image'}>
-                {profile.imagePath ? <img src={profile.imagePath} alt="" /> : '—'}
+                {profile.imagePath && model.assets[profile.imagePath]
+                  ? <img src={assetDataUrl(model.assets[profile.imagePath])} alt="" />
+                  : '—'}
               </div>
               <button
                 className="tb-btn small"

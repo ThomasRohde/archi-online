@@ -35,6 +35,7 @@ export function createEmptyModel(name: string): ModelState {
   const state: ModelState = {
     info: { id: newId(), name, documentation: '', properties: [], version: '5.0.0' },
     profiles: {},
+    assets: {},
     folders: {},
     rootFolderIds: [],
     elements: {},

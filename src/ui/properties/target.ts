@@ -131,6 +131,11 @@ export function resolveTarget(model: ModelState, source: 'tree' | 'view', ids: s
       base.properties = node.properties;
       return base;
     }
+    if (node.nodeType === 'image') {
+      base.typeLabel = 'Image';
+      base.name = 'Image';
+      return base;
+    }
     base.typeLabel = 'View Reference';
     base.name = model.views[node.refViewId]?.name ?? '';
     return base;

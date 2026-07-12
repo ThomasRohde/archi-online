@@ -8,7 +8,9 @@ import type {
   DiagramConnection,
   DiagramNode,
   DiagramView,
+  ModelAsset,
   ModelState,
+  ProfileDefinition,
 } from './types';
 
 export type ModelTransferRootKind = 'element' | 'view' | 'node';
@@ -28,6 +30,8 @@ export interface ModelTransferBundle {
   views: DiagramView[];
   nodes: DiagramNode[];
   connections: DiagramConnection[];
+  profiles: ProfileDefinition[];
+  assets: ModelAsset[];
 }
 
 export interface PasteTransferOptions {
@@ -44,7 +48,9 @@ export interface PasteTransferOptions {
 }
 
 function deepClone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return typeof structuredClone === 'function'
+    ? structuredClone(value)
+    : JSON.parse(JSON.stringify(value)) as T;
 }
 
 function createCollector(model: ModelState) {
@@ -53,15 +59,32 @@ function createCollector(model: ModelState) {
   const viewIds = new Set<string>();
   const nodeIds = new Set<string>();
   const connectionIds = new Set<string>();
+  const profileIds = new Set<string>();
+  const assetPaths = new Set<string>();
+
+  const addAsset = (path: string | undefined): void => {
+    if (path && model.assets[path]) assetPaths.add(path);
+  };
+
+  const addProfiles = (ids: string[]): void => {
+    for (const id of ids) {
+      const profile = model.profiles[id];
+      if (!profile) continue;
+      profileIds.add(id);
+      addAsset(profile.imagePath);
+    }
+  };
 
   const addConcept = (id: string): void => {
     if (model.elements[id]) {
       elementIds.add(id);
+      addProfiles(model.elements[id].profileIds);
       return;
     }
     const relationship = model.relationships[id];
     if (!relationship || relationshipIds.has(id)) return;
     relationshipIds.add(id);
+    addProfiles(relationship.profileIds);
     addConcept(relationship.sourceId);
     addConcept(relationship.targetId);
   };
@@ -71,6 +94,7 @@ function createCollector(model: ModelState) {
     const node = model.nodes[id];
     if (!node) return;
     nodeIds.add(id);
+    addAsset(node.imagePath);
     if (node.nodeType === 'element') addConcept(node.elementId);
     if (node.nodeType === 'ref') addView(node.refViewId);
     for (const childId of node.childIds) addNode(childId);
@@ -114,6 +138,8 @@ function createCollector(model: ModelState) {
         views: [...viewIds].map((id) => deepClone(model.views[id])),
         nodes: [...nodeIds].map((id) => deepClone(model.nodes[id])),
         connections: [...connectionIds].map((id) => deepClone(model.connections[id])),
+        profiles: [...profileIds].map((id) => deepClone(model.profiles[id])),
+        assets: [...assetPaths].map((path) => deepClone(model.assets[path])),
       } satisfies ModelTransferBundle;
     },
   };
@@ -335,6 +361,42 @@ export function pasteTransferBundle(
   nodesToPaste.forEach((item) => mapFresh(item.id));
   connectionsToPaste.forEach((item) => mapFresh(item.id));
 
+  const assetPathMap = new Map<string, string>();
+  for (const asset of bundle.assets) {
+    if (!crossModel) {
+      assetPathMap.set(asset.path, asset.path);
+      continue;
+    }
+    const duplicate = Object.values(targetState.model.assets)
+      .find((candidate) => candidate.sha256 === asset.sha256);
+    if (duplicate) {
+      assetPathMap.set(asset.path, duplicate.path);
+      continue;
+    }
+    const extension = asset.path.split('.').pop() ?? 'png';
+    const path = targetState.model.assets[asset.path]
+      ? `images/_${newId().slice(3, 25)}.${extension}`
+      : asset.path;
+    assetPathMap.set(asset.path, path);
+  }
+
+  const profileIdMap = new Map<string, string>();
+  for (const profile of bundle.profiles) {
+    if (!crossModel) {
+      profileIdMap.set(profile.id, profile.id);
+      continue;
+    }
+    const duplicate = Object.values(targetState.model.profiles).find(
+      (candidate) =>
+        candidate.conceptType === profile.conceptType &&
+        candidate.name.localeCompare(profile.name, undefined, { sensitivity: 'accent' }) === 0,
+    );
+    profileIdMap.set(
+      profile.id,
+      duplicate?.id ?? (targetState.model.profiles[profile.id] ? newId() : profile.id),
+    );
+  }
+
   const treeVisualIds = new Map<string, string>();
   if (bundle.kind === 'tree' && destination === 'view') {
     for (const root of bundle.roots) {
@@ -360,6 +422,23 @@ export function pasteTransferBundle(
   transact(
     'Paste from model',
     (draft) => {
+      if (crossModel) {
+        for (const asset of bundle.assets) {
+          const path = assetPathMap.get(asset.path)!;
+          if (!draft.assets[path]) draft.assets[path] = { ...deepClone(asset), path };
+        }
+        for (const profile of bundle.profiles) {
+          const id = profileIdMap.get(profile.id)!;
+          if (draft.profiles[id]) continue;
+          draft.profiles[id] = {
+            ...deepClone(profile),
+            id,
+            imagePath: profile.imagePath
+              ? assetPathMap.get(profile.imagePath) ?? profile.imagePath
+              : undefined,
+          };
+        }
+      }
       if (elementIdsToClone.size > 0 || relationshipIdsToClone.size > 0) {
         for (const source of bundle.elements) {
           if (!elementIdsToClone.has(source.id)) continue;
@@ -367,7 +446,12 @@ export function pasteTransferBundle(
           const folderId = crossModel || !draft.folders[source.folderId]
             ? folderForElementType(draft, source.type)
             : source.folderId;
-          draft.elements[id] = { ...deepClone(source), id, folderId };
+          draft.elements[id] = {
+            ...deepClone(source),
+            id,
+            folderId,
+            profileIds: source.profileIds.map((profileId) => profileIdMap.get(profileId) ?? profileId),
+          };
           draft.folders[folderId].itemIds.push(id);
         }
         for (const source of bundle.relationships) {
@@ -385,6 +469,7 @@ export function pasteTransferBundle(
             folderId,
             sourceId,
             targetId,
+            profileIds: source.profileIds.map((profileId) => profileIdMap.get(profileId) ?? profileId),
           };
           draft.folders[folderId].itemIds.push(id);
         }
@@ -430,6 +515,9 @@ export function pasteTransferBundle(
           childIds: [],
           sourceConnectionIds: [],
           targetConnectionIds: [],
+          imagePath: source.imagePath
+            ? assetPathMap.get(source.imagePath) ?? source.imagePath
+            : undefined,
           ...(source.nodeType === 'element'
             ? { elementId: elementId! }
             : {}),

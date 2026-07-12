@@ -8,7 +8,7 @@ import {
  * Take the file stashed by the service worker's share-target route.
  * Returns null when nothing was shared; the inbox entry is deleted on read.
  */
-export async function takeSharedFile(): Promise<{ name: string; text: string } | null> {
+export async function takeSharedFile(): Promise<{ name: string; bytes: Uint8Array } | null> {
   if (!('caches' in globalThis)) return null;
   const cache = await caches.open(SHARE_INBOX_CACHE);
   const response = await cache.match(SHARE_INBOX_KEY);
@@ -16,7 +16,7 @@ export async function takeSharedFile(): Promise<{ name: string; text: string } |
   const name = decodeURIComponent(
     response.headers.get(SHARE_FILE_NAME_HEADER) ?? 'shared.archimate',
   );
-  const text = await response.text();
+  const bytes = new Uint8Array(await response.arrayBuffer());
   await cache.delete(SHARE_INBOX_KEY);
-  return { name, text };
+  return { name, bytes };
 }

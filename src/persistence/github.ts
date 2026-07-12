@@ -1,11 +1,12 @@
 import { defaultKeyValueStore, type AsyncKeyValueStore } from './keyval';
+import { isArchimateZip } from '../model/io/archimate-xml';
 
 export const GITHUB_TOKEN_KEY = 'archi-online.github.token';
 
 export interface SaveGistRequest {
   token: string;
   gistId?: string;
-  xml: string;
+  documentBytes: Uint8Array;
   fileName: string;
   public: boolean;
 }
@@ -68,7 +69,11 @@ export async function saveModelGist(
       description: 'Archi Online shared model',
       ...(request.gistId ? {} : { public: request.public }),
       files: {
-        [request.fileName || 'model.archimate']: { content: request.xml },
+        [request.fileName || 'model.archimate']: {
+          content: isArchimateZip(request.documentBytes)
+            ? bytesToBase64(request.documentBytes)
+            : new TextDecoder().decode(request.documentBytes),
+        },
       },
     }),
   });
@@ -85,7 +90,19 @@ export async function fetchGistArchimateXml(
   const gist = (await res.json()) as GitHubGistResponse;
   const file = Object.entries(gist.files ?? {}).find(([name]) => name.endsWith('.archimate'))?.[1];
   if (!file?.raw_url) throw new GitHubPersistenceError('The gist does not contain a .archimate file.');
-  return fetchRawArchimateXml(file.raw_url, fetchImpl);
+  return new TextDecoder().decode(await fetchRawArchimateBytes(file.raw_url, fetchImpl));
+}
+
+export async function fetchGistArchimateBytes(
+  gistId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Uint8Array> {
+  const res = await fetchImpl(`https://api.github.com/gists/${encodeURIComponent(gistId)}`);
+  if (!res.ok) throw await githubError(res, 'Could not load gist');
+  const gist = (await res.json()) as GitHubGistResponse;
+  const file = Object.entries(gist.files ?? {}).find(([name]) => name.endsWith('.archimate'))?.[1];
+  if (!file?.raw_url) throw new GitHubPersistenceError('The gist does not contain a .archimate file.');
+  return fetchRawArchimateBytes(file.raw_url, fetchImpl);
 }
 
 export async function fetchRawArchimateXml(
@@ -104,9 +121,53 @@ export async function fetchRawArchimateXml(
   if (!['raw.githubusercontent.com', 'gist.githubusercontent.com'].includes(parsed.hostname)) {
     throw new GitHubPersistenceError('Shared raw model URLs must point to GitHub raw content.');
   }
+  return new TextDecoder().decode(await fetchRawArchimateBytes(parsed.href, fetchImpl));
+}
+
+export async function fetchRawArchimateBytes(
+  url: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Uint8Array> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch (cause) {
+    throw new GitHubPersistenceError('Shared raw model URL is not valid.', { cause });
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new GitHubPersistenceError('Shared raw model URLs must use HTTPS.');
+  }
+  if (!['raw.githubusercontent.com', 'gist.githubusercontent.com'].includes(parsed.hostname)) {
+    throw new GitHubPersistenceError('Shared raw model URLs must point to GitHub raw content.');
+  }
   const res = await fetchImpl(parsed.href);
   if (!res.ok) throw await githubError(res, 'Could not load shared model');
-  return res.text();
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (isArchimateZip(bytes) || new TextDecoder().decode(bytes.subarray(0, 64)).trimStart().startsWith('<')) {
+    return bytes;
+  }
+  try {
+    return base64ToBytes(new TextDecoder().decode(bytes).trim());
+  } catch (cause) {
+    throw new GitHubPersistenceError('Shared model content is neither XML nor a base64 Archi archive.', {
+      cause,
+    });
+  }
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 function savedGistFromResponse(gist: GitHubGistResponse): SavedGist {

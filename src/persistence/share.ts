@@ -1,9 +1,9 @@
 import { deflateSync, inflateSync } from 'fflate';
-import { parseArchimate, serializeArchimate } from '../model/io/archimate-xml';
+import { parseArchimateDocument, serializeArchimateDocument } from '../model/io/archimate-xml';
 import type { ModelState } from '../model/types';
 import {
-  fetchGistArchimateXml,
-  fetchRawArchimateXml,
+  fetchGistArchimateBytes,
+  fetchRawArchimateBytes,
   saveModelGist,
   type SaveGistRequest,
 } from './github';
@@ -27,12 +27,12 @@ export type ShareFragment =
   | { kind: 'none' };
 
 export interface DecodedInlineModel {
-  xml: string;
+  documentBytes: Uint8Array;
   model: ModelState;
 }
 
 export interface LoadedSharedModel {
-  xml: string;
+  documentBytes: Uint8Array;
   model: ModelState;
   fileName: string;
   sourceLabel: string;
@@ -46,13 +46,13 @@ export class ShareLinkError extends Error {
   }
 }
 
-export function encodeModelToInlineShare(
+export async function encodeModelToInlineShare(
   model: ModelState,
   baseHref = viewerBaseHref(),
   initialViewId?: string,
-): InlineShare {
-  const xml = serializeArchimate(model);
-  const payload = bytesToBase64Url(deflateSync(new TextEncoder().encode(xml)));
+): Promise<InlineShare> {
+  const documentBytes = await serializeArchimateDocument(model);
+  const payload = bytesToBase64Url(deflateSync(documentBytes));
   const href = `${baseHref}?mode=viewer#${shareFragment({ m: payload, view: initialViewId })}`;
   return {
     kind: 'inline',
@@ -63,11 +63,11 @@ export function encodeModelToInlineShare(
   };
 }
 
-export function decodeInlineSharePayload(payload: string): DecodedInlineModel {
+export async function decodeInlineSharePayload(payload: string): Promise<DecodedInlineModel> {
   try {
     const bytes = base64UrlToBytes(payload);
-    const xml = new TextDecoder().decode(inflateSync(bytes));
-    return { xml, model: parseArchimate(xml) };
+    const documentBytes = inflateSync(bytes);
+    return { documentBytes, model: await parseArchimateDocument(documentBytes) };
   } catch (cause) {
     throw new ShareLinkError('Could not decode shared model. The link may be incomplete or corrupted.', {
       cause,
@@ -94,7 +94,7 @@ export async function loadSharedModelFromLocation(
 ): Promise<LoadedSharedModel> {
   const source = parseShareFragment(location.hash);
   if (source.kind === 'inline') {
-    const decoded = decodeInlineSharePayload(source.payload);
+    const decoded = await decodeInlineSharePayload(source.payload);
     return {
       ...decoded,
       fileName: `${safeFileName(decoded.model.info.name)}.archimate`,
@@ -103,10 +103,10 @@ export async function loadSharedModelFromLocation(
     };
   }
   if (source.kind === 'gist') {
-    const xml = await fetchGistArchimateXml(source.gistId, fetchImpl);
-    const model = parseArchimate(xml);
+    const documentBytes = await fetchGistArchimateBytes(source.gistId, fetchImpl);
+    const model = await parseArchimateDocument(documentBytes);
     return {
-      xml,
+      documentBytes,
       model,
       fileName: `gist-${source.gistId}.archimate`,
       sourceLabel: `gist ${source.gistId}`,
@@ -114,10 +114,10 @@ export async function loadSharedModelFromLocation(
     };
   }
   if (source.kind === 'raw') {
-    const xml = await fetchRawArchimateXml(source.url, fetchImpl);
-    const model = parseArchimate(xml);
+    const documentBytes = await fetchRawArchimateBytes(source.url, fetchImpl);
+    const model = await parseArchimateDocument(documentBytes);
     return {
-      xml,
+      documentBytes,
       model,
       fileName: source.url.split('/').pop() || 'shared.archimate',
       sourceLabel: source.url,

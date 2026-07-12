@@ -69,7 +69,9 @@ describe('share target inbox', () => {
       }),
     );
 
-    expect(await takeSharedFile()).toEqual({ name: 'My Model.archimate', text: xml });
+    const shared = await takeSharedFile();
+    expect(shared?.name).toBe('My Model.archimate');
+    expect(Array.from(shared?.bytes ?? [])).toEqual(Array.from(new TextEncoder().encode(xml)));
     expect(await takeSharedFile()).toBeNull();
   });
 

@@ -1,4 +1,4 @@
-import { parseArchimate, serializeArchimate } from '../model/io/archimate-xml';
+import { parseArchimateDocument, serializeArchimateDocument } from '../model/io/archimate-xml';
 import {
   activateModelSession,
   addModelSession,
@@ -10,11 +10,11 @@ import type { ModelState } from '../model/types';
 import { defaultKeyValueStore } from './keyval';
 
 const KEY = 'archi-online.workspace';
-const VERSION = 1;
+const VERSION = 2;
 
 interface WorkspaceSessionRecord {
   sessionId: string;
-  xml: string;
+  documentBytes: Uint8Array;
   fileName: string | null;
   dirty: boolean;
   openViewIds: string[];
@@ -39,7 +39,7 @@ export interface RestoreWorkspaceResult {
 let timer: number | undefined;
 let workspaceUnsubscribe: (() => void) | undefined;
 const sessionUnsubscribes = new Map<string, () => void>();
-const xmlCache = new Map<string, { model: ModelState; xml: string }>();
+const documentCache = new Map<string, { model: ModelState; bytes: Uint8Array }>();
 let recoveryStore: ReturnType<typeof defaultKeyValueStore> | null = null;
 let recoverySessions: WorkspaceSessionRecord[] = [];
 let recoveryOrder: string[] = [];
@@ -57,7 +57,7 @@ function syncSessionSubscriptions(sessions: Record<string, ModelSession>): void 
     if (!sessions[id]) {
       unsubscribe();
       sessionUnsubscribes.delete(id);
-      xmlCache.delete(id);
+      documentCache.delete(id);
     }
   }
   for (const [id, session] of Object.entries(sessions)) {
@@ -104,17 +104,20 @@ export async function flushAutosaveNow(): Promise<void> {
   await persistWorkspace();
 }
 
-function sessionRecord(session: ModelSession, savedAt: number): WorkspaceSessionRecord | null {
+async function sessionRecord(
+  session: ModelSession,
+  savedAt: number,
+): Promise<WorkspaceSessionRecord | null> {
   const state = session.store.getState();
   if (!state.model) return null;
-  let cached = xmlCache.get(session.id);
+  let cached = documentCache.get(session.id);
   if (!cached || cached.model !== state.model) {
-    cached = { model: state.model, xml: serializeArchimate(state.model) };
-    xmlCache.set(session.id, cached);
+    cached = { model: state.model, bytes: await serializeArchimateDocument(state.model) };
+    documentCache.set(session.id, cached);
   }
   return {
     sessionId: session.id,
-    xml: cached.xml,
+    documentBytes: cached.bytes,
     fileName: state.fileName,
     dirty: state.dirty,
     openViewIds: state.openViewIds,
@@ -134,11 +137,12 @@ async function persistWorkspace(): Promise<void> {
       return;
     }
     const savedAt = Date.now();
-    const liveSessions = state.order
-      .map((id) => state.sessions[id])
-      .filter((session): session is ModelSession => session !== undefined)
-      .map((session) => sessionRecord(session, savedAt))
-      .filter((record): record is WorkspaceSessionRecord => record !== null);
+    const liveSessions = (await Promise.all(
+      state.order
+        .map((id) => state.sessions[id])
+        .filter((session): session is ModelSession => session !== undefined)
+        .map((session) => sessionRecord(session, savedAt)),
+    )).filter((record): record is WorkspaceSessionRecord => record !== null);
     const sessionsById = new Map<string, WorkspaceSessionRecord>();
     preserved.forEach((session) => sessionsById.set(session.sessionId, session));
     liveSessions.forEach((session) => sessionsById.set(session.sessionId, session));
@@ -189,7 +193,7 @@ export async function restoreWorkspace(): Promise<RestoreWorkspaceResult> {
   const failedSessions: WorkspaceSessionRecord[] = [];
   for (const saved of record.sessions) {
     try {
-      const model = parseArchimate(saved.xml);
+      const model = await parseArchimateDocument(saved.documentBytes);
       const openViewIds = saved.openViewIds.filter((id) => model.views[id]);
       addModelSession({
         id: saved.sessionId,

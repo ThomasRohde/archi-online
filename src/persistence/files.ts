@@ -1,5 +1,9 @@
 import { emitModelSaved } from '../extensions/events';
-import { parseArchimate, serializeArchimate } from '../model/io/archimate-xml';
+import {
+  parseArchimate,
+  parseArchimateDocument,
+  serializeArchimateDocument,
+} from '../model/io/archimate-xml';
 import { isExchangeXml, parseExchange } from '../model/io/exchange-xml';
 import {
   activateModelSession,
@@ -63,7 +67,7 @@ export async function openModelFromDisk(): Promise<ModelSessionId[]> {
           const errors: unknown[] = [];
           for (const file of [...(input.files ?? [])]) {
             try {
-              opened.push(loadModelText(await file.text(), file.name).sessionId);
+              opened.push((await loadModelBytes(new Uint8Array(await file.arrayBuffer()), file.name)).sessionId);
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
               errors.push(new Error(`${file.name}: ${message}`, { cause: error }));
@@ -95,7 +99,10 @@ export async function openModelFromHandle(handle: FileSystemFileHandle): Promise
     }
   }
   const file = await handle.getFile();
-  const { format, sessionId } = loadModelText(await file.text(), file.name);
+  const { format, sessionId } = await loadModelBytes(
+    new Uint8Array(await file.arrayBuffer()),
+    file.name,
+  );
   // Open Exchange imports become a new unsaved model — never keep the .xml
   // handle, or Ctrl+S would overwrite it with .archimate content.
   if (format === 'archimate') {
@@ -119,12 +126,27 @@ export function loadModelText(
   return { format: 'archimate', sessionId };
 }
 
+export async function loadModelBytes(
+  bytes: Uint8Array,
+  fileName: string,
+): Promise<{ format: 'archimate' | 'exchange'; sessionId: ModelSessionId }> {
+  const text = bytes[0] === 0x50 && bytes[1] === 0x4b ? '' : new TextDecoder().decode(bytes);
+  if (text && isExchangeXml(text)) {
+    const model = parseExchange(text);
+    const sessionId = addModelSession({ model, fileName: null, dirty: true });
+    return { format: 'exchange', sessionId };
+  }
+  const model = await parseArchimateDocument(bytes);
+  const sessionId = addModelSession({ model, fileName, dirty: false });
+  return { format: 'archimate', sessionId };
+}
+
 export async function saveModelToDisk(sessionId: ModelSessionId, saveAs = false): Promise<void> {
   const session = getModelSession(sessionId);
   if (!session) return;
   const s = session.store.getState();
   if (!s.model) return;
-  const xml = serializeArchimate(s.model);
+  const document = await serializeArchimateDocument(s.model);
   const suggested = s.fileName ?? sanitizeFileName(s.model.info.name) + '.archimate';
 
   if (session.fileHandle || supportsSaveFsAccess()) {
@@ -139,7 +161,7 @@ export async function saveModelToDisk(sessionId: ModelSessionId, saveAs = false)
         if (isUserCancelledFileDialog(error)) return;
         if (shouldDownloadAfterSaveError(error)) {
           setModelSessionFileHandle(sessionId, null);
-          downloadModel(sessionId, xml, suggested);
+          downloadModel(sessionId, document, suggested);
           return;
         }
         throw error;
@@ -148,20 +170,20 @@ export async function saveModelToDisk(sessionId: ModelSessionId, saveAs = false)
     }
     try {
       const writable = await handle.createWritable();
-      await writable.write(xml);
+      await writable.write(document.slice().buffer as ArrayBuffer);
       await writable.close();
       session.store.setState({ dirty: false, fileName: handle.name });
       emitModelSaved(sessionId);
     } catch (error) {
       if (shouldDownloadAfterSaveError(error)) {
         setModelSessionFileHandle(sessionId, null);
-        downloadModel(sessionId, xml, suggested);
+        downloadModel(sessionId, document, suggested);
         return;
       }
       throw error;
     }
   } else {
-    downloadModel(sessionId, xml, suggested);
+    downloadModel(sessionId, document, suggested);
   }
 }
 
@@ -238,8 +260,10 @@ function downloadBlob(blob: Blob, fileName: string): void {
   URL.revokeObjectURL(url);
 }
 
-function downloadModel(sessionId: ModelSessionId, xml: string, fileName: string): void {
-  const blob = new Blob([xml], { type: 'application/xml' });
+function downloadModel(sessionId: ModelSessionId, documentBytes: Uint8Array, fileName: string): void {
+  const blob = new Blob([documentBytes.slice().buffer as ArrayBuffer], {
+    type: 'application/octet-stream',
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

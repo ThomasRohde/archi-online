@@ -6,7 +6,11 @@ import {
   createElementOnView,
   createEmptyModel,
   createRelationshipOnView,
+  createProfile,
   deleteItems,
+  importModelAsset,
+  setConceptProfiles,
+  setNodeStyle,
 } from '../src/model/ops';
 import { activateModelSession, addModelSession, getModelSession, resetWorkspaceForTests } from '../src/model/workspace';
 import { undo } from '../src/model/store';
@@ -52,6 +56,39 @@ function buildSourceModel() {
 }
 
 describe('cross-model transfer', () => {
+  it('copies and deduplicates specialization and image assets across models', async () => {
+    const source = buildSourceModel();
+    const sourceSession = getModelSession(source.sessionId)!;
+    const path = await importModelAsset(
+      new Uint8Array([1, 2, 3, 4]),
+      'actor.png',
+      'image/png',
+      sourceSession.store,
+    );
+    const profile = createProfile(
+      { name: 'External party', conceptType: 'BusinessActor', imagePath: path },
+      sourceSession.store,
+    );
+    setConceptProfiles(source.actor.elementId, [profile], sourceSession.store);
+    setNodeStyle([source.actor.nodeId], { imageSource: 0, imagePosition: 2 }, sourceSession.store);
+
+    const bundle = createTreeTransferBundle(
+      source.sessionId,
+      sourceSession.store.getState().model!,
+      [source.viewId],
+    );
+    const targetId = addModelSession({ model: createEmptyModel('Target'), fileName: null });
+    const target = getModelSession(targetId)!;
+    pasteTransferBundle(bundle, target.store, { targetSessionId: targetId });
+
+    const pasted = target.store.getState().model!;
+    const pastedActor = Object.values(pasted.elements).find((element) => element.name === 'Customer')!;
+    const pastedProfile = pasted.profiles[pastedActor.profileIds[0]];
+    expect(pastedProfile).toMatchObject({ name: 'External party', conceptType: 'BusinessActor' });
+    expect(Array.from(pasted.assets[pastedProfile.imagePath!].bytes)).toEqual([1, 2, 3, 4]);
+    expect(ArrayBuffer.isView(pasted.assets[pastedProfile.imagePath!].bytes)).toBe(true);
+  });
+
   it('copies a whole view with fresh concept, relationship, node, and connection ids in one undo step', () => {
     const source = buildSourceModel();
     const sourceModel = getModelSession(source.sessionId)!.store.getState().model!;

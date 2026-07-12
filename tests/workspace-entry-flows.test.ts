@@ -12,7 +12,9 @@ describe('workspace entry flows', () => {
   it('loads an example as another model session', async () => {
     const existingId = addModelSession({ model: createEmptyModel('Existing'), fileName: null });
     const xml = readFileSync(join(__dirname, 'fixtures', 'Archisurance.archimate'), 'utf8');
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ text: async () => xml } as Response);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      arrayBuffer: async () => new TextEncoder().encode(xml).buffer,
+    } as Response);
 
     const exampleId = await loadExampleModel('Archisurance.archimate');
 

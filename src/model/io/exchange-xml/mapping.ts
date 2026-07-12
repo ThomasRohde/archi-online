@@ -183,6 +183,8 @@ export function defaultNodeFill(node: DiagramNode, element: ArchimateElement | u
       return '#d2d7dd';
     case 'ref':
       return '#dcebeb';
+    case 'image':
+      return '#ffffff';
     case 'element':
       if (element?.type === 'Junction') return '#000000';
       return element ? ELEMENT_TYPE_MAP[element.type].fill : '#ffffff';

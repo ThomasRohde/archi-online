@@ -3,16 +3,30 @@ import { ConnectionView } from '../ConnectionView';
 import { connectionPolyline } from '../geometry';
 import { NodeFigure } from '../figures/NodeFigure';
 import { computeAbsBounds } from '../view-editor/bounds';
+import { assetDataUrl } from '../../model/assets';
 
 function StaticNode({ model, nodeId }: { model: ModelState; nodeId: string }) {
   const node = model.nodes[nodeId];
   if (!node) return null;
   const element = node.nodeType === 'element' ? model.elements[node.elementId] : undefined;
   const refView = node.nodeType === 'ref' ? model.views[node.refViewId] : undefined;
+  const imagePath = node.nodeType === 'element' && (node.imageSource ?? 0) === 0
+    ? model.profiles[element?.profileIds[0] ?? '']?.imagePath
+    : node.imagePath;
+  const imageUrl = imagePath && model.assets[imagePath]
+    ? assetDataUrl(model.assets[imagePath])
+    : undefined;
   const { x, y, width, height } = node.bounds;
   return (
     <g transform={`translate(${x},${y})`}>
-      <NodeFigure node={node} element={element} refView={refView} width={width} height={height} />
+      <NodeFigure
+        node={node}
+        element={element}
+        refView={refView}
+        width={width}
+        height={height}
+        imageUrl={imageUrl}
+      />
       {node.childIds.map((cid) => (
         <StaticNode key={cid} model={model} nodeId={cid} />
       ))}

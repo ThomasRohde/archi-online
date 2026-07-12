@@ -24,7 +24,8 @@ export type Tool =
   | { kind: 'create-relationship'; type: RelationshipType }
   | { kind: 'magic-connector' }
   | { kind: 'create-note' }
-  | { kind: 'create-group' };
+  | { kind: 'create-group' }
+  | { kind: 'create-image'; imagePath: string };
 
 export interface SelectionState {
   source: 'tree' | 'view';

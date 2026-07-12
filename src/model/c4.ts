@@ -415,5 +415,6 @@ function connectionEndpointName(model: ModelState, nodeId: string): string {
   if (node.nodeType === 'element') return model.elements[node.elementId]?.name ?? 'Unknown';
   if (node.nodeType === 'group') return node.name;
   if (node.nodeType === 'note') return node.content.split(/\r?\n/)[0] || 'Note';
+  if (node.nodeType === 'image') return 'Image';
   return model.views[node.refViewId]?.name ?? 'View';
 }

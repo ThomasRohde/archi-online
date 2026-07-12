@@ -25,12 +25,13 @@ import { useModelStoreApi, useStore } from './store-hooks';
 import type { ModelState, Property } from '../model/types';
 import { AppearanceTab } from './properties/AppearanceTab';
 import { AnalysisTab } from './properties/AnalysisTab';
+import { ImageTab } from './properties/ImageTab';
 import { conceptName, resolveTarget, type Target } from './properties/target';
 
 // Well-known viewpoints for the picker, sorted by their friendly display name.
 const VIEWPOINTS_BY_NAME = [...VIEWPOINTS].sort((a, b) => a.name.localeCompare(b.name));
 
-type Tab = 'main' | 'properties' | 'analysis' | 'appearance';
+type Tab = 'main' | 'properties' | 'analysis' | 'appearance' | 'image';
 
 /** Text input that keeps local state and commits on blur/Enter. */
 function CommitInput({
@@ -294,6 +295,7 @@ export function PropertiesPanel() {
       target.conceptId &&
       (model.elements[target.conceptId] || model.relationships[target.conceptId]),
   );
+  const supportsImage = Boolean(target?.count === 1 && target.node);
   useEffect(() => {
     if ((readOnly && tab === 'appearance') || (tab === 'analysis' && !supportsAnalysis)) {
       setTab('main');
@@ -313,6 +315,7 @@ export function PropertiesPanel() {
             'properties',
             ...(supportsAnalysis ? ['analysis'] : []),
             ...(readOnly ? [] : ['appearance']),
+            ...(supportsImage ? ['image'] : []),
           ] as Tab[]).map((t) => (
             <button
               key={t}
@@ -324,8 +327,10 @@ export function PropertiesPanel() {
                 : t === 'properties'
                   ? 'Properties'
                   : t === 'analysis'
-                    ? 'Analysis'
-                    : 'Appearance'}
+                  ? 'Analysis'
+                    : t === 'appearance'
+                      ? 'Appearance'
+                      : 'Image'}
             </button>
           ))}
         </div>
@@ -494,6 +499,7 @@ export function PropertiesPanel() {
             <AnalysisTab model={model} conceptId={target.conceptId} />
           )}
           {tab === 'appearance' && !readOnly && <AppearanceTab target={target} readOnly={readOnly} />}
+          {tab === 'image' && supportsImage && <ImageTab target={target} readOnly={readOnly} />}
         </div>
       </div>
     </div>

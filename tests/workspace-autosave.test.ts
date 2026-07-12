@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { addView, createEmptyModel } from '../src/model/ops';
-import { serializeArchimate } from '../src/model/io/archimate-xml';
+import { serializeArchimate, serializeArchimateDocument } from '../src/model/io/archimate-xml';
 import { openView } from '../src/model/store';
 import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
@@ -65,10 +65,59 @@ describe('workspace autosave', () => {
     expect(getModelSession(secondId)?.store.getState().model?.info.name).toBe('Second');
   });
 
-  it('retains corrupt session XML through restore and the next complete persist', async () => {
+  it('restores image-bearing version 2 document bytes', async () => {
+    const model = createEmptyModel('Asset model');
+    const path = 'images/_abcdefghijklmnopqrstuv.png';
+    const bytes = new Uint8Array([9, 8, 7]);
+    model.assets[path] = {
+      path,
+      mediaType: 'image/png',
+      bytes,
+      renderMediaType: 'image/png',
+      renderBytes: bytes,
+      sha256: 'hash',
+    };
+    model.profiles.profile = {
+      id: 'profile',
+      name: 'Asset profile',
+      conceptType: 'BusinessActor',
+      specialization: true,
+      imagePath: path,
+    };
+    const sessionId = addModelSession({ model, fileName: 'asset.archimate' });
+    await flushAutosaveNow();
+    resetWorkspaceForTests();
+
+    expect(await restoreWorkspace()).toEqual({ restored: 1, failed: 0 });
+    expect(Array.from(getModelSession(sessionId)!.store.getState().model!.assets[path].bytes))
+      .toEqual([9, 8, 7]);
+  });
+
+  it('does not read or migrate greenfield version 1 records', async () => {
+    await keyValueStore.set('archi-online.workspace', {
+      version: 1,
+      order: ['legacy'],
+      activeSessionId: 'legacy',
+      activationOrder: ['legacy'],
+      sessions: [{
+        sessionId: 'legacy',
+        xml: serializeArchimate(createEmptyModel('Legacy')),
+        fileName: 'legacy.archimate',
+        dirty: false,
+        openViewIds: [],
+        activeViewId: null,
+        savedAt: 1,
+      }],
+    });
+
+    expect(await restoreWorkspace()).toEqual({ restored: 0, failed: 0 });
+    expect(useWorkspaceStore.getState().order).toEqual([]);
+  });
+
+  it('retains corrupt version 2 document bytes through restore and the next persist', async () => {
     const corruptSession = {
       sessionId: 'corrupt-session',
-      xml: '<archimate:model broken',
+      documentBytes: new TextEncoder().encode('<archimate:model broken'),
       fileName: 'corrupt.archimate',
       dirty: true,
       openViewIds: ['missing-view'],
@@ -78,7 +127,7 @@ describe('workspace autosave', () => {
     const validModel = createEmptyModel('Recovered model');
     const validSession = {
       sessionId: 'valid-session',
-      xml: serializeArchimate(validModel),
+      documentBytes: await serializeArchimateDocument(validModel),
       fileName: 'valid.archimate',
       dirty: false,
       openViewIds: [],
@@ -86,7 +135,7 @@ describe('workspace autosave', () => {
       savedAt: 456,
     };
     await keyValueStore.set('archi-online.workspace', {
-      version: 1,
+      version: 2,
       order: [corruptSession.sessionId, validSession.sessionId],
       activeSessionId: validSession.sessionId,
       activationOrder: [corruptSession.sessionId, validSession.sessionId],

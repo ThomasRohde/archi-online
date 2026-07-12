@@ -31,6 +31,7 @@ const DEFAULT_SIZES: Record<string, { width: number; height: number }> = {
   Group: { width: 400, height: 140 },
   Note: { width: 185, height: 80 },
   DiagramModelReference: { width: 200, height: 140 },
+  DiagramModelImage: { width: 120, height: 80 },
 };
 
 interface PendingConnection {
@@ -55,6 +56,7 @@ export function parseArchimate(xml: string): ModelState {
       version: root.getAttribute('version') ?? undefined,
     },
     profiles: {},
+    assets: {},
     folders: {},
     rootFolderIds: [],
     elements: {},
@@ -105,10 +107,17 @@ export function parseArchimate(xml: string): ModelState {
       const refViewId = el.getAttribute('model');
       if (!refViewId) return null;
       node = { ...base, nodeType: 'ref', refViewId };
+    } else if (t === 'DiagramModelImage') {
+      const imagePath = el.getAttribute('imagePath');
+      if (!imagePath) return null;
+      node = { ...base, nodeType: 'image', imagePath };
     } else {
       return null; // unsupported child (e.g. sketch/canvas types)
     }
     parseNodeStyle(el, node);
+    node.imagePath = strAttr(el, 'imagePath') ?? node.imagePath;
+    node.imageSource = intAttr(el, 'imageSource') as 0 | 1 | undefined;
+    node.imagePosition = intAttr(el, 'imagePosition');
     const tc = el.getAttribute('targetConnections');
     if (tc) targetOrder.set(id, tc.split(/\s+/).filter(Boolean));
     state.nodes[id] = node;

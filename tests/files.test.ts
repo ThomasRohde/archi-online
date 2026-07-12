@@ -3,7 +3,7 @@ import { createEmptyModel } from '../src/model/ops';
 import { getModelSession, addModelSession, resetWorkspaceForTests } from '../src/model/workspace';
 import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
-  loadModelText,
+  loadModelBytes,
   openModelFromDisk,
   openModelFromHandle,
   saveModelToDisk,
@@ -114,7 +114,7 @@ describe('file persistence', () => {
     expect(getModelSession(sessionId)?.store.getState().fileName).toBeNull();
   });
 
-  it('does not disturb existing session handles when opening invalid XML fails', () => {
+  it('does not disturb existing session handles when opening invalid XML fails', async () => {
     const handle = { name: 'existing.archimate' } as FileSystemFileHandle;
     const sessionId = addModelSession({
       model: createEmptyModel('Existing'),
@@ -122,17 +122,18 @@ describe('file persistence', () => {
       fileHandle: handle,
     });
 
-    expect(() => loadModelText('<archimate:model', 'broken.archimate')).toThrow();
+    await expect(loadModelBytes(new TextEncoder().encode('<archimate:model'), 'broken.archimate'))
+      .rejects.toThrow();
 
     expect(getModelSession(sessionId)?.fileHandle).toBe(handle);
   });
 
   it('saves only the requested session through its own handle', async () => {
-    const writes: string[] = [];
+    const writes: ArrayBuffer[] = [];
     const firstHandle = {
       name: 'first.archimate',
       createWritable: async () => ({
-        write: async (xml: string) => writes.push(xml),
+        write: async (document: ArrayBuffer) => writes.push(document),
         close: async () => {},
       }),
     } as unknown as FileSystemFileHandle;
@@ -147,7 +148,7 @@ describe('file persistence', () => {
     await saveModelToDisk(firstId);
 
     expect(writes).toHaveLength(1);
-    expect(writes[0]).toContain('First');
+    expect(new TextDecoder().decode(writes[0])).toContain('First');
     expect(getModelSession(firstId)?.store.getState().dirty).toBe(false);
     expect(getModelSession(secondId)?.store.getState().dirty).toBe(true);
   });
@@ -181,8 +182,14 @@ describe('file persistence', () => {
       Object.defineProperty(this, 'files', {
         configurable: true,
         value: [
-          { name: 'valid.archimate', text: async () => validXml },
-          { name: 'broken.archimate', text: async () => '<archimate:model broken' },
+          {
+            name: 'valid.archimate',
+            arrayBuffer: async () => new TextEncoder().encode(validXml).buffer,
+          },
+          {
+            name: 'broken.archimate',
+            arrayBuffer: async () => new TextEncoder().encode('<archimate:model broken').buffer,
+          },
         ],
       });
       this.dispatchEvent(new Event('change'));

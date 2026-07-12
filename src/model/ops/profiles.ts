@@ -2,6 +2,7 @@ import { newId } from '../id';
 import { isElementType, isRelationshipType } from '../metamodel';
 import { transact, type ModelStore } from '../store';
 import type { Concept, ConceptType, ModelState, ProfileDefinition } from '../types';
+import { pruneUnreferencedAssets } from '../assets';
 
 export interface CreateProfileInput {
   name: string;
@@ -106,6 +107,7 @@ export function updateProfile(
     profile.conceptType = conceptType;
     if (patch.specialization !== undefined) profile.specialization = patch.specialization;
     if ('imagePath' in patch) profile.imagePath = patch.imagePath;
+    pruneUnreferencedAssets(draft);
   }, store);
 }
 
@@ -138,6 +140,7 @@ export function deleteProfile(profileId: string, store?: ModelStore): void {
       concept.profileIds = concept.profileIds.filter((id) => id !== profileId);
     }
     delete draft.profiles[profileId];
+    pruneUnreferencedAssets(draft);
   }, store);
 }
 
@@ -177,5 +180,6 @@ export function replaceProfiles(profiles: ProfileDefinition[], store?: ModelStor
       concept.profileIds = concept.profileIds.filter((id) => retained.has(id));
     }
     draft.profiles = next;
+    pruneUnreferencedAssets(draft);
   }, store);
 }

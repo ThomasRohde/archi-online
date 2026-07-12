@@ -278,6 +278,11 @@ function nodeTag(
     if (node.content !== '') children.push(textTag(inner, 'label', node.content));
     children.push(...propertiesTags(inner, node.properties, propertyDefs));
     children.push(styleTag(state, node, inner));
+  } else if (node.nodeType === 'image') {
+    // The Open Exchange schema has no embedded-image node. Keep its bounds as
+    // an unlabeled diagram label so the rest of the view remains valid.
+    attrs = [['identifier', exchangeId(node.id)], ['xsi:type', 'Label'], ...boundsAttrs];
+    children.push(styleTag(state, node, inner));
   } else {
     // View reference exports as a Label with a viewRef child (per Archi).
     attrs = [['identifier', exchangeId(node.id)], ['xsi:type', 'Label'], ...boundsAttrs];

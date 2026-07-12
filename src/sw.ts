@@ -49,7 +49,7 @@ registerRoute(
           SHARE_INBOX_KEY,
           new Response(file, {
             headers: {
-              'Content-Type': 'application/xml',
+              'Content-Type': file.type || 'application/octet-stream',
               [SHARE_FILE_NAME_HEADER]: encodeURIComponent(file.name || 'shared.archimate'),
             },
           }),

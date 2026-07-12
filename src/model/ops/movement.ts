@@ -1,5 +1,6 @@
 import { transact, type ModelStore } from '../store';
 import type { Bounds } from '../types';
+import { pruneUnreferencedAssets } from '../assets';
 import { deleteConnectionFromDraft, deleteNodeFromDraft } from './draft';
 
 export interface MoveEntry {
@@ -117,5 +118,6 @@ export function deleteViewObjects(ids: string[], store?: ModelStore): void {
       if (draft.connections[id]) deleteConnectionFromDraft(draft, id);
       else if (draft.nodes[id]) deleteNodeFromDraft(draft, id);
     }
+    pruneUnreferencedAssets(draft);
   }, store);
 }

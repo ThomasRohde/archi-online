@@ -50,19 +50,44 @@ beforeEach(() => {
 });
 
 describe('share link encoding', () => {
-  it('round-trips a model through an inline fragment payload', () => {
-    const model = parseArchimate(archisuranceXml);
-    const share = encodeModelToInlineShare(model, 'https://example.test/archi/');
-    const decoded = decodeInlineSharePayload(share.payload);
+  it('round-trips image-bearing archive bytes through an inline share', async () => {
+    const model = createEmptyModel('Shared images');
+    const path = 'images/_abcdefghijklmnopqrstuv.png';
+    const bytes = new Uint8Array([1, 2, 3]);
+    model.assets[path] = {
+      path,
+      mediaType: 'image/png',
+      bytes,
+      renderMediaType: 'image/png',
+      renderBytes: bytes,
+      sha256: 'hash',
+    };
+    model.profiles.profile = {
+      id: 'profile',
+      name: 'Image profile',
+      conceptType: 'BusinessActor',
+      specialization: true,
+      imagePath: path,
+    };
 
-    expect(parseArchimate(decoded.xml)).toEqual(parseArchimate(serializeArchimate(model)));
+    const share = await encodeModelToInlineShare(model, 'https://example.test/archi/');
+    const decoded = await decodeInlineSharePayload(share.payload);
+    expect(Array.from(decoded.model.assets[path].bytes)).toEqual([1, 2, 3]);
+  });
+
+  it('round-trips a model through an inline fragment payload', async () => {
+    const model = parseArchimate(archisuranceXml);
+    const share = await encodeModelToInlineShare(model, 'https://example.test/archi/');
+    const decoded = await decodeInlineSharePayload(share.payload);
+
+    expect(decoded.model).toEqual(parseArchimate(serializeArchimate(model)));
     expect(share.href).toBe(`https://example.test/archi/?mode=viewer#m=${share.payload}`);
     expect(share.encodedLength).toBe(share.payload.length);
   });
 
-  it('reports whether an inline payload exceeds the threshold', () => {
+  it('reports whether an inline payload exceeds the threshold', async () => {
     const model = parseArchimate(archisuranceXml);
-    const share = encodeModelToInlineShare(model, 'https://example.test/archi/');
+    const share = await encodeModelToInlineShare(model, 'https://example.test/archi/');
 
     expect(INLINE_SHARE_THRESHOLD).toBe(8 * 1024);
     expect(typeof share.exceedsThreshold).toBe('boolean');
@@ -78,15 +103,15 @@ describe('share link encoding', () => {
     });
   });
 
-  it('rejects malformed inline payloads with a share-specific error', () => {
-    expect(() => decodeInlineSharePayload('not-valid-base64url!')).toThrow(
+  it('rejects malformed inline payloads with a share-specific error', async () => {
+    await expect(decodeInlineSharePayload('not-valid-base64url!')).rejects.toThrow(
       /Could not decode shared model/,
     );
   });
 
   it('loads a shared model from an inline location', async () => {
     const model = parseArchimate(archisuranceXml);
-    const share = encodeModelToInlineShare(model, 'https://example.test/archi/');
+    const share = await encodeModelToInlineShare(model, 'https://example.test/archi/');
 
     const loaded = await loadSharedModelFromLocation({ hash: `#m=${share.payload}` });
 

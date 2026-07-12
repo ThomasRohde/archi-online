@@ -6,6 +6,7 @@ import type {
   Bounds,
   ElementNode,
   GroupNode,
+  ImageNode,
   ModelState,
   NoteNode,
 } from '../types';
@@ -246,6 +247,34 @@ export function addNoteToView(
       nodeType: 'note',
       content,
       properties: [],
+      ...defaults,
+    };
+    attachNode(draft, node);
+  }, store);
+  return id;
+}
+
+export function addImageToView(
+  viewId: string,
+  parentId: string,
+  bounds: Bounds,
+  imagePath: string,
+  defaults: DiagramNodeDefaults = {},
+  store?: ModelStore,
+): string {
+  const id = newId();
+  transact('Create Image', (draft) => {
+    const node: ImageNode = {
+      id,
+      viewId,
+      parentId,
+      bounds,
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'image',
+      imagePath,
+      imagePosition: 9,
       ...defaults,
     };
     attachNode(draft, node);

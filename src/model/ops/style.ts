@@ -1,5 +1,6 @@
 import { transact, type ModelStore } from '../store';
 import type { DiagramConnection } from '../types';
+import { pruneUnreferencedAssets } from '../assets';
 
 export interface NodeStyle {
   fillColor?: string | undefined;
@@ -12,6 +13,9 @@ export interface NodeStyle {
   textPosition?: number | undefined;
   figureType?: number | undefined;
   lineWidth?: number | undefined;
+  imagePath?: string | undefined;
+  imageSource?: 0 | 1 | undefined;
+  imagePosition?: number | undefined;
 }
 
 export function setNodeStyle(ids: string[], style: NodeStyle, store?: ModelStore): void {
@@ -33,6 +37,7 @@ export function setNodeStyle(ids: string[], style: NodeStyle, store?: ModelStore
         if ('textPosition' in style) conn.textPosition = style.textPosition;
       }
     }
+    pruneUnreferencedAssets(draft);
   }, store);
 }
 

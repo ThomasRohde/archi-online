@@ -10,6 +10,15 @@ export interface ProfileDefinition {
   imagePath?: string;
 }
 
+export interface ModelAsset {
+  path: string;
+  mediaType: string;
+  bytes: Uint8Array;
+  renderMediaType: string;
+  renderBytes: Uint8Array;
+  sha256: string;
+}
+
 export interface Property {
   key: string;
   value: string;
@@ -128,6 +137,11 @@ export interface DiagramNodeBase {
   textAlignment?: number;
   /** 0=top, 1=center, 2=bottom */
   textPosition?: number;
+  imagePath?: string;
+  /** 0=specialization image, 1=custom image. */
+  imageSource?: 0 | 1;
+  /** Archi image placement: 0..8 anchors, 9=fill. */
+  imagePosition?: number;
 }
 
 export interface ElementNode extends DiagramNodeBase {
@@ -159,7 +173,12 @@ export interface RefNode extends DiagramNodeBase {
   refViewId: string;
 }
 
-export type DiagramNode = ElementNode | GroupNode | NoteNode | RefNode;
+export interface ImageNode extends DiagramNodeBase {
+  nodeType: 'image';
+  imagePath: string;
+}
+
+export type DiagramNode = ElementNode | GroupNode | NoteNode | RefNode | ImageNode;
 
 export interface DiagramConnection {
   id: string;
@@ -191,6 +210,7 @@ export interface ModelInfo {
 export interface ModelState {
   info: ModelInfo;
   profiles: Record<string, ProfileDefinition>;
+  assets: Record<string, ModelAsset>;
   folders: Record<string, Folder>;
   /** Ordered top-level folder ids. */
   rootFolderIds: string[];

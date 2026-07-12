@@ -18,7 +18,7 @@ import {
 import { ModelStoreProvider, useWorkspaceStore } from './ui/store-hooks';
 import { getActiveModelSession, addModelSession, setWorkspaceBooted } from './model/workspace';
 import { restoreWorkspace, startAutosave } from './persistence/autosave';
-import { loadModelText, openModelFromHandle } from './persistence/files';
+import { loadModelBytes, openModelFromHandle } from './persistence/files';
 import { loadSharedModelFromLocation, parseShareFragment } from './persistence/share';
 import { consumePwaAction } from './pwa/actions';
 import { signalEditorRuntimeReady } from './pwa/boot-signal';
@@ -132,7 +132,7 @@ async function handlePwaAction(): Promise<void> {
       return;
     }
     try {
-      loadModelText(shared.text, shared.name);
+      await loadModelBytes(shared.bytes, shared.name);
     } catch (error) {
       await showAlertDialog({
         title: 'Could not open shared model',

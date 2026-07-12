@@ -4,6 +4,7 @@ import type { Bounds, ModelState } from '../../model/types';
 import type { Point } from '../geometry';
 import { NodeFigure } from '../figures/NodeFigure';
 import { GHOST_OPACITY, isNodeGhosted } from './viewpoint-ghost';
+import { assetDataUrl } from '../../model/assets';
 
 export function NodeView({
   model,
@@ -35,6 +36,12 @@ export function NodeView({
   if (!node) return null;
   const element = node.nodeType === 'element' ? model.elements[node.elementId] : undefined;
   const refView = node.nodeType === 'ref' ? model.views[node.refViewId] : undefined;
+  const imagePath = node.nodeType === 'element' && (node.imageSource ?? 0) === 0
+    ? model.profiles[element?.profileIds[0] ?? '']?.imagePath
+    : node.imagePath;
+  const imageUrl = imagePath && model.assets[imagePath]
+    ? assetDataUrl(model.assets[imagePath])
+    : undefined;
   const delta = moveDelta.get(nodeId);
   const rel = resize?.nodeId === nodeId ? resize.rel : node.bounds;
   const x = rel.x + (delta?.x ?? 0);
@@ -63,6 +70,7 @@ export function NodeView({
           width={width}
           height={height}
           c4ViewType={c4ViewType}
+          imageUrl={imageUrl}
         />
       </g>
       {(selected || highlight || invalid) && (

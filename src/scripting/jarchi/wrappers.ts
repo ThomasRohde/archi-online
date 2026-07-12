@@ -659,6 +659,8 @@ export class JVisual extends JObject {
         return 'diagram-model-note';
       case 'ref':
         return 'archimate-diagram-model-reference';
+      case 'image':
+        return 'diagram-model-image';
     }
   }
 
@@ -667,6 +669,7 @@ export class JVisual extends JObject {
     if (n.nodeType === 'element') return state().elements[n.elementId]?.name ?? '';
     if (n.nodeType === 'group') return n.name;
     if (n.nodeType === 'note') return n.content;
+    if (n.nodeType === 'image') return '';
     return state().views[n.refViewId]?.name ?? '';
   }
 
