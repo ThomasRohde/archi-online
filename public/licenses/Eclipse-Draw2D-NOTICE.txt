@@ -71,3 +71,18 @@ License
 
 Eclipse Public License 1.0
 https://www.eclipse.org/legal/epl-v10.html
+
+Canonical EPL-1.0 text provenance
+---------------------------------
+
+Eclipse source:
+https://www.eclipse.org/legal/epl/epl-v10.html
+
+SPDX identifier: EPL-1.0
+SPDX canonical text:
+https://raw.githubusercontent.com/spdx/license-list-data/main/text/EPL-1.0.txt
+
+Normalized SHA-256: f373772c0a15348e5e1ec5b15ac5066413a252c3852edcb9d1979ad2bc7c7165
+
+The production build verifies this vendored copy offline and performs no
+network request.

@@ -66,6 +66,7 @@ describe('Draw2D-compatible Manhattan router', () => {
 
     const license = readFileSync(licensePath, 'utf8');
     const draw2dNotice = readFileSync(draw2dNoticePath, 'utf8');
+    const normalizedDraw2dNotice = draw2dNotice.replace(/\s+/g, ' ');
     const mitLicense = readFileSync(mitLicensePath, 'utf8');
     const projectLicense = readFileSync(resolve('LICENSE'), 'utf8');
     const correspondingSource = readFileSync(correspondingSourcePath, 'utf8');
@@ -73,6 +74,8 @@ describe('Draw2D-compatible Manhattan router', () => {
     const repositoryNotice = readFileSync(resolve('THIRD_PARTY_NOTICES.md'), 'utf8');
 
     expect(license).toContain('Eclipse Public License - v 1.0');
+    expect(license).toContain('"Licensed Patents" mean patent claims');
+    expect(license).not.toContain('"Licensed Patents " mean patent claims');
     expect(license).toContain('3. REQUIREMENTS');
     expect(license).toContain('7. GENERAL');
     expect(license).toContain('This Agreement is governed by the laws of the State of New York');
@@ -84,6 +87,17 @@ describe('Draw2D-compatible Manhattan router', () => {
     expect(draw2dNotice).toContain('ALL EPL CONTRIBUTORS DISCLAIM ALL WARRANTIES AND CONDITIONS');
     expect(draw2dNotice).toContain('NO EPL CONTRIBUTOR SHALL BE LIABLE');
     expect(draw2dNotice).toContain('/licenses/source/manhattan-router.ts.txt');
+    expect(draw2dNotice).toContain('https://www.eclipse.org/legal/epl/epl-v10.html');
+    expect(draw2dNotice).toContain(
+      'https://raw.githubusercontent.com/spdx/license-list-data/main/text/EPL-1.0.txt',
+    );
+    expect(draw2dNotice).toContain('SPDX identifier: EPL-1.0');
+    expect(draw2dNotice).toContain(
+      'Normalized SHA-256: f373772c0a15348e5e1ec5b15ac5066413a252c3852edcb9d1979ad2bc7c7165',
+    );
+    expect(normalizedDraw2dNotice).toContain(
+      'The production build verifies this vendored copy offline and performs no network request.',
+    );
     expect(draw2dNotice).not.toContain('<corresponding Git tag>');
     expect(mitLicense.replace(/\r\n/g, '\n')).toBe(projectLicense.replace(/\r\n/g, '\n'));
     expect(correspondingSource).toBe(routerSource);

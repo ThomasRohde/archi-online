@@ -3,6 +3,10 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
+const EPL_CANONICAL_SHA256 = 'f373772c0a15348e5e1ec5b15ac5066413a252c3852edcb9d1979ad2bc7c7165';
+const EPL_ECLIPSE_SOURCE_URL = 'https://www.eclipse.org/legal/epl/epl-v10.html';
+const EPL_SPDX_SOURCE_URL =
+  'https://raw.githubusercontent.com/spdx/license-list-data/main/text/EPL-1.0.txt';
 
 function readRequired(relativePath) {
   try {
@@ -58,7 +62,7 @@ const normalizedLicense = publicLicense
   .join('\n')
   .trimEnd() + '\n';
 const licenseHash = createHash('sha256').update(normalizedLicense).digest('hex');
-if (licenseHash !== '2a3309551210de4a1ef5db287b4f0e38d43b57e973b7c821d726c36f47fa2aec') {
+if (licenseHash !== EPL_CANONICAL_SHA256) {
   throw new Error(`public/licenses/EPL-1.0.txt is not the canonical EPL-1.0 text: ${licenseHash}`);
 }
 
@@ -66,6 +70,7 @@ const normalizedNotice = publicNotice.replace(/\s+/g, ' ');
 for (const marker of [
   'Eclipse Public License - v 1.0',
   '1. DEFINITIONS',
+  '"Licensed Patents" mean patent claims',
   '2. GRANT OF RIGHTS',
   '3. REQUIREMENTS',
   '4. COMMERCIAL DISTRIBUTION',
@@ -75,6 +80,9 @@ for (const marker of [
   'This Agreement is governed by the laws of the State of New York',
 ]) {
   requireText(publicLicense, marker, 'public/licenses/EPL-1.0.txt');
+}
+if (publicLicense.includes('"Licensed Patents " mean patent claims')) {
+  throw new Error('public/licenses/EPL-1.0.txt alters the canonical "Licensed Patents" term');
 }
 
 for (const marker of [
@@ -90,6 +98,11 @@ for (const marker of [
   'NO EPL CONTRIBUTOR SHALL BE LIABLE',
   '/licenses/source/manhattan-router.ts.txt',
   'No external tag lookup is required',
+  EPL_ECLIPSE_SOURCE_URL,
+  EPL_SPDX_SOURCE_URL,
+  'SPDX identifier: EPL-1.0',
+  `Normalized SHA-256: ${EPL_CANONICAL_SHA256}`,
+  'The production build verifies this vendored copy offline and performs no network request.',
 ]) {
   requireText(normalizedNotice, marker, 'public/licenses/Eclipse-Draw2D-NOTICE.txt');
 }
