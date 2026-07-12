@@ -14,6 +14,7 @@ import {
   addGroupToView,
   addImageToView,
   addNoteToView,
+  analyzeConnectionReconnection,
   analyzeMagicConnectionTarget,
   analyzeMagicTargetCreation,
   createC4ElementOnView,
@@ -52,6 +53,7 @@ import {
 } from '../../settings/app-settings';
 import { showContextMenu } from '../../ui/ContextMenu';
 import { requestNestingChange } from '../../ui/automatic-relationships';
+import { requestConnectionReconnection } from '../../ui/connection-reconnection';
 import { copyNodes, pasteNodes } from '../clipboard';
 import {
   closestSegment,
@@ -132,11 +134,24 @@ export function useViewEditorInteractions({
 
   const hitFromEvent = (
     e: { clientX: number; clientY: number },
-  ): { nodeId?: string; connId?: string; handle?: string; bendIndex?: number } => {
+  ): {
+    nodeId?: string;
+    connId?: string;
+    handle?: string;
+    bendIndex?: number;
+    connectionEnd?: 'source' | 'target';
+  } => {
     // Element under the cursor, not the event target: pointer capture retargets
     // events to the svg root mid-gesture.
     let el = document.elementFromPoint(e.clientX, e.clientY);
     while (el && el !== svgRef.current) {
+      const connectionEnd = el.getAttribute?.('data-connection-endpoint-handle');
+      if (connectionEnd === 'source' || connectionEnd === 'target') {
+        return {
+          connId: el.getAttribute('data-connection-endpoint-id') ?? undefined,
+          connectionEnd,
+        };
+      }
       const handle = el.getAttribute?.('data-handle');
       if (handle) return { handle, nodeId: el.getAttribute('data-handle-node') ?? undefined };
       const bp = el.getAttribute?.('data-bendpoint');
@@ -469,6 +484,17 @@ export function useViewEditorInteractions({
       setInter({ kind: 'resize', nodeId: hit.nodeId, handle: hit.handle, startAbs: abs, currentAbs: abs });
       return;
     }
+    if (hit.connectionEnd && hit.connId) {
+      setSelection('view', [hit.connId]);
+      setInter({
+        kind: 'reconnect',
+        connId: hit.connId,
+        end: hit.connectionEnd,
+        current: p,
+        hoverConnectableId: null,
+      });
+      return;
+    }
     if (hit.connId !== undefined && hit.bendIndex !== undefined) {
       setSelection('view', [hit.connId]);
       setInter({
@@ -504,7 +530,11 @@ export function useViewEditorInteractions({
       } else {
         setSelection('view', [hit.connId]);
       }
-      setInter({ kind: 'maybe-bend', start: p, connId: hit.connId });
+      setInter(
+        view.connectionRouterType === 2
+          ? { kind: 'none' }
+          : { kind: 'maybe-bend', start: p, connId: hit.connId },
+      );
       return;
     }
     setInter({ kind: 'marquee', start: p, current: p, additive: e.ctrlKey });
@@ -592,6 +622,12 @@ export function useViewEditorInteractions({
       case 'connect': {
         const hit = hitFromEvent(e);
         setInter({ ...cur, current: p, hoverNodeId: hit.nodeId ?? null });
+        break;
+      }
+      case 'reconnect': {
+        const hit = hitFromEvent(e);
+        const hoverConnectableId = hit.nodeId ?? hit.connId ?? null;
+        setInter({ ...cur, current: p, hoverConnectableId });
         break;
       }
       case 'bend':
@@ -718,6 +754,19 @@ export function useViewEditorInteractions({
           finishConnect(hit.nodeId, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
         } else if (!hit.nodeId) {
           finishConnect(undefined, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
+        }
+        break;
+      }
+      case 'reconnect': {
+        const hit = hitFromEvent(e);
+        const endpointId = hit.nodeId ?? hit.connId;
+        setInter({ kind: 'none' });
+        if (endpointId) {
+          void requestConnectionReconnection({
+            connectionId: cur.connId,
+            end: cur.end,
+            endpointId,
+          }, modelStore);
         }
         break;
       }
@@ -987,21 +1036,34 @@ export function useViewEditorInteractions({
     return { id: inter.hoverNodeId, valid };
   })();
 
+  const reconnectHover: { id: string; valid: boolean } | null = (() => {
+    if (!model || inter.kind !== 'reconnect' || !inter.hoverConnectableId) return null;
+    const plan = analyzeConnectionReconnection(model, {
+      connectionId: inter.connId,
+      end: inter.end,
+      endpointId: inter.hoverConnectableId,
+    });
+    return { id: inter.hoverConnectableId, valid: plan.valid };
+  })();
+
   const cursor =
     inter.kind === 'pan'
       ? 'grabbing'
-      : spaceHeld
-        ? 'grab'
-        : activeTool.kind === 'select'
-          ? undefined
-          : activeTool.kind === 'create-relationship' || activeTool.kind === 'magic-connector'
-            ? 'crosshair'
-            : 'copy';
+      : inter.kind === 'reconnect'
+        ? 'crosshair'
+        : spaceHeld
+          ? 'grab'
+          : activeTool.kind === 'select'
+            ? undefined
+            : activeTool.kind === 'create-relationship' || activeTool.kind === 'magic-connector'
+              ? 'crosshair'
+              : 'copy';
 
   return {
     inter,
     edit,
     connectHover,
+    reconnectHover,
     commitEdit,
     commitEditAndRestoreFocus,
     cancelEditAndSelect,

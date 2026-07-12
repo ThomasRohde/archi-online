@@ -10,6 +10,11 @@ describe('jArchi Monaco declarations', () => {
     expect(JARCHI_SCRIPT_DTS).toContain(
       'add(relationship: JConcept, source: JConnectable, target: JConnectable): JConnection;',
     );
+    expect(JARCHI_SCRIPT_DTS).toContain("routerType: 'manual' | 'manhattan';");
+    expect(JARCHI_SCRIPT_DTS).toContain(
+      "reconnect(end: 'source' | 'target', endpoint: JConnectable): void;",
+    );
+    expect(JARCHI_SCRIPT_DTS).toContain('routedPoints(): JPoint[];');
   });
 
   it('keeps extension-only app declarations separate from script declarations', () => {

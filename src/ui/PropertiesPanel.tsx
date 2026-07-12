@@ -19,6 +19,7 @@ import {
   setJunctionType,
   setProperties,
   setRelationshipAttrs,
+  setViewConnectionRouterType,
   setViewpoint,
 } from '../model/ops';
 import { useModelStoreApi, useStore } from './store-hooks';
@@ -440,25 +441,46 @@ export function PropertiesPanel() {
                     </div>
                   )}
                   {target.viewId && (
-                    <div className="prop-row">
-                      <label>Viewpoint</label>
-                      <select
-                        value={target.viewpoint ?? ''}
-                        disabled={readOnly}
-                        onChange={(e) => setViewpoint(target.viewId!, e.target.value, modelStore)}
-                      >
-                        <option value="">None</option>
-                        {target.viewpoint &&
-                          !VIEWPOINTS_BY_NAME.some((vp) => vp.id === target.viewpoint) && (
-                            <option value={target.viewpoint}>{target.viewpoint} (unknown)</option>
-                          )}
-                        {VIEWPOINTS_BY_NAME.map((vp) => (
-                          <option key={vp.id} value={vp.id}>
-                            {vp.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <>
+                      <div className="prop-row">
+                        <label>Viewpoint</label>
+                        <select
+                          value={target.viewpoint ?? ''}
+                          disabled={readOnly}
+                          onChange={(e) => setViewpoint(target.viewId!, e.target.value, modelStore)}
+                        >
+                          <option value="">None</option>
+                          {target.viewpoint &&
+                            !VIEWPOINTS_BY_NAME.some((vp) => vp.id === target.viewpoint) && (
+                              <option value={target.viewpoint}>{target.viewpoint} (unknown)</option>
+                            )}
+                          {VIEWPOINTS_BY_NAME.map((vp) => (
+                            <option key={vp.id} value={vp.id}>
+                              {vp.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="prop-row">
+                        <label htmlFor={`connection-router-${target.viewId}`}>Connection router</label>
+                        <select
+                          id={`connection-router-${target.viewId}`}
+                          aria-label="Connection router"
+                          value={model.views[target.viewId]?.connectionRouterType ?? 0}
+                          disabled={readOnly}
+                          onChange={(event) =>
+                            setViewConnectionRouterType(
+                              target.viewId!,
+                              event.target.value === '2' ? 2 : 0,
+                              modelStore,
+                            )
+                          }
+                        >
+                          <option value={0}>Manual</option>
+                          <option value={2}>Manhattan</option>
+                        </select>
+                      </div>
+                    </>
                   )}
                   {target.relationship && (
                     <div className="prop-hint">

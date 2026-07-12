@@ -211,7 +211,11 @@ export function showViewObjectContextMenu({
     items.push(SEPARATOR);
   }
   const conn = model.connections[id];
-  if (conn && conn.bendpoints.length > 0) {
+  if (
+    conn &&
+    (model.views[conn.viewId]?.connectionRouterType ?? 0) === 0 &&
+    conn.bendpoints.length > 0
+  ) {
     items.push({
       label: 'Remove All Bendpoints',
       onClick: () => setConnectionBendpoints(id, [], modelStore),

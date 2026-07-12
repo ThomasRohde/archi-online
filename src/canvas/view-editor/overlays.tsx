@@ -73,6 +73,39 @@ export function BendpointHandles({
   );
 }
 
+export function ConnectionEndpointHandles({
+  conn,
+  points,
+}: {
+  conn: DiagramConnection | undefined;
+  points: import('../geometry').Point[] | undefined;
+}) {
+  if (!conn || !points || points.length < 2) return null;
+  const handles = [
+    { end: 'source', point: points[0] },
+    { end: 'target', point: points[points.length - 1] },
+  ] as const;
+  return (
+    <>
+      {handles.map(({ end, point }) => (
+        <circle
+          key={end}
+          data-connection-endpoint-handle={end}
+          data-connection-endpoint-id={conn.id}
+          aria-label={`Reconnect ${end}`}
+          cx={point.x}
+          cy={point.y}
+          r={4}
+          fill="#ffffff"
+          stroke="#2a6cc4"
+          strokeWidth={1.4}
+          style={{ cursor: 'crosshair' }}
+        />
+      ))}
+    </>
+  );
+}
+
 export function MarqueeOverlay({ inter }: { inter: Interaction }) {
   if (inter.kind !== 'marquee') return null;
   return (
@@ -110,6 +143,32 @@ export function PendingConnectionOverlay({
       y2={inter.current.y}
       stroke="#2a6cc4"
       strokeWidth={1.2}
+      strokeDasharray="5 3"
+      pointerEvents="none"
+    />
+  );
+}
+
+export function PendingReconnectionOverlay({
+  inter,
+  points,
+  valid,
+}: {
+  inter: Interaction;
+  points: import('../geometry').Point[] | undefined;
+  valid: boolean | undefined;
+}) {
+  if (inter.kind !== 'reconnect' || !points || points.length < 2) return null;
+  const fixed = inter.end === 'source' ? points[points.length - 1] : points[0];
+  return (
+    <line
+      data-reconnection-preview={inter.end}
+      x1={fixed.x}
+      y1={fixed.y}
+      x2={inter.current.x}
+      y2={inter.current.y}
+      stroke={valid === false ? '#b43a3a' : valid === true ? '#2f7d32' : '#2a6cc4'}
+      strokeWidth={1.4}
       strokeDasharray="5 3"
       pointerEvents="none"
     />

@@ -4,6 +4,20 @@ import type {
   DiagramConnection,
   ModelState,
 } from '../model/types';
+import {
+  createManhattanRouterState,
+  routeManhattanConnection,
+  type ManhattanRouteInput,
+  type ManhattanRouteResult,
+  type ManhattanRouterState,
+} from './manhattan-router';
+export {
+  createManhattanRouterState,
+  routeManhattanConnection,
+  type ManhattanRouteInput,
+  type ManhattanRouteResult,
+  type ManhattanRouterState,
+};
 export { createConnectionVisibilityResolver } from '../model/connection-visibility';
 
 export interface Point {
@@ -36,24 +50,36 @@ export function createConnectionRouteResolver(
 ): ConnectionRouteResolver {
   const cache = new Map<string, Point[] | undefined>();
   const resolving = new Set<string>();
+  const manhattanState = new Map<string, ManhattanRouterState>();
   const connection = (id: string) => options.connection?.(id) ?? model.connections[id];
 
-  const connectablePoint = (id: string): Point | undefined => {
+  const connectableGeometry = (
+    id: string,
+  ): { point: Point; bounds?: Bounds } | undefined => {
     const bounds = nodeBounds.get(id);
-    if (model.nodes[id] && bounds) return center(bounds);
+    if (model.nodes[id] && bounds) return { point: center(bounds), bounds };
     if (!model.connections[id]) return undefined;
     const route = resolve(id);
-    return route ? pointAlong(route, 0.5).point : undefined;
+    return route
+      ? { point: pointAlong(route, 0.5).point, bounds: pointsBounds(route) }
+      : undefined;
+  };
+
+  const endpointGeometries = (connectionId: string) => {
+    const conn = connection(connectionId);
+    if (!conn) return undefined;
+    const source = connectableGeometry(conn.sourceId);
+    const target = connectableGeometry(conn.targetId);
+    return source && target ? { source, target } : undefined;
   };
 
   const endpointPoints = (
     connectionId: string,
   ): { source: Point; target: Point } | undefined => {
-    const conn = connection(connectionId);
-    if (!conn) return undefined;
-    const source = connectablePoint(conn.sourceId);
-    const target = connectablePoint(conn.targetId);
-    return source && target ? { source, target } : undefined;
+    const endpoints = endpointGeometries(connectionId);
+    return endpoints
+      ? { source: endpoints.source.point, target: endpoints.target.point }
+      : undefined;
   };
 
   const resolve = ((connectionId: string): Point[] | undefined => {
@@ -66,7 +92,10 @@ export function createConnectionRouteResolver(
     }
 
     resolving.add(connectionId);
-    const endpoints = endpointPoints(connectionId);
+    const endpointGeometry = endpointGeometries(connectionId);
+    const endpoints = endpointGeometry
+      ? { source: endpointGeometry.source.point, target: endpointGeometry.target.point }
+      : undefined;
     if (!endpoints) {
       resolving.delete(connectionId);
       cache.set(connectionId, undefined);
@@ -76,7 +105,25 @@ export function createConnectionRouteResolver(
     const sourceBounds = model.nodes[conn.sourceId] ? nodeBounds.get(conn.sourceId) : undefined;
     const targetBounds = model.nodes[conn.targetId] ? nodeBounds.get(conn.targetId) : undefined;
     let route: Point[];
-    if (
+    if ((model.views[conn.viewId]?.connectionRouterType ?? 0) === 2) {
+      const source = sourceBounds
+        ? rectAnchor(sourceBounds, endpoints.target)
+        : endpoints.source;
+      const target = targetBounds
+        ? rectAnchor(targetBounds, endpoints.source)
+        : endpoints.target;
+      const result = routeManhattanConnection(
+        {
+          start: source,
+          end: target,
+          sourceBounds: endpointGeometry?.source.bounds,
+          targetBounds: endpointGeometry?.target.bounds,
+        },
+        manhattanState.get(conn.viewId) ?? createManhattanRouterState(),
+      );
+      manhattanState.set(conn.viewId, result.state);
+      route = result.points;
+    } else if (
       sourceBounds &&
       targetBounds &&
       conn.sourceId === conn.targetId &&
@@ -98,6 +145,10 @@ export function createConnectionRouteResolver(
     return route;
   }) as ConnectionRouteResolver;
   resolve.endpointPoints = endpointPoints;
+  // Draw2D owns one Manhattan router per connection layer. Pre-warming in a
+  // stable dependency-first order makes row/column reservations independent
+  // of which projection asks for a route first.
+  for (const connectionId of Object.keys(model.connections)) resolve(connectionId);
   return resolve;
 }
 
@@ -106,6 +157,21 @@ function center(bounds: Bounds): Point {
     x: bounds.x + bounds.width / 2,
     y: bounds.y + bounds.height / 2,
   };
+}
+
+function pointsBounds(points: Point[]): Bounds | undefined {
+  if (points.length === 0) return undefined;
+  let minX = points[0].x;
+  let minY = points[0].y;
+  let maxX = points[0].x;
+  let maxY = points[0].y;
+  for (const point of points.slice(1)) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
 /**

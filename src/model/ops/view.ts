@@ -4,6 +4,7 @@ import { isAllowedRelationship } from '../rules';
 import { getActiveModelStore, transact, type ModelStore } from '../store';
 import type {
   Bounds,
+  ConnectionRouterType,
   ElementNode,
   GroupNode,
   ImageNode,
@@ -25,6 +26,18 @@ export interface DiagramNodeDefaults {
   font?: string;
   alpha?: number;
   lineAlpha?: number;
+}
+
+export function setViewConnectionRouterType(
+  viewId: string,
+  connectionRouterType: ConnectionRouterType,
+  store?: ModelStore,
+): void {
+  transact('Set Connection Router', (draft) => {
+    const view = draft.views[viewId];
+    if (!view) return;
+    view.connectionRouterType = connectionRouterType;
+  }, store);
 }
 
 /**

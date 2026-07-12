@@ -9,6 +9,7 @@ import {
 import type { ModelStore } from '../model/store';
 import type { AutomaticRelationshipSettings } from '../model/automatic-relationships';
 import { showNestingRelationshipDialog } from './AppDialog';
+export { requestConnectionReconnection } from './connection-reconnection';
 
 export interface AutomaticRelationshipResult {
   plan: NestingChangePlan;

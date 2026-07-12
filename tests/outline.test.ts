@@ -12,6 +12,7 @@ import { ViewEditor } from '../src/canvas/ViewEditor';
 import { addElement, addElementNodeToView, addView, createEmptyModel } from '../src/model/ops';
 import { openView, replaceModel } from '../src/model/store';
 import { OutlinePanel } from '../src/ui/OutlinePanel';
+import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 async function renderOutline(): Promise<{ host: HTMLDivElement; root: Root }> {
   const host = document.createElement('div');
@@ -168,6 +169,21 @@ describe('viewport bus', () => {
 });
 
 describe('OutlinePanel', () => {
+  it('uses the same view-wide Manhattan route as the editor and export', async () => {
+    const model = connectionEndpointModel();
+    model.views.view.connectionRouterType = 2;
+    replaceModel(model, null);
+    openView('view');
+
+    const { host, root } = await renderOutline();
+
+    expect(
+      host.querySelector('[data-conn-id="dependent"] path')?.getAttribute('d'),
+    ).toBe('M150,20 L150,90 L150,90 L150,160');
+
+    await act(async () => root.unmount());
+  });
+
   it('renders the active view at measured content bounds and shows its viewport', async () => {
     const elementId = addElement('BusinessActor', 'Actor');
     const viewId = addView('Active View');

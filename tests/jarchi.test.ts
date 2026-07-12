@@ -1,4 +1,7 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { StaticViewContent } from '../src/canvas/export/StaticViewSvg';
 import {
   addConnectionToView,
   addElement,
@@ -10,6 +13,7 @@ import {
 } from '../src/model/ops';
 import { attachConnection } from '../src/model/ops/draft';
 import { replaceModel, undo } from '../src/model/store';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 import { useStore } from '../src/ui/store-hooks';
 import { JView } from '../src/scripting/jarchi';
 import { JARCHI_CAPABILITY_TEST_SCRIPT } from '../src/scripting/example-scripts';
@@ -295,6 +299,126 @@ describe('jArchi scripting API', () => {
       'log:2 180 130 220 160',
       'log:0 0',
     ]);
+  });
+
+  it('exposes view routers, rendered routes, and additive connection reconnection', () => {
+    const { logs, error } = run(`
+      var a = model.createElement("business-actor", "A");
+      var b = model.createElement("business-role", "B");
+      var c = model.createElement("business-role", "C");
+      var rel = model.createRelationship("assignment-relationship", "assigned", a, b);
+      var view = model.createArchimateView("Router");
+      var aNode = view.add(a, 0, 0, 100, 40);
+      var bNode = view.add(b, 200, 0, 100, 40);
+      var cNode = view.add(c, 400, 0, 100, 40);
+      var conn = view.add(rel, aNode, bNode);
+      conn.setAbsoluteRoute([{ x: 250, y: 120 }]);
+      console.log(view.routerType, conn.bendpoints.length);
+      view.routerType = "manhattan";
+      conn.reconnect("target", cNode);
+      var route = conn.routedPoints();
+      console.log(view.routerType, rel.target.name, conn.target.concept.name,
+        conn.bendpoints.length, route.length,
+        Math.round(route[0].x), Math.round(route[route.length - 1].x));
+    `);
+
+    expect(error).toBeUndefined();
+    expect(logs).toEqual([
+      'log:manual 1',
+      'log:manhattan C C 1 4 100 400',
+    ]);
+  });
+
+  it('returns the same Manhattan lane as projections when nesting hides an earlier connection', () => {
+    const routeModel = createEmptyModel('Nested route');
+    const diagrams = routeModel.rootFolderIds
+      .map((id) => routeModel.folders[id])
+      .find((folder) => folder.folderType === 'diagrams')!;
+    routeModel.views.view = {
+      id: 'view',
+      kind: 'view',
+      name: 'Nested route',
+      documentation: '',
+      properties: [],
+      folderId: diagrams.id,
+      childIds: ['hidden-source', 'visible-source', 'visible-target'],
+      connectionRouterType: 2,
+    };
+    diagrams.itemIds.push('view');
+    routeModel.nodes['hidden-source'] = {
+      id: 'hidden-source',
+      viewId: 'view',
+      parentId: 'view',
+      bounds: { x: 0, y: 0, width: 100, height: 40 },
+      childIds: ['hidden-target'],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'note',
+      content: 'Hidden source',
+      properties: [],
+    };
+    routeModel.nodes['hidden-target'] = {
+      id: 'hidden-target',
+      viewId: 'view',
+      parentId: 'hidden-source',
+      bounds: { x: 200, y: 80, width: 100, height: 40 },
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'note',
+      content: 'Hidden target',
+      properties: [],
+    };
+    for (const [id, x, y] of [
+      ['visible-source', 0, 0],
+      ['visible-target', 200, 80],
+    ] as const) {
+      routeModel.nodes[id] = {
+        id,
+        viewId: 'view',
+        parentId: 'view',
+        bounds: { x, y, width: 100, height: 40 },
+        childIds: [],
+        sourceConnectionIds: [],
+        targetConnectionIds: [],
+        nodeType: 'note',
+        content: id,
+        properties: [],
+      };
+    }
+    attachConnection(
+      routeModel,
+      endpointConnection('hidden', 'hidden-source', 'hidden-target'),
+    );
+    attachConnection(
+      routeModel,
+      endpointConnection('visible', 'visible-source', 'visible-target'),
+    );
+
+    const previousSettings = useSettingsStore.getState().settings;
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
+    try {
+      replaceModel(routeModel, null);
+      const markup = renderToStaticMarkup(
+        createElement('svg', null, createElement(StaticViewContent, {
+          model: routeModel,
+          viewId: 'view',
+        })),
+      );
+      const visible = new JView('view').connections()
+        .find((connection) => connection.id === 'visible')!;
+
+      expect(markup).not.toContain('data-conn-id="hidden"');
+      expect(markup).toContain('d="M100,40 L100,60 L200,60 L200,80"');
+      expect(visible.routedPoints()).toEqual([
+        { x: 100, y: 40 },
+        { x: 100, y: 60 },
+        { x: 200, y: 60 },
+        { x: 200, y: 80 },
+      ]);
+    } finally {
+      useSettingsStore.setState({ settings: previousSettings });
+    }
   });
 
   it('applies bulk view layout with absolute bounds and routes in one transaction', () => {

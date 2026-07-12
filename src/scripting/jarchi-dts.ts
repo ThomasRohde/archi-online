@@ -66,10 +66,13 @@ declare interface JConnection extends JObject {
   bendpoints: JBendpoint[];
   absoluteRoute(): JPoint[];
   setAbsoluteRoute(points: JPoint[]): void;
+  routedPoints(): JPoint[];
+  reconnect(end: 'source' | 'target', endpoint: JConnectable): void;
 }
 
 declare interface JView extends JObject {
   readonly viewpoint?: string;
+  routerType: 'manual' | 'manhattan';
   /** Add an element to the view, or a relationship between two visual objects. */
   add(element: JConcept, x: number, y: number, width: number, height: number): JVisual;
   add(relationship: JConcept, source: JConnectable, target: JConnectable): JConnection;

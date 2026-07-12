@@ -28,6 +28,13 @@ export type Interaction =
     }
   | { kind: 'marquee'; start: Point; current: Point; additive: boolean }
   | { kind: 'connect'; sourceNodeId: string; current: Point; hoverNodeId: string | null }
+  | {
+      kind: 'reconnect';
+      connId: string;
+      end: 'source' | 'target';
+      current: Point;
+      hoverConnectableId: string | null;
+    }
   | { kind: 'bend'; connId: string; index: number; start: Point; current: Point; isNew: boolean };
 
 export interface EditState {

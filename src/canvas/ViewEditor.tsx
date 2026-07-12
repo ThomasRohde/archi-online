@@ -23,9 +23,11 @@ import { NodeView } from './view-editor/NodeView';
 import { isConnectableGhosted } from './view-editor/viewpoint-ghost';
 import {
   BendpointHandles,
+  ConnectionEndpointHandles,
   DirectEditOverlay,
   MarqueeOverlay,
   PendingConnectionOverlay,
+  PendingReconnectionOverlay,
   ResizeHandles,
   ZoomControls,
   bendpointPreview,
@@ -88,6 +90,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     inter,
     edit,
     connectHover,
+    reconnectHover,
     commitEdit,
     commitEditAndRestoreFocus,
     cancelEditAndSelect,
@@ -271,8 +274,12 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
               );
             })}
           </g>
-          <BendpointHandles
+          <ConnectionEndpointHandles
             conn={selectedConnection}
+            points={selectedConnection ? routes(selectedConnection.id) : undefined}
+          />
+          <BendpointHandles
+            conn={view.connectionRouterType === 2 ? undefined : selectedConnection}
             sourcePoint={selectedConnection ? routes.endpointPoints(selectedConnection.id)?.source : undefined}
             targetPoint={selectedConnection ? routes.endpointPoints(selectedConnection.id)?.target : undefined}
           />
@@ -284,6 +291,11 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
           <PendingConnectionOverlay
             inter={inter}
             sourceBounds={inter.kind === 'connect' ? liveAbs.get(inter.sourceNodeId) : undefined}
+          />
+          <PendingReconnectionOverlay
+            inter={inter}
+            points={inter.kind === 'reconnect' ? routes(inter.connId) : undefined}
+            valid={reconnectHover?.valid}
           />
         </g>
       </svg>

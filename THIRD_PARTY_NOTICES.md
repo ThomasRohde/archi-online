@@ -1,8 +1,7 @@
 # Third-Party Notices
 
-Archi Online is licensed under the MIT License. Some compatibility data and
-visual geometry are derived from the Archi project, which is also licensed
-under the MIT License.
+Archi Online is licensed under the MIT License. It includes or derives behavior
+from the third-party material listed below under each material's own license.
 
 ## Archi
 
@@ -27,6 +26,24 @@ Derived material in this repository:
   Archi's `org.opengroup.archimate.xmlexchange.tests` plugin.
 
 The MIT permission notice is included in `LICENSE`.
+
+## Eclipse Draw2D Manhattan connection router
+
+Source: https://github.com/archimatetool/archi/blob/release_5.9.0/org.eclipse.draw2d/src/org/eclipse/draw2d/ManhattanConnectionRouter.java
+
+Pinned Archi source: tag `release_5.9.0`, commit
+`e0ba88c6b3391e0d3c5839917474d1b6085adbe4`
+
+License: Eclipse Public License 1.0 (EPL-1.0),
+https://www.eclipse.org/legal/epl-v10.html
+
+Copyright (c) 2000, 2010 IBM Corporation and others.
+
+Derived material in this repository:
+
+- `src/canvas/manhattan-router.ts` is a behaviorally faithful TypeScript port
+  of `org.eclipse.draw2d.ManhattanConnectionRouter`, including route direction,
+  spacing, and row/column reservation behavior.
 
 ## elkjs
 

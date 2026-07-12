@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { computeAbsBounds } from '../src/canvas/view-editor/bounds';
 import * as geometry from '../src/canvas/geometry';
+import * as operations from '../src/model/ops';
+import { createModelStore } from '../src/model/store';
 import type { ModelState } from '../src/model/types';
 import { connectionEndpointModel } from './helpers/connection-endpoints';
 
@@ -81,5 +83,79 @@ describe('shared connection route resolver', () => {
     expect(isVisible('base')).toBe(false);
     expect(isVisible('dependent')).toBe(false);
     expect(model.connections.dependent.sourceId).toBe('base');
+  });
+
+  it('uses the view-wide Manhattan router and ignores dormant bendpoints', () => {
+    const model = connectionEndpointModel();
+    model.views.view.connectionRouterType = 2;
+    model.connections.base.bendpoints = [
+      { startX: 0, startY: 100, endX: 0, endY: 100 },
+    ];
+    model.connections.dependent.bendpoints = [
+      { startX: 200, startY: 200, endX: 200, endY: 200 },
+    ];
+
+    const resolve = geometry.createConnectionRouteResolver(
+      model,
+      computeAbsBounds(model, 'view'),
+    );
+
+    expect(resolve('base')).toEqual([
+      { x: 100, y: 20 },
+      { x: 150, y: 20 },
+      { x: 150, y: 20 },
+      { x: 200, y: 20 },
+    ]);
+    expect(resolve('dependent')).toEqual([
+      { x: 150, y: 20 },
+      { x: 150, y: 90 },
+      { x: 150, y: 90 },
+      { x: 150, y: 160 },
+    ]);
+  });
+
+  it('preserves dormant bendpoints while toggling Manhattan off and on', () => {
+    const model = connectionEndpointModel();
+    model.connections.dependent.bendpoints = [
+      { startX: 10, startY: 20, endX: -30, endY: 40 },
+    ];
+    const store = createModelStore({ model, fileName: null });
+    const manual = geometry.createConnectionRouteResolver(
+      model,
+      computeAbsBounds(model, 'view'),
+    )('dependent');
+    const setRouter = (operations as typeof operations & {
+      setViewConnectionRouterType?: (
+        viewId: string,
+        type: 0 | 2,
+        store?: ReturnType<typeof createModelStore>,
+      ) => void;
+    }).setViewConnectionRouterType;
+    expect(setRouter).toBeTypeOf('function');
+    if (!setRouter) return;
+
+    setRouter('view', 2, store);
+    const manhattanModel = store.getState().model!;
+    expect(manhattanModel.connections.dependent.bendpoints).toEqual(
+      model.connections.dependent.bendpoints,
+    );
+    expect(
+      geometry.createConnectionRouteResolver(
+        manhattanModel,
+        computeAbsBounds(manhattanModel, 'view'),
+      )('dependent'),
+    ).not.toEqual(manual);
+
+    setRouter('view', 0, store);
+    const restoredModel = store.getState().model!;
+    expect(restoredModel.connections.dependent.bendpoints).toEqual(
+      model.connections.dependent.bendpoints,
+    );
+    expect(
+      geometry.createConnectionRouteResolver(
+        restoredModel,
+        computeAbsBounds(restoredModel, 'view'),
+      )('dependent'),
+    ).toEqual(manual);
   });
 });

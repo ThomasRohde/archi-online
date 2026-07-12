@@ -13,6 +13,9 @@ import {
   addNoteToView,
   addRelationship,
   addView,
+  analyzeConnectionReconnection,
+  applyConnectionReconnection,
+  createNestedConnectionVisibilityResolver,
   createProfile,
   deleteItems,
   deleteProfile,
@@ -21,6 +24,7 @@ import {
   renameItem,
   resizeNode,
   setConnectionBendpoints,
+  setViewConnectionRouterType,
   setDocumentation,
   setNodeStyle,
   setLabelExpression,
@@ -219,6 +223,22 @@ function absoluteRouteForConnection(
   const centers = connectionEndpointCenters(m, conn, boundsForNode);
   return bendpointPositions(conn.bendpoints, centers.source, centers.target)
     .map((point) => ({ ...point }));
+}
+
+function renderedRouteForConnection(m: ModelState, conn: DiagramConnection): JPoint[] {
+  const bounds = new Map(
+    Object.values(m.nodes)
+      .filter((node) => node.viewId === conn.viewId)
+      .map((node) => [node.id, modelAbsoluteBounds(m, node.id)]),
+  );
+  const route = createConnectionRouteResolver(m, bounds, {
+    isVisible: createNestedConnectionVisibilityResolver(
+      m,
+      useSettingsStore.getState().settings,
+    ),
+  })(conn.id);
+  if (!route) throw new Error(`Connection ${conn.id} has a missing endpoint`);
+  return route.map((point) => ({ ...point }));
 }
 
 function routeToBendpoints(
@@ -457,6 +477,17 @@ export class JView extends JObject {
 
   get viewpoint(): string | undefined {
     return this.view().viewpoint;
+  }
+
+  get routerType(): 'manual' | 'manhattan' {
+    return this.view().connectionRouterType === 2 ? 'manhattan' : 'manual';
+  }
+
+  set routerType(value: 'manual' | 'manhattan') {
+    if (value !== 'manual' && value !== 'manhattan') {
+      throw new Error(`Unknown connection router: ${String(value)}`);
+    }
+    setViewConnectionRouterType(this.id, value === 'manhattan' ? 2 : 0);
   }
 
   prop = propApi(this).prop;
@@ -989,6 +1020,26 @@ export class JConnection extends JObject {
         validatePointArray(points, `connection.${this.id}.route`),
       ),
     );
+  }
+
+  routedPoints(): JPoint[] {
+    const m = state();
+    return renderedRouteForConnection(m, this.conn());
+  }
+
+  reconnect(end: 'source' | 'target', endpoint: JConnectable): void {
+    if ((end !== 'source' && end !== 'target') || !isJConnectable(endpoint)) {
+      throw new Error('connection.reconnect(end, endpoint)');
+    }
+    const plan = analyzeConnectionReconnection(state(), {
+      connectionId: this.id,
+      end,
+      endpointId: endpoint.id,
+    });
+    if (!plan.valid) throw new Error(plan.reason ?? 'Connection cannot be reconnected');
+    if (!applyConnectionReconnection(plan)) {
+      throw new Error('Connection reconnection was not applied');
+    }
   }
 
   delete(): void {
