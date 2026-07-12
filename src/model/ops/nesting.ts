@@ -5,7 +5,7 @@ import {
   type AutomaticRelationshipSettings,
 } from '../automatic-relationships';
 import { createConnectionVisibilityResolver } from '../connection-visibility';
-import { isAllowedElementInViewpoint } from '../data/viewpoints';
+import { isAllowedRelationshipInViewpoint } from '../data/viewpoints';
 import { newId } from '../id';
 import type { ElementType, RelationshipType } from '../metamodel';
 import { isAllowedRelationship } from '../rules';
@@ -243,7 +243,9 @@ export function applyNestingChange(
 ): NestingApplyResult {
   const result: NestingApplyResult = { nodeIds: [], relationshipIds: [], connectionIds: [] };
   const state = store.getState();
-  if (!state.model || state.readOnly || !stageModel(state.model, plan.input)) return result;
+  if (!state.model || state.readOnly) return result;
+  const staged = stageModel(state.model, plan.input);
+  if (!staged || !planReferencesAreValid(staged, plan, selections)) return result;
 
   transact('Automatic Relationship Management', (draft) => {
     const createdNodeIds = applyEntriesToDraft(draft, plan.input);
@@ -299,6 +301,82 @@ export function applyNestingChange(
   return result;
 }
 
+function planReferencesAreValid(
+  model: ModelState,
+  plan: NestingChangePlan,
+  selections: Record<string, string | null>,
+): boolean {
+  const representedConcepts = new Map<string, string>();
+  for (const node of Object.values(model.nodes)) {
+    if (node.viewId === plan.input.viewId && node.nodeType === 'element') {
+      representedConcepts.set(node.id, node.elementId);
+    }
+  }
+  for (const connection of Object.values(model.connections)) {
+    if (connection.viewId === plan.input.viewId && connection.relationshipId) {
+      representedConcepts.set(connection.id, connection.relationshipId);
+    }
+  }
+
+  for (const child of plan.children) {
+    for (const reusable of child.reusableRelationships) {
+      const relationship = model.relationships[reusable.relationshipId];
+      if (
+        !relationship ||
+        relationship.type !== reusable.relationshipType ||
+        relationship.sourceId !== reusable.sourceElementId ||
+        relationship.targetId !== reusable.targetElementId
+      ) {
+        return false;
+      }
+    }
+
+    const selectedId = selections[child.childNodeId];
+    if (selectedId === undefined || selectedId === null) continue;
+    const candidate = child.candidates.find((item) => item.id === selectedId);
+    if (
+      !candidate ||
+      representedConcepts.get(candidate.sourceNodeId) !== candidate.sourceElementId ||
+      representedConcepts.get(candidate.targetNodeId) !== candidate.targetElementId ||
+      !model.elements[candidate.sourceElementId] ||
+      !model.elements[candidate.targetElementId]
+    ) {
+      return false;
+    }
+    const nowReusable = child.candidates.some((currentCandidate) =>
+      Object.values(model.relationships).some(
+        (relationship) =>
+          relationship.type === currentCandidate.relationshipType &&
+          relationshipMatchesCandidate(relationship, currentCandidate),
+      ),
+    );
+    if (nowReusable) return false;
+  }
+
+  for (const missing of plan.missingOccurrences) {
+    const relationship = model.relationships[missing.relationshipId];
+    if (
+      !relationship ||
+      Boolean(model.nodes[missing.connectionId] || model.connections[missing.connectionId]) ||
+      representedConcepts.has(missing.connectionId) ||
+      representedConcepts.get(missing.sourceNodeId) !== relationship.sourceId ||
+      representedConcepts.get(missing.targetNodeId) !== relationship.targetId
+    ) {
+      return false;
+    }
+    const alreadyExists = Object.values(model.connections).some(
+      (connection) =>
+        connection.viewId === plan.input.viewId &&
+        connection.relationshipId === missing.relationshipId &&
+        connection.sourceId === missing.sourceNodeId &&
+        connection.targetId === missing.targetNodeId,
+    );
+    if (alreadyExists) return false;
+    representedConcepts.set(missing.connectionId, missing.relationshipId);
+  }
+  return true;
+}
+
 function analyzeChildren(
   original: ModelState,
   staged: ModelState,
@@ -329,13 +407,6 @@ function analyzeChildren(
     const childElement = staged.elements[childNode.elementId];
     const parentElement = staged.elements[parentNode.elementId];
     if (!childElement || !parentElement || childElement.type === 'Junction') continue;
-    if (
-      !isAllowedElementInViewpoint(view.viewpoint, childElement.type) ||
-      !isAllowedElementInViewpoint(view.viewpoint, parentElement.type)
-    ) {
-      continue;
-    }
-
     const allCandidates = enumerateCandidates(
       parentElement.id,
       parentElement.type,
@@ -343,6 +414,7 @@ function analyzeChildren(
       childElement.id,
       childElement.type,
       childNode.id,
+      view.viewpoint,
       settings,
     );
     const reusableRelationships: ReusableNestingRelationship[] = [];
@@ -395,6 +467,7 @@ function enumerateCandidates(
   childElementId: string,
   childType: ElementType,
   childNodeId: string,
+  viewpointId: string | undefined,
   settings: AutomaticRelationshipSettings,
 ): NestingRelationshipCandidate[] {
   const candidates: NestingRelationshipCandidate[] = [];
@@ -410,7 +483,12 @@ function enumerateCandidates(
       [sourceNodeId, targetNodeId] = [targetNodeId, sourceNodeId];
       [sourceType, targetType] = [targetType, sourceType];
     }
-    if (!isAllowedRelationship(relationshipType, sourceType, targetType)) return;
+    if (
+      !isAllowedRelationshipInViewpoint(viewpointId, relationshipType) ||
+      !isAllowedRelationship(relationshipType, sourceType, targetType)
+    ) {
+      return;
+    }
     candidates.push({
       id: `create:${direction}:${relationshipType}`,
       direction,
@@ -724,10 +802,34 @@ function stageModel(model: ModelState, input: NestingChangeInput): ModelState | 
   if (!staged.views[input.viewId]) return null;
   try {
     applyEntriesToDraft(staged, input);
+    if (!input.entries.every((entry) => entryAppliedExactly(staged, input.viewId, entry))) {
+      return null;
+    }
     return staged;
   } catch {
     return null;
   }
+}
+
+function entryAppliedExactly(
+  model: ModelState,
+  viewId: string,
+  entry: NestingEntry,
+): boolean {
+  const node = model.nodes[entry.nodeId];
+  if (
+    !node ||
+    node.viewId !== viewId ||
+    node.parentId !== entry.parentId ||
+    node.bounds.x !== entry.bounds.x ||
+    node.bounds.y !== entry.bounds.y ||
+    node.bounds.width !== entry.bounds.width ||
+    node.bounds.height !== entry.bounds.height
+  ) {
+    return false;
+  }
+  if (entry.parentId === viewId) return true;
+  return model.nodes[entry.parentId]?.viewId === viewId;
 }
 
 function applyEntriesToDraft(draft: ModelState, input: NestingChangeInput): string[] {

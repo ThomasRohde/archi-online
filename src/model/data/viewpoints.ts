@@ -15,7 +15,7 @@
 // The viewpoint ids/names must stay in lockstep with VIEWPOINT_ID_TO_NAME in
 // src/model/io/exchange-xml/mapping.ts (tests/viewpoints.test.ts asserts this).
 
-import type { ElementType } from '../metamodel';
+import type { ElementType, RelationshipType } from '../metamodel';
 
 // $…Elements$ collection expansions — ArchimateModelUtils.getXxxClasses().
 const STRATEGY_ELEMENTS: readonly ElementType[] = [
@@ -387,6 +387,14 @@ export function isAllowedElementInViewpoint(
   if (!vp) return true; // unknown id → NONE_VIEWPOINT → allow all
   if (vp.elementTypes.length === 0) return true; // empty list → allow all elements
   return vp.elementTypes.includes(type);
+}
+
+/** Desktop default viewpoints do not restrict relationship concepts. */
+export function isAllowedRelationshipInViewpoint(
+  _viewpointId: string | undefined,
+  _type: RelationshipType,
+): boolean {
+  return true;
 }
 
 /** Display name of a viewpoint id (Viewpoint.getName), or '' for none/unknown. */

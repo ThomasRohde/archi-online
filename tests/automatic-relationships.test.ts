@@ -9,7 +9,7 @@ import {
   createEmptyModel,
 } from '../src/model/ops';
 import * as ops from '../src/model/ops';
-import { attachConnection } from '../src/model/ops/draft';
+import { attachConnection, attachNode } from '../src/model/ops/draft';
 import {
   createModelStore,
   redo,
@@ -430,7 +430,7 @@ describe('automatic relationship analysis', () => {
     );
   });
 
-  it('filters candidates by viewpoint and excludes Junction children', () => {
+  it('filters relationship candidates by viewpoint rather than ghosted endpoints and excludes Junction children', () => {
     const arm = requireArmFunctions();
     if (!arm) return;
     const store = makeStore();
@@ -475,10 +475,15 @@ describe('automatic relationship analysis', () => {
       DEFAULT_SETTINGS,
     );
 
-    expect(plan.children).toHaveLength(0);
+    expect(plan.children).toHaveLength(1);
+    expect(plan.children[0].childNodeId).toBe(restrictedNodeId);
+    expect(plan.children[0].candidates).toContainEqual(
+      expect.objectContaining({ relationshipType: 'AssignmentRelationship' }),
+    );
+    expect(plan.children.some((child) => child.childNodeId === junctionNodeId)).toBe(false);
   });
 
-  it('restores an existing occurrence for a viewpoint-disallowed nested child', () => {
+  it('restores an existing occurrence without suppressing candidates for a ghosted child', () => {
     const arm = requireArmFunctions();
     if (!arm) return;
     const store = makeStore();
@@ -511,7 +516,8 @@ describe('automatic relationship analysis', () => {
       DEFAULT_SETTINGS,
     );
 
-    expect(plan.children).toHaveLength(0);
+    expect(plan.children).toHaveLength(1);
+    expect(plan.children[0]).toMatchObject({ childNodeId });
     expect(plan.missingOccurrences).toContainEqual(
       expect.objectContaining({
         relationshipId,
@@ -1117,6 +1123,235 @@ describe('automatic relationship apply', () => {
       targetId: parentNodeId,
     });
     expect(store.getState().undoStack).toHaveLength(undoDepth + 1);
+  });
+
+  it('rejects a stale move plan when the child occurrence was deleted before apply', () => {
+    const arm = requireArmFunctions();
+    if (!arm) return;
+    const store = makeStore();
+    const viewId = addViewTo(store);
+    const parentElementId = addElementTo(store, 'ApplicationComponent', 'Parent');
+    const childElementId = addElementTo(store, 'ApplicationComponent', 'Child');
+    const parentNodeId = addNodeTo(
+      store,
+      viewId,
+      parentElementId,
+      viewId,
+      { x: 0, y: 0, width: 320, height: 240 },
+    );
+    const childNodeId = addNodeTo(store, viewId, childElementId, viewId, BOUNDS);
+    const plan = arm.analyze(
+      store.getState().model!,
+      moveInput(viewId, childNodeId, parentNodeId),
+      DEFAULT_SETTINGS,
+    );
+    const choice = plan.children[0].candidates[0];
+    ops.deleteViewObjects([childNodeId], store);
+    const before = store.getState().model;
+    const undoDepth = store.getState().undoStack.length;
+
+    const result = arm.apply(plan, { [childNodeId]: choice.id }, store);
+
+    expect(result).toEqual({ nodeIds: [], relationshipIds: [], connectionIds: [] });
+    expect(store.getState().model).toBe(before);
+    expect(store.getState().model!.elements[childElementId]).toBeDefined();
+    expect(Object.keys(store.getState().model!.relationships)).toHaveLength(0);
+    expect(Object.keys(store.getState().model!.connections)).toHaveLength(0);
+    expect(store.getState().undoStack).toHaveLength(undoDepth);
+  });
+
+  it('rejects a stale move plan when the target parent became a child descendant', () => {
+    const arm = requireArmFunctions();
+    if (!arm) return;
+    const store = makeStore();
+    const viewId = addViewTo(store);
+    const parentElementId = addElementTo(store, 'ApplicationComponent', 'Parent');
+    const childElementId = addElementTo(store, 'ApplicationComponent', 'Child');
+    const parentNodeId = addNodeTo(
+      store,
+      viewId,
+      parentElementId,
+      viewId,
+      { x: 0, y: 0, width: 320, height: 240 },
+    );
+    const childNodeId = addNodeTo(store, viewId, childElementId, viewId, BOUNDS);
+    const plan = arm.analyze(
+      store.getState().model!,
+      moveInput(viewId, childNodeId, parentNodeId),
+      DEFAULT_SETTINGS,
+    );
+    const choice = plan.children[0].candidates[0];
+    store.transact('Make parent a child descendant', (draft) => {
+      draft.views[viewId].childIds = draft.views[viewId].childIds.filter(
+        (nodeId) => nodeId !== parentNodeId,
+      );
+      draft.nodes[parentNodeId].parentId = childNodeId;
+      draft.nodes[childNodeId].childIds.push(parentNodeId);
+    });
+    const before = store.getState().model;
+    const undoDepth = store.getState().undoStack.length;
+
+    const result = arm.apply(plan, { [childNodeId]: choice.id }, store);
+
+    expect(result).toEqual({ nodeIds: [], relationshipIds: [], connectionIds: [] });
+    expect(store.getState().model).toBe(before);
+    expect(Object.keys(store.getState().model!.relationships)).toHaveLength(0);
+    expect(Object.keys(store.getState().model!.connections)).toHaveLength(0);
+    expect(store.getState().undoStack).toHaveLength(undoDepth);
+  });
+
+  it('rejects a stale move plan when its reusable relationship was deleted before apply', () => {
+    const arm = requireArmFunctions();
+    if (!arm) return;
+    const store = makeStore();
+    const viewId = addViewTo(store);
+    const parentElementId = addElementTo(store, 'ApplicationComponent', 'Parent');
+    const childElementId = addElementTo(store, 'ApplicationComponent', 'Child');
+    const relationshipId = addRelationship(
+      'CompositionRelationship',
+      parentElementId,
+      childElementId,
+      '',
+      undefined,
+      store,
+    )!;
+    const parentNodeId = addNodeTo(
+      store,
+      viewId,
+      parentElementId,
+      viewId,
+      { x: 0, y: 0, width: 320, height: 240 },
+    );
+    const childNodeId = addNodeTo(store, viewId, childElementId, viewId, BOUNDS);
+    const plan = arm.analyze(
+      store.getState().model!,
+      moveInput(viewId, childNodeId, parentNodeId),
+      DEFAULT_SETTINGS,
+    );
+    expect(plan.children[0].reusableRelationships).toEqual([
+      expect.objectContaining({ relationshipId }),
+    ]);
+    store.transact('Delete relationship while chooser is open', (draft) => {
+      const relationship = draft.relationships[relationshipId];
+      draft.folders[relationship.folderId].itemIds = draft.folders[
+        relationship.folderId
+      ].itemIds.filter((id) => id !== relationshipId);
+      delete draft.relationships[relationshipId];
+    });
+    const before = store.getState().model;
+    const undoDepth = store.getState().undoStack.length;
+
+    const result = arm.apply(plan, {}, store);
+
+    expect(result).toEqual({ nodeIds: [], relationshipIds: [], connectionIds: [] });
+    expect(store.getState().model).toBe(before);
+    expect(store.getState().model!.nodes[childNodeId].parentId).toBe(viewId);
+    expect(Object.keys(store.getState().model!.relationships)).toHaveLength(0);
+    expect(Object.keys(store.getState().model!.connections)).toHaveLength(0);
+    expect(store.getState().undoStack).toHaveLength(undoDepth);
+  });
+
+  it('rejects a stale move plan when a planned connection id became occupied', () => {
+    const arm = requireArmFunctions();
+    if (!arm) return;
+    const store = makeStore();
+    const viewId = addViewTo(store);
+    const parentElementId = addElementTo(store, 'ApplicationComponent', 'Parent');
+    const childElementId = addElementTo(store, 'ApplicationComponent', 'Child');
+    addRelationship(
+      'CompositionRelationship',
+      parentElementId,
+      childElementId,
+      '',
+      undefined,
+      store,
+    );
+    const parentNodeId = addNodeTo(
+      store,
+      viewId,
+      parentElementId,
+      viewId,
+      { x: 0, y: 0, width: 320, height: 240 },
+    );
+    const childNodeId = addNodeTo(store, viewId, childElementId, viewId, BOUNDS);
+    const plan = arm.analyze(
+      store.getState().model!,
+      moveInput(viewId, childNodeId, parentNodeId),
+      DEFAULT_SETTINGS,
+    );
+    const occupiedId = plan.missingOccurrences[0].connectionId;
+    store.transact('Occupy planned connection id', (draft) => {
+      attachNode(draft, {
+        id: occupiedId,
+        viewId,
+        parentId: viewId,
+        bounds: { x: 500, y: 20, width: 120, height: 80 },
+        childIds: [],
+        sourceConnectionIds: [],
+        targetConnectionIds: [],
+        nodeType: 'group',
+        name: 'Concurrent group',
+        documentation: '',
+        properties: [],
+      });
+    });
+    const before = store.getState().model;
+    const undoDepth = store.getState().undoStack.length;
+
+    const result = arm.apply(plan, {}, store);
+
+    expect(result).toEqual({ nodeIds: [], relationshipIds: [], connectionIds: [] });
+    expect(store.getState().model).toBe(before);
+    expect(store.getState().model!.nodes[childNodeId].parentId).toBe(viewId);
+    expect(store.getState().model!.nodes[occupiedId]?.nodeType).toBe('group');
+    expect(store.getState().model!.connections[occupiedId]).toBeUndefined();
+    expect(store.getState().undoStack).toHaveLength(undoDepth);
+  });
+
+  it('rejects a stale selection when another candidate relationship was created after analysis', () => {
+    const arm = requireArmFunctions();
+    if (!arm) return;
+    const store = makeStore();
+    const viewId = addViewTo(store);
+    const parentElementId = addElementTo(store, 'ApplicationComponent', 'Parent');
+    const childElementId = addElementTo(store, 'ApplicationComponent', 'Child');
+    const parentNodeId = addNodeTo(
+      store,
+      viewId,
+      parentElementId,
+      viewId,
+      { x: 0, y: 0, width: 320, height: 240 },
+    );
+    const childNodeId = addNodeTo(store, viewId, childElementId, viewId, BOUNDS);
+    const plan = arm.analyze(
+      store.getState().model!,
+      moveInput(viewId, childNodeId, parentNodeId),
+      DEFAULT_SETTINGS,
+    );
+    const choice = plan.children[0].candidates.find(
+      (candidate) => candidate.relationshipType === 'CompositionRelationship',
+    )!;
+    const concurrentRelationshipId = addRelationship(
+      'AggregationRelationship',
+      parentElementId,
+      childElementId,
+      '',
+      undefined,
+      store,
+    )!;
+    const before = store.getState().model;
+    const undoDepth = store.getState().undoStack.length;
+
+    const result = arm.apply(plan, { [childNodeId]: choice.id }, store);
+
+    expect(result).toEqual({ nodeIds: [], relationshipIds: [], connectionIds: [] });
+    expect(store.getState().model).toBe(before);
+    expect(store.getState().model!.nodes[childNodeId].parentId).toBe(viewId);
+    expect(Object.keys(store.getState().model!.relationships)).toEqual([
+      concurrentRelationshipId,
+    ]);
+    expect(Object.keys(store.getState().model!.connections)).toHaveLength(0);
+    expect(store.getState().undoStack).toHaveLength(undoDepth);
   });
 
   it('honors read-only mode and mutates only the explicit model store', () => {
