@@ -1,5 +1,10 @@
 import { decodeTiff, encodePng } from 'image-js';
 import type { ModelAsset, ModelState } from './types';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_DIMENSION,
+  MAX_IMAGE_PIXELS,
+} from './io/document-limits';
 
 const MEDIA_TYPES: Record<string, string> = {
   png: 'image/png',
@@ -27,6 +32,8 @@ export async function createModelAsset(
   source: Uint8Array,
   mediaType = mediaTypeForPath(path),
 ): Promise<ModelAsset> {
+  if (source.length > MAX_IMAGE_BYTES) throw new Error('Image exceeds the size limit');
+  assertImageDimensions(source, mediaType);
   const bytes = source.slice();
   let renderMediaType = mediaType;
   let renderBytes = bytes;
@@ -42,6 +49,90 @@ export async function createModelAsset(
     renderBytes,
     sha256: sha256Hex(bytes),
   };
+}
+
+function assertImageDimensions(bytes: Uint8Array, mediaType: string): void {
+  const dimensions = imageDimensions(bytes, mediaType);
+  if (!dimensions) return;
+  const [width, height] = dimensions;
+  if (
+    width < 1 || height < 1 ||
+    width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION ||
+    width * height > MAX_IMAGE_PIXELS
+  ) {
+    throw new Error(`Image dimensions exceed the limit: ${width}x${height}`);
+  }
+}
+
+function imageDimensions(bytes: Uint8Array, mediaType: string): [number, number] | undefined {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (mediaType === 'image/png' && bytes.length >= 24) {
+    return [view.getUint32(16, false), view.getUint32(20, false)];
+  }
+  if (mediaType === 'image/gif' && bytes.length >= 10) {
+    return [view.getUint16(6, true), view.getUint16(8, true)];
+  }
+  if (mediaType === 'image/bmp' && bytes.length >= 26) {
+    return [Math.abs(view.getInt32(18, true)), Math.abs(view.getInt32(22, true))];
+  }
+  if (mediaType === 'image/x-icon' && bytes.length >= 8) {
+    return [bytes[6] || 256, bytes[7] || 256];
+  }
+  if (mediaType === 'image/jpeg') return jpegDimensions(bytes, view);
+  if (mediaType === 'image/tiff') return tiffDimensions(bytes, view);
+  return undefined;
+}
+
+function jpegDimensions(bytes: Uint8Array, view: DataView): [number, number] | undefined {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
+  let offset = 2;
+  while (offset + 8 < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset++;
+      continue;
+    }
+    const marker = bytes[offset + 1];
+    if (marker === 0xd8 || marker === 0xd9) {
+      offset += 2;
+      continue;
+    }
+    const length = view.getUint16(offset + 2, false);
+    if (length < 2 || offset + 2 + length > bytes.length) return undefined;
+    if (
+      (marker >= 0xc0 && marker <= 0xc3) ||
+      (marker >= 0xc5 && marker <= 0xc7) ||
+      (marker >= 0xc9 && marker <= 0xcb) ||
+      (marker >= 0xcd && marker <= 0xcf)
+    ) {
+      return [view.getUint16(offset + 7, false), view.getUint16(offset + 5, false)];
+    }
+    offset += 2 + length;
+  }
+  return undefined;
+}
+
+function tiffDimensions(bytes: Uint8Array, view: DataView): [number, number] | undefined {
+  if (bytes.length < 10) return undefined;
+  const littleEndian = bytes[0] === 0x49 && bytes[1] === 0x49;
+  if (!littleEndian && !(bytes[0] === 0x4d && bytes[1] === 0x4d)) return undefined;
+  const directory = view.getUint32(4, littleEndian);
+  if (directory + 2 > bytes.length) return undefined;
+  const count = view.getUint16(directory, littleEndian);
+  let width: number | undefined;
+  let height: number | undefined;
+  for (let index = 0; index < count; index++) {
+    const offset = directory + 2 + index * 12;
+    if (offset + 12 > bytes.length) break;
+    const tag = view.getUint16(offset, littleEndian);
+    if (tag !== 256 && tag !== 257) continue;
+    const type = view.getUint16(offset + 2, littleEndian);
+    const value = type === 3
+      ? view.getUint16(offset + 8, littleEndian)
+      : view.getUint32(offset + 8, littleEndian);
+    if (tag === 256) width = value;
+    else height = value;
+  }
+  return width !== undefined && height !== undefined ? [width, height] : undefined;
 }
 
 export function assetDataUrl(asset: ModelAsset): string {

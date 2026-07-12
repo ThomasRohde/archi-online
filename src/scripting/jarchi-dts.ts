@@ -40,6 +40,7 @@ declare interface JVisual extends JObject {
   gradient: number;
   lineStyle: number;
   lineWidth: number;
+  /** 0 uses the specialization image; 1 uses a custom image. */
   imageSource: number;
   imagePosition: number;
   text: string;

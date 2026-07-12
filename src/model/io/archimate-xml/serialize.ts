@@ -77,7 +77,10 @@ export function serializeArchimate(state: ModelState): string {
       ['borderType', node.nodeType === 'group' || node.nodeType === 'note' ? node.borderType : undefined],
       ['fillColor', node.fillColor],
       ['imagePath', node.imagePath],
-      ['imagePosition', node.imagePosition],
+      // Desktop's standalone DiagramModelImage always fills its bounds and
+      // does not implement IIconic. Writing imagePosition there makes Archi
+      // report an unknown feature before opening the model.
+      ['imagePosition', node.nodeType !== 'image' ? node.imagePosition : undefined],
       ['archimateElement', node.nodeType === 'element' ? node.elementId : undefined],
       ['type', node.nodeType === 'element' ? node.figureType : undefined],
       ['model', node.nodeType === 'ref' ? node.refViewId : undefined],

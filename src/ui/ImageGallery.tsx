@@ -12,9 +12,11 @@ interface GalleryEntry {
 export function ImageGallery({
   selectedPath,
   onSelect,
+  importAsset,
 }: {
   selectedPath: string | undefined;
   onSelect: (path: string) => void;
+  importAsset?: (bytes: Uint8Array, fileName: string, mediaType?: string) => Promise<string>;
 }) {
   const modelStore = useModelStoreApi();
   const activeModel = useStore((state) => state.model);
@@ -37,22 +39,17 @@ export function ImageGallery({
   }
 
   const choose = async (entry: GalleryEntry) => {
-    const path = await importModelAsset(
-      entry.asset.bytes,
-      entry.asset.path,
-      entry.asset.mediaType,
-      modelStore,
-    );
+    const path = importAsset
+      ? await importAsset(entry.asset.bytes, entry.asset.path, entry.asset.mediaType)
+      : await importModelAsset(entry.asset.bytes, entry.asset.path, entry.asset.mediaType, modelStore);
     onSelect(path);
   };
 
   const importFile = async (file: File) => {
-    const path = await importModelAsset(
-      new Uint8Array(await file.arrayBuffer()),
-      file.name,
-      file.type || undefined,
-      modelStore,
-    );
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const path = importAsset
+      ? await importAsset(bytes, file.name, file.type || undefined)
+      : await importModelAsset(bytes, file.name, file.type || undefined, modelStore);
     onSelect(path);
   };
 

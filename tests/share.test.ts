@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { deflateSync } from 'fflate';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseArchimate, serializeArchimate } from '../src/model/io/archimate-xml';
+import { MAX_INLINE_DOCUMENT_BYTES } from '../src/model/io/document-limits';
 import { addView, createElementOnView, createEmptyModel } from '../src/model/ops';
 import { openView, replaceModel } from '../src/model/store';
 import { isViewerLocation, viewerRouteKey } from '../src/App';
@@ -107,6 +109,15 @@ describe('share link encoding', () => {
     await expect(decodeInlineSharePayload('not-valid-base64url!')).rejects.toThrow(
       /Could not decode shared model/,
     );
+  });
+
+  it('rejects an inline decompression bomb before parsing it', async () => {
+    const compressed = deflateSync(new Uint8Array(MAX_INLINE_DOCUMENT_BYTES + 1));
+    let binary = '';
+    for (const byte of compressed) binary += String.fromCharCode(byte);
+    const payload = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+
+    await expect(decodeInlineSharePayload(payload)).rejects.toThrow(/Could not decode shared model/);
   });
 
   it('loads a shared model from an inline location', async () => {

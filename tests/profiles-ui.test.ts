@@ -6,8 +6,10 @@ import {
   addView,
   createEmptyModel,
   createProfile,
+  importModelAsset,
 } from '../src/model/ops';
-import { openView, replaceModel, setSelection } from '../src/model/store';
+import { openView, redo, replaceModel, setSelection, undo } from '../src/model/store';
+import { resetWorkspaceForTests } from '../src/model/workspace';
 import { Palette } from '../src/ui/Palette';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
 import { SpecializationsManager } from '../src/ui/SpecializationsManager';
@@ -40,6 +42,7 @@ async function change(element: HTMLInputElement | HTMLSelectElement, value: stri
 
 beforeEach(() => {
   document.body.innerHTML = '';
+  resetWorkspaceForTests();
   replaceModel(createEmptyModel('Profiles UI'), null);
 });
 
@@ -96,5 +99,36 @@ describe('specialization UI', () => {
     expect(useStore.getState().undoStack.at(-1)?.label).toBe('Manage Specializations');
     expect(onClose).toHaveBeenCalled();
     await act(async () => root.unmount());
+  });
+
+  it('stages profile image selection and removal in undoable manager transactions', async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const path = await importModelAsset(bytes, 'profile.png', 'image/png');
+    const profile = createProfile({ name: 'External party', conceptType: 'BusinessActor' });
+    const onClose = vi.fn();
+    const first = await render(createElement(SpecializationsManager, { open: true, onClose }));
+    let dialog = document.body.querySelector<HTMLElement>('[aria-label="Specializations Manager"]')!;
+
+    await click(dialog.querySelector(`[aria-label="Choose image for External party"]`)!);
+    await click(dialog.querySelector(`[data-image-path="${path}"]`)!);
+    expect(useStore.getState().model!.profiles[profile].imagePath).toBeUndefined();
+    await click(Array.from(dialog.querySelectorAll('button')).find((button) => button.textContent === 'Apply')!);
+
+    expect(useStore.getState().model!.profiles[profile].imagePath).toBe(path);
+    await act(async () => undo());
+    expect(useStore.getState().model!.profiles[profile].imagePath).toBeUndefined();
+    await act(async () => redo());
+    expect(useStore.getState().model!.profiles[profile].imagePath).toBe(path);
+    await act(async () => first.root.unmount());
+
+    const second = await render(createElement(SpecializationsManager, { open: true, onClose }));
+    dialog = document.body.querySelector<HTMLElement>('[aria-label="Specializations Manager"]')!;
+    await click(dialog.querySelector(`[aria-label="Remove image from External party"]`)!);
+    expect(useStore.getState().model!.profiles[profile].imagePath).toBe(path);
+    await click(Array.from(dialog.querySelectorAll('button')).find((button) => button.textContent === 'Apply')!);
+
+    expect(useStore.getState().model!.profiles[profile].imagePath).toBeUndefined();
+    expect(useStore.getState().model!.assets[path]).toBeUndefined();
+    await act(async () => second.root.unmount());
   });
 });

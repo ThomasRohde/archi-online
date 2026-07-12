@@ -212,8 +212,20 @@ canvas. Depending on what is selected it edits:
 
 - **Name** and **Documentation**.
 - **Properties** — the ArchiMate key-value property list.
-- **Appearance** (diagram objects) — fill color, line color, font color,
-  opacity, text alignment, and text position.
+- **Appearance** (diagram objects) — fill/line/font color and opacity,
+  gradients, solid/dashed/dotted/hidden outlines, normal/medium/heavy widths,
+  derived line color, icon color and visibility, text placement, and font
+  family, point size, bold, and italic. Local Font Access augments the editable
+  common-font list when the browser grants permission.
+- **Label** — a live Archi 5.9 label-expression editor with rendered preview and
+  diagnostics. Explicit expressions override C4 and default labels.
+- **Image** — custom or specialization image source, shared gallery/chooser,
+  preview, removal, and all ten Desktop image positions. The gallery can copy
+  and deduplicate an image from another open model.
+- **Specialization** — exact-type profile assignment for elements and
+  relationships. Use the Specializations Manager to create, edit, preview, and
+  delete model profiles transactionally; specialized palette and tree entries
+  create already-assigned concepts.
 - **Figure** (elements with two notations) — switch between the default
   box-with-icon figure and the classic ArchiMate shape.
 - **Relationship specifics** — access type (access relationships), influence
@@ -281,8 +293,9 @@ Values are validated and clamped to sensible ranges when loaded or edited.
 
 ## Files and autosave
 
-`.archimate` files are the durable, portable format — the same XML desktop
-Archi uses. **Open…** also accepts ArchiMate Open Exchange `.xml` files; they
+`.archimate` files are the durable, portable format — plain XML for asset-free
+models and Desktop-compatible ZIP archives for image-bearing models. **Open…**
+also accepts ArchiMate Open Exchange `.xml` files; they
 are imported as new, unsaved models, so the next save writes a native
 `.archimate` file rather than overwriting the interchange source.
 
@@ -291,9 +304,10 @@ to a download when the browser or organization policy blocks file handles.
 See [[Getting Started|Getting-Started]] for the storage overview and
 [[Archi Compatibility|Archi-Compatibility]] for exchange details.
 
-Autosave writes the complete open workspace to IndexedDB shortly after every
+Autosave version 2 writes the complete open workspace as document bytes to
+IndexedDB shortly after every
 change and restores all model roots, file names, dirty flags, active model,
-and open views on the next launch. It protects against crashes and accidental
+open views, and image assets on the next launch. It protects against crashes and accidental
 tab closes within the same browser profile — it is not a backup.
 
 ## Installed app and offline use

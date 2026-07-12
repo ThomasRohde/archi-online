@@ -31,6 +31,13 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  // Keep dependency pre-bundling aligned with the production target. The
+  // browser-side XSD validator uses top-level await.
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext',
+    },
+  },
   // libxml2-wasm uses top-level await and itself targets modern browsers
   // (Chrome/Edge 89+, Safari 15+). Preserve that syntax in the application bundle.
   build: {

@@ -7,19 +7,26 @@ tools.
 
 ## Same file format
 
-Both tools read and write the same native `.archimate` XML. A model saved in
-Archi Online opens in desktop Archi and vice versa — element ids, folder
-structure, view layouts, colors, and key-value properties are preserved.
+Both tools read and write the same native `.archimate` document. Asset-free
+models are plain XML; image-bearing models are Desktop-compatible ZIP archives
+with `model.xml` and referenced `images/*` entries. A model saved in Archi
+Online opens in Desktop Archi and vice versa — element ids, folders, view
+layouts, specializations, images, label expressions, complete Phase 1
+appearance, Dublin Core metadata, and key-value properties are preserved.
 
-Round-trip fidelity is verified in the test suite against Archi's official
-*Archisurance* example model: parsing and re-serializing it reproduces the
-original file.
+Round-trip fidelity is verified against Archi's official *Archisurance* model
+and reciprocal Phase 1 fixtures. `npm run verify:phase1:desktop` asks the
+installed Archi 5.9 command-line application to load and save the Online
+fixture, then compares normalized source semantics and archive asset hashes.
 
 Two details worth knowing:
 
 - **Bendpoints** are stored in Archi's relative offset format
   (`startX`/`startY`/`endX`/`endY`), exactly as desktop Archi writes them, so
   manually routed connections survive the round trip.
+- **Images** retain their original PNG, JPEG, GIF, TIFF, BMP, or ICO bytes.
+  Browser-incompatible sources use a derived PNG only for rendering. Assets are
+  deduplicated and are included in autosave, sharing, viewer, and export flows.
 - **Browser-local data** (settings, scripts, extensions, autosave, layout) is
   never written into `.archimate` files — files stay clean for exchange.
 
@@ -35,12 +42,14 @@ Archi Online also implements desktop Archi's interchange workflows:
   `elements.csv`, `relations.csv`, and `properties.csv`; **Import CSV into
   model…** updates or creates objects by ID in a single undoable operation.
 
-The Open Exchange importer/exporter preserves concepts, relationships,
-folders, views, viewpoints, diagram coordinates, styles, property definitions,
-and Archi-specific relationship attributes where the exchange format supports
-them. CSV import/export follows Archi's three-file schema and special
-relationship-property conventions. See [[Import & Export|Import-and-Export]]
-for the exact workflows.
+The Open Exchange importer/exporter preserves concepts, relationships, folders,
+views, viewpoints, diagram coordinates, styles, property definitions,
+language-tagged values, all 15 Dublin Core fields, folder organization, and
+specialization properties. Export can validate locally against the five
+bundled Archi 5.9 schemas and optionally copy them beside the XML. CSV
+import/export follows Archi's three-file schema, including specialization
+creation and assignment, special relationship properties, duplicate rejection,
+and atomic failure. See [[Import & Export|Import-and-Export]] for the workflows.
 
 ## Same metamodel and rules
 
@@ -73,6 +82,12 @@ Element figures are ported from Archi's Java source rather than redrawn:
   the classic notation shape. Switch per object via **Figure** in the
   Properties panel.
 - Corner icons are 1:1 transcriptions of Archi's icon-drawing code.
+- Diagram appearance includes Desktop gradients, solid/dashed/dotted/hidden
+  outlines, normal/medium/heavy widths, fill/line/font opacity and color, icon
+  visibility and color, derived line color, ten image positions, and editable
+  font family, point size, bold, and italic.
+- Label expressions follow the Archi 5.9 grammar, prefixes, recursive ten-pass
+  evaluation, and visible diagnostics without preventing a view from loading.
 
 ## Known limitations
 

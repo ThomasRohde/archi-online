@@ -138,6 +138,10 @@ model.removeProp("key");         // remove (or a specific value: removeProp(key,
 model.createElement(type, name, folder);
 model.createRelationship(type, name, source, target, folder);
 model.createArchimateView(name, folder);
+
+model.specializations;           // ordered JProfile[]
+model.createSpecialization("Retail Customer", "business-actor");
+model.findSpecialization("Retail Customer", "business-actor");
 ```
 
 `folder` arguments are optional; new objects land in the default folder for
@@ -178,6 +182,17 @@ their name from the underlying relationship and refuse renames.
 ## Concepts
 
 `JConcept` wraps elements and relationships. Relationship-only members:
+
+```js
+concept.specialization;          // primary specialization name or undefined
+concept.specialization = "Retail Customer";
+```
+
+Profiles expose `name`, `type`, `image`, and `delete()`. Profile names are
+unique case-insensitively within a base concept type; deleting a used profile
+removes its assignments in the same undo transaction.
+
+Relationship-only members:
 
 ```js
 relationship.source;              // JConcept
@@ -223,6 +238,12 @@ visual.fillColor;        // "#rrggbb" or undefined for the type default
 visual.lineColor;
 visual.fontColor;
 visual.opacity;          // 0–255
+visual.labelExpression;
+visual.gradient;         // -1 none/default, 0 top, 1 left, 2 right, 3 bottom
+visual.lineStyle;        // -1 default, 0 solid, 1 dashed, 2 dotted, 3 hidden
+visual.lineWidth;        // 1 normal, 2 medium, 3 heavy
+visual.imageSource;      // 0 specialization, 1 custom
+visual.imagePosition;    // 0 through 9, matching Desktop Archi
 
 visual.add(element, x, y, width, height);  // nest a child (relative coordinates)
 visual.parent();          // JVisual or JView
@@ -246,6 +267,9 @@ connection.source;        // JVisual
 connection.target;        // JVisual
 connection.concept;       // underlying relationship
 connection.lineColor;
+connection.labelExpression;
+connection.lineStyle;
+connection.lineWidth;
 connection.bendpoints;    // raw Archi/GEF format
 connection.absoluteRoute();
 connection.setAbsoluteRoute(points);

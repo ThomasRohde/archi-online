@@ -1,4 +1,4 @@
-import { strFromU8, unzipSync } from 'fflate';
+import { strFromU8, unzipSync, zipSync } from 'fflate';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addImageToView,
@@ -71,9 +71,29 @@ describe('native Archi document codec', () => {
   });
 
   it('rejects ZIP documents without model.xml', async () => {
-    const { zipSync } = await import('fflate');
     await expect(parseArchimateDocument(zipSync({ 'images/a.png': new Uint8Array([1]) })))
       .rejects.toThrow(/model\.xml/);
+  });
+
+  it('rejects archives that exceed the entry budget before extraction', async () => {
+    const entries: Record<string, Uint8Array> = {
+      'model.xml': new TextEncoder().encode(serializeArchimate(model())),
+    };
+    for (let index = 0; index < 512; index++) {
+      entries[`images/${index}.png`] = new Uint8Array();
+    }
+    await expect(parseArchimateDocument(zipSync(entries))).rejects.toThrow(/more than 512 entries/);
+  });
+
+  it('rejects unsafe image dimensions before decoding or storing the asset', async () => {
+    const bytes = new Uint8Array(24);
+    bytes.set([137, 80, 78, 71, 13, 10, 26, 10]);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(16, 20_000, false);
+    view.setUint32(20, 1, false);
+
+    await expect(importModelAsset(bytes, 'wide.png', 'image/png'))
+      .rejects.toThrow(/dimensions exceed the limit/);
   });
 
   it('deduplicates imported assets by SHA-256 and uses Archi image paths', async () => {
@@ -86,12 +106,12 @@ describe('native Archi document codec', () => {
     expect(Object.keys(model().assets)).toEqual([first]);
   });
 
-  it('round-trips standalone image nodes and image controls', () => {
+  it('round-trips standalone image nodes without unsupported image-position attributes', () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="Images" id="model" version="5.0.0">
   <folder name="Views" id="views" type="diagrams">
     <element xsi:type="archimate:ArchimateDiagramModel" name="Image view" id="view">
-      <child xsi:type="archimate:DiagramModelImage" id="image" imagePath="images/_abcdefghijklmnopqrstuv.png" imagePosition="9">
+      <child xsi:type="archimate:DiagramModelImage" id="image" imagePath="images/_abcdefghijklmnopqrstuv.png">
         <bounds x="10" y="20" width="200" height="100"/>
       </child>
     </element>
@@ -101,9 +121,10 @@ describe('native Archi document codec', () => {
     expect(parsed.nodes.image).toMatchObject({
       nodeType: 'image',
       imagePath: 'images/_abcdefghijklmnopqrstuv.png',
-      imagePosition: 9,
     });
-    expect(serializeArchimate(parsed)).toContain('xsi:type="archimate:DiagramModelImage"');
+    const serialized = serializeArchimate(parsed);
+    expect(serialized).toContain('xsi:type="archimate:DiagramModelImage"');
+    expect(serialized).not.toMatch(/DiagramModelImage[^>]*imagePosition=/);
 
     const view = addView('New image view');
     const image = addImageToView(
@@ -113,6 +134,7 @@ describe('native Archi document codec', () => {
       'images/_abcdefghijklmnopqrstuv.png',
     );
     expect(model().nodes[image].nodeType).toBe('image');
+    expect(serializeArchimate(model())).not.toMatch(/DiagramModelImage[^>]*imagePosition=/);
   });
 
   it('removes an unreferenced asset in the same undoable image transaction', async () => {

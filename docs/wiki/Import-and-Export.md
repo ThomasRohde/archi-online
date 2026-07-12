@@ -40,14 +40,19 @@ vendor-neutral ArchiMate 3 interchange XML.
   Open Exchange file is imported as a **new, unsaved** model (as in desktop
   Archi), so a later `Ctrl+S` saves it as `.archimate` rather than
   overwriting the source.
-- **Export** — **Import/Export ▾ → Model to Open Exchange (.xml)…** writes
-  the current model as Open Exchange XML.
+- **Export** — **Import/Export ▾ → Model to Open Exchange (.xml)…** opens the
+  Archi 5.9 export options. Folder organization and local XSD validation are on
+  by default; language defaults to `en`; all 15 Dublin Core fields are editable;
+  and schema copying is optional. Invalid output is not written. When schema
+  copying is selected, one directory choice receives the XML and five official
+  XSDs where supported, with individual downloads as the fallback.
 
 The mapping is ported from Archi's own exporter/importer, including
-viewpoints, junctions, property definitions, folder organization, absolute
-diagram coordinates, styles, bendpoints, and access/influence/association
-attributes. Model, concept, view, folder, group, and note properties are
-carried through when the exchange format can represent them.
+viewpoints, junctions, property definitions, optional folder organization,
+absolute diagram coordinates, styles, bendpoints, access/influence/association
+attributes, ISO-639 language, Dublin Core metadata, and Archi 5.9
+specialization definitions and assignments. Import returns structured warnings
+and errors and never applies a partial model.
 
 ## CSV
 
@@ -66,8 +71,11 @@ Archi's CSV format is three files — `elements.csv`, `relations.csv`, and
   suffix in their names). Comma, semicolon, and tab delimiters are detected
   automatically. Objects are matched to the current model by ID: existing
   ones are updated in place and new ones are created, with relationships
-  validated against the ArchiMate rules. The whole import is a single undo
-  step, and any error aborts it without changing the model.
+  validated against the ArchiMate rules. Specializations are created or
+  assigned from the Archi columns. The report distinguishes created, updated,
+  unchanged, profile, property, warning, and error counts. The whole import is
+  a single undo step, and any illegal ID, record length, endpoint update,
+  duplicate relationship, or other error aborts it without changing the model.
 
 ## What does not leave the browser
 

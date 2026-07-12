@@ -54,7 +54,8 @@ export function evaluateLabelExpression(
     for (let pass = 0; pass < 10; pass++) {
       seen.add(text);
       const next = renderText(model, source, text, 0);
-      if (next === text || !next.includes('${') || seen.has(next)) {
+      if (next !== text && seen.has(next)) throw new RecursionError(RECURSION_TEXT);
+      if (next === text || !next.includes('${')) {
         text = next;
         break;
       }

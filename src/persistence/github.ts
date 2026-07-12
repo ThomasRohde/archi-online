@@ -1,5 +1,6 @@
 import { defaultKeyValueStore, type AsyncKeyValueStore } from './keyval';
 import { isArchimateZip } from '../model/io/archimate-xml';
+import { MAX_DOCUMENT_BYTES } from '../model/io/document-limits';
 
 export const GITHUB_TOKEN_KEY = 'archi-online.github.token';
 
@@ -142,17 +143,56 @@ export async function fetchRawArchimateBytes(
   }
   const res = await fetchImpl(parsed.href);
   if (!res.ok) throw await githubError(res, 'Could not load shared model');
-  const bytes = new Uint8Array(await res.arrayBuffer());
+  const bytes = await readResponseBytes(res, Math.ceil(MAX_DOCUMENT_BYTES * 4 / 3) + 4);
   if (isArchimateZip(bytes) || new TextDecoder().decode(bytes.subarray(0, 64)).trimStart().startsWith('<')) {
+    if (bytes.length > MAX_DOCUMENT_BYTES) {
+      throw new GitHubPersistenceError('Shared model exceeds the size limit.');
+    }
     return bytes;
   }
   try {
-    return base64ToBytes(new TextDecoder().decode(bytes).trim());
+    const decoded = base64ToBytes(new TextDecoder().decode(bytes).trim());
+    if (decoded.length > MAX_DOCUMENT_BYTES) {
+      throw new Error('Decoded archive exceeds the size limit');
+    }
+    return decoded;
   } catch (cause) {
     throw new GitHubPersistenceError('Shared model content is neither XML nor a base64 Archi archive.', {
       cause,
     });
   }
+}
+
+async function readResponseBytes(response: Response, limit: number): Promise<Uint8Array> {
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > limit) {
+    throw new GitHubPersistenceError('Shared model exceeds the size limit.');
+  }
+  if (!response.body) return new Uint8Array(await response.arrayBuffer());
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.length;
+      if (length > limit) {
+        await reader.cancel();
+        throw new GitHubPersistenceError('Shared model exceeds the size limit.');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {

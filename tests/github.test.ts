@@ -8,6 +8,7 @@ import {
   setStoredGitHubToken,
 } from '../src/persistence/github';
 import { memoryKeyValueStore } from '../src/persistence/keyval';
+import { MAX_DOCUMENT_BYTES } from '../src/model/io/document-limits';
 import { zipSync } from 'fflate';
 
 function response(body: unknown, init: ResponseInit = {}) {
@@ -147,5 +148,15 @@ describe('GitHub persistence', () => {
     await expect(fetchRawArchimateXml('https://example.test/model.archimate')).rejects.toThrow(
       /GitHub raw content/,
     );
+  });
+
+  it('rejects an oversized raw response before reading its body', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(response('', {
+      headers: { 'content-length': String(Math.ceil(MAX_DOCUMENT_BYTES * 4 / 3) + 5) },
+    }));
+
+    await expect(
+      fetchRawArchimateXml('https://raw.githubusercontent.com/o/r/main/model.archimate', fetchImpl),
+    ).rejects.toThrow(/size limit/);
   });
 });

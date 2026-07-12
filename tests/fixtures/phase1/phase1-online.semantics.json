@@ -1,0 +1,695 @@
+{
+  "info": {
+    "id": "phase1-parity-model",
+    "name": "Phase 1 Structural Parity",
+    "language": "en",
+    "metadata": [
+      {
+        "name": "title",
+        "value": "Phase 1 title"
+      },
+      {
+        "name": "creator",
+        "value": "Phase 1 creator"
+      },
+      {
+        "name": "subject",
+        "value": "Phase 1 subject"
+      },
+      {
+        "name": "description",
+        "value": "Phase 1 description"
+      },
+      {
+        "name": "publisher",
+        "value": "Phase 1 publisher"
+      },
+      {
+        "name": "contributor",
+        "value": "Phase 1 contributor"
+      },
+      {
+        "name": "date",
+        "value": "Phase 1 date"
+      },
+      {
+        "name": "type",
+        "value": "Phase 1 type"
+      },
+      {
+        "name": "format",
+        "value": "Phase 1 format"
+      },
+      {
+        "name": "identifier",
+        "value": "Phase 1 identifier"
+      },
+      {
+        "name": "source",
+        "value": "Phase 1 source"
+      },
+      {
+        "name": "language",
+        "value": "Phase 1 language"
+      },
+      {
+        "name": "relation",
+        "value": "Phase 1 relation"
+      },
+      {
+        "name": "coverage",
+        "value": "Phase 1 coverage"
+      },
+      {
+        "name": "rights",
+        "value": "Phase 1 rights"
+      }
+    ]
+  },
+  "profiles": [
+    {
+      "id": "profile-element",
+      "name": "External Party",
+      "conceptType": "BusinessActor",
+      "specialization": true,
+      "imagePath": "images/_phase1parityasset00001.png"
+    },
+    {
+      "id": "profile-relation",
+      "name": "Trusted Access",
+      "conceptType": "AccessRelationship",
+      "specialization": true,
+      "imagePath": "images/_phase1parityasset00001.png"
+    }
+  ],
+  "elements": [
+    {
+      "id": "actor",
+      "kind": "element",
+      "type": "BusinessActor",
+      "name": "Customer Representative",
+      "documentation": "Actor documentation",
+      "properties": [
+        {
+          "key": "team",
+          "value": "Customer"
+        },
+        {
+          "key": "team",
+          "value": "Service"
+        }
+      ],
+      "profileIds": [
+        "profile-element"
+      ],
+      "folderId": "id-74ba6e62b6f14c0bbf9d48d798e8739b"
+    },
+    {
+      "id": "role",
+      "kind": "element",
+      "type": "BusinessRole",
+      "name": "Service Owner",
+      "documentation": "Role documentation",
+      "properties": [
+        {
+          "key": "tier",
+          "value": "1"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "id-74ba6e62b6f14c0bbf9d48d798e8739b"
+    }
+  ],
+  "relationships": [
+    {
+      "id": "access",
+      "kind": "relationship",
+      "type": "AccessRelationship",
+      "name": "Reads",
+      "documentation": "Access docs",
+      "properties": [],
+      "profileIds": [
+        "profile-relation"
+      ],
+      "folderId": "id-089b2bf476a0433ba095be0da99b8457",
+      "sourceId": "actor",
+      "targetId": "role",
+      "accessType": 1
+    },
+    {
+      "id": "influence",
+      "kind": "relationship",
+      "type": "InfluenceRelationship",
+      "name": "Influences",
+      "documentation": "",
+      "properties": [],
+      "profileIds": [],
+      "folderId": "id-089b2bf476a0433ba095be0da99b8457",
+      "sourceId": "actor",
+      "targetId": "role",
+      "strength": "++"
+    }
+  ],
+  "views": [
+    {
+      "id": "main",
+      "kind": "view",
+      "name": "Phase 1 Golden View",
+      "documentation": "All structural parity features",
+      "properties": [],
+      "folderId": "id-08657f4794674b44976783fe690b1a0c",
+      "viewpoint": "business_process_cooperation",
+      "childIds": [
+        "position-0",
+        "position-1",
+        "position-2",
+        "position-3",
+        "position-4",
+        "position-5",
+        "position-6",
+        "position-7",
+        "position-8",
+        "position-9",
+        "group",
+        "note",
+        "ref",
+        "image"
+      ]
+    },
+    {
+      "id": "reference",
+      "kind": "view",
+      "name": "Referenced View",
+      "documentation": "",
+      "properties": [],
+      "folderId": "id-08657f4794674b44976783fe690b1a0c",
+      "childIds": []
+    }
+  ],
+  "nodes": [
+    {
+      "id": "group",
+      "nodeType": "group",
+      "name": "Image Group",
+      "documentation": "Group docs",
+      "properties": [],
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 30,
+        "y": 290,
+        "width": 250,
+        "height": 130
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imagePath": "images/_phase1parityasset00001.png",
+      "imagePosition": 0,
+      "gradient": 0,
+      "lineStyle": 1,
+      "lineWidth": 2,
+      "labelExpression": "${name}"
+    },
+    {
+      "id": "image",
+      "nodeType": "image",
+      "imagePath": "images/_phase1parityasset00001.png",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 730,
+        "y": 290,
+        "width": 140,
+        "height": 100
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imagePosition": 9
+    },
+    {
+      "id": "note",
+      "nodeType": "note",
+      "content": "Image Note",
+      "properties": [
+        {
+          "key": "note",
+          "value": "value"
+        }
+      ],
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 310,
+        "y": 290,
+        "width": 180,
+        "height": 100
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imagePath": "images/_phase1parityasset00001.png",
+      "imagePosition": 4,
+      "labelExpression": "${content} ${property:note}"
+    },
+    {
+      "id": "position-0",
+      "nodeType": "element",
+      "elementId": "actor",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 30,
+        "y": 30,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "access-connection"
+      ],
+      "targetConnectionIds": [],
+      "imageSource": 0,
+      "imagePosition": 0,
+      "gradient": -1,
+      "lineStyle": -1,
+      "lineWidth": 1,
+      "iconVisible": 0,
+      "iconColor": "#003399",
+      "derivedLineColor": true,
+      "fillColor": "#ffffb5",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Segoe UI",
+        "sizePt": 9,
+        "bold": true,
+        "italic": true
+      },
+      "labelExpression": "${name}\\n${documentation}\\n${type}\\n${specialization}\\n${property:team}"
+    },
+    {
+      "id": "position-1",
+      "nodeType": "element",
+      "elementId": "role",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 210,
+        "y": 30,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [
+        "access-connection"
+      ],
+      "imagePath": "images/_phase1parityasset00001.png",
+      "imageSource": 1,
+      "imagePosition": 1,
+      "gradient": 0,
+      "lineStyle": 0,
+      "lineWidth": 2,
+      "iconVisible": 1,
+      "iconColor": "#cc3300",
+      "derivedLineColor": false,
+      "fillColor": "#b5ffff",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Arial",
+        "sizePt": 10,
+        "bold": false,
+        "italic": false
+      },
+      "labelExpression": "${properties}\\n${propertiesvalues}\\n${properties: / :team}"
+    },
+    {
+      "id": "position-2",
+      "nodeType": "element",
+      "elementId": "actor",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 390,
+        "y": 30,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "influence-connection"
+      ],
+      "targetConnectionIds": [],
+      "imageSource": 0,
+      "imagePosition": 2,
+      "gradient": 1,
+      "lineStyle": 1,
+      "lineWidth": 3,
+      "iconVisible": 2,
+      "iconColor": "#003399",
+      "derivedLineColor": true,
+      "fillColor": "#ffffb5",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Segoe UI",
+        "sizePt": 11,
+        "bold": true,
+        "italic": false
+      },
+      "labelExpression": "${if:${property:team}:Team:${name}}\\n${nvl:${property:missing}:Fallback}"
+    },
+    {
+      "id": "position-3",
+      "nodeType": "element",
+      "elementId": "role",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 570,
+        "y": 30,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [
+        "influence-connection"
+      ],
+      "imagePath": "images/_phase1parityasset00001.png",
+      "imageSource": 1,
+      "imagePosition": 3,
+      "gradient": 2,
+      "lineStyle": 2,
+      "lineWidth": 1,
+      "iconVisible": 0,
+      "iconColor": "#cc3300",
+      "derivedLineColor": false,
+      "fillColor": "#b5ffff",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Arial",
+        "sizePt": 12,
+        "bold": false,
+        "italic": true
+      },
+      "labelExpression": "${wordwrap:12:${name}}\\n${viewpoint}"
+    },
+    {
+      "id": "position-4",
+      "nodeType": "element",
+      "elementId": "actor",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 750,
+        "y": 30,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imageSource": 0,
+      "imagePosition": 4,
+      "gradient": 3,
+      "lineStyle": 3,
+      "lineWidth": 2,
+      "iconVisible": 1,
+      "iconColor": "#003399",
+      "derivedLineColor": true,
+      "fillColor": "#ffffb5",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Segoe UI",
+        "sizePt": 9,
+        "bold": true,
+        "italic": false
+      },
+      "labelExpression": "$model{name}|$view{name}|$mfolder{name}|$vfolder{name}"
+    },
+    {
+      "id": "position-5",
+      "nodeType": "element",
+      "elementId": "role",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 30,
+        "y": 150,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imagePath": "images/_phase1parityasset00001.png",
+      "imageSource": 1,
+      "imagePosition": 5,
+      "gradient": -1,
+      "lineStyle": -1,
+      "lineWidth": 3,
+      "iconVisible": 2,
+      "iconColor": "#cc3300",
+      "derivedLineColor": false,
+      "fillColor": "#b5ffff",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Arial",
+        "sizePt": 10,
+        "bold": false,
+        "italic": false
+      },
+      "labelExpression": "$parent{name}|$access:target{name}"
+    },
+    {
+      "id": "position-6",
+      "nodeType": "element",
+      "elementId": "actor",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 210,
+        "y": 150,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imageSource": 0,
+      "imagePosition": 6,
+      "gradient": 0,
+      "lineStyle": 0,
+      "lineWidth": 1,
+      "iconVisible": 0,
+      "iconColor": "#003399",
+      "derivedLineColor": true,
+      "fillColor": "#ffffb5",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Segoe UI",
+        "sizePt": 11,
+        "bold": true,
+        "italic": true
+      },
+      "labelExpression": "Escaped\\: colon and slash\\\\ ${name}"
+    },
+    {
+      "id": "position-7",
+      "nodeType": "element",
+      "elementId": "role",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 390,
+        "y": 150,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imagePath": "images/_phase1parityasset00001.png",
+      "imageSource": 1,
+      "imagePosition": 7,
+      "gradient": 1,
+      "lineStyle": 1,
+      "lineWidth": 2,
+      "iconVisible": 1,
+      "iconColor": "#cc3300",
+      "derivedLineColor": false,
+      "fillColor": "#b5ffff",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Arial",
+        "sizePt": 12,
+        "bold": false,
+        "italic": false
+      },
+      "labelExpression": "${name}\\n${documentation}\\n${type}\\n${specialization}\\n${property:team}"
+    },
+    {
+      "id": "position-8",
+      "nodeType": "element",
+      "elementId": "actor",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 570,
+        "y": 150,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imageSource": 0,
+      "imagePosition": 8,
+      "gradient": 2,
+      "lineStyle": 2,
+      "lineWidth": 3,
+      "iconVisible": 2,
+      "iconColor": "#003399",
+      "derivedLineColor": true,
+      "fillColor": "#ffffb5",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Segoe UI",
+        "sizePt": 9,
+        "bold": true,
+        "italic": false
+      },
+      "labelExpression": "${properties}\\n${propertiesvalues}\\n${properties: / :team}"
+    },
+    {
+      "id": "position-9",
+      "nodeType": "element",
+      "elementId": "role",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 750,
+        "y": 150,
+        "width": 150,
+        "height": 85
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imagePath": "images/_phase1parityasset00001.png",
+      "imageSource": 1,
+      "imagePosition": 9,
+      "gradient": 3,
+      "lineStyle": 3,
+      "lineWidth": 1,
+      "iconVisible": 0,
+      "iconColor": "#cc3300",
+      "derivedLineColor": false,
+      "fillColor": "#b5ffff",
+      "lineColor": "#334455",
+      "fontColor": "#112233",
+      "alpha": 220,
+      "lineAlpha": 190,
+      "fontStyle": {
+        "family": "Arial",
+        "sizePt": 10,
+        "bold": false,
+        "italic": true
+      },
+      "labelExpression": "${if:${property:team}:Team:${name}}\\n${nvl:${property:missing}:Fallback}"
+    },
+    {
+      "id": "ref",
+      "nodeType": "ref",
+      "refViewId": "reference",
+      "viewId": "main",
+      "parentId": "main",
+      "bounds": {
+        "x": 520,
+        "y": 290,
+        "width": 180,
+        "height": 100
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "imagePath": "images/_phase1parityasset00001.png",
+      "imagePosition": 8,
+      "labelExpression": "${name}"
+    }
+  ],
+  "connections": [
+    {
+      "id": "access-connection",
+      "viewId": "main",
+      "connType": "relationship",
+      "relationshipId": "access",
+      "sourceId": "position-0",
+      "targetId": "position-1",
+      "bendpoints": [],
+      "lineColor": "#445566",
+      "lineWidth": 3,
+      "fontStyle": {
+        "family": "Arial",
+        "sizePt": 10,
+        "bold": true,
+        "italic": false
+      },
+      "labelExpression": "$source{name} -> $target{name} ${accessType}"
+    },
+    {
+      "id": "influence-connection",
+      "viewId": "main",
+      "connType": "relationship",
+      "relationshipId": "influence",
+      "sourceId": "position-2",
+      "targetId": "position-3",
+      "bendpoints": [
+        {
+          "startX": 30,
+          "startY": 20,
+          "endX": -30,
+          "endY": -20
+        }
+      ],
+      "lineWidth": 2,
+      "labelExpression": "${name} ${strength}"
+    }
+  ],
+  "assets": [
+    {
+      "id": "images/_phase1parityasset00001.png",
+      "mediaType": "image/png",
+      "sha256": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "byteLength": 68
+    }
+  ]
+}

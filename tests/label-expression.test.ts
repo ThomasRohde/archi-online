@@ -85,6 +85,19 @@ describe('Archi 5.9 label expressions', () => {
     });
   });
 
+  it('reports recursive property cycles instead of leaving an unresolved expression', () => {
+    const model = fixture();
+    model.elements.source.properties.push(
+      { key: 'a', value: '${property:b}' },
+      { key: 'b', value: '${property:a}' },
+    );
+
+    expect(evaluateLabelExpression(model, 'node-source', '${property:a}')).toMatchObject({
+      text: '*** Recursion Error in Label Expression ***',
+      diagnostics: [{ severity: 'error' }],
+    });
+  });
+
   it('round-trips label and appearance feature entries', () => {
     const model = fixture();
     model.nodes['node-source'].labelExpression = '${specialization}';

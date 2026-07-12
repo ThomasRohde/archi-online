@@ -25,11 +25,23 @@ beforeEach(() => {
 
 describe('Archi specializations', () => {
   it('creates, assigns, updates, deletes, and restores profiles transactionally', () => {
+    const imagePath = 'images/_abcdefghijklmnopqrstuv.png';
+    const seeded = createEmptyModel('Profiles');
+    const bytes = new Uint8Array([1, 2, 3]);
+    seeded.assets[imagePath] = {
+      path: imagePath,
+      mediaType: 'image/png',
+      bytes,
+      renderMediaType: 'image/png',
+      renderBytes: bytes,
+      sha256: 'profile-image',
+    };
+    replaceModel(seeded, null);
     const actor = addElement('BusinessActor', 'Customer');
     const profile = createProfile({
       name: 'External party',
       conceptType: 'BusinessActor',
-      imagePath: 'images/_abcdefghijklmnopqrstuv.png',
+      imagePath,
     });
 
     setConceptProfiles(actor, [profile]);
@@ -41,6 +53,9 @@ describe('Archi specializations', () => {
     );
     expect(() => createProfile({ name: 'EXTERNAL PARTY', conceptType: 'BusinessActor' })).toThrow(
       /unique/i,
+    );
+    expect(() => updateProfile(profile, { imagePath: 'images/missing.png' })).toThrow(
+      /missing from the model/i,
     );
 
     deleteProfile(profile);

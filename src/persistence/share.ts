@@ -1,5 +1,9 @@
-import { deflateSync, inflateSync } from 'fflate';
+import { deflateSync, Inflate } from 'fflate';
 import { parseArchimateDocument, serializeArchimateDocument } from '../model/io/archimate-xml';
+import {
+  MAX_INLINE_COMPRESSED_BYTES,
+  MAX_INLINE_DOCUMENT_BYTES,
+} from '../model/io/document-limits';
 import type { ModelState } from '../model/types';
 import {
   fetchGistArchimateBytes,
@@ -66,7 +70,7 @@ export async function encodeModelToInlineShare(
 export async function decodeInlineSharePayload(payload: string): Promise<DecodedInlineModel> {
   try {
     const bytes = base64UrlToBytes(payload);
-    const documentBytes = inflateSync(bytes);
+    const documentBytes = inflateWithLimit(bytes, MAX_INLINE_DOCUMENT_BYTES);
     return { documentBytes, model: await parseArchimateDocument(documentBytes) };
   } catch (cause) {
     throw new ShareLinkError('Could not decode shared model. The link may be incomplete or corrupted.', {
@@ -185,14 +189,38 @@ function bytesToBase64Url(bytes: Uint8Array): string {
 }
 
 function base64UrlToBytes(value: string): Uint8Array {
+  if (value.length > Math.ceil(MAX_INLINE_COMPRESSED_BYTES * 4 / 3) + 4) {
+    throw new Error('Inline share exceeds the compressed size limit');
+  }
   const padded = value
     .replace(/-/g, '+')
     .replace(/_/g, '/')
     .padEnd(Math.ceil(value.length / 4) * 4, '=');
   const binary = atob(padded);
+  if (binary.length > MAX_INLINE_COMPRESSED_BYTES) {
+    throw new Error('Inline share exceeds the compressed size limit');
+  }
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
+}
+
+function inflateWithLimit(bytes: Uint8Array, limit: number): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  const inflater = new Inflate((chunk) => {
+    length += chunk.length;
+    if (length > limit) throw new Error('Inline share exceeds the uncompressed size limit');
+    chunks.push(chunk);
+  });
+  inflater.push(bytes, true);
+  const output = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return output;
 }
 
 function shareFragment(values: { m?: string; gist?: string; raw?: string; view?: string }): string {

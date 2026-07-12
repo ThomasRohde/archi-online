@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-12
+
+### Added
+
+- Desktop Archi 5.9 specializations across model state, properties, palette,
+  model tree, native files, CSV/Open Exchange, and the jArchi-compatible API
+- Native XML/ZIP document I/O with deduplicated archive images, browser-safe
+  TIFF rendering, image galleries, all Desktop image positions, and byte-based
+  autosave, sharing, viewer, launch, and Gist flows
+- Archi 5.9 label expressions, gradients, outline styles and widths, icon
+  controls, derived line colors, opacity controls, and complete font styling
+- Dublin Core metadata, language and organization options, bundled XSD
+  validation/copy, structured atomic interchange reports, and current Archi
+  CSV edge behavior
+- Reciprocal Phase 1 fixtures and an installed Desktop Archi CLI semantic and
+  archive-asset verification gate
+
+### Changed
+
+- Browser build output now targets modern JavaScript required by the pinned
+  browser-side XML schema validator
+- Autosave uses the greenfield version 2 document-byte format; version 1 is not
+  read or migrated
+
 ## [1.2.1] - 2026-07-11
 
 ### Changed

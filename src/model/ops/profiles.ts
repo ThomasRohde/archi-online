@@ -1,7 +1,7 @@
 import { newId } from '../id';
 import { isElementType, isRelationshipType } from '../metamodel';
 import { transact, type ModelStore } from '../store';
-import type { Concept, ConceptType, ModelState, ProfileDefinition } from '../types';
+import type { Concept, ConceptType, ModelAsset, ModelState, ProfileDefinition } from '../types';
 import { pruneUnreferencedAssets } from '../assets';
 
 export interface CreateProfileInput {
@@ -77,6 +77,7 @@ export function createProfile(input: CreateProfileInput, store?: ModelStore): st
     const name = normalizedName(input.name);
     assertConceptType(input.conceptType);
     assertUnique(draft, name, input.conceptType);
+    assertAssetPath(draft, input.imagePath);
     draft.profiles[id] = {
       id,
       name,
@@ -103,6 +104,7 @@ export function updateProfile(
       throw new Error(`Cannot change the concept type of used profile: ${profile.name}`);
     }
     assertUnique(draft, name, conceptType, profileId);
+    if ('imagePath' in patch) assertAssetPath(draft, patch.imagePath);
     profile.name = name;
     profile.conceptType = conceptType;
     if (patch.specialization !== undefined) profile.specialization = patch.specialization;
@@ -144,8 +146,25 @@ export function deleteProfile(profileId: string, store?: ModelStore): void {
   }, store);
 }
 
-export function replaceProfiles(profiles: ProfileDefinition[], store?: ModelStore): void {
+export function replaceProfiles(
+  profiles: ProfileDefinition[],
+  store?: ModelStore,
+  stagedAssets: ModelAsset[] = [],
+): void {
   transact('Manage Specializations', (draft) => {
+    const assetPaths = new Map<string, string>();
+    for (const asset of stagedAssets) {
+      const duplicate = Object.values(draft.assets).find(
+        (candidate) => candidate.sha256 === asset.sha256,
+      );
+      if (duplicate) {
+        assetPaths.set(asset.path, duplicate.path);
+      } else {
+        if (draft.assets[asset.path]) throw new Error(`Image path already exists: ${asset.path}`);
+        draft.assets[asset.path] = asset;
+        assetPaths.set(asset.path, asset.path);
+      }
+    }
     const next: Record<string, ProfileDefinition> = {};
     for (const candidate of profiles) {
       const name = normalizedName(candidate.name);
@@ -169,10 +188,15 @@ export function replaceProfiles(profiles: ProfileDefinition[], store?: ModelStor
       ) {
         throw new Error(`Cannot change the concept type of used profile: ${current.name}`);
       }
+      const imagePath = candidate.imagePath
+        ? (assetPaths.get(candidate.imagePath) ?? candidate.imagePath)
+        : undefined;
+      assertAssetPath(draft, imagePath);
       next[candidate.id] = {
         ...candidate,
         name,
         specialization: candidate.specialization ?? true,
+        imagePath,
       };
     }
     const retained = new Set(Object.keys(next));
@@ -182,4 +206,10 @@ export function replaceProfiles(profiles: ProfileDefinition[], store?: ModelStor
     draft.profiles = next;
     pruneUnreferencedAssets(draft);
   }, store);
+}
+
+function assertAssetPath(state: ModelState, imagePath: string | undefined): void {
+  if (imagePath && !state.assets[imagePath]) {
+    throw new Error(`Profile image is missing from the model: ${imagePath}`);
+  }
 }
