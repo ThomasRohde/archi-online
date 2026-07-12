@@ -1,5 +1,5 @@
 import type { Bounds, DiagramConnection, ModelState } from '../../types';
-import { ARCHIMATE_NS, docTag, propertyTags, tag, textTag, type Attr } from './xml';
+import { ARCHIMATE_NS, docTag, featureTags, propertyTags, serializeFontStyle, tag, textTag, type Attr } from './xml';
 
 export function serializeArchimate(state: ModelState): string {
   const IND = '  ';
@@ -14,21 +14,26 @@ export function serializeArchimate(state: ModelState): string {
   }
 
   function writeConnection(indent: string, conn: DiagramConnection): string {
-    const children: string[] = conn.bendpoints.map((bp) =>
+    const children: string[] = featureTags(indent + IND, {
+      labelExpression: conn.labelExpression,
+      lineStyle: conn.lineStyle,
+      fontAlpha: conn.fontAlpha,
+    });
+    children.push(...conn.bendpoints.map((bp) =>
       tag(indent + IND, 'bendpoint', [
         ['startX', bp.startX !== 0 ? bp.startX : undefined],
         ['startY', bp.startY !== 0 ? bp.startY : undefined],
         ['endX', bp.endX !== 0 ? bp.endX : undefined],
         ['endY', bp.endY !== 0 ? bp.endY : undefined],
       ]),
-    );
+    ));
     return tag(
       indent,
       'sourceConnection',
       [
         ['xsi:type', 'archimate:Connection'],
         ['id', conn.id],
-        ['font', conn.font],
+        ['font', conn.font ?? serializeFontStyle(conn.fontStyle)],
         ['fontColor', conn.fontColor],
         ['lineColor', conn.lineColor],
         ['lineWidth', conn.lineWidth],
@@ -62,23 +67,32 @@ export function serializeArchimate(state: ModelState): string {
         'targetConnections',
         node.targetConnectionIds.length > 0 ? node.targetConnectionIds.join(' ') : undefined,
       ],
-      ['font', node.font],
+      ['font', node.font ?? serializeFontStyle(node.fontStyle)],
       ['fontColor', node.fontColor],
       ['lineColor', node.lineColor],
       ['textAlignment', node.textAlignment],
       ['textPosition', node.textPosition],
       ['alpha', node.alpha],
-      ['lineAlpha', node.lineAlpha],
+      ['lineWidth', node.lineWidth],
       ['borderType', node.nodeType === 'group' || node.nodeType === 'note' ? node.borderType : undefined],
       ['fillColor', node.fillColor],
       ['imagePath', node.imagePath],
-      ['imageSource', node.imageSource],
       ['imagePosition', node.imagePosition],
       ['archimateElement', node.nodeType === 'element' ? node.elementId : undefined],
       ['type', node.nodeType === 'element' ? node.figureType : undefined],
       ['model', node.nodeType === 'ref' ? node.refViewId : undefined],
     ];
-    const children: string[] = [writeBounds(indent + IND, node.bounds)];
+    const children: string[] = [writeBounds(indent + IND, node.bounds), ...featureTags(indent + IND, {
+      labelExpression: node.labelExpression,
+      gradient: node.gradient,
+      lineStyle: node.lineStyle,
+      iconVisible: node.iconVisible,
+      iconColor: node.iconColor,
+      deriveElementLineColor: node.derivedLineColor,
+      fontAlpha: node.fontAlpha,
+      lineAlpha: node.lineAlpha,
+      imageSource: node.imageSource,
+    })];
     for (const connId of node.sourceConnectionIds) {
       const conn = state.connections[connId];
       if (conn) children.push(writeConnection(indent + IND, conn));
@@ -158,6 +172,7 @@ export function serializeArchimate(state: ModelState): string {
     for (const itemId of folder.itemIds) children.push(writeItem(indent + IND, itemId));
     children.push(...docTag(indent + IND, folder.documentation));
     children.push(...propertyTags(indent + IND, folder.properties));
+    children.push(...featureTags(indent + IND, { labelExpression: folder.labelExpression }));
     return tag(indent, 'folder', [
       ['name', folder.name],
       ['id', folder.id],

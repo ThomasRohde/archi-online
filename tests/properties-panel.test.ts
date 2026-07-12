@@ -164,8 +164,8 @@ describe('properties Appearance tab', () => {
     ]) {
       expect(field(host, label)).toBeTruthy();
     }
-    expect(field(host, 'Gradient').querySelector('select')?.disabled).toBe(true);
-    expect(field(host, 'Line Style').querySelector('button')?.disabled).toBe(true);
+    expect(field(host, 'Gradient').querySelector('select')?.disabled).toBe(false);
+    expect(field(host, 'Line Style').querySelector('select')?.disabled).toBe(false);
 
     await changeInput(field(host, 'Fill Opacity').querySelector('input')!, '128');
     await changeInput(field(host, 'Line Opacity').querySelector('input')!, '64');
@@ -173,6 +173,9 @@ describe('properties Appearance tab', () => {
     await click(field(host, 'Text Position').querySelector('[aria-label="Position top"]')!);
     await changeInput(field(host, 'Font Colour').querySelector('input[type="color"]')!, '#112233');
     await changeSelect(field(host, 'Figure').querySelector('select')!, '1');
+    await changeSelect(field(host, 'Gradient').querySelector('select')!, '3');
+    await changeSelect(field(host, 'Line Style').querySelector('select')!, '2');
+    await changeSelect(field(host, 'Line Width').querySelector('select')!, '3');
 
     expect(model().nodes[nodeId]).toMatchObject({
       alpha: 128,
@@ -181,11 +184,34 @@ describe('properties Appearance tab', () => {
       textPosition: 0,
       fontColor: '#112233',
       figureType: 1,
+      gradient: 3,
+      lineStyle: 2,
+      lineWidth: 3,
     });
 
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it('previews and commits a label expression for a visual object', async () => {
+    const actorId = addElement('BusinessActor', 'Actor');
+    const viewId = addView('View');
+    const nodeId = addElementNodeToView(viewId, actorId, viewId, { x: 10, y: 10, width: 120, height: 55 });
+    setSelection('view', [nodeId]);
+    const { host, root } = await renderPropertiesPanel();
+    await click(Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Label')!);
+    const textarea = host.querySelector<HTMLTextAreaElement>('[aria-label="Label expression"]')!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      setter?.call(textarea, '${type}: ${name}');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(host.querySelector('.label-expression-preview')?.textContent).toBe('Business Actor: Actor');
+    await act(async () => textarea.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(model().nodes[nodeId].labelExpression).toBe('${type}: ${name}');
+    await act(async () => root.unmount());
   });
 
   it('renders Archi-style connection appearance controls and applies connection style edits', async () => {

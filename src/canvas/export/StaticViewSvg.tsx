@@ -4,6 +4,7 @@ import { connectionPolyline } from '../geometry';
 import { NodeFigure } from '../figures/NodeFigure';
 import { computeAbsBounds } from '../view-editor/bounds';
 import { assetDataUrl } from '../../model/assets';
+import { evaluateLabelExpression } from '../../model/label-expression';
 
 function StaticNode({ model, nodeId }: { model: ModelState; nodeId: string }) {
   const node = model.nodes[nodeId];
@@ -26,6 +27,7 @@ function StaticNode({ model, nodeId }: { model: ModelState; nodeId: string }) {
         width={width}
         height={height}
         imageUrl={imageUrl}
+        displayLabel={node.labelExpression !== undefined ? evaluateLabelExpression(model, nodeId, node.labelExpression).text : undefined}
       />
       {node.childIds.map((cid) => (
         <StaticNode key={cid} model={model} nodeId={cid} />
@@ -62,6 +64,7 @@ export function StaticViewContent({ model, viewId }: { model: ModelState; viewId
               rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
               points={connectionPolyline(src, tgt, conn.bendpoints)}
               selected={false}
+              displayLabel={conn.labelExpression !== undefined ? evaluateLabelExpression(model, conn.id, conn.labelExpression).text : undefined}
             />
           );
         })}

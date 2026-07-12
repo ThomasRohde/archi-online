@@ -26,12 +26,13 @@ import type { ModelState, Property } from '../model/types';
 import { AppearanceTab } from './properties/AppearanceTab';
 import { AnalysisTab } from './properties/AnalysisTab';
 import { ImageTab } from './properties/ImageTab';
+import { LabelTab } from './properties/LabelTab';
 import { conceptName, resolveTarget, type Target } from './properties/target';
 
 // Well-known viewpoints for the picker, sorted by their friendly display name.
 const VIEWPOINTS_BY_NAME = [...VIEWPOINTS].sort((a, b) => a.name.localeCompare(b.name));
 
-type Tab = 'main' | 'properties' | 'analysis' | 'appearance' | 'image';
+type Tab = 'main' | 'properties' | 'analysis' | 'appearance' | 'label' | 'image';
 
 /** Text input that keeps local state and commits on blur/Enter. */
 function CommitInput({
@@ -296,6 +297,9 @@ export function PropertiesPanel() {
       (model.elements[target.conceptId] || model.relationships[target.conceptId]),
   );
   const supportsImage = Boolean(target?.count === 1 && target.node);
+  const labelObjectId = target?.count === 1
+    ? target.node?.id ?? target.connection?.id ?? (target.conceptId && model?.folders[target.conceptId] ? target.conceptId : undefined)
+    : undefined;
   useEffect(() => {
     if ((readOnly && tab === 'appearance') || (tab === 'analysis' && !supportsAnalysis)) {
       setTab('main');
@@ -315,6 +319,7 @@ export function PropertiesPanel() {
             'properties',
             ...(supportsAnalysis ? ['analysis'] : []),
             ...(readOnly ? [] : ['appearance']),
+            ...(labelObjectId ? ['label'] : []),
             ...(supportsImage ? ['image'] : []),
           ] as Tab[]).map((t) => (
             <button
@@ -330,6 +335,8 @@ export function PropertiesPanel() {
                   ? 'Analysis'
                     : t === 'appearance'
                       ? 'Appearance'
+                      : t === 'label'
+                        ? 'Label'
                       : 'Image'}
             </button>
           ))}
@@ -499,6 +506,7 @@ export function PropertiesPanel() {
             <AnalysisTab model={model} conceptId={target.conceptId} />
           )}
           {tab === 'appearance' && !readOnly && <AppearanceTab target={target} readOnly={readOnly} />}
+          {tab === 'label' && labelObjectId && <LabelTab model={model} objectId={labelObjectId} readOnly={readOnly} />}
           {tab === 'image' && supportsImage && <ImageTab target={target} readOnly={readOnly} />}
         </div>
       </div>

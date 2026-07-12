@@ -1,4 +1,4 @@
-import { relationshipLabel } from '../model/metamodel';
+import { labelForModelTreeItem } from '../model/label-expression';
 import type { ModelState } from '../model/types';
 
 /**
@@ -19,18 +19,13 @@ export type TreeTypeFilter =
  * matches exactly what the user sees. */
 export function treeItemLabel(model: ModelState, id: string): string {
   const el = model.elements[id];
-  if (el) return el.name;
+  if (el) return labelForModelTreeItem(model, id);
   const rel = model.relationships[id];
-  if (rel) {
-    const src = model.elements[rel.sourceId] ?? model.relationships[rel.sourceId];
-    const tgt = model.elements[rel.targetId] ?? model.relationships[rel.targetId];
-    const base = rel.name !== '' ? rel.name : relationshipLabel(rel.type);
-    return `${base} (${src?.name ?? '?'} → ${tgt?.name ?? '?'})`;
-  }
+  if (rel) return labelForModelTreeItem(model, id);
   const view = model.views[id];
-  if (view) return view.name;
+  if (view) return labelForModelTreeItem(model, id);
   const folder = model.folders[id];
-  if (folder) return folder.name;
+  if (folder) return labelForModelTreeItem(model, id);
   return '?';
 }
 
@@ -60,7 +55,7 @@ export function computeVisibleTreeItems(
 
   for (const el of Object.values(model.elements)) {
     if (type !== 'all' && type !== 'elements' && type !== el.type) continue;
-    if (nameMatches(el.name)) addWithAncestors(el.id, el.folderId);
+    if (nameMatches(treeItemLabel(model, el.id))) addWithAncestors(el.id, el.folderId);
   }
   for (const rel of Object.values(model.relationships)) {
     if (type !== 'all' && type !== 'relationships' && type !== rel.type) continue;
@@ -68,13 +63,13 @@ export function computeVisibleTreeItems(
   }
   for (const view of Object.values(model.views)) {
     if (type !== 'all' && type !== 'views') continue;
-    if (nameMatches(view.name)) addWithAncestors(view.id, view.folderId);
+    if (nameMatches(treeItemLabel(model, view.id))) addWithAncestors(view.id, view.folderId);
   }
   // Folders match by their own name only when searching text or explicitly
   // filtering for folders; a bare type filter shouldn't flood with folders.
   if ((type === 'all' && needle) || type === 'folders') {
     for (const folder of Object.values(model.folders)) {
-      if (nameMatches(folder.name)) addWithAncestors(folder.id, folder.parentId);
+      if (nameMatches(treeItemLabel(model, folder.id))) addWithAncestors(folder.id, folder.parentId);
     }
   }
   return visible;

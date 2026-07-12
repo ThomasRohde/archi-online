@@ -204,17 +204,30 @@ export interface ConnectionViewProps {
   c4ViewType?: C4ViewType;
   /** Dim the connection because an endpoint element is outside the viewpoint. */
   ghosted?: boolean;
+  displayLabel?: string;
 }
 
-export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghosted }: ConnectionViewProps) {
+export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghosted, displayLabel }: ConnectionViewProps) {
   if (points.length < 2) return null;
   const isC4Relationship = !!c4ViewType && !!rel;
   const color = conn.lineColor ?? (isC4Relationship ? C4_VISUAL_DEFAULTS.relationshipLine : DEFAULT_LINE);
-  const style = isC4Relationship ? c4StyleFor() : styleFor(rel);
+  const nativeStyle = isC4Relationship ? c4StyleFor() : styleFor(rel);
+  const style = {
+    ...nativeStyle,
+    dash: conn.lineStyle === 0 || conn.lineStyle === -1
+      ? undefined
+      : conn.lineStyle === 1
+        ? '6 4'
+        : conn.lineStyle === 2
+          ? '2 3'
+          : nativeStyle.dash,
+  };
   const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
 
   let labelLines: string[] = [];
-  if (rel && isC4Relationship) {
+  if (displayLabel !== undefined) {
+    labelLines = displayLabel.split(/\r?\n/).filter(Boolean);
+  } else if (rel && isC4Relationship) {
     const parts = c4RelationshipLabelParts(rel);
     labelLines = [
       c4RelationshipIntentLine(parts),
@@ -227,7 +240,9 @@ export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghoste
     }
     labelLines = labelText.split(/\r?\n/).filter(Boolean);
   }
-  const font = parseFont(conn.font);
+  const font = conn.fontStyle
+    ? { family: conn.fontStyle.family, sizePx: conn.fontStyle.sizePt * (4 / 3), bold: conn.fontStyle.bold, italic: conn.fontStyle.italic }
+    : parseFont(conn.font);
   const t = conn.textPosition === 0 ? 0.15 : conn.textPosition === 2 ? 0.85 : 0.5;
   const mid = pointAlong(points, t).point;
   const labelColor = conn.fontColor ?? (isC4Relationship ? C4_VISUAL_DEFAULTS.relationshipText : '#000000');
@@ -244,7 +259,7 @@ export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghoste
         d={d}
         data-c4-relationship={isC4Relationship ? 'true' : undefined}
         fill="none"
-        stroke={selected ? '#2a6cc4' : color}
+        stroke={conn.lineStyle === 3 ? 'none' : selected ? '#2a6cc4' : color}
         strokeWidth={(conn.lineWidth ?? 1) * (selected ? 1.6 : 1)}
         strokeDasharray={style.dash}
       />
@@ -259,6 +274,7 @@ export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghoste
           fontWeight={font.bold ? 700 : 400}
           fontStyle={font.italic ? 'italic' : 'normal'}
           fill={labelColor}
+          opacity={(conn.fontAlpha ?? 255) / 255}
           paintOrder="stroke"
           stroke="#ffffff"
           strokeWidth={3}

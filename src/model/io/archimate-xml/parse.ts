@@ -1,4 +1,5 @@
 import { newId } from '../../id';
+import { parseFontStyle } from '../../font-style';
 import { isElementType, isRelationshipType } from '../../metamodel';
 import type {
   ArchimateElement,
@@ -18,6 +19,8 @@ import {
   intAttr,
   parseBounds,
   parseDocumentation,
+  feature,
+  intFeature,
   parseNodeStyle,
   parseProperties,
   strAttr,
@@ -116,8 +119,8 @@ export function parseArchimate(xml: string): ModelState {
     }
     parseNodeStyle(el, node);
     node.imagePath = strAttr(el, 'imagePath') ?? node.imagePath;
-    node.imageSource = intAttr(el, 'imageSource') as 0 | 1 | undefined;
-    node.imagePosition = intAttr(el, 'imagePosition');
+    node.imageSource = node.imageSource ?? (intAttr(el, 'imageSource') as 0 | 1 | undefined);
+    node.imagePosition = intAttr(el, 'imagePosition') as DiagramNode['imagePosition'];
     const tc = el.getAttribute('targetConnections');
     if (tc) targetOrder.set(id, tc.split(/\s+/).filter(Boolean));
     state.nodes[id] = node;
@@ -163,6 +166,7 @@ export function parseArchimate(xml: string): ModelState {
       folderType: (el.getAttribute('type') as FolderType | null) ?? undefined,
       documentation: parseDocumentation(el),
       properties: parseProperties(el),
+      labelExpression: feature(el, 'labelExpression'),
       parentId,
       folderIds: [],
       itemIds: [],
@@ -269,9 +273,14 @@ export function parseArchimate(xml: string): ModelState {
       lineColor: strAttr(el, 'lineColor'),
       fontColor: strAttr(el, 'fontColor'),
       font: strAttr(el, 'font'),
-      lineWidth: intAttr(el, 'lineWidth'),
+      fontStyle: undefined,
+      lineWidth: intAttr(el, 'lineWidth') as DiagramConnection['lineWidth'],
       textPosition: intAttr(el, 'textPosition'),
+      labelExpression: feature(el, 'labelExpression'),
+      lineStyle: intFeature(el, 'lineStyle') as DiagramConnection['lineStyle'],
+      fontAlpha: intFeature(el, 'fontAlpha'),
     };
+    conn.fontStyle = parseFontStyle(conn.font);
     state.connections[id] = conn;
     state.nodes[pc.sourceNodeId].sourceConnectionIds.push(id);
   }

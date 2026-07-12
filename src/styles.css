@@ -1468,6 +1468,36 @@ body {
   row-gap: 12px;
 }
 
+.appearance-font-controls {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) 58px 28px 28px;
+  gap: 4px;
+}
+
+.appearance-font-controls input,
+.appearance-font-controls button {
+  min-width: 0;
+  height: 26px;
+}
+
+.appearance-font-controls button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.label-expression-preview {
+  display: block;
+  min-height: 42px;
+  padding: 7px 8px;
+  white-space: pre-wrap;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.label-expression-error {
+  color: var(--danger, #b42318);
+}
+
 .appearance-column {
   display: flex;
   flex-direction: column;

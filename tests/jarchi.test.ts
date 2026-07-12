@@ -180,6 +180,27 @@ describe('jArchi scripting API', () => {
     expect(child.bounds).toEqual({ x: 10, y: 40, width: 100, height: 40 });
   });
 
+  it('exposes Archi 5.9 label and appearance fields', () => {
+    const { logs, error } = run(`
+      var actor = model.createElement("business-actor", "Actor");
+      var role = model.createElement("business-role", "Role");
+      var rel = model.createRelationship("assignment-relationship", "assigned", actor, role);
+      var view = model.createArchimateView("View");
+      var source = view.add(actor, 10, 10, 120, 55);
+      var target = view.add(role, 220, 10, 120, 55);
+      var connection = view.add(rel, source, target);
+      source.labelExpression = "\${name}";
+      source.gradient = 3; source.lineStyle = 2; source.lineWidth = 3;
+      source.imageSource = 1; source.imagePosition = 9;
+      connection.labelExpression = "\${source:name}";
+      connection.lineStyle = 1; connection.lineWidth = 2;
+      console.log(source.labelExpression, source.gradient, source.lineStyle, source.lineWidth, source.imageSource, source.imagePosition);
+      console.log(connection.labelExpression, connection.lineStyle, connection.lineWidth);
+    `);
+    expect(error).toBeUndefined();
+    expect(logs).toEqual(['log:${name} 3 2 3 1 9', 'log:${source:name} 1 2']);
+  });
+
   it('exposes diagram automation traversal helpers', () => {
     const { logs, error } = run(`
       var actor = model.createElement("business-actor", "Actor");

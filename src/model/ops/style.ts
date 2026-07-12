@@ -1,5 +1,5 @@
 import { transact, type ModelStore } from '../store';
-import type { DiagramConnection } from '../types';
+import type { DiagramConnection, FontStyle, ImagePosition } from '../types';
 import { pruneUnreferencedAssets } from '../assets';
 
 export interface NodeStyle {
@@ -12,10 +12,17 @@ export interface NodeStyle {
   textAlignment?: number | undefined;
   textPosition?: number | undefined;
   figureType?: number | undefined;
-  lineWidth?: number | undefined;
+  lineWidth?: 1 | 2 | 3 | undefined;
   imagePath?: string | undefined;
   imageSource?: 0 | 1 | undefined;
-  imagePosition?: number | undefined;
+  imagePosition?: ImagePosition | undefined;
+  gradient?: -1 | 0 | 1 | 2 | 3 | undefined;
+  lineStyle?: -1 | 0 | 1 | 2 | 3 | undefined;
+  iconVisible?: 0 | 1 | 2 | undefined;
+  iconColor?: string | undefined;
+  derivedLineColor?: boolean | undefined;
+  fontStyle?: FontStyle | undefined;
+  fontAlpha?: number | undefined;
 }
 
 export function setNodeStyle(ids: string[], style: NodeStyle, store?: ModelStore): void {
@@ -25,7 +32,9 @@ export function setNodeStyle(ids: string[], style: NodeStyle, store?: ModelStore
       if (node) {
         const nodeStyle = { ...style };
         delete nodeStyle.lineWidth;
+        if ('lineWidth' in style) node.lineWidth = style.lineWidth;
         Object.assign(node, nodeStyle);
+        if ('fontStyle' in style) node.font = undefined;
         continue;
       }
       const conn = draft.connections[id];
@@ -35,9 +44,20 @@ export function setNodeStyle(ids: string[], style: NodeStyle, store?: ModelStore
         if ('font' in style) conn.font = style.font;
         if ('lineWidth' in style) conn.lineWidth = style.lineWidth;
         if ('textPosition' in style) conn.textPosition = style.textPosition;
+        if ('lineStyle' in style) conn.lineStyle = style.lineStyle;
+        if ('fontStyle' in style) conn.fontStyle = style.fontStyle;
+        if ('fontStyle' in style) conn.font = undefined;
+        if ('fontAlpha' in style) conn.fontAlpha = style.fontAlpha;
       }
     }
     pruneUnreferencedAssets(draft);
+  }, store);
+}
+
+export function setLabelExpression(id: string, expression: string | undefined, store?: ModelStore): void {
+  transact('Change Label Expression', (draft) => {
+    const target = draft.nodes[id] ?? draft.connections[id] ?? draft.folders[id];
+    if (target) target.labelExpression = expression || undefined;
   }, store);
 }
 

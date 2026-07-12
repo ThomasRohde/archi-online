@@ -36,6 +36,12 @@ declare interface JVisual extends JObject {
   lineColor: string | undefined;
   fontColor: string | undefined;
   opacity: number;
+  labelExpression: string | undefined;
+  gradient: number;
+  lineStyle: number;
+  lineWidth: number;
+  imageSource: number;
+  imagePosition: number;
   text: string;
   /** Add a nested element (coordinates relative to this container). */
   add(element: JConcept, x: number, y: number, width: number, height: number): JVisual;
@@ -51,6 +57,9 @@ declare interface JConnection extends JObject {
   readonly source: JVisual;
   readonly target: JVisual;
   lineColor: string | undefined;
+  labelExpression: string | undefined;
+  lineStyle: number;
+  lineWidth: number;
   bendpoints: JBendpoint[];
   absoluteRoute(): JPoint[];
   setAbsoluteRoute(points: JPoint[]): void;
@@ -72,7 +81,9 @@ declare interface JView extends JObject {
   openInUI(): void;
 }
 
-declare interface JFolder extends JObject {}
+declare interface JFolder extends JObject {
+  labelExpression: string | undefined;
+}
 
 declare interface JCollection {
   size(): number;

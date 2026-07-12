@@ -8,6 +8,7 @@ import type { Bounds } from '../model/types';
 import { setCanvasStatus } from '../ui/canvas-status';
 import { useSettingsStore } from '../settings/app-settings';
 import { ConnectionView } from './ConnectionView';
+import { evaluateLabelExpression } from '../model/label-expression';
 import { connectionPolyline, type Point } from './geometry';
 import { computeAbsBounds, deriveLiveViewState } from './view-editor/bounds';
 import { NodeView } from './view-editor/NodeView';
@@ -221,6 +222,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
                     isNodeGhosted(model, conn.sourceId, view.viewpoint) ||
                     isNodeGhosted(model, conn.targetId, view.viewpoint)
                   }
+                  displayLabel={conn.labelExpression !== undefined ? evaluateLabelExpression(model, conn.id, conn.labelExpression).text : undefined}
                 />
               );
             })}
@@ -363,6 +365,7 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
                     isNodeGhosted(model, conn.sourceId, view.viewpoint) ||
                     isNodeGhosted(model, conn.targetId, view.viewpoint)
                   }
+                  displayLabel={conn.labelExpression !== undefined ? evaluateLabelExpression(model, conn.id, conn.labelExpression).text : undefined}
                 />
               );
             })}

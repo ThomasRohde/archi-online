@@ -217,6 +217,8 @@ export interface FigureProps {
   height: number;
   c4ViewType?: C4ViewType;
   imageUrl?: string;
+  /** Evaluated label expression. Undefined keeps the native/default label. */
+  displayLabel?: string;
 }
 
 /** The visual shape + label of one diagram node (position handled by parent <g>). */
@@ -228,12 +230,53 @@ export function NodeFigure({
   height: h,
   c4ViewType,
   imageUrl,
+  displayLabel,
 }: FigureProps) {
-  const font = parseFont(node.font);
+  const font = node.fontStyle
+    ? { family: node.fontStyle.family, sizePx: node.fontStyle.sizePt * (4 / 3), bold: node.fontStyle.bold, italic: node.fontStyle.italic }
+    : parseFont(node.font);
   const alpha = (node.alpha ?? 255) / 255;
   const lineAlpha = (node.lineAlpha ?? 255) / 255;
-  const stroke = node.lineColor ?? DEFAULT_LINE;
+  const defaultFillForLine = node.nodeType === 'element'
+    ? ELEMENT_TYPE_MAP[element?.type ?? 'BusinessActor'].fill
+    : node.nodeType === 'group'
+      ? '#d2d7dd'
+      : node.nodeType === 'ref'
+        ? '#dcebeb'
+        : '#ffffff';
+  const derivedStroke = darken(node.fillColor ?? defaultFillForLine);
+  const stroke = node.lineStyle === 3
+    ? 'none'
+    : (node.derivedLineColor ?? true)
+      ? derivedStroke
+      : node.lineColor ?? DEFAULT_LINE;
+  const strokeWidth = node.lineWidth ?? 1;
+  const strokeDasharray = node.lineStyle === 1 ? '6 4' : node.lineStyle === 2 ? '2 3' : undefined;
   const fontColor = node.fontColor ?? '#000000';
+  const outline = { stroke, strokeOpacity: lineAlpha, strokeWidth, strokeDasharray };
+  const gradientId = `gradient-${node.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  const gradient = node.gradient ?? -1;
+  const gradientVector = gradient === 0
+    ? { x1: '0%', y1: '0%', x2: '0%', y2: '115%' }
+    : gradient === 1
+      ? { x1: '0%', y1: '0%', x2: '115%', y2: '0%' }
+      : gradient === 2
+        ? { x1: '100%', y1: '0%', x2: '-15%', y2: '0%' }
+        : { x1: '0%', y1: '100%', x2: '0%', y2: '-15%' };
+  function gradientPaint(fill: string) {
+    return gradient >= 0 ? {
+      fill: `url(#${gradientId})`,
+      opacity: 1,
+      definition: (
+        <defs>
+          <linearGradient id={gradientId} {...gradientVector}>
+            <stop offset="0%" stopColor={fill} stopOpacity={alpha} />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity={alpha} />
+          </linearGradient>
+        </defs>
+      ),
+    } : { fill, opacity: alpha, definition: null };
+  }
   const imageFigure = (() => {
     if (!imageUrl) return null;
     const position = node.imagePosition ?? (node.nodeType === 'image' ? 9 : 2);
@@ -261,6 +304,7 @@ export function NodeFigure({
     fontWeight: font.bold ? 700 : 400,
     fontStyle: font.italic ? 'italic' : 'normal',
     color: fontColor,
+    opacity: (node.fontAlpha ?? 255) / 255,
     overflow: 'hidden',
     lineHeight: 1.25,
     wordBreak: 'break-word',
@@ -300,7 +344,7 @@ export function NodeFigure({
   function icon(type: ElementType) {
     if (!ARCHI_ICONS[type] || w < 40) return null;
     return (
-      <g color={stroke}>
+      <g color={node.iconColor ?? stroke}>
         <NodeIcon type={type} width={w} />
       </g>
     );
@@ -374,7 +418,7 @@ export function NodeFigure({
     );
   }
 
-  function c4DatabaseBody(fill: string, lineColor: string, visual: C4VisualStyle) {
+  function c4DatabaseBody(fill: string, fillOpacity: number, lineColor: string, visual: C4VisualStyle) {
     const capH = Math.min(24, Math.max(14, h * 0.24));
     return (
       <g>
@@ -382,9 +426,11 @@ export function NodeFigure({
           data-c4-shape={visual.shape}
           d={`M0,${capH / 2} V${h - capH / 2} C0,${h + capH / 2} ${w},${h + capH / 2} ${w},${h - capH / 2} V${capH / 2} C${w},${capH * 1.5} 0,${capH * 1.5} 0,${capH / 2} Z`}
           fill={fill}
-          fillOpacity={alpha}
-          stroke={lineColor}
+          fillOpacity={fillOpacity}
+          stroke={node.lineStyle === 3 ? 'none' : lineColor}
           strokeOpacity={lineAlpha}
+          strokeWidth={strokeWidth}
+          strokeDasharray={strokeDasharray}
         />
         <ellipse
           cx={w / 2}
@@ -392,9 +438,11 @@ export function NodeFigure({
           rx={w / 2}
           ry={capH / 2}
           fill={fill}
-          fillOpacity={alpha}
-          stroke={lineColor}
+          fillOpacity={fillOpacity}
+          stroke={node.lineStyle === 3 ? 'none' : lineColor}
           strokeOpacity={lineAlpha}
+          strokeWidth={strokeWidth}
+          strokeDasharray={strokeDasharray}
         />
       </g>
     );
@@ -406,30 +454,33 @@ export function NodeFigure({
     const fill = node.fillColor ?? visual.fillColor;
     const lineColor = node.lineColor ?? visual.lineColor;
     const textColor = node.fontColor ?? visual.fontColor;
+    const paint = gradientPaint(fill);
 
     if (visual.shape === 'boundary') {
       return (
         <g>
+          {paint.definition}
           <rect
             data-c4-shape={visual.shape}
             width={w}
             height={h}
             rx={6}
             ry={6}
-            fill={fill}
-            fillOpacity={alpha}
-            stroke={lineColor}
+            fill={paint.fill}
+            fillOpacity={paint.opacity}
+            stroke={node.lineStyle === 3 ? 'none' : lineColor}
             strokeOpacity={lineAlpha}
-            strokeDasharray="8 5"
+            strokeWidth={strokeWidth}
+            strokeDasharray={strokeDasharray ?? '8 5'}
           />
-          {c4BoundaryLabel(parts, textColor)}
+          {displayLabel !== undefined ? label(displayLabel, { align: 'left', vert: 'top', inset: 8 }) : c4BoundaryLabel(parts, textColor)}
         </g>
       );
     }
 
     const body =
       visual.shape === 'database' ? (
-        c4DatabaseBody(fill, lineColor, visual)
+        c4DatabaseBody(paint.fill, paint.opacity, lineColor, visual)
       ) : (
         <rect
           data-c4-shape={visual.shape}
@@ -437,17 +488,20 @@ export function NodeFigure({
           height={h}
           rx={4}
           ry={4}
-          fill={fill}
-          fillOpacity={alpha}
-          stroke={lineColor}
+          fill={paint.fill}
+          fillOpacity={paint.opacity}
+          stroke={node.lineStyle === 3 ? 'none' : lineColor}
           strokeOpacity={lineAlpha}
+          strokeWidth={strokeWidth}
+          strokeDasharray={strokeDasharray}
         />
       );
 
     return (
       <g>
+        {paint.definition}
         {body}
-        {c4StructuredLabel(parts, textColor, 10)}
+        {displayLabel !== undefined ? label(displayLabel, { inset: 10 }) : c4StructuredLabel(parts, textColor, 10)}
       </g>
     );
   }
@@ -457,54 +511,57 @@ export function NodeFigure({
 
   if (node.nodeType === 'note') {
     const fill = node.fillColor ?? '#ffffff';
+    const paint = gradientPaint(fill);
     const border = node.borderType ?? 0;
     return (
       <g>
+        {paint.definition}
         {border === 0 ? (
           <path
             d={`M0,0 H${w} V${h - 12} L${w - 12},${h} H0 Z`}
-            fill={fill}
-            fillOpacity={alpha}
-            stroke={stroke}
-            strokeOpacity={lineAlpha}
+            fill={paint.fill}
+            fillOpacity={paint.opacity}
+            {...outline}
           />
         ) : (
           <rect
             width={w}
             height={h}
-            fill={fill}
-            fillOpacity={alpha}
+            fill={paint.fill}
+            fillOpacity={paint.opacity}
+            {...outline}
             stroke={border === 2 ? 'none' : stroke}
-            strokeOpacity={lineAlpha}
           />
         )}
         {imageFigure}
-        {label(node.content, { align: alignOf('left'), vert: vertOf('top') })}
+        {label(displayLabel ?? node.content, { align: alignOf('left'), vert: vertOf('top') })}
       </g>
     );
   }
 
   if (node.nodeType === 'group') {
     const fill = node.fillColor ?? '#d2d7dd';
+    const paint = gradientPaint(fill);
     const tabW = Math.min(w / 2, 120);
     const tabH = 18;
     if ((node.borderType ?? 0) === 1) {
       return (
         <g>
-          <rect width={w} height={h} fill={fill} fillOpacity={alpha} stroke={stroke} strokeOpacity={lineAlpha} />
+          {paint.definition}
+          <rect width={w} height={h} fill={paint.fill} fillOpacity={paint.opacity} {...outline} />
           {imageFigure}
-          {label(node.name, { vert: vertOf('top') })}
+          {label(displayLabel ?? node.name, { vert: vertOf('top') })}
         </g>
       );
     }
     return (
       <g>
+        {paint.definition}
         <path
           d={`M0,${tabH} V${h} H${w} V${tabH} H${tabW} M0,${tabH} V0 H${tabW} V${tabH} H0 Z`}
-          fill={fill}
-          fillOpacity={alpha}
-          stroke={stroke}
-          strokeOpacity={lineAlpha}
+          fill={paint.fill}
+          fillOpacity={paint.opacity}
+          {...outline}
         />
         {imageFigure}
         <foreignObject x={0} y={0} width={tabW} height={tabH}>
@@ -518,7 +575,7 @@ export function NodeFigure({
               textOverflow: 'ellipsis',
             }}
           >
-            {node.name}
+            {displayLabel ?? node.name}
           </div>
         </foreignObject>
       </g>
@@ -527,9 +584,11 @@ export function NodeFigure({
 
   if (node.nodeType === 'ref') {
     const fill = node.fillColor ?? '#dcebeb';
+    const paint = gradientPaint(fill);
     return (
       <g>
-        <rect width={w} height={h} fill={fill} fillOpacity={alpha} stroke={stroke} strokeOpacity={lineAlpha} />
+        {paint.definition}
+        <rect width={w} height={h} fill={paint.fill} fillOpacity={paint.opacity} {...outline} />
         {imageFigure}
         <g transform={`translate(${w - 20}, 3)`} color={stroke} style={{ pointerEvents: 'none' }}>
           <g fill="none" stroke="currentColor" strokeWidth="1.1">
@@ -538,7 +597,7 @@ export function NodeFigure({
             <path d="M5.2 6.5 V10.7 H8.5" />
           </g>
         </g>
-        {label(refView?.name ?? '')}
+        {label(displayLabel ?? refView?.name ?? '')}
       </g>
     );
   }
@@ -552,11 +611,11 @@ export function NodeFigure({
   const figureType = node.nodeType === 'element' ? (node.figureType ?? 0) : 0;
   const kind = shapeFor(type, figureType);
   const fill = node.fillColor ?? def.fill;
+  const paint = gradientPaint(fill);
   const common = {
-    fill,
-    fillOpacity: alpha,
-    stroke,
-    strokeOpacity: lineAlpha,
+    fill: paint.fill,
+    fillOpacity: paint.opacity,
+    ...outline,
   };
 
   if (kind === 'junction') {
@@ -709,13 +768,23 @@ export function NodeFigure({
   }
 
   // corner icons belong to the default figure; alternate figures are the notation
-  const showIcon = figureType !== 1 || !ALT_SHAPES[type];
+  const notationAllowsIcon = figureType !== 1 || !ALT_SHAPES[type];
+  const showIcon = notationAllowsIcon && node.iconVisible !== 2 && (node.iconVisible === 1 || !imageUrl);
   return (
     <g>
+      {paint.definition}
       {body}
       {imageFigure}
       {showIcon && icon(type)}
-      {label(element?.name ?? '')}
+      {label(displayLabel ?? element?.name ?? '')}
     </g>
   );
+}
+
+function darken(color: string): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) return DEFAULT_LINE;
+  const value = Number.parseInt(match[1], 16);
+  const channel = (shift: number) => Math.max(0, Math.floor(((value >> shift) & 0xff) * 0.7));
+  return `#${[channel(16), channel(8), channel(0)].map((part) => part.toString(16).padStart(2, '0')).join('')}`;
 }

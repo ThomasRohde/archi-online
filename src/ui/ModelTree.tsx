@@ -614,7 +614,7 @@ function ModelTreeInner({
             id={folderId}
             depth={depth}
             icon={<span className="tree-chevron">{isCollapsed ? '▸' : '▾'}</span>}
-            label={folder.name}
+            label={itemLabel(folder.id)}
             onContextMenu={(x, y) => showTreeContextMenu(x, y, folderMenu(folder), folderId)}
             draggable={folder.parentId !== null}
             onDropIds={(ids) => moveItemsToFolder(ids, folderId, modelStore)}

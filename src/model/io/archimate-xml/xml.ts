@@ -1,3 +1,4 @@
+import { parseFontStyle, serializeFontStyle } from '../../font-style';
 import type { Bounds, DiagramNode, Property } from '../../types';
 
 export const ARCHIMATE_NS = 'http://www.archimatetool.com/archimate';
@@ -69,10 +70,35 @@ export function parseNodeStyle(el: Element, node: DiagramNode): void {
   node.lineColor = strAttr(el, 'lineColor');
   node.fontColor = strAttr(el, 'fontColor');
   node.font = strAttr(el, 'font');
+  node.fontStyle = parseFontStyle(node.font);
   node.alpha = intAttr(el, 'alpha');
-  node.lineAlpha = intAttr(el, 'lineAlpha');
+  node.lineAlpha = intFeature(el, 'lineAlpha') ?? intAttr(el, 'lineAlpha');
   node.textAlignment = intAttr(el, 'textAlignment');
   node.textPosition = intAttr(el, 'textPosition');
+  node.lineWidth = intAttr(el, 'lineWidth') as DiagramNode['lineWidth'];
+  node.labelExpression = feature(el, 'labelExpression');
+  node.gradient = intFeature(el, 'gradient') as DiagramNode['gradient'];
+  node.lineStyle = intFeature(el, 'lineStyle') as DiagramNode['lineStyle'];
+  node.iconVisible = intFeature(el, 'iconVisible') as DiagramNode['iconVisible'];
+  node.iconColor = feature(el, 'iconColor');
+  node.fontAlpha = intFeature(el, 'fontAlpha');
+  const derive = feature(el, 'deriveElementLineColor');
+  node.derivedLineColor = derive === undefined ? undefined : derive === 'true';
+  node.imageSource = (intFeature(el, 'imageSource') ?? intAttr(el, 'imageSource')) as 0 | 1 | undefined;
+}
+
+export function feature(el: Element, name: string): string | undefined {
+  for (const child of el.children) {
+    if (child.localName === 'feature' && child.getAttribute('name') === name) {
+      return child.getAttribute('value') ?? '';
+    }
+  }
+  return undefined;
+}
+
+export function intFeature(el: Element, name: string): number | undefined {
+  const value = feature(el, name);
+  return value === undefined ? undefined : Number.parseInt(value, 10);
 }
 
 export function esc(s: string): string {
@@ -114,6 +140,14 @@ export function propertyTags(indent: string, properties: Property[]): string[] {
     ]),
   );
 }
+
+export function featureTags(indent: string, entries: Record<string, string | number | boolean | undefined>): string[] {
+  return Object.entries(entries)
+    .filter(([, value]) => value !== undefined)
+    .map(([name, value]) => tag(indent, 'feature', [['name', name], ['value', String(value)]]));
+}
+
+export { serializeFontStyle };
 
 export function docTag(indent: string, documentation: string): string[] {
   return documentation !== '' ? [textTag(indent, 'documentation', documentation)] : [];

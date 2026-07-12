@@ -5,6 +5,7 @@ import type { Point } from '../geometry';
 import { NodeFigure } from '../figures/NodeFigure';
 import { GHOST_OPACITY, isNodeGhosted } from './viewpoint-ghost';
 import { assetDataUrl } from '../../model/assets';
+import { evaluateLabelExpression } from '../../model/label-expression';
 
 export function NodeView({
   model,
@@ -59,6 +60,9 @@ export function NodeView({
   // ghosting). Only the figure dims — the selection outline and nested child
   // nodes keep their own opacity.
   const ghosted = isNodeGhosted(model, nodeId, viewpoint);
+  const displayLabel = node.labelExpression !== undefined
+    ? evaluateLabelExpression(model, nodeId, node.labelExpression).text
+    : undefined;
 
   return (
     <g transform={`translate(${x},${y})`} data-node-id={nodeId} opacity={delta ? 0.75 : 1}>
@@ -71,6 +75,7 @@ export function NodeView({
           height={height}
           c4ViewType={c4ViewType}
           imageUrl={imageUrl}
+          displayLabel={displayLabel}
         />
       </g>
       {(selected || highlight || invalid) && (

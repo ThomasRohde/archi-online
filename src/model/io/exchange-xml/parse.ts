@@ -364,7 +364,7 @@ export function parseExchange(xml: string): ModelState {
       if (styleEl) {
         const lineWidth = styleEl.getAttribute('lineWidth');
         if (lineWidth !== null) {
-          conn.lineWidth = Math.min(3, Math.max(1, parseInt(lineWidth, 10) || 1));
+          conn.lineWidth = Math.min(3, Math.max(1, parseInt(lineWidth, 10) || 1)) as 1 | 2 | 3;
         }
         const lineEl = child(styleEl, 'lineColor');
         if (lineEl) conn.lineColor = rgbAttr(lineEl);

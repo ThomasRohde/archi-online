@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ELEMENT_TYPE_MAP } from '../../model/metamodel';
+import { parseFontStyle } from '../../model/font-style';
 import { setNodeStyle, type NodeStyle } from '../../model/ops';
 import { useModelStoreApi, useStore } from '../store-hooks';
 import type { Target } from './target';
@@ -18,18 +19,6 @@ const FONT_OPTIONS = [
 function buildFontString(name: string, size: number, bold: boolean, italic: boolean): string {
   const style = (bold ? 1 : 0) | (italic ? 2 : 0);
   return `1|${name}|${size}|${style}|`;
-}
-
-function labelForFont(font: string): string {
-  const parts = font.split('|');
-  if (parts.length < 4) return font;
-  const name = parts[1] || 'Segoe UI';
-  const size = Math.round(parseFloat(parts[2])) || 9;
-  const style = parseInt(parts[3], 10) || 0;
-  const suffix = [(style & 1) !== 0 ? 'Bold' : '', (style & 2) !== 0 ? 'Italic' : '']
-    .filter(Boolean)
-    .join(' ');
-  return `${name} ${size}${suffix ? ` ${suffix}` : ''}`;
 }
 
 function clampByte(value: string | number, fallback: number): number {
@@ -160,30 +149,29 @@ function PositionIcon({ position }: { position: 'top' | 'middle' | 'bottom' }) {
   );
 }
 
-function LineStylePreview() {
-  return (
-    <button type="button" className="appearance-line-preview" disabled aria-label="Line style">
-      <span />
-    </button>
-  );
-}
-
-function fontOptions(currentFont: string): { label: string; value: string }[] {
-  if (FONT_OPTIONS.some((option) => option.value === currentFont)) return FONT_OPTIONS;
-  return [{ label: labelForFont(currentFont), value: currentFont }, ...FONT_OPTIONS];
-}
-
 export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: boolean }) {
   const modelStore = useModelStoreApi();
-  if (target.styleIds.length === 0) {
-    return <div className="empty-hint">Select objects on a view to edit their appearance.</div>;
-  }
-
   const apply = (style: NodeStyle) => setNodeStyle(target.styleIds, style, modelStore);
   const node = target.node;
   const conn = target.connection;
   const isConnection = !!conn && !node;
   const currentFont = node?.font ?? conn?.font ?? FONT_OPTIONS[0].value;
+  const currentFontStyle = node?.fontStyle ?? conn?.fontStyle ?? parseFontStyle(currentFont) ?? {
+    family: 'Segoe UI', sizePt: 9, bold: false, italic: false,
+  };
+  const [fontFamilies, setFontFamilies] = useState(['Segoe UI', 'Arial', 'Aptos', 'Calibri', 'Helvetica', 'sans-serif']);
+  useEffect(() => {
+    const query = (window as Window & { queryLocalFonts?: () => Promise<{ family: string }[]> }).queryLocalFonts;
+    if (!query) return;
+    void query().then((fonts) => setFontFamilies([...new Set([...fontFamilies, ...fonts.map((font) => font.family)])].sort()))
+      .catch(() => undefined);
+  // Common-font fallbacks are intentionally stable if permission is denied.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const updateFont = (patch: Partial<typeof currentFontStyle>) => apply({ fontStyle: { ...currentFontStyle, ...patch } });
+  if (target.styleIds.length === 0) {
+    return <div className="empty-hint">Select objects on a view to edit their appearance.</div>;
+  }
   const defaultFill =
     node?.nodeType === 'element'
       ? ELEMENT_TYPE_MAP[
@@ -237,30 +225,30 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
           />
         </AppearanceField>
         <AppearanceField label="Font">
-          <select
-            value={currentFont}
-            disabled={readOnly || (!node && !conn)}
-            onChange={(event) => apply({ font: event.target.value })}
-          >
-            {fontOptions(currentFont).map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <div className="appearance-font-controls">
+            <input list="local-font-families" value={currentFontStyle.family} disabled={readOnly || (!node && !conn)} onChange={(event) => updateFont({ family: event.target.value })} />
+            <datalist id="local-font-families">{fontFamilies.map((family) => <option key={family} value={family} />)}</datalist>
+            <input className="appearance-number" type="number" min={6} max={72} value={currentFontStyle.sizePt} disabled={readOnly || (!node && !conn)} onChange={(event) => updateFont({ sizePt: Math.max(6, Math.min(72, Number(event.target.value) || 9)) })} />
+            <button type="button" className={currentFontStyle.bold ? 'active' : ''} disabled={readOnly || (!node && !conn)} onClick={() => updateFont({ bold: !currentFontStyle.bold })}>B</button>
+            <button type="button" className={currentFontStyle.italic ? 'active' : ''} disabled={readOnly || (!node && !conn)} onClick={() => updateFont({ italic: !currentFontStyle.italic })}><i>I</i></button>
+          </div>
         </AppearanceField>
       </div>
       <div className="appearance-column">
         <AppearanceField label="Gradient">
-          <select value="none" disabled>
-            <option value="none">None</option>
+          <select value={node?.gradient ?? -1} disabled={readOnly || !node} onChange={(event) => apply({ gradient: Number(event.target.value) as -1 | 0 | 1 | 2 | 3 })}>
+            <option value={-1}>None</option>
+            <option value={0}>Top</option>
+            <option value={1}>Left</option>
+            <option value={2}>Right</option>
+            <option value={3}>Bottom</option>
           </select>
         </AppearanceField>
         <AppearanceField label="Line Width">
           <select
-            value={conn?.lineWidth ?? 1}
-            disabled={readOnly || !conn}
-            onChange={(event) => apply({ lineWidth: parseInt(event.target.value, 10) })}
+            value={node?.lineWidth ?? conn?.lineWidth ?? 1}
+            disabled={readOnly || (!node && !conn)}
+            onChange={(event) => apply({ lineWidth: parseInt(event.target.value, 10) as 1 | 2 | 3 })}
           >
             <option value={1}>Normal</option>
             <option value={2}>Medium</option>
@@ -268,7 +256,13 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
           </select>
         </AppearanceField>
         <AppearanceField label="Line Style">
-          <LineStylePreview />
+          <select value={node?.lineStyle ?? conn?.lineStyle ?? -1} disabled={readOnly || (!node && !conn)} onChange={(event) => apply({ lineStyle: Number(event.target.value) as -1 | 0 | 1 | 2 | 3 })}>
+            <option value={-1}>Default</option>
+            <option value={0}>Solid</option>
+            <option value={1}>Dashed</option>
+            <option value={2}>Dotted</option>
+            <option value={3}>Hidden</option>
+          </select>
         </AppearanceField>
         <AppearanceField label="Text Position">
           <SegmentedControl
@@ -298,6 +292,24 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
             onChange={(value) => apply({ fontColor: value })}
           />
         </AppearanceField>
+        <AppearanceField label="Font Opacity">
+          <OpacityControl value={node?.fontAlpha ?? conn?.fontAlpha ?? 255} disabled={readOnly || (!node && !conn)} onChange={(value) => apply({ fontAlpha: value })} />
+        </AppearanceField>
+        {node && (
+          <>
+            <AppearanceField label="Derived Line Colour">
+              <input type="checkbox" checked={node.derivedLineColor ?? true} disabled={readOnly} onChange={(event) => apply({ derivedLineColor: event.target.checked })} />
+            </AppearanceField>
+            <AppearanceField label="Icon Visibility">
+              <select value={node.iconVisible ?? 0} disabled={readOnly || node.nodeType !== 'element'} onChange={(event) => apply({ iconVisible: Number(event.target.value) as 0 | 1 | 2 })}>
+                <option value={0}>When no image</option><option value={1}>Always</option><option value={2}>Never</option>
+              </select>
+            </AppearanceField>
+            <AppearanceField label="Icon Colour">
+              <ColourControl value={node.iconColor} fallback={DEFAULT_LINE} disabled={readOnly || node.nodeType !== 'element'} onChange={(value) => apply({ iconColor: value })} />
+            </AppearanceField>
+          </>
+        )}
         {node?.nodeType === 'element' && (
           <AppearanceField label="Figure">
             <select

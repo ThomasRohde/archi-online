@@ -31,6 +31,20 @@ export interface Bounds {
   height: number;
 }
 
+export interface FontStyle {
+  family: string;
+  sizePt: number;
+  bold: boolean;
+  italic: boolean;
+}
+
+export type Gradient = -1 | 0 | 1 | 2 | 3;
+export type LineStyle = -1 | 0 | 1 | 2 | 3;
+export type LineWidth = 1 | 2 | 3;
+export type IconVisibility = 0 | 1 | 2;
+export type ImageSource = 0 | 1;
+export type ImagePosition = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+
 /**
  * Bendpoint stored Archi-style: offsets from the source and target anchor
  * (figure centers) captured at edit time. Absolute position is computed at
@@ -98,6 +112,7 @@ export interface Folder {
   folderType?: FolderType;
   documentation: string;
   properties: Property[];
+  labelExpression?: string;
   parentId: string | null;
   folderIds: string[];
   itemIds: string[];
@@ -130,18 +145,27 @@ export interface DiagramNodeBase {
   lineColor?: string;
   fontColor?: string;
   font?: string;
+  fontStyle?: FontStyle;
+  fontAlpha?: number;
   /** Fill opacity 0-255 (Archi default 255). */
   alpha?: number;
   lineAlpha?: number;
+  gradient?: Gradient;
+  lineStyle?: LineStyle;
+  lineWidth?: LineWidth;
+  iconVisible?: IconVisibility;
+  iconColor?: string;
+  derivedLineColor?: boolean;
+  labelExpression?: string;
   /** SWT alignment: 1=left, 2=center, 4=right */
   textAlignment?: number;
   /** 0=top, 1=center, 2=bottom */
   textPosition?: number;
   imagePath?: string;
   /** 0=specialization image, 1=custom image. */
-  imageSource?: 0 | 1;
+  imageSource?: ImageSource;
   /** Archi image placement: 0..8 anchors, 9=fill. */
-  imagePosition?: number;
+  imagePosition?: ImagePosition;
 }
 
 export interface ElementNode extends DiagramNodeBase {
@@ -193,7 +217,11 @@ export interface DiagramConnection {
   lineColor?: string;
   fontColor?: string;
   font?: string;
-  lineWidth?: number;
+  fontStyle?: FontStyle;
+  fontAlpha?: number;
+  lineWidth?: LineWidth;
+  lineStyle?: LineStyle;
+  labelExpression?: string;
   /** 0=source, 1=middle (default), 2=target */
   textPosition?: number;
 }

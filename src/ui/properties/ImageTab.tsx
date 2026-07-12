@@ -48,7 +48,7 @@ export function ImageTab({ target, readOnly }: { target: Target; readOnly: boole
           aria-label="Image position"
           value={node.imagePosition ?? (node.nodeType === 'image' ? 9 : 2)}
           disabled={readOnly || !effectivePath}
-          onChange={(event) => commit({ imagePosition: Number(event.target.value) })}
+          onChange={(event) => commit({ imagePosition: Number(event.target.value) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 })}
         >
           {POSITIONS.map((label, value) => <option key={label} value={value}>{label}</option>)}
         </select>

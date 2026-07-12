@@ -23,6 +23,7 @@ import {
   setConnectionBendpoints,
   setDocumentation,
   setNodeStyle,
+  setLabelExpression,
   setProperties,
   setRelationshipAttrs,
   setConceptProfiles,
@@ -353,6 +354,9 @@ export class JFolder extends JObject {
 
   prop = propApi(this).prop;
   removeProp = propApi(this).removeProp;
+
+  get labelExpression(): string | undefined { return this.folder().labelExpression; }
+  set labelExpression(value: string | undefined) { setLabelExpression(this.id, value); }
 
   delete(): void {
     deleteItems([this.id]);
@@ -775,6 +779,24 @@ export class JVisual extends JObject {
     setNodeStyle([this.id], { alpha: Math.max(0, Math.min(255, v)) });
   }
 
+  get labelExpression(): string | undefined { return this.node().labelExpression; }
+  set labelExpression(value: string | undefined) { setLabelExpression(this.id, value); }
+
+  get gradient(): number { return this.node().gradient ?? -1; }
+  set gradient(value: number) { setNodeStyle([this.id], { gradient: Math.max(-1, Math.min(3, value)) as -1 | 0 | 1 | 2 | 3 }); }
+
+  get lineStyle(): number { return this.node().lineStyle ?? -1; }
+  set lineStyle(value: number) { setNodeStyle([this.id], { lineStyle: Math.max(-1, Math.min(3, value)) as -1 | 0 | 1 | 2 | 3 }); }
+
+  get lineWidth(): number { return this.node().lineWidth ?? 1; }
+  set lineWidth(value: number) { setNodeStyle([this.id], { lineWidth: Math.max(1, Math.min(3, value)) as 1 | 2 | 3 }); }
+
+  get imageSource(): number { return this.node().imageSource ?? 0; }
+  set imageSource(value: number) { setNodeStyle([this.id], { imageSource: value === 1 ? 1 : 0 }); }
+
+  get imagePosition(): number { return this.node().imagePosition ?? 2; }
+  set imagePosition(value: number) { setNodeStyle([this.id], { imagePosition: Math.max(0, Math.min(9, value)) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 }); }
+
   /** Nested add (bounds relative to this container). */
   add(element: JConcept, x: number, y: number, w: number, h: number): JVisual {
     const n = this.node();
@@ -841,6 +863,15 @@ export class JConnection extends JObject {
   set lineColor(v: string | undefined) {
     setNodeStyle([this.id], { lineColor: v });
   }
+
+  get labelExpression(): string | undefined { return this.conn().labelExpression; }
+  set labelExpression(value: string | undefined) { setLabelExpression(this.id, value); }
+
+  get lineStyle(): number { return this.conn().lineStyle ?? -1; }
+  set lineStyle(value: number) { setNodeStyle([this.id], { lineStyle: Math.max(-1, Math.min(3, value)) as -1 | 0 | 1 | 2 | 3 }); }
+
+  get lineWidth(): number { return this.conn().lineWidth ?? 1; }
+  set lineWidth(value: number) { setNodeStyle([this.id], { lineWidth: Math.max(1, Math.min(3, value)) as 1 | 2 | 3 }); }
 
   get bendpoints(): JBendpoint[] {
     return this.conn().bendpoints.map((bp) => ({ ...bp }));
