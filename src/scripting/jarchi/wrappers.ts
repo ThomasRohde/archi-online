@@ -42,6 +42,7 @@ import {
 } from '../../model/types';
 import { useSettingsStore } from '../../settings/app-settings';
 import {
+  bendpointPositions,
   createConnectionRouteResolver,
   createConnectionVisibilityResolver,
   toRelativeBendpoint,
@@ -215,15 +216,9 @@ function absoluteRouteForConnection(
   conn: DiagramConnection,
   boundsForNode: (nodeId: string) => Bounds = (nodeId) => modelAbsoluteBounds(m, nodeId),
 ): JPoint[] {
-  const bounds = new Map(
-    Object.values(m.nodes)
-      .filter((node) => node.viewId === conn.viewId)
-      .map((node) => [node.id, boundsForNode(node.id)]),
-  );
-  const visible = createConnectionVisibilityResolver(m);
-  const route = createConnectionRouteResolver(m, bounds, { isVisible: visible })(conn.id);
-  if (!route) throw new Error(`Connection ${conn.id} has a missing endpoint`);
-  return route.slice(1, -1).map((point) => ({ ...point }));
+  const centers = connectionEndpointCenters(m, conn, boundsForNode);
+  return bendpointPositions(conn.bendpoints, centers.source, centers.target)
+    .map((point) => ({ ...point }));
 }
 
 function routeToBendpoints(
@@ -654,11 +649,26 @@ export class JView extends JObject {
         .filter((update): update is typeof update & { route: JPoint[] } => Boolean(update.route))
         .map((update) => [update.id, update]),
     );
+    const dependsOnPendingRoute = (
+      connectionId: string,
+      visited: Set<string> = new Set(),
+    ): boolean => {
+      if (visited.has(connectionId)) return false;
+      visited.add(connectionId);
+      const connection = stagedConnections.get(connectionId) ?? m.connections[connectionId];
+      if (!connection) return false;
+      return [connection.sourceId, connection.targetId].some((endpointId) => {
+        if (pendingRoutes.has(endpointId)) return true;
+        return Boolean(m.connections[endpointId]) && dependsOnPendingRoute(endpointId, visited);
+      });
+    };
     while (pendingRoutes.size > 0) {
       let progressed = false;
       for (const [connectionId, update] of [...pendingRoutes]) {
         const waitsForEndpoint = [update.connection.sourceId, update.connection.targetId]
-          .some((endpointId) => pendingRoutes.has(endpointId));
+          .some((endpointId) => (
+            pendingRoutes.has(endpointId) || dependsOnPendingRoute(endpointId)
+          ));
         if (waitsForEndpoint) continue;
         const bendpoints = routeToBendpoints(
           m,

@@ -8,12 +8,13 @@ import {
   addView,
   createEmptyModel,
 } from '../src/model/ops';
+import { attachConnection } from '../src/model/ops/draft';
 import { replaceModel, undo } from '../src/model/store';
 import { useStore } from '../src/ui/store-hooks';
 import { JView } from '../src/scripting/jarchi';
 import { JARCHI_CAPABILITY_TEST_SCRIPT } from '../src/scripting/example-scripts';
 import { runScript, type ConsoleEntry } from '../src/scripting/runner';
-import { connectionEndpointModel } from './helpers/connection-endpoints';
+import { connectionEndpointModel, endpointConnection } from './helpers/connection-endpoints';
 
 function model() {
   return useStore.getState().model!;
@@ -355,6 +356,47 @@ describe('jArchi scripting API', () => {
     const byId = new Map(view.connections().map((connection) => [connection.id, connection]));
     expect(byId.get('base')!.absoluteRoute()).toEqual([{ x: 150, y: 100 }]);
     expect(byId.get('dependent')!.absoluteRoute()).toEqual([{ x: 140, y: 120 }]);
+  });
+
+  it('applies routes after transitive endpoint route dependencies regardless of input order', () => {
+    const source = connectionEndpointModel();
+    source.nodes['node-d'] = {
+      id: 'node-d',
+      viewId: 'view',
+      parentId: 'view',
+      bounds: { x: 300, y: 160, width: 100, height: 40 },
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'note',
+      content: 'D',
+      properties: [],
+    };
+    source.views.view.childIds.push('node-d');
+    attachConnection(source, endpointConnection('top', 'dependent', 'node-d'));
+    replaceModel(source, null);
+    const view = new JView('view');
+
+    view.layout({
+      connections: {
+        top: { route: [{ x: 240, y: 120 }] },
+        base: { route: [{ x: 150, y: 100 }] },
+      },
+    });
+
+    const byId = new Map(view.connections().map((connection) => [connection.id, connection]));
+    expect(byId.get('base')!.absoluteRoute()).toEqual([{ x: 150, y: 100 }]);
+    expect(byId.get('top')!.absoluteRoute()).toEqual([{ x: 240, y: 120 }]);
+  });
+
+  it('returns only stored logical bendpoints for self-loop absolute routes', () => {
+    const source = connectionEndpointModel();
+    attachConnection(source, endpointConnection('self', 'node-a', 'node-a'));
+    replaceModel(source, null);
+
+    const self = new JView('view').connections().find((connection) => connection.id === 'self')!;
+
+    expect(self.absoluteRoute()).toEqual([]);
   });
 
   it('rejects invalid bulk layout input without partial mutation', () => {

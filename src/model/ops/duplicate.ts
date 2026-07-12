@@ -277,8 +277,31 @@ function copyInternalConnectionsWithFreshRelationships(
   const connections = mappedConnectionClosure(draft, viewId, nodeIdMap);
   for (const connection of connections) nodeIdMap.set(connection.id, newId());
   mapClonedNodeAdjacency(draft, nodeIdMap);
+  const eligibleConnectionIds = new Set<string>();
+  let addedConnection = true;
+  while (addedConnection) {
+    addedConnection = false;
+    for (const connection of connections) {
+      if (
+        eligibleConnectionIds.has(connection.id) ||
+        (connection.relationshipId && !draft.relationships[connection.relationshipId])
+      ) {
+        continue;
+      }
+      const endpointIsEligible = (endpointId: string): boolean => (
+        Boolean(draft.nodes[endpointId] && nodeIdMap.has(endpointId)) ||
+        eligibleConnectionIds.has(endpointId)
+      );
+      if (!endpointIsEligible(connection.sourceId) || !endpointIsEligible(connection.targetId)) {
+        continue;
+      }
+      eligibleConnectionIds.add(connection.id);
+      addedConnection = true;
+    }
+  }
   for (const connection of connections) {
     if (
+      eligibleConnectionIds.has(connection.id) &&
       connection.relationshipId &&
       draft.relationships[connection.relationshipId] &&
       !relationshipIdMap.has(connection.relationshipId)
@@ -316,10 +339,10 @@ function copyInternalConnectionsWithFreshRelationships(
     draft.folders[relationship.folderId]?.itemIds.push(copyRelationshipId);
   }
   for (const connection of connections) {
+    if (!eligibleConnectionIds.has(connection.id)) continue;
     const relationshipId = connection.relationshipId
       ? relationshipIdMap.get(connection.relationshipId)
       : undefined;
-    if (connection.relationshipId && !relationshipId) continue;
 
     const copy: DiagramConnection = {
       ...deepClone(connection),

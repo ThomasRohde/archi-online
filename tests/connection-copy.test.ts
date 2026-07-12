@@ -140,6 +140,22 @@ describe('connection endpoint cloning', () => {
     expect(base.sourceConnectionIds).toEqual([dependent.id]);
   });
 
+  it('does not duplicate dependents of a connection with a missing relationship', () => {
+    const source = connectionEndpointModel();
+    Object.assign(source.connections.base, {
+      connType: 'relationship',
+      relationshipId: 'missing-relationship',
+    });
+    replaceModel(source, null);
+
+    duplicateViewObjects('view', ['node-a', 'node-b', 'node-c'], 16);
+
+    const copied = Object.values(useStore.getState().model!.connections)
+      .filter((item) => item.id !== 'base' && item.id !== 'dependent');
+    expect(copied).toEqual([]);
+    expect(connectionGraphError(useStore.getState().model!)).toBeUndefined();
+  });
+
   it('collects and pastes a cross-model view connection chain', () => {
     const source = connectionEndpointModel();
     const bundle = createTreeTransferBundle('source', source, ['view']);
