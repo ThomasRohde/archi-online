@@ -1498,6 +1498,36 @@ body {
   color: var(--danger, #b42318);
 }
 
+.exchange-export-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}
+
+.exchange-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 12px;
+  margin: 12px 0;
+}
+
+.exchange-metadata-grid label {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  text-transform: capitalize;
+}
+
+.exchange-diagnostics {
+  max-height: 150px;
+  overflow: auto;
+  margin: 10px 0;
+  padding: 8px;
+  color: var(--danger, #b42318);
+  border: 1px solid currentColor;
+}
+
 .appearance-column {
   display: flex;
   flex-direction: column;

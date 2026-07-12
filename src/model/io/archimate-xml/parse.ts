@@ -56,6 +56,8 @@ export function parseArchimate(xml: string): ModelState {
       name: root.getAttribute('name') ?? 'Model',
       documentation: childText(root, 'purpose'),
       properties: parseProperties(root),
+      metadata: parseNativeMetadata(root),
+      language: feature(root, 'exchangeLanguage'),
       version: root.getAttribute('version') ?? undefined,
     },
     profiles: {},
@@ -301,4 +303,15 @@ export function parseArchimate(xml: string): ModelState {
   }
 
   return state;
+}
+
+function parseNativeMetadata(root: Element): ModelState['info']['metadata'] {
+  const raw = feature(root, 'dublinCoreMetadata');
+  if (!raw) return [];
+  try {
+    const value = JSON.parse(raw) as ModelState['info']['metadata'];
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
 }

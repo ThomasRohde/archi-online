@@ -11,6 +11,7 @@ import type {
   Property,
 } from '../../types';
 import { tag, textTag, type Attr } from '../archimate-xml/xml';
+import type { ExchangeExportOptions } from './contracts';
 import {
   accessTypeToExchange,
   alphaToExchange,
@@ -42,13 +43,15 @@ interface Point {
   y: number;
 }
 
-export function serializeExchange(state: ModelState): string {
+export function serializeExchange(state: ModelState, options: ExchangeExportOptions = {}): string {
+  const language = normalizeLanguage(options.language ?? state.info.language ?? 'en');
+  const metadata = options.metadata ?? state.info.metadata;
   const propertyDefs = collectPropertyDefinitions(state);
   const out: string[] = [];
   out.push('<?xml version="1.0" encoding="UTF-8"?>\n');
   out.push(
-    `<model xmlns="${EXCHANGE_NS}" xmlns:xsi="${XSI_NS}" ` +
-      `xsi:schemaLocation="${EXCHANGE_SCHEMA_LOCATION}" ` +
+    `<model xmlns="${EXCHANGE_NS}" xmlns:xsi="${XSI_NS}"${metadata.length > 0 ? ' xmlns:dc="http://purl.org/dc/elements/1.1/"' : ''} ` +
+      `xsi:schemaLocation="${EXCHANGE_SCHEMA_LOCATION}${metadata.length > 0 ? ' http://purl.org/dc/elements/1.1/ http://www.opengroup.org/xsd/archimate/3.1/dc.xsd' : ''}" ` +
       `identifier="${exchangeId(state.info.id)}">\n`,
   );
 
@@ -57,15 +60,22 @@ export function serializeExchange(state: ModelState): string {
     out.push(textTag('  ', 'documentation', state.info.documentation));
   }
   out.push(...propertiesTags('  ', state.info.properties, propertyDefs));
+  if (metadata.length > 0) {
+    const entries = [textTag('    ', 'schema', 'Dublin Core'), textTag('    ', 'schemaversion', '1.1')];
+    for (const entry of metadata) {
+      if (entry.value !== '') entries.push(textTag('    ', `dc:${entry.name}`, entry.value));
+    }
+    out.push(tag('  ', 'metadata', [], entries));
+  }
 
   writeElements(state, out);
   writeRelationships(state, out, propertyDefs);
-  writeOrganizations(state, out, propertyDefs);
+  if (options.includeOrganization ?? true) writeOrganizations(state, out, propertyDefs);
   writePropertyDefinitions(out, propertyDefs);
   writeViews(state, out, propertyDefs);
 
   out.push('</model>\n');
-  return out.join('');
+  return addLanguageTags(out.join(''), language);
 
   function writeElements(s: ModelState, o: string[]) {
     const rows: string[] = [];
@@ -101,6 +111,18 @@ export function serializeExchange(state: ModelState): string {
     }
     if (rows.length > 0) o.push('  <elements>\n', ...rows, '  </elements>\n');
   }
+}
+
+function normalizeLanguage(language: string): string {
+  const normalized = language.trim();
+  if (!/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(normalized)) {
+    throw new Error(`Invalid ISO-639 language code: ${language}`);
+  }
+  return normalized;
+}
+
+function addLanguageTags(xml: string, language: string): string {
+  return xml.replace(/<(name|documentation|label|value)>/g, `<$1 xml:lang="${language}">`);
 }
 
 function writeRelationships(

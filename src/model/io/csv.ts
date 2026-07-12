@@ -7,6 +7,6 @@ export {
   RELATIONS_FILENAME,
   type CsvDelimiter,
 } from './csv/constants';
-export { applyCsvImport, type CsvImportFiles } from './csv/import';
+export { applyCsvImport, type CsvImportFiles, type CsvImportReport } from './csv/import';
 export { CsvParseError, parseCsvRecords } from './csv/parse';
 export { serializeCsv, type CsvExportOptions, type CsvFile } from './csv/serialize';

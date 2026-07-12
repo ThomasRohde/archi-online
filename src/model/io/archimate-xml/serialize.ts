@@ -193,6 +193,10 @@ export function serializeArchimate(state: ModelState): string {
   for (const fid of state.rootFolderIds) body.push(writeFolder(IND, fid));
   if (state.info.documentation !== '') body.push(textTag(IND, 'purpose', state.info.documentation));
   body.push(...propertyTags(IND, state.info.properties));
+  body.push(...featureTags(IND, {
+    dublinCoreMetadata: state.info.metadata.length > 0 ? JSON.stringify(state.info.metadata) : undefined,
+    exchangeLanguage: state.info.language,
+  }));
 
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +

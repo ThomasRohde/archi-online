@@ -4,6 +4,7 @@
 // (Archi's importer throws before anything is applied).
 
 import { newId } from '../../id';
+import { current, isDraft } from 'immer';
 import {
   ELEMENT_TYPE_MAP,
   isElementType,
@@ -33,8 +34,33 @@ export interface CsvImportFiles {
   properties?: string;
 }
 
+export interface CsvImportReport {
+  created: number;
+  updated: number;
+  unchanged: number;
+  profiles: number;
+  properties: number;
+  warnings: number;
+  errors: number;
+}
+
 /** Mutates the draft model in place; must run inside a single transact(). */
-export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
+export function applyCsvImport(draft: ModelState, files: CsvImportFiles): CsvImportReport {
+  const source = isDraft(draft) ? current(draft) : draft;
+  const working = structuredClone(source) as ModelState;
+  const report = applyCsvImportInPlace(working, files);
+  Object.assign(draft, working);
+  return report;
+}
+
+function applyCsvImportInPlace(draft: ModelState, files: CsvImportFiles): CsvImportReport {
+  const beforeProfiles = Object.keys(draft.profiles).length;
+  const before = new Map<string, string>();
+  for (const object of [...Object.values(draft.elements), ...Object.values(draft.relationships)]) {
+    before.set(object.id, JSON.stringify(object));
+  }
+  const touched = new Set<string>();
+  let propertyRecords = 0;
   const modelIds = new Set<string>(); // ids the elements.csv model row claims
   const createdRelations = new Set<string>(); // for duplicate detection
   const pendingEndpoints = new Map<string, { sourceId: string; targetId: string }>();
@@ -42,6 +68,24 @@ export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
   if (files.elements !== undefined) importElements(files.elements);
   if (files.relations !== undefined) importRelations(files.relations);
   if (files.properties !== undefined) importProperties(files.properties);
+  let created = 0;
+  let updated = 0;
+  let unchanged = 0;
+  for (const id of touched) {
+    const object = draft.elements[id] ?? draft.relationships[id];
+    if (!before.has(id)) created++;
+    else if (JSON.stringify(object) === before.get(id)) unchanged++;
+    else updated++;
+  }
+  return {
+    created,
+    updated,
+    unchanged,
+    profiles: Object.keys(draft.profiles).length - beforeProfiles,
+    properties: propertyRecords,
+    warnings: 0,
+    errors: 0,
+  };
 
   function importElements(text: string): void {
     const records = parseCsvRecords(text);
@@ -95,6 +139,7 @@ export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
     element.name = normalise(record[2]);
     element.documentation = record[3] ?? '';
     applySpecialization(element, record[4]);
+    touched.add(id);
   }
 
   function importRelations(text: string): void {
@@ -163,11 +208,14 @@ export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
       draft.relationships[id] = rel;
       draft.folders[rel.folderId].itemIds.push(id);
       createdRelations.add(id);
+    } else if (rel.sourceId !== sourceId || rel.targetId !== targetId) {
+      createdRelations.add(id);
     }
     pendingEndpoints.set(id, { sourceId, targetId });
     rel.name = normalise(record[2]);
     rel.documentation = record[3] ?? '';
     applySpecialization(rel, record[6]);
+    touched.add(id);
   }
 
   function applySpecialization(
@@ -213,6 +261,7 @@ export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
 
     const key = normalise(record[1]);
     const value = normalise(record[2]);
+    propertyRecords++;
 
     if (modelIds.has(id)) {
       upsertProperty(draft.info.properties, key, value);
@@ -225,6 +274,7 @@ export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
     const folder = draft.folders[id];
     const target = element ?? relationship ?? view ?? folder;
     if (!target) throw new CsvParseError(`Property references missing object: ${id}`);
+    if (element || relationship) touched.add(id);
 
     // Special pseudo-properties carry concept attributes (per Archi's
     // exporter; the importer matches by key — Archi compares Directed with

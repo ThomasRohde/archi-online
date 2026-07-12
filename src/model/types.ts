@@ -24,6 +24,16 @@ export interface Property {
   value: string;
 }
 
+export const DUBLIN_CORE_FIELDS = [
+  'title', 'creator', 'subject', 'description', 'publisher', 'contributor', 'date',
+  'type', 'format', 'identifier', 'source', 'language', 'relation', 'coverage', 'rights',
+] as const;
+export type DublinCoreField = (typeof DUBLIN_CORE_FIELDS)[number];
+export interface DublinCoreEntry {
+  name: DublinCoreField;
+  value: string;
+}
+
 export interface Bounds {
   x: number;
   y: number;
@@ -231,6 +241,8 @@ export interface ModelInfo {
   name: string;
   documentation: string;
   properties: Property[];
+  metadata: DublinCoreEntry[];
+  language?: string;
   version?: string;
 }
 

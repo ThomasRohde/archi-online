@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { parseArchimate } from '../src/model/io/archimate-xml';
 import { applyCsvImport, parseCsvRecords, serializeCsv } from '../src/model/io/csv';
 import { createEmptyModel } from '../src/model/ops/concepts';
+import { importCsv } from '../src/model/ops/csv-import';
+import { replaceModel } from '../src/model/store';
+import { useStore } from '../src/ui/store-hooks';
 import type { ModelState } from '../src/model/types';
 
 const archisurance = readFileSync(join(__dirname, 'fixtures', 'Archisurance.archimate'), 'utf8');
@@ -212,5 +215,42 @@ describe('CSV import semantics', () => {
     expect(() =>
       applyCsvImport(m, { properties: '"ID","Key","Value"\r\n"ghost","k","v"' }),
     ).toThrow(/missing object/);
+  });
+
+  it('reports created, updated, unchanged, profile, and property counts', () => {
+    const m = baseModel();
+    const first = applyCsvImport(m, {
+      elements: '"ID","Type","Name","Documentation","Specialization"\r\n"a","BusinessActor","A","","External"',
+      properties: '"ID","Key","Value"\r\n"a","team","platform"',
+    });
+    expect(first).toMatchObject({ created: 1, updated: 0, profiles: 1, properties: 1, warnings: 0, errors: 0 });
+    const second = applyCsvImport(m, {
+      elements: '"ID","Type","Name","Documentation","Specialization"\r\n"a","BusinessActor","A","","External"',
+    });
+    expect(second).toMatchObject({ created: 0, updated: 0, unchanged: 1, profiles: 0 });
+  });
+
+  it('rejects duplicate endpoint-changing relationship rows', () => {
+    const m = baseModel();
+    applyCsvImport(m, {
+      elements: '"ID","Type","Name","Documentation"\r\n"a","BusinessActor","A",""\r\n"b","BusinessRole","B",""\r\n"c","BusinessRole","C",""',
+      relations: '"ID","Type","Name","Documentation","Source","Target"\r\n"r","AssignmentRelationship","","","a","b"',
+    });
+    const before = JSON.stringify(m);
+    expect(() => applyCsvImport(m, {
+      relations: '"ID","Type","Name","Documentation","Source","Target"\r\n"r","AssignmentRelationship","","","a","c"\r\n"r","AssignmentRelationship","","","a","c"',
+    })).toThrow(/Duplicate relationship/);
+    expect(JSON.stringify(m)).toBe(before);
+  });
+
+  it('keeps the active model unchanged when any CSV record fails', () => {
+    const m = baseModel();
+    replaceModel(m, null);
+    const before = JSON.stringify(useStore.getState().model);
+    expect(() => importCsv({
+      elements: '"ID","Type","Name","Documentation"\r\n"a","BusinessActor","A",""\r\n"bad id!","BusinessActor","B",""',
+    })).toThrow(/Illegal characters/);
+    expect(JSON.stringify(useStore.getState().model)).toBe(before);
+    expect(useStore.getState().undoStack).toEqual([]);
   });
 });

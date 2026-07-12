@@ -132,9 +132,9 @@ describe('Archi specializations', () => {
 
     const xml = serializeExchange(model());
     expect(xml).toContain('identifier="specialization"');
-    expect(xml).toContain('<name>Specialization</name>');
+    expect(xml).toContain('<name xml:lang="en">Specialization</name>');
     expect(xml).toContain('propertyDefinitionRef="specialization"');
-    expect(xml).toContain('<value>External party</value>');
+    expect(xml).toContain('<value xml:lang="en">External party</value>');
 
     const imported = parseExchange(xml);
     expect(imported.elements[actor].profileIds).toHaveLength(1);

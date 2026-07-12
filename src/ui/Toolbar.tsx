@@ -15,7 +15,6 @@ import {
   RELATIONS_FILENAME,
   type CsvImportFiles,
 } from '../model/io/csv';
-import { serializeExchange } from '../model/io/exchange-xml';
 import {
   createC4TemplateView,
   importCsv,
@@ -26,8 +25,6 @@ import { useStore } from './store-hooks';
 import { getActiveModelSession } from '../model/workspace';
 import {
   openModelFromDisk,
-  sanitizeFileName,
-  saveBlobToDisk,
   saveModelToDisk,
 } from '../persistence/files';
 import { getStoredGitHubToken, setStoredGitHubToken } from '../persistence/github';
@@ -42,6 +39,7 @@ import { copyViewPngToClipboard } from '../canvas/export/view-image';
 import { showAlertDialog, showConfirmDialog, showPromptDialog } from './AppDialog';
 import { showContextMenu, SEPARATOR, type MenuItem } from './ContextMenu';
 import { ExportCsvDialog } from './ExportCsvDialog';
+import { ExportExchangeDialog } from './ExportExchangeDialog';
 import { ExportImageDialog } from './ExportImageDialog';
 import { PresentationMode } from './PresentationMode';
 import { layoutBus } from './layout-bus';
@@ -189,25 +187,6 @@ async function runShareModel(): Promise<void> {
   }
 }
 
-async function exportModelToExchange(): Promise<void> {
-  const s = useStore.getState();
-  if (!s.model) return;
-  try {
-    const xml = serializeExchange(s.model);
-    await saveBlobToDisk(
-      new Blob([xml], { type: 'application/xml' }),
-      `${sanitizeFileName(s.model.info.name)}.xml`,
-      { description: 'ArchiMate Open Exchange', accept: { 'application/xml': ['.xml'] } },
-    );
-  } catch (error) {
-    await showAlertDialog({
-      title: 'Could not export model',
-      message: errorMessage(error),
-      intent: 'error',
-    });
-  }
-}
-
 /** Pick 1–3 Archi CSV files (elements/relations/properties, matched by file
  * name) and import them into the current model as one undo step. */
 function importCsvFromDisk(): void {
@@ -231,7 +210,11 @@ function importCsvFromDisk(): void {
           'No matching files — names must end with "elements", "relations", or "properties" (e.g. elements.csv).',
         );
       }
-      importCsv(byRole);
+      const report = importCsv(byRole);
+      await showAlertDialog({
+        title: 'CSV import complete',
+        message: `Created ${report.created}, updated ${report.updated}, unchanged ${report.unchanged}, profiles ${report.profiles}, properties ${report.properties}, warnings ${report.warnings}, errors ${report.errors}.`,
+      });
     } catch (error) {
       await showAlertDialog({
         title: 'Could not import CSV',
@@ -379,6 +362,7 @@ export function Toolbar() {
   const [showHelp, setShowHelp] = useState(false);
   const [showExportImage, setShowExportImage] = useState(false);
   const [showExportCsv, setShowExportCsv] = useState(false);
+  const [showExportExchange, setShowExportExchange] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [showSpecializations, setShowSpecializations] = useState(false);
   const [showImages, setShowImages] = useState(false);
@@ -412,7 +396,7 @@ export function Toolbar() {
     SEPARATOR,
     {
       label: 'Model to Open Exchange (.xml)…',
-      onClick: () => void exportModelToExchange(),
+      onClick: () => setShowExportExchange(true),
     },
     {
       label: 'Model to CSV…',
@@ -610,6 +594,7 @@ export function Toolbar() {
       </button>
       {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
       {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}
+      {showExportExchange && <ExportExchangeDialog onClose={() => setShowExportExchange(false)} />}
       {presenting && <PresentationMode onClose={() => setPresenting(false)} />}
       <SpecializationsManager
         open={showSpecializations}

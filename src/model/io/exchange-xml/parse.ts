@@ -17,6 +17,8 @@ import type {
   ModelState,
   Property,
 } from '../../types';
+import { DUBLIN_CORE_FIELDS } from '../../types';
+import type { ExchangeImportOptions, ExchangeImportResult } from './contracts';
 import {
   buildFontString,
   EXCHANGE_NS,
@@ -34,7 +36,7 @@ export function isExchangeXml(text: string): boolean {
   return text.includes(EXCHANGE_NS);
 }
 
-export function parseExchange(xml: string): ModelState {
+export function parseExchange(xml: string, options: ExchangeImportOptions = {}): ModelState {
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   const root = doc.documentElement;
   if (root.localName !== 'model' || root.namespaceURI !== EXCHANGE_NS) {
@@ -43,6 +45,8 @@ export function parseExchange(xml: string): ModelState {
   }
 
   const state = createEmptyModel('Model');
+  const language = options.language ?? documentLanguage(root) ?? 'en';
+  const readText = (el: Element, name: string, normalize: boolean) => childText(el, name, normalize, language);
 
   // Property definitions first (id → key name).
   const propertyDefs = new Map<string, string>();
@@ -50,7 +54,7 @@ export function parseExchange(xml: string): ModelState {
   if (defsEl) {
     for (const defEl of children(defsEl, 'propertyDefinition')) {
       const id = defEl.getAttribute('identifier');
-      const name = childText(defEl, 'name', false);
+      const name = readText(defEl, 'name', false);
       if (id !== null && name !== null) propertyDefs.set(id, name);
     }
   }
@@ -63,7 +67,7 @@ export function parseExchange(xml: string): ModelState {
         if (ref === 'specialization') continue;
         const key = ref !== null ? propertyDefs.get(ref) : undefined;
         if (key !== undefined) {
-          props.push({ key, value: childText(propEl, 'value', true) ?? '' });
+          props.push({ key, value: readText(propEl, 'value', true) ?? '' });
         }
       }
     }
@@ -78,7 +82,7 @@ export function parseExchange(xml: string): ModelState {
     const specialization = children(propsEl, 'property').find(
       (property) => property.getAttribute('propertyDefinitionRef') === 'specialization',
     );
-    const name = specialization ? childText(specialization, 'value', true)?.trim() : '';
+    const name = specialization ? readText(specialization, 'value', true)?.trim() : '';
     if (!name) return [];
     let profile = Object.values(state.profiles).find(
       (candidate) =>
@@ -95,9 +99,11 @@ export function parseExchange(xml: string): ModelState {
 
   // Root element.
   state.info.id = root.getAttribute('identifier') ?? state.info.id;
-  state.info.name = childText(root, 'name', true) ?? state.info.name;
-  state.info.documentation = childText(root, 'documentation', false) ?? '';
+  state.info.name = readText(root, 'name', true) ?? state.info.name;
+  state.info.documentation = readText(root, 'documentation', false) ?? '';
   state.info.properties = readProperties(root);
+  state.info.language = language;
+  state.info.metadata = readMetadata(root);
   state.info.version = undefined;
 
   // Elements.
@@ -115,8 +121,8 @@ export function parseExchange(xml: string): ModelState {
       id,
       kind: 'element',
       type: mapped.type as ArchimateElement['type'],
-      name: childText(el, 'name', true) ?? '',
-      documentation: childText(el, 'documentation', false) ?? '',
+      name: readText(el, 'name', true) ?? '',
+      documentation: readText(el, 'documentation', false) ?? '',
       properties: readProperties(el),
       profileIds: [],
       folderId: defaultElementFolder(state, mapped.type),
@@ -143,8 +149,8 @@ export function parseExchange(xml: string): ModelState {
         id,
         kind: 'relationship',
         type: mapped.type as ArchimateRelationship['type'],
-        name: childText(el, 'name', true) ?? '',
-        documentation: childText(el, 'documentation', false) ?? '',
+        name: readText(el, 'name', true) ?? '',
+        documentation: readText(el, 'documentation', false) ?? '',
         properties: readProperties(el),
         profileIds: [],
         folderId: relationsFolder,
@@ -185,8 +191,8 @@ export function parseExchange(xml: string): ModelState {
       const view: DiagramView = {
         id,
         kind: 'view',
-        name: childText(viewEl, 'name', true) ?? '',
-        documentation: childText(viewEl, 'documentation', false) ?? '',
+        name: readText(viewEl, 'name', true) ?? '',
+        documentation: readText(viewEl, 'documentation', false) ?? '',
         properties: readProperties(viewEl),
         folderId: diagramsFolder,
         viewpoint: viewpointFor(viewEl),
@@ -214,6 +220,22 @@ export function parseExchange(xml: string): ModelState {
   }
 
   return state;
+
+  function readMetadata(modelEl: Element): ModelState['info']['metadata'] {
+    const metadataEl = child(modelEl, 'metadata');
+    if (!metadataEl) return [];
+    const fields = new Set<string>(DUBLIN_CORE_FIELDS);
+    const entries: ModelState['info']['metadata'] = [];
+    for (const element of metadataEl.children) {
+      if (element.namespaceURI === 'http://purl.org/dc/elements/1.1/' && fields.has(element.localName)) {
+        entries.push({
+          name: element.localName as ModelState['info']['metadata'][number]['name'],
+          value: element.textContent ?? '',
+        });
+      }
+    }
+    return entries;
+  }
 
   function viewpointFor(viewEl: Element): string | undefined {
     const name = viewEl.getAttribute('viewpoint');
@@ -261,8 +283,8 @@ export function parseExchange(xml: string): ModelState {
         node = {
           ...base,
           nodeType: 'group',
-          name: childText(nodeEl, 'label', true) ?? '',
-          documentation: childText(nodeEl, 'documentation', false) ?? '',
+          name: readText(nodeEl, 'label', true) ?? '',
+          documentation: readText(nodeEl, 'documentation', false) ?? '',
           properties: readProperties(nodeEl),
         };
       } else if (typeName === 'Label' && viewRefEl) {
@@ -276,7 +298,7 @@ export function parseExchange(xml: string): ModelState {
         node = {
           ...base,
           nodeType: 'note',
-          content: childText(nodeEl, 'label', false) ?? '',
+          content: readText(nodeEl, 'label', false) ?? '',
           properties: readProperties(nodeEl),
         };
       }
@@ -461,8 +483,8 @@ export function parseExchange(xml: string): ModelState {
   function getSubFolder(itemEl: Element, folder: Folder | null): Folder | null {
     if (!folder) return null;
     for (const el of itemHierarchy(itemEl)) {
-      const name = childText(el, 'label', true) ?? '';
-      const documentation = childText(el, 'documentation', true) ?? '';
+      const name = readText(el, 'label', true) ?? '';
+      const documentation = readText(el, 'documentation', true) ?? '';
       const properties = readProperties(el);
       const topLevel = topLevelFolder(el);
       if (topLevel) {
@@ -526,7 +548,7 @@ export function parseExchange(xml: string): ModelState {
 
   function topLevelFolder(itemEl: Element): Folder | null {
     if (itemEl.parentElement?.localName !== 'organizations') return null;
-    const name = childText(itemEl, 'label', true);
+    const name = readText(itemEl, 'label', true);
     for (const fid of state.rootFolderIds) {
       const folder = state.folders[fid];
       if (folder && folder.name === name) return folder;
@@ -541,6 +563,43 @@ export function parseExchange(xml: string): ModelState {
     if (from) from.itemIds = from.itemIds.filter((i) => i !== objectId);
     folder.itemIds.push(objectId);
     object.folderId = folder.id;
+  }
+}
+
+export function parseExchangeDocument(xml: string, options: ExchangeImportOptions = {}): ExchangeImportResult {
+  const language = options.language ?? documentLanguage(new DOMParser().parseFromString(xml, 'application/xml').documentElement) ?? 'en';
+  try {
+    const model = parseExchange(xml, { ...options, language });
+    const propertyCount = model.info.properties.length
+      + Object.values(model.elements).reduce((total, item) => total + item.properties.length, 0)
+      + Object.values(model.relationships).reduce((total, item) => total + item.properties.length, 0)
+      + Object.values(model.views).reduce((total, item) => total + item.properties.length, 0)
+      + Object.values(model.folders).reduce((total, item) => total + item.properties.length, 0);
+    return {
+      model,
+      language,
+      diagnostics: [],
+      warnings: [],
+      errors: [],
+      counts: {
+        elements: Object.keys(model.elements).length,
+        relationships: Object.keys(model.relationships).length,
+        views: Object.keys(model.views).length,
+        profiles: Object.keys(model.profiles).length,
+        properties: propertyCount,
+        warnings: 0,
+        errors: 0,
+      },
+    };
+  } catch (error) {
+    const diagnostic = { severity: 'error' as const, message: error instanceof Error ? error.message : String(error) };
+    return {
+      language,
+      diagnostics: [diagnostic],
+      warnings: [],
+      errors: [diagnostic],
+      counts: { elements: 0, relationships: 0, views: 0, profiles: 0, properties: 0, warnings: 0, errors: 1 },
+    };
   }
 }
 
@@ -602,11 +661,22 @@ function child(el: Element, name: string): Element | null {
 /** First matching child's text; normalize collapses whitespace like JDOM's
  * getTextNormalize. (Archi prefers the xml:lang matching the system locale;
  * we take the first child, its documented fallback.) */
-function childText(el: Element, name: string, normalize: boolean): string | null {
-  const c = child(el, name);
-  if (c === null) return null;
+function childText(el: Element, name: string, normalize: boolean, language?: string): string | null {
+  const candidates = children(el, name);
+  const c = candidates.find((candidate) => candidate.getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang') === language)
+    ?? candidates.find((candidate) => !candidate.hasAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang'))
+    ?? candidates[0];
+  if (!c) return null;
   const text = c.textContent ?? '';
   return normalize ? text.replace(/\s+/g, ' ').trim() : text;
+}
+
+function documentLanguage(root: Element): string | undefined {
+  for (const candidate of children(root, 'name')) {
+    const language = candidate.getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang');
+    if (language) return language;
+  }
+  return undefined;
 }
 
 function xsiType(el: Element): string | null {

@@ -31,6 +31,11 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  // libxml2-wasm uses top-level await and itself targets modern browsers
+  // (Chrome/Edge 89+, Safari 15+). Preserve that syntax in the application bundle.
+  build: {
+    target: 'esnext',
+  },
   test: {
     environment: 'jsdom',
     include: ['tests/**/*.test.ts'],
