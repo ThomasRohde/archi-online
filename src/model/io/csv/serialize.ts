@@ -108,8 +108,8 @@ export function serializeCsv(state: ModelState, options: CsvExportOptions = {}):
       .map((id) => state.elements[id])
       .filter((el): el is ArchimateElement => !!el);
     for (const el of sortConcepts(elements)) {
-      // Specialization column: profiles are not supported, written empty.
-      elementRows.push(row([el.id, el.type, normalise(el.name), normalise(el.documentation), '']));
+      const specialization = state.profiles[el.profileIds[0]]?.name ?? '';
+      elementRows.push(row([el.id, el.type, normalise(el.name), normalise(el.documentation), normalise(specialization)]));
     }
   }
 
@@ -127,7 +127,7 @@ export function serializeCsv(state: ModelState, options: CsvExportOptions = {}):
         normalise(rel.documentation),
         rel.sourceId,
         rel.targetId,
-        '',
+        normalise(state.profiles[rel.profileIds[0]]?.name ?? ''),
       ]),
     );
   }

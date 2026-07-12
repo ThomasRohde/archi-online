@@ -212,6 +212,7 @@ describe('Open Exchange round-trip of editable non-concept properties', () => {
       name: 'Actor',
       documentation: '',
       properties: [],
+      profileIds: [],
       folderId: business.id,
     };
     business.itemIds.push('actor');

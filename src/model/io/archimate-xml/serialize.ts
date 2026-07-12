@@ -99,6 +99,7 @@ export function serializeArchimate(state: ModelState): string {
           ['xsi:type', 'archimate:' + element.type],
           ['name', element.name],
           ['id', element.id],
+          ['profiles', element.profileIds.length > 0 ? element.profileIds.join(' ') : undefined],
           ['type', element.type === 'Junction' && element.junctionType === 'or' ? 'or' : undefined],
         ],
         [...docTag(indent + IND, element.documentation), ...propertyTags(indent + IND, element.properties)],
@@ -113,6 +114,7 @@ export function serializeArchimate(state: ModelState): string {
           ['xsi:type', 'archimate:' + rel.type],
           ['name', rel.name !== '' ? rel.name : undefined],
           ['id', rel.id],
+          ['profiles', rel.profileIds.length > 0 ? rel.profileIds.join(' ') : undefined],
           ['source', rel.sourceId],
           ['target', rel.targetId],
           ['accessType', rel.accessType],
@@ -159,6 +161,15 @@ export function serializeArchimate(state: ModelState): string {
   }
 
   const body: string[] = [];
+  for (const profile of Object.values(state.profiles)) {
+    body.push(tag(IND, 'profile', [
+      ['name', profile.name],
+      ['id', profile.id],
+      ['imagePath', profile.imagePath],
+      ['conceptType', profile.conceptType],
+      ['specialization', profile.specialization ? 'true' : 'false'],
+    ]));
+  }
   for (const fid of state.rootFolderIds) body.push(writeFolder(IND, fid));
   if (state.info.documentation !== '') body.push(textTag(IND, 'purpose', state.info.documentation));
   body.push(...propertyTags(IND, state.info.properties));

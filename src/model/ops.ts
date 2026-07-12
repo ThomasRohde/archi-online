@@ -5,6 +5,7 @@ export * from './ops/concepts';
 export * from './ops/alignment';
 export * from './ops/c4';
 export * from './ops/csv-import';
+export * from './ops/profiles';
 export * from './ops/deletion';
 export * from './ops/duplicate';
 export * from './ops/layout';

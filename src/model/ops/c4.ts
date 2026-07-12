@@ -114,6 +114,7 @@ export function createC4ElementOnView(
       name: name ?? defaultName,
       documentation: '',
       properties: c4Properties,
+      profileIds: [],
       folderId: fid,
     };
     draft.folders[fid].itemIds.push(elementId);
@@ -470,6 +471,7 @@ function createC4Element(draft: ModelState, input: C4ElementInput): ArchimateEle
     name: input.name,
     documentation: input.documentation,
     properties: elementProperties(input.kind, input),
+    profileIds: [],
     folderId,
   };
   draft.elements[id] = element;
@@ -525,6 +527,7 @@ function createC4Relationship(
     name: input.name,
     documentation: '',
     properties: relationshipProperties(input),
+    profileIds: [],
     folderId,
     sourceId: source.id,
     targetId: target.id,

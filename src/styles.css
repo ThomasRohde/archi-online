@@ -2447,3 +2447,37 @@ body {
     border-bottom: 1px solid var(--border);
   }
 }
+.specializations-manager {
+  width: min(920px, calc(100vw - 48px));
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  box-shadow: 0 16px 48px #0006;
+  padding: 18px;
+}
+
+.specializations-manager > header,
+.specializations-manager > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.specializations-manager h2 { margin: 2px 0 12px; font-size: 19px; }
+.specializations-manager > footer { justify-content: flex-end; margin-top: 16px; }
+.specializations-table { display: grid; gap: 4px; }
+.specializations-head,
+.specializations-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(180px, 1fr) 72px 72px 30px;
+  align-items: center;
+  gap: 8px;
+}
+.specializations-head { color: var(--text-muted); font-size: 12px; padding: 0 4px; }
+.specialization-count { text-align: center; }
+.specialization-image-preview { width: 44px; height: 32px; display: grid; place-items: center; }
+.specialization-image-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.specializations-error { color: var(--danger); margin-top: 10px; }

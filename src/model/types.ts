@@ -1,5 +1,15 @@
 import type { ElementType, RelationshipType } from './metamodel';
 
+export type ConceptType = ElementType | RelationshipType;
+
+export interface ProfileDefinition {
+  id: string;
+  name: string;
+  conceptType: ConceptType;
+  specialization: boolean;
+  imagePath?: string;
+}
+
 export interface Property {
   key: string;
   value: string;
@@ -31,6 +41,8 @@ export interface ArchimateElement {
   name: string;
   documentation: string;
   properties: Property[];
+  /** Ordered profile references. The first assignment is the primary specialization. */
+  profileIds: string[];
   folderId: string;
   /** Junction only. Archi stores type="or"; "and" is the default. */
   junctionType?: 'and' | 'or';
@@ -43,6 +55,8 @@ export interface ArchimateRelationship {
   name: string;
   documentation: string;
   properties: Property[];
+  /** Ordered profile references. The first assignment is the primary specialization. */
+  profileIds: string[];
   folderId: string;
   sourceId: string;
   targetId: string;
@@ -176,6 +190,7 @@ export interface ModelInfo {
 /** The full persistent state of one open ArchiMate model (undo/redo tracked). */
 export interface ModelState {
   info: ModelInfo;
+  profiles: Record<string, ProfileDefinition>;
   folders: Record<string, Folder>;
   /** Ordered top-level folder ids. */
   rootFolderIds: string[];

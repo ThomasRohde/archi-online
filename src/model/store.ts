@@ -19,7 +19,7 @@ export interface Transaction {
 
 export type Tool =
   | { kind: 'select' }
-  | { kind: 'create-element'; type: ElementType }
+  | { kind: 'create-element'; type: ElementType; profileId?: string }
   | { kind: 'create-c4-element'; c4Kind: C4ElementKind; c4Properties?: Record<string, string> }
   | { kind: 'create-relationship'; type: RelationshipType }
   | { kind: 'magic-connector' }

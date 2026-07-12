@@ -42,6 +42,7 @@ describe('C4 profile helpers', () => {
         { key: C4_PROPERTY_KEYS.kind, value: 'container' },
         { key: C4_PROPERTY_KEYS.technology, value: 'React, TypeScript' },
       ],
+      profileIds: [],
     };
     const relationship: ArchimateRelationship = {
       id: 'rel',
@@ -56,6 +57,7 @@ describe('C4 profile helpers', () => {
         { key: C4_PROPERTY_KEYS.technology, value: 'HTTPS/JSON' },
         { key: C4_PROPERTY_KEYS.order, value: '1' },
       ],
+      profileIds: [],
     };
 
     expect(c4KindForConcept(element)).toBe('container');
@@ -99,6 +101,7 @@ describe('C4 profile helpers', () => {
         { key: C4_PROPERTY_KEYS.kind, value: 'container' },
         { key: C4_PROPERTY_KEYS.technology, value: 'React' },
       ],
+      profileIds: [],
     };
     const externalSystem: ArchimateElement = {
       ...container,

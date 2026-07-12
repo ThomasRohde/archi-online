@@ -22,6 +22,7 @@ describe('NodeFigure', () => {
       name: 'Application Component',
       documentation: '',
       properties: [],
+      profileIds: [],
       folderId: 'app-folder',
     };
     const node: ElementNode = {

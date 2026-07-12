@@ -26,8 +26,9 @@ import {
   duplicateItems,
   moveItemsToFolder,
   renameItem,
+  setConceptProfiles,
 } from '../model/ops';
-import { openView, setSelection } from '../model/store';
+import { openView, runBatch, setSelection } from '../model/store';
 import { ModelStoreProvider, useModelStoreApi, useStore, useWorkspaceStore } from './store-hooks';
 import {
   canPasteTo,
@@ -514,10 +515,33 @@ function ModelTreeInner({
     while (top.parentId !== null) top = model.folders[top.parentId];
     const topLayers = top.folderType ? FOLDER_LAYERS[top.folderType] : layers;
     if (topLayers) {
+      const definitions = topLayers.flatMap((layer) =>
+        ELEMENT_TYPES.filter((definition) => definition.layer === layer),
+      );
+      const specializationItems = Object.values(model.profiles)
+        .flatMap((profile) => {
+          const definition = definitions.find((candidate) => candidate.type === profile.conceptType);
+          if (!definition) return [];
+          return [{
+            label: `${profile.name} (${definition.label})`,
+            icon: <ElementIcon type={definition.type} />,
+            onClick: () => {
+              let id = '';
+              runBatch('Create Specialized Element', () => {
+                id = addElement(definition.type, profile.name, folder.id, modelStore);
+                setConceptProfiles(id, [profile.id], modelStore);
+              }, modelStore);
+              setSelection('tree', [id], modelStore);
+              setRenamingId(id);
+            },
+          } as MenuItem];
+        });
       items.push({
         label: 'New Element',
-        children: topLayers.flatMap((layer) =>
-          ELEMENT_TYPES.filter((d) => d.layer === layer).map((d) => ({
+        children: [
+          ...specializationItems,
+          ...(specializationItems.length > 0 ? [SEPARATOR] : []),
+          ...definitions.map((d) => ({
             label: d.label,
             icon: <ElementIcon type={d.type} />,
             onClick: () => {
@@ -526,7 +550,7 @@ function ModelTreeInner({
               setRenamingId(id);
             },
           })),
-        ),
+        ],
       });
     }
     if (top.folderType === 'diagrams') {

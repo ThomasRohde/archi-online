@@ -14,6 +14,7 @@ declare interface JObject {
 }
 
 declare interface JConcept extends JObject {
+  specialization?: string;
   /** Relationship source/target (relationships only) */
   readonly source?: JConcept;
   readonly target?: JConcept;
@@ -112,9 +113,19 @@ declare interface JModel {
   prop(key: string): string | undefined;
   prop(key: string, value: string, duplicate?: boolean): void;
   removeProp(key: string, value?: string): void;
+  readonly specializations: JProfile[];
+  createSpecialization(name: string, conceptType: string, image?: { path: string }): JProfile;
+  findSpecialization(name: string, conceptType: string): JProfile | undefined;
   createElement(type: string, name?: string, folder?: JFolder): JConcept;
   createRelationship(type: string, name: string, source: JConcept, target: JConcept, folder?: JFolder): JConcept;
   createArchimateView(name?: string, folder?: JFolder): JView;
+}
+
+declare interface JProfile {
+  name: string;
+  type: string;
+  image: { path: string } | undefined;
+  delete(): void;
 }
 
 declare interface JElkLayoutOptions {

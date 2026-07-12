@@ -46,6 +46,7 @@ import { ExportImageDialog } from './ExportImageDialog';
 import { PresentationMode } from './PresentationMode';
 import { layoutBus } from './layout-bus';
 import { createNewModelSession } from './model-session-actions';
+import { SpecializationsManager } from './SpecializationsManager';
 
 /** Published documentation site (GitHub Pages). */
 const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
@@ -378,6 +379,7 @@ export function Toolbar() {
   const [showExportImage, setShowExportImage] = useState(false);
   const [showExportCsv, setShowExportCsv] = useState(false);
   const [presenting, setPresenting] = useState(false);
+  const [showSpecializations, setShowSpecializations] = useState(false);
   const extensionSnapshot = useSyncExternalStore(
     (listener) => extensionRegistry.subscribe(listener),
     () => extensionRegistry.getSnapshot(),
@@ -537,6 +539,14 @@ export function Toolbar() {
       >
         <TbIcon name="c4" />
       </button>
+      <button
+        className="tb-icon tb-icon-text"
+        {...tip('Manage specializations')}
+        disabled={!hasModel || readOnly}
+        onClick={() => setShowSpecializations(true)}
+      >
+        Profiles
+      </button>
       <div className="toolbar-spacer" />
       {extensionSnapshot.toolbarButtons.map((button) => (
         <button
@@ -591,6 +601,10 @@ export function Toolbar() {
       {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
       {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}
       {presenting && <PresentationMode onClose={() => setPresenting(false)} />}
+      <SpecializationsManager
+        open={showSpecializations}
+        onClose={() => setShowSpecializations(false)}
+      />
       {showHelp &&
         createPortal(
           <div className="modal-backdrop" onClick={() => setShowHelp(false)}>

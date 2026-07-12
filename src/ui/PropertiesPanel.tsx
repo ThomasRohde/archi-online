@@ -13,6 +13,8 @@ import {
 import { VIEWPOINTS } from '../model/data/viewpoints';
 import {
   renameItem,
+  profilesForConceptType,
+  setConceptProfiles,
   setDocumentation,
   setJunctionType,
   setProperties,
@@ -452,6 +454,35 @@ export function PropertiesPanel() {
                       {conceptName(model, target.relationship.targetId)}
                     </div>
                   )}
+                  {target.conceptId &&
+                    (model.elements[target.conceptId] || model.relationships[target.conceptId]) && (() => {
+                      const concept = model.elements[target.conceptId!] ?? model.relationships[target.conceptId!];
+                      const available = profilesForConceptType(model, concept.type);
+                      return (
+                        <div className="prop-row">
+                          <label>Specialization</label>
+                          <select
+                            aria-label="Specialization"
+                            value={concept.profileIds[0] ?? ''}
+                            disabled={readOnly}
+                            onChange={(event) => {
+                              const selected = event.target.value;
+                              const remaining = concept.profileIds.slice(1).filter((id) => id !== selected);
+                              setConceptProfiles(
+                                concept.id,
+                                selected ? [selected, ...remaining] : remaining,
+                                modelStore,
+                              );
+                            }}
+                          >
+                            <option value="">None</option>
+                            {available.map((profile) => (
+                              <option key={profile.id} value={profile.id}>{profile.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })()}
                   <C4Fields model={model} target={target} readOnly={readOnly} />
                 </>
               )}

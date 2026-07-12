@@ -29,6 +29,26 @@ beforeEach(() => {
 });
 
 describe('jArchi scripting API', () => {
+  it('matches the jArchi specialization API', () => {
+    const { logs, error } = run(`
+      var actor = model.createElement("business-actor", "Customer");
+      var profile = model.createSpecialization("External party", "business-actor");
+      actor.specialization = "External party";
+      console.log(actor.specialization, profile.type, model.specializations.length);
+      profile.name = "External customer";
+      console.log(model.findSpecialization("External customer", "business-actor").name);
+      profile.delete();
+      console.log(actor.specialization, model.specializations.length);
+    `);
+
+    expect(error).toBeUndefined();
+    expect(logs).toEqual([
+      'log:External party business-actor 1',
+      'log:External customer',
+      'log:undefined 0',
+    ]);
+  });
+
   it('creates elements, relationships and views', () => {
     const { error } = run(`
       var actor = model.createElement("business-actor", "Bob");

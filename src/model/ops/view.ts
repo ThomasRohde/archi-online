@@ -131,6 +131,7 @@ export function createElementOnView(
       name: name ?? elementLabel(type),
       documentation: '',
       properties: [],
+      profileIds: [],
       folderId: fid,
       ...(type === 'Junction' ? { junctionType: 'and' as const } : {}),
     };
@@ -181,6 +182,7 @@ export function createRelationshipOnView(
       name: '',
       documentation: '',
       properties: [],
+      profileIds: [],
       folderId: fid,
       sourceId: srcEl.id,
       targetId: tgtEl.id,

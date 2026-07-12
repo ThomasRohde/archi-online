@@ -79,7 +79,12 @@ export function serializeExchange(state: ModelState): string {
           if (el.documentation !== '') {
             children.push(textTag('      ', 'documentation', el.documentation));
           }
-          children.push(...propertiesTags('      ', el.properties, propertyDefs));
+          children.push(...propertiesTags(
+            '      ',
+            el.properties,
+            propertyDefs,
+            s.profiles[el.profileIds[0]]?.name,
+          ));
           rows.push(
             tag(
               '    ',
@@ -127,7 +132,12 @@ function writeRelationships(
     if (rel.documentation !== '') {
       children.push(textTag('      ', 'documentation', rel.documentation));
     }
-    children.push(...propertiesTags('      ', rel.properties, propertyDefs));
+    children.push(...propertiesTags(
+      '      ',
+      rel.properties,
+      propertyDefs,
+      state.profiles[rel.profileIds[0]]?.name,
+    ));
     rows.push(tag('    ', 'relationship', attrs, children));
   }
   if (rows.length > 0) out.push('  <relationships>\n', ...rows, '  </relationships>\n');
@@ -503,6 +513,10 @@ function collectPropertyDefinitions(state: ModelState): Map<string, string> {
   const map = new Map<string, string>();
   let count = 1;
   for (const key of [...keys].sort()) map.set(key, `propid-${count++}`);
+  if ([...Object.values(state.elements), ...Object.values(state.relationships)]
+    .some((concept) => concept.profileIds.length > 0)) {
+    map.set('Specialization', 'specialization');
+  }
   return map;
 }
 
@@ -510,6 +524,7 @@ function propertiesTags(
   indent: string,
   properties: Property[],
   propertyDefs: Map<string, string>,
+  specialization?: string,
 ): string[] {
   const inner = indent + '  ';
   const rows: string[] = [];
@@ -522,6 +537,13 @@ function propertiesTags(
         ]),
       );
     }
+  }
+  if (specialization) {
+    rows.push(
+      tag(inner, 'property', [['propertyDefinitionRef', 'specialization']], [
+        textTag(inner + '  ', 'value', specialization),
+      ]),
+    );
   }
   return rows.length > 0 ? [tag(indent, 'properties', [], rows)] : [];
 }

@@ -50,6 +50,7 @@ describe('invalid-relationship checker', () => {
       name: '',
       documentation: '',
       properties: [],
+      profileIds: [],
       folderId: '',
       sourceId: a,
       targetId: b,

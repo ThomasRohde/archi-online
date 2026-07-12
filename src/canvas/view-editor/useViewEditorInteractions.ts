@@ -19,12 +19,14 @@ import {
   deleteViewObjects,
   duplicateViewObjects,
   renameItem,
+  setConceptProfiles,
   setConnectionBendpoints,
   type MoveEntry,
 } from '../../model/ops';
 import { isAllowedRelationship, validRelationshipTypes } from '../../model/rules';
 import {
   openView as openModelView,
+  runBatch,
   setActiveTool as setModelActiveTool,
   setSelection as setModelSelection,
   type Tool,
@@ -220,15 +222,20 @@ export function useViewEditorInteractions({
           width: def.width,
           height: def.height,
         };
-        const { nodeId } = createElementOnView(
-          tool.type,
-          viewId,
-          parentId,
-          bounds,
-          undefined,
-          textDefaults,
-          modelStore,
-        );
+        let nodeId = '';
+        runBatch('Create Specialized Element', () => {
+          const created = createElementOnView(
+            tool.type,
+            viewId,
+            parentId,
+            bounds,
+            undefined,
+            textDefaults,
+            modelStore,
+          );
+          nodeId = created.nodeId;
+          if (tool.profileId) setConceptProfiles(created.elementId, [tool.profileId], modelStore);
+        }, modelStore);
         setSelection('view', [nodeId]);
         setActiveTool({ kind: 'select' });
         setTimeout(() => startEdit(nodeId), 0);

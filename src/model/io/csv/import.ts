@@ -83,6 +83,7 @@ export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
         name: '',
         documentation: '',
         properties: [],
+        profileIds: [],
         folderId: defaultElementFolder(draft, type),
         junctionType: type === 'Junction' ? 'and' : undefined,
       };
@@ -93,7 +94,7 @@ export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
     }
     element.name = normalise(record[2]);
     element.documentation = record[3] ?? '';
-    // Specialization column (record[4]) is ignored — profiles are out of scope.
+    applySpecialization(element, record[4]);
   }
 
   function importRelations(text: string): void {
@@ -154,6 +155,7 @@ export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
         name: '',
         documentation: '',
         properties: [],
+        profileIds: [],
         folderId: topFolderId(draft, 'relations'),
         sourceId: '',
         targetId: '',
@@ -165,7 +167,31 @@ export function applyCsvImport(draft: ModelState, files: CsvImportFiles): void {
     pendingEndpoints.set(id, { sourceId, targetId });
     rel.name = normalise(record[2]);
     rel.documentation = record[3] ?? '';
-    // Specialization column (record[6]) is ignored — profiles are out of scope.
+    applySpecialization(rel, record[6]);
+  }
+
+  function applySpecialization(
+    concept: { id: string; type: ElementType | RelationshipType; profileIds: string[] },
+    name: string | undefined,
+  ): void {
+    const normalized = normalise(name).trim();
+    if (!normalized) return;
+    let profile = Object.values(draft.profiles).find(
+      (candidate) =>
+        candidate.conceptType === concept.type &&
+        candidate.name.localeCompare(normalized, undefined, { sensitivity: 'accent' }) === 0,
+    );
+    if (!profile) {
+      const id = newId();
+      profile = {
+        id,
+        name: normalized,
+        conceptType: concept.type,
+        specialization: true,
+      };
+      draft.profiles[id] = profile;
+    }
+    concept.profileIds = [profile.id];
   }
 
   function importProperties(text: string): void {

@@ -10,6 +10,7 @@ import type {
   Folder,
   FolderType,
   ModelState,
+  ProfileDefinition,
 } from '../../types';
 import {
   ARCHIMATE_NS,
@@ -53,6 +54,7 @@ export function parseArchimate(xml: string): ModelState {
       properties: parseProperties(root),
       version: root.getAttribute('version') ?? undefined,
     },
+    profiles: {},
     folders: {},
     rootFolderIds: [],
     elements: {},
@@ -176,6 +178,7 @@ export function parseArchimate(xml: string): ModelState {
             name: child.getAttribute('name') ?? '',
             documentation: parseDocumentation(child),
             properties: parseProperties(child),
+            profileIds: (child.getAttribute('profiles') ?? '').split(/\s+/).filter(Boolean),
             folderId: id,
             sourceId: child.getAttribute('source') ?? '',
             targetId: child.getAttribute('target') ?? '',
@@ -193,6 +196,7 @@ export function parseArchimate(xml: string): ModelState {
             name: child.getAttribute('name') ?? '',
             documentation: parseDocumentation(child),
             properties: parseProperties(child),
+            profileIds: (child.getAttribute('profiles') ?? '').split(/\s+/).filter(Boolean),
             folderId: id,
             junctionType:
               t === 'Junction' ? (child.getAttribute('type') === 'or' ? 'or' : 'and') : undefined,
@@ -207,7 +211,19 @@ export function parseArchimate(xml: string): ModelState {
   }
 
   for (const child of root.children) {
-    if (child.localName === 'folder') {
+    if (child.localName === 'profile') {
+      const conceptType = child.getAttribute('conceptType') ?? '';
+      if (!isElementType(conceptType) && !isRelationshipType(conceptType)) continue;
+      const id = child.getAttribute('id') ?? newId();
+      const profile: ProfileDefinition = {
+        id,
+        name: child.getAttribute('name') ?? '',
+        conceptType,
+        specialization: child.getAttribute('specialization') !== 'false',
+        imagePath: strAttr(child, 'imagePath'),
+      };
+      state.profiles[id] = profile;
+    } else if (child.localName === 'folder') {
       const folder = parseFolder(child, null);
       state.rootFolderIds.push(folder.id);
     }

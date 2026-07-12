@@ -60,6 +60,7 @@ export function parseExchange(xml: string): ModelState {
     if (propsEl) {
       for (const propEl of children(propsEl, 'property')) {
         const ref = propEl.getAttribute('propertyDefinitionRef');
+        if (ref === 'specialization') continue;
         const key = ref !== null ? propertyDefs.get(ref) : undefined;
         if (key !== undefined) {
           props.push({ key, value: childText(propEl, 'value', true) ?? '' });
@@ -67,6 +68,29 @@ export function parseExchange(xml: string): ModelState {
       }
     }
     return props;
+  };
+  const readSpecialization = (
+    el: Element,
+    conceptType: ArchimateElement['type'] | ArchimateRelationship['type'],
+  ): string[] => {
+    const propsEl = child(el, 'properties');
+    if (!propsEl) return [];
+    const specialization = children(propsEl, 'property').find(
+      (property) => property.getAttribute('propertyDefinitionRef') === 'specialization',
+    );
+    const name = specialization ? childText(specialization, 'value', true)?.trim() : '';
+    if (!name) return [];
+    let profile = Object.values(state.profiles).find(
+      (candidate) =>
+        candidate.conceptType === conceptType &&
+        candidate.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0,
+    );
+    if (!profile) {
+      const id = newId();
+      profile = { id, name, conceptType, specialization: true };
+      state.profiles[id] = profile;
+    }
+    return [profile.id];
   };
 
   // Root element.
@@ -94,9 +118,11 @@ export function parseExchange(xml: string): ModelState {
       name: childText(el, 'name', true) ?? '',
       documentation: childText(el, 'documentation', false) ?? '',
       properties: readProperties(el),
+      profileIds: [],
       folderId: defaultElementFolder(state, mapped.type),
       junctionType: mapped.junctionType,
     };
+    element.profileIds = readSpecialization(el, element.type);
     state.elements[id] = element;
     state.folders[element.folderId].itemIds.push(id);
   }
@@ -120,10 +146,12 @@ export function parseExchange(xml: string): ModelState {
         name: childText(el, 'name', true) ?? '',
         documentation: childText(el, 'documentation', false) ?? '',
         properties: readProperties(el),
+        profileIds: [],
         folderId: relationsFolder,
         sourceId: el.getAttribute('source') ?? '',
         targetId: el.getAttribute('target') ?? '',
       };
+      rel.profileIds = readSpecialization(el, rel.type);
       if (rel.type === 'AccessRelationship') {
         const accessType = el.getAttribute('accessType');
         if (accessType !== null) rel.accessType = exchangeToAccessType(accessType);

@@ -13,7 +13,9 @@ import {
   addNoteToView,
   addRelationship,
   addView,
+  createProfile,
   deleteItems,
+  deleteProfile,
   deleteViewObjects,
   layoutView,
   renameItem,
@@ -23,6 +25,8 @@ import {
   setNodeStyle,
   setProperties,
   setRelationshipAttrs,
+  setConceptProfiles,
+  updateProfile,
 } from '../../model/ops';
 import { openView } from '../../model/store';
 import {
@@ -33,6 +37,7 @@ import {
   type Concept,
   type DiagramConnection,
   type ModelState,
+  type ProfileDefinition,
   type Property,
 } from '../../model/types';
 import { useSettingsStore } from '../../settings/app-settings';
@@ -284,6 +289,29 @@ export class JConcept extends JObject {
     setRelationshipAttrs(this.id, { directed: v });
   }
 
+  get specialization(): string | undefined {
+    const concept = this.concept();
+    return state().profiles[concept.profileIds[0]]?.name;
+  }
+
+  set specialization(name: string | undefined) {
+    const concept = this.concept();
+    if (name !== undefined && name.trim() === '') {
+      throw new Error('Specialization name must not be empty');
+    }
+    if (name === undefined || name === null) {
+      setConceptProfiles(this.id, concept.profileIds.slice(1));
+      return;
+    }
+    const profile = Object.values(state().profiles).find(
+      (candidate) =>
+        candidate.conceptType === concept.type &&
+        candidate.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0,
+    );
+    if (!profile) throw new Error(`Specialization not found: ${name} (${concept.type})`);
+    setConceptProfiles(this.id, [profile.id, ...concept.profileIds.filter((id) => id !== profile.id)]);
+  }
+
   prop = propApi(this).prop;
   removeProp = propApi(this).removeProp;
 
@@ -328,6 +356,53 @@ export class JFolder extends JObject {
 
   delete(): void {
     deleteItems([this.id]);
+  }
+}
+
+export class JProfile {
+  constructor(readonly id: string) {}
+
+  private profile(): ProfileDefinition {
+    const profile = state().profiles[this.id];
+    if (!profile) throw new Error(`Specialization ${this.id} no longer exists`);
+    return profile;
+  }
+
+  get name(): string {
+    return this.profile().name;
+  }
+
+  set name(value: string) {
+    updateProfile(this.id, { name: value });
+  }
+
+  get type(): string {
+    return toKebab(this.profile().conceptType);
+  }
+
+  set type(value: string) {
+    const conceptType = resolveType(value);
+    if (!conceptType || (!isElementType(conceptType) && !isRelationshipType(conceptType))) {
+      throw new Error(`Unknown profile concept type: ${value}`);
+    }
+    updateProfile(this.id, { conceptType });
+  }
+
+  get image(): { path: string } | undefined {
+    const path = this.profile().imagePath;
+    return path ? { path } : undefined;
+  }
+
+  set image(value: { path: string } | undefined) {
+    updateProfile(this.id, { imagePath: value?.path });
+  }
+
+  delete(): void {
+    deleteProfile(this.id);
+  }
+
+  toString(): string {
+    return `${this.name}: ${this.type}`;
   }
 }
 
@@ -833,6 +908,37 @@ export class JModel extends JObject {
 
   removeProp(key: string, value?: string): void {
     propApi({ id: state().info.id }).removeProp(key, value);
+  }
+
+  get specializations(): JProfile[] {
+    return Object.values(state().profiles).map((profile) => new JProfile(profile.id));
+  }
+
+  createSpecialization(
+    name: string,
+    conceptType: string,
+    image?: { path: string },
+  ): JProfile {
+    const resolved = resolveType(conceptType);
+    if (!resolved || (!isElementType(resolved) && !isRelationshipType(resolved))) {
+      throw new Error(`Unknown profile concept type: ${conceptType}`);
+    }
+    return new JProfile(createProfile({
+      name,
+      conceptType: resolved,
+      imagePath: image?.path,
+    }));
+  }
+
+  findSpecialization(name: string, conceptType: string): JProfile | undefined {
+    const resolved = resolveType(conceptType);
+    if (!resolved || (!isElementType(resolved) && !isRelationshipType(resolved))) return undefined;
+    const profile = Object.values(state().profiles).find(
+      (candidate) =>
+        candidate.conceptType === resolved &&
+        candidate.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0,
+    );
+    return profile ? new JProfile(profile.id) : undefined;
   }
 
   createElement(type: string, name?: string, folder?: JFolder): JConcept {

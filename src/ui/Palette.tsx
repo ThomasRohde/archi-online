@@ -212,7 +212,10 @@ function relGlyph(type: RelationshipType): ReactNode {
 
 function toolEq(a: Tool, b: Tool): boolean {
   if (a.kind !== b.kind) return false;
-  if ('type' in a && 'type' in b) return a.type === b.type;
+  if ('type' in a && 'type' in b) {
+    return a.type === b.type &&
+      ('profileId' in a ? a.profileId : undefined) === ('profileId' in b ? b.profileId : undefined);
+  }
   if ('c4Kind' in a && 'c4Kind' in b) {
     return (
       a.c4Kind === b.c4Kind &&
@@ -238,6 +241,7 @@ function ToolButton({
     <button
       className={'pal-btn' + (active ? ' active' : '') + (disabled ? ' palette-item-disabled' : '')}
       title={title}
+      data-profile-id={'profileId' in tool ? tool.profileId : undefined}
       onClick={disabled ? undefined : () => setActiveTool(active ? { kind: 'select' } : tool)}
     >
       {children}
@@ -246,6 +250,8 @@ function ToolButton({
 }
 
 export function Palette() {
+  const profileMap = useStore((s) => s.model?.profiles);
+  const profiles = Object.values(profileMap ?? {});
   const activeC4ViewType = useStore((s) => {
     if (!s.model || !s.activeViewId) return undefined;
     return c4ViewType(s.model.views[s.activeViewId]);
@@ -311,6 +317,30 @@ export function Palette() {
             <div className="pal-sep-label" title={label}>
               {LAYER_ABBREV[layer] ?? label}
             </div>
+            {profiles
+              .filter((profile) => defs.some((definition) => definition.type === profile.conceptType))
+              .map((profile) => {
+                const definition = defs.find((candidate) => candidate.type === profile.conceptType)!;
+                const allowed = isAllowedElementInViewpoint(viewpoint, definition.type);
+                return (
+                  <ToolButton
+                    key={profile.id}
+                    tool={{ kind: 'create-element', type: definition.type, profileId: profile.id }}
+                    title={allowed
+                      ? `${profile.name} (${definition.label} specialization)`
+                      : "Not allowed by this view's viewpoint"}
+                    disabled={!allowed}
+                  >
+                    <span
+                      className="pal-el pal-specialized-el"
+                      data-palette-element={definition.type}
+                      style={{ background: definition.fill, color: '#333' }}
+                    >
+                      <StandaloneIcon type={definition.type} size={15} />
+                    </span>
+                  </ToolButton>
+                );
+              })}
             {defs.map((d) => {
               const isJunction = d.type === 'Junction';
               const allowed = isAllowedElementInViewpoint(viewpoint, d.type);

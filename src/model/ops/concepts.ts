@@ -34,6 +34,7 @@ const TOP_FOLDERS: { name: string; type: FolderType }[] = [
 export function createEmptyModel(name: string): ModelState {
   const state: ModelState = {
     info: { id: newId(), name, documentation: '', properties: [], version: '5.0.0' },
+    profiles: {},
     folders: {},
     rootFolderIds: [],
     elements: {},
@@ -97,6 +98,7 @@ export function addElement(
       name: name ?? elementLabel(type),
       documentation: '',
       properties: [],
+      profileIds: [],
       folderId: fid,
     };
     draft.elements[id] = el;
@@ -129,6 +131,7 @@ export function addRelationship(
       name,
       documentation: '',
       properties: [],
+      profileIds: [],
       folderId: fid,
       sourceId,
       targetId,
