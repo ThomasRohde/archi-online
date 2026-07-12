@@ -1,6 +1,9 @@
 import type { ModelState } from '../../model/types';
 import { ConnectionView } from '../ConnectionView';
-import { connectionPolyline } from '../geometry';
+import {
+  createConnectionRouteResolver,
+  createConnectionVisibilityResolver,
+} from '../geometry';
 import { NodeFigure } from '../figures/NodeFigure';
 import { computeAbsBounds } from '../view-editor/bounds';
 import { assetDataUrl } from '../../model/assets';
@@ -47,6 +50,10 @@ export function StaticViewContent({ model, viewId }: { model: ModelState; viewId
   if (!view) return null;
   const absBounds = computeAbsBounds(model, viewId);
   const connections = Object.values(model.connections).filter((c) => c.viewId === viewId);
+  const isConnectionVisible = createConnectionVisibilityResolver(model);
+  const route = createConnectionRouteResolver(model, absBounds, {
+    isVisible: isConnectionVisible,
+  });
   return (
     <>
       {view.childIds.map((id) => (
@@ -54,15 +61,14 @@ export function StaticViewContent({ model, viewId }: { model: ModelState; viewId
       ))}
       <g>
         {connections.map((conn) => {
-          const src = absBounds.get(conn.sourceId);
-          const tgt = absBounds.get(conn.targetId);
-          if (!src || !tgt) return null;
+          const points = route(conn.id);
+          if (!points) return null;
           return (
             <ConnectionView
               key={conn.id}
               conn={conn}
               rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
-              points={connectionPolyline(src, tgt, conn.bendpoints)}
+              points={points}
               selected={false}
               displayLabel={conn.labelExpression !== undefined ? evaluateLabelExpression(model, conn.id, conn.labelExpression).text : undefined}
             />

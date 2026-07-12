@@ -17,6 +17,7 @@ import {
   memoryKeyValueStore,
   setDefaultKeyValueStoreForTests,
 } from '../src/persistence/keyval';
+import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 let restoreKeyValueStore: (() => void) | undefined;
 let keyValueStore: ReturnType<typeof memoryKeyValueStore>;
@@ -29,6 +30,22 @@ beforeEach(() => {
 });
 
 describe('workspace autosave', () => {
+  it('restores connection endpoints and their ordered adjacency', async () => {
+    const sessionId = addModelSession({
+      model: connectionEndpointModel(),
+      fileName: 'connection-endpoints.archimate',
+    });
+
+    await flushAutosaveNow();
+    resetWorkspaceForTests();
+
+    expect(await restoreWorkspace()).toEqual({ restored: 1, failed: 0 });
+    const restored = getModelSession(sessionId)!.store.getState().model!;
+    expect(restored.connections.dependent.sourceId).toBe('base');
+    expect(restored.connections.base.sourceConnectionIds).toEqual(['dependent']);
+    expect(restored.nodes['node-c'].targetConnectionIds).toEqual(['dependent']);
+  });
+
   it('restores every model and the active/MRU workspace state', async () => {
     const firstId = addModelSession({
       model: createEmptyModel('First'),

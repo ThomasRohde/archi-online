@@ -10,7 +10,7 @@ import { newId } from '../id';
 import { getActiveModelStore, transact, type ModelStore } from '../store';
 import type { DiagramConnection, DiagramNode, ModelState } from '../types';
 import { alignableNodeIds } from './alignment';
-import { attachConnection, attachNode } from './draft';
+import { attachNode, rebuildConnectionAdjacency } from './draft';
 
 const COPY_SUFFIX = ' (copy)';
 
@@ -107,19 +107,70 @@ function copyInternalConnections(
   targetViewId: string,
   idMap: Map<string, string>,
 ): void {
-  for (const conn of Object.values(draft.connections)) {
-    if (conn.viewId !== sourceViewId) continue;
-    const sourceId = idMap.get(conn.sourceId);
-    const targetId = idMap.get(conn.targetId);
-    if (!sourceId || !targetId) continue;
+  const connections = mappedConnectionClosure(draft, sourceViewId, idMap);
+  for (const connection of connections) idMap.set(connection.id, newId());
+  mapClonedNodeAdjacency(draft, idMap);
+  for (const conn of connections) {
     const copy: DiagramConnection = {
       ...deepClone(conn),
-      id: newId(),
+      id: idMap.get(conn.id)!,
       viewId: targetViewId,
-      sourceId,
-      targetId,
+      sourceId: idMap.get(conn.sourceId)!,
+      targetId: idMap.get(conn.targetId)!,
+      sourceConnectionIds: mappedAdjacency(conn.sourceConnectionIds, idMap),
+      targetConnectionIds: mappedAdjacency(conn.targetConnectionIds, idMap),
     };
-    attachConnection(draft, copy);
+    draft.connections[copy.id] = copy;
+  }
+  rebuildConnectionAdjacency(draft);
+}
+
+function mappedConnectionClosure(
+  draft: ModelState,
+  viewId: string,
+  idMap: Map<string, string>,
+): DiagramConnection[] {
+  const candidates = Object.values(draft.connections).filter(
+    (connection) => connection.viewId === viewId,
+  );
+  const included = new Set(idMap.keys());
+  const selected: DiagramConnection[] = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const connection of candidates) {
+      if (
+        included.has(connection.id) ||
+        !included.has(connection.sourceId) ||
+        !included.has(connection.targetId)
+      ) {
+        continue;
+      }
+      selected.push(connection);
+      included.add(connection.id);
+      changed = true;
+    }
+  }
+  return selected;
+}
+
+function mappedAdjacency(ids: string[], idMap: Map<string, string>): string[] {
+  return ids.flatMap((id) => {
+    const mapped = idMap.get(id);
+    return mapped ? [mapped] : [];
+  });
+}
+
+function mapClonedNodeAdjacency(
+  draft: ModelState,
+  idMap: Map<string, string>,
+): void {
+  for (const [sourceId, copyId] of idMap) {
+    const source = draft.nodes[sourceId];
+    const copy = draft.nodes[copyId];
+    if (!source || !copy) continue;
+    copy.sourceConnectionIds = mappedAdjacency(source.sourceConnectionIds, idMap);
+    copy.targetConnectionIds = mappedAdjacency(source.targetConnectionIds, idMap);
   }
 }
 
@@ -223,37 +274,63 @@ function copyInternalConnectionsWithFreshRelationships(
   elementIdMap: Map<string, string>,
 ): void {
   const relationshipIdMap = new Map<string, string>();
-  for (const connection of Object.values(draft.connections)) {
-    if (connection.viewId !== viewId) continue;
-    const sourceId = nodeIdMap.get(connection.sourceId);
-    const targetId = nodeIdMap.get(connection.targetId);
-    if (!sourceId || !targetId) continue;
-
-    let relationshipId = connection.relationshipId;
-    if (relationshipId) {
-      let copyRelationshipId = relationshipIdMap.get(relationshipId);
-      if (!copyRelationshipId) {
-        const relationship = draft.relationships[relationshipId];
-        if (!relationship) continue;
-        copyRelationshipId = newId();
-        relationshipIdMap.set(relationshipId, copyRelationshipId);
-        draft.relationships[copyRelationshipId] = {
-          ...deepClone(relationship),
-          id: copyRelationshipId,
-          sourceId: elementIdMap.get(relationship.sourceId) ?? relationship.sourceId,
-          targetId: elementIdMap.get(relationship.targetId) ?? relationship.targetId,
-        };
-        draft.folders[relationship.folderId]?.itemIds.push(copyRelationshipId);
-      }
-      relationshipId = copyRelationshipId;
+  const connections = mappedConnectionClosure(draft, viewId, nodeIdMap);
+  for (const connection of connections) nodeIdMap.set(connection.id, newId());
+  mapClonedNodeAdjacency(draft, nodeIdMap);
+  for (const connection of connections) {
+    if (
+      connection.relationshipId &&
+      draft.relationships[connection.relationshipId] &&
+      !relationshipIdMap.has(connection.relationshipId)
+    ) {
+      relationshipIdMap.set(connection.relationshipId, newId());
     }
-
-    attachConnection(draft, {
-      ...deepClone(connection),
-      id: newId(),
-      sourceId,
-      targetId,
-      ...(relationshipId ? { relationshipId } : {}),
-    });
   }
+  let addedRelationshipDependency = true;
+  while (addedRelationshipDependency) {
+    addedRelationshipDependency = false;
+    for (const relationshipId of [...relationshipIdMap.keys()]) {
+      const relationship = draft.relationships[relationshipId];
+      for (const endpointId of [relationship.sourceId, relationship.targetId]) {
+        if (draft.relationships[endpointId] && !relationshipIdMap.has(endpointId)) {
+          relationshipIdMap.set(endpointId, newId());
+          addedRelationshipDependency = true;
+        }
+      }
+    }
+  }
+  for (const [relationshipId, copyRelationshipId] of relationshipIdMap) {
+    const relationship = draft.relationships[relationshipId];
+    draft.relationships[copyRelationshipId] = {
+      ...deepClone(relationship),
+      id: copyRelationshipId,
+      sourceId:
+        elementIdMap.get(relationship.sourceId) ??
+        relationshipIdMap.get(relationship.sourceId) ??
+        relationship.sourceId,
+      targetId:
+        elementIdMap.get(relationship.targetId) ??
+        relationshipIdMap.get(relationship.targetId) ??
+        relationship.targetId,
+    };
+    draft.folders[relationship.folderId]?.itemIds.push(copyRelationshipId);
+  }
+  for (const connection of connections) {
+    const relationshipId = connection.relationshipId
+      ? relationshipIdMap.get(connection.relationshipId)
+      : undefined;
+    if (connection.relationshipId && !relationshipId) continue;
+
+    const copy: DiagramConnection = {
+      ...deepClone(connection),
+      id: nodeIdMap.get(connection.id)!,
+      sourceId: nodeIdMap.get(connection.sourceId)!,
+      targetId: nodeIdMap.get(connection.targetId)!,
+      sourceConnectionIds: mappedAdjacency(connection.sourceConnectionIds, nodeIdMap),
+      targetConnectionIds: mappedAdjacency(connection.targetConnectionIds, nodeIdMap),
+      ...(relationshipId ? { relationshipId } : {}),
+    };
+    draft.connections[copy.id] = copy;
+  }
+  rebuildConnectionAdjacency(draft);
 }

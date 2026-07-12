@@ -186,7 +186,11 @@ export function addFolder(parentId: string, name = 'New Folder', store?: ModelSt
 export function renameItem(id: string, name: string, store?: ModelStore): void {
   transact('Rename', (draft) => {
     const item =
-      draft.elements[id] ?? draft.relationships[id] ?? draft.views[id] ?? draft.folders[id];
+      draft.elements[id] ??
+      draft.relationships[id] ??
+      draft.views[id] ??
+      draft.folders[id] ??
+      draft.connections[id];
     if (item) item.name = name;
     else if (draft.info.id === id) draft.info.name = name;
     else {
@@ -200,7 +204,11 @@ export function renameItem(id: string, name: string, store?: ModelStore): void {
 export function setDocumentation(id: string, documentation: string, store?: ModelStore): void {
   transact('Edit Documentation', (draft) => {
     const item =
-      draft.elements[id] ?? draft.relationships[id] ?? draft.views[id] ?? draft.folders[id];
+      draft.elements[id] ??
+      draft.relationships[id] ??
+      draft.views[id] ??
+      draft.folders[id] ??
+      draft.connections[id];
     if (item) item.documentation = documentation;
     else if (draft.info.id === id) draft.info.documentation = documentation;
     else {
@@ -213,7 +221,11 @@ export function setDocumentation(id: string, documentation: string, store?: Mode
 export function setProperties(id: string, properties: Property[], store?: ModelStore): void {
   transact('Edit Properties', (draft) => {
     const item =
-      draft.elements[id] ?? draft.relationships[id] ?? draft.views[id] ?? draft.folders[id];
+      draft.elements[id] ??
+      draft.relationships[id] ??
+      draft.views[id] ??
+      draft.folders[id] ??
+      draft.connections[id];
     if (item) item.properties = properties;
     else if (draft.info.id === id) draft.info.properties = properties;
     else {

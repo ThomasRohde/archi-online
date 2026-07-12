@@ -1,6 +1,6 @@
 import { newId } from './id';
 import { defaultFolderId, folderForElementType } from './ops/concepts';
-import { attachConnection, attachNode } from './ops/draft';
+import { attachNode, rebuildConnectionAdjacency } from './ops/draft';
 import { transact, type ModelStore } from './store';
 import type {
   ArchimateElement,
@@ -53,6 +53,31 @@ function deepClone<T>(value: T): T {
     : JSON.parse(JSON.stringify(value)) as T;
 }
 
+function connectionClosure(
+  connections: DiagramConnection[],
+  seedConnectableIds: ReadonlySet<string>,
+): DiagramConnection[] {
+  const included = new Set(seedConnectableIds);
+  const selected: DiagramConnection[] = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const connection of connections) {
+      if (
+        included.has(connection.id) ||
+        !included.has(connection.sourceId) ||
+        !included.has(connection.targetId)
+      ) {
+        continue;
+      }
+      selected.push(connection);
+      included.add(connection.id);
+      changed = true;
+    }
+  }
+  return selected;
+}
+
 function createCollector(model: ModelState) {
   const elementIds = new Set<string>();
   const relationshipIds = new Set<string>();
@@ -101,14 +126,11 @@ function createCollector(model: ModelState) {
   };
 
   const addConnectionsForView = (viewId: string): void => {
-    for (const connection of Object.values(model.connections)) {
-      if (
-        connection.viewId !== viewId ||
-        !nodeIds.has(connection.sourceId) ||
-        !nodeIds.has(connection.targetId)
-      ) {
-        continue;
-      }
+    const connections = connectionClosure(
+      Object.values(model.connections).filter((connection) => connection.viewId === viewId),
+      new Set([...nodeIds, ...connectionIds]),
+    );
+    for (const connection of connections) {
       connectionIds.add(connection.id);
       if (connection.relationshipId) addConcept(connection.relationshipId);
     }
@@ -225,11 +247,7 @@ export function pasteTransferBundle(
   const baseNodeIdsToPaste = new Set(baseNodesToPaste.map((node) => node.id));
   const baseConnectionsToPaste =
     !crossModel && bundle.kind === 'canvas' && destination === 'view'
-      ? bundle.connections.filter(
-          (connection) =>
-            baseNodeIdsToPaste.has(connection.sourceId) &&
-            baseNodeIdsToPaste.has(connection.targetId),
-        )
+      ? connectionClosure(bundle.connections, baseNodeIdsToPaste)
       : crossModel && includeGeometry
         ? bundle.connections
         : [];
@@ -348,6 +366,33 @@ export function pasteTransferBundle(
     }
   }
 
+  // A relationship can itself be a semantic endpoint. If a required
+  // relationship depends on another relationship that is missing in the
+  // target, clone that dependency as a relationship (not as an element) and
+  // continue until the semantic endpoint graph is closed.
+  const bundleRelationshipsById = new Map(
+    bundle.relationships.map((relationship) => [relationship.id, relationship]),
+  );
+  let addedRelationshipDependency = true;
+  while (addedRelationshipDependency) {
+    addedRelationshipDependency = false;
+    for (const relationshipId of [...relationshipIdsToClone]) {
+      const relationship = bundleRelationshipsById.get(relationshipId);
+      if (!relationship) continue;
+      for (const endpointId of [relationship.sourceId, relationship.targetId]) {
+        if (!bundleRelationshipsById.has(endpointId)) continue;
+        elementIdsToClone.delete(endpointId);
+        if (
+          (crossModel || !targetState.model.relationships[endpointId]) &&
+          !relationshipIdsToClone.has(endpointId)
+        ) {
+          relationshipIdsToClone.add(endpointId);
+          addedRelationshipDependency = true;
+        }
+      }
+    }
+  }
+
   const idMap = new Map<string, string>();
   const mapFresh = (id: string) => {
     const mapped = newId();
@@ -454,6 +499,13 @@ export function pasteTransferBundle(
           };
           draft.folders[folderId].itemIds.push(id);
         }
+        const relationshipCopies: ArchimateRelationship[] = [];
+        const pendingRelationshipIds = new Set(
+          [...relationshipIdsToClone].flatMap((id) => {
+            const mapped = idMap.get(id);
+            return mapped ? [mapped] : [];
+          }),
+        );
         for (const source of bundle.relationships) {
           if (!relationshipIdsToClone.has(source.id)) continue;
           const id = idMap.get(source.id)!;
@@ -462,16 +514,29 @@ export function pasteTransferBundle(
             : source.folderId;
           const sourceId = idMap.get(source.sourceId) ?? source.sourceId;
           const targetId = idMap.get(source.targetId) ?? source.targetId;
-          if (!draft.elements[sourceId] || !draft.elements[targetId]) continue;
-          draft.relationships[id] = {
+          const sourceExists = Boolean(
+            draft.elements[sourceId] ??
+            draft.relationships[sourceId] ??
+            (pendingRelationshipIds.has(sourceId) ? sourceId : undefined),
+          );
+          const targetExists = Boolean(
+            draft.elements[targetId] ??
+            draft.relationships[targetId] ??
+            (pendingRelationshipIds.has(targetId) ? targetId : undefined),
+          );
+          if (!sourceExists || !targetExists) continue;
+          relationshipCopies.push({
             ...deepClone(source),
             id,
             folderId,
             sourceId,
             targetId,
             profileIds: source.profileIds.map((profileId) => profileIdMap.get(profileId) ?? profileId),
-          };
-          draft.folders[folderId].itemIds.push(id);
+          });
+        }
+        for (const relationship of relationshipCopies) {
+          draft.relationships[relationship.id] = relationship;
+          draft.folders[relationship.folderId].itemIds.push(relationship.id);
         }
       }
       if (viewIdsToClone.size > 0) {
@@ -513,8 +578,14 @@ export function pasteTransferBundle(
               ? { ...source.bounds, x: source.bounds.x + dx, y: source.bounds.y + dy }
               : { ...source.bounds },
           childIds: [],
-          sourceConnectionIds: [],
-          targetConnectionIds: [],
+          sourceConnectionIds: source.sourceConnectionIds.flatMap((connectionId) => {
+            const mapped = idMap.get(connectionId);
+            return mapped ? [mapped] : [];
+          }),
+          targetConnectionIds: source.targetConnectionIds.flatMap((connectionId) => {
+            const mapped = idMap.get(connectionId);
+            return mapped ? [mapped] : [];
+          }),
           imagePath: source.imagePath
             ? assetPathMap.get(source.imagePath) ?? source.imagePath
             : undefined,
@@ -528,26 +599,69 @@ export function pasteTransferBundle(
         attachNode(draft, node);
       }
 
-      for (const source of connectionsToPaste) {
+      const preparedConnections = connectionsToPaste.flatMap((source) => {
         const sourceId = idMap.get(source.sourceId);
         const targetId = idMap.get(source.targetId);
         const viewId = idMap.get(source.viewId) ?? options.targetViewId;
-        if (!sourceId || !targetId || !viewId || !draft.nodes[sourceId] || !draft.nodes[targetId]) {
-          continue;
-        }
         const relationshipId = source.relationshipId
           ? (idMap.get(source.relationshipId) ?? source.relationshipId)
           : undefined;
-        if (relationshipId && !draft.relationships[relationshipId]) continue;
-        attachConnection(draft, {
+        if (
+          !sourceId ||
+          !targetId ||
+          !viewId ||
+          (relationshipId && !draft.relationships[relationshipId])
+        ) {
+          return [];
+        }
+        return [{ source, sourceId, targetId, viewId, relationshipId }];
+      });
+      const eligibleConnectionIds = new Set<string>();
+      let addedEligibleConnection = true;
+      while (addedEligibleConnection) {
+        addedEligibleConnection = false;
+        for (const prepared of preparedConnections) {
+          if (eligibleConnectionIds.has(prepared.source.id)) continue;
+          const sourceExists = Boolean(
+            draft.nodes[prepared.sourceId] ||
+            draft.connections[prepared.sourceId] ||
+            eligibleConnectionIds.has(prepared.source.sourceId),
+          );
+          const targetExists = Boolean(
+            draft.nodes[prepared.targetId] ||
+            draft.connections[prepared.targetId] ||
+            eligibleConnectionIds.has(prepared.source.targetId),
+          );
+          if (sourceExists && targetExists) {
+            eligibleConnectionIds.add(prepared.source.id);
+            addedEligibleConnection = true;
+          }
+        }
+      }
+      const connectionCopies: DiagramConnection[] = [];
+      for (const { source, sourceId, targetId, viewId, relationshipId } of preparedConnections) {
+        if (!eligibleConnectionIds.has(source.id)) continue;
+        connectionCopies.push({
           ...deepClone(source),
           id: idMap.get(source.id)!,
           viewId,
           sourceId,
           targetId,
+          sourceConnectionIds: source.sourceConnectionIds.flatMap((id) => {
+            const mapped = idMap.get(id);
+            return mapped ? [mapped] : [];
+          }),
+          targetConnectionIds: source.targetConnectionIds.flatMap((id) => {
+            const mapped = idMap.get(id);
+            return mapped ? [mapped] : [];
+          }),
           ...(relationshipId ? { relationshipId } : {}),
         });
       }
+      for (const connection of connectionCopies) {
+        draft.connections[connection.id] = connection;
+      }
+      if (connectionsToPaste.length > 0) rebuildConnectionAdjacency(draft);
 
       if (bundle.kind === 'tree' && options.targetViewId) {
         const offset = options.offset ?? 16;

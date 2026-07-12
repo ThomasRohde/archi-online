@@ -23,3 +23,30 @@ export function isNodeGhosted(
   const el = model.elements[node.elementId];
   return !!el && !isAllowedElementInViewpoint(viewpoint, el.type);
 }
+
+/**
+ * Connections inherit viewpoint ghosting from both endpoints. Connection
+ * endpoints are followed recursively so every dependent edge projects the
+ * same ghost state; corrupt cycles terminate without mutating the model.
+ */
+export function isConnectableGhosted(
+  model: ModelState,
+  connectableId: string,
+  viewpoint: string | undefined,
+): boolean {
+  const cache = new Map<string, boolean>();
+  const visiting = new Set<string>();
+  const resolve = (id: string): boolean => {
+    if (model.nodes[id]) return isNodeGhosted(model, id, viewpoint);
+    const cached = cache.get(id);
+    if (cached !== undefined) return cached;
+    const connection = model.connections[id];
+    if (!connection || visiting.has(id)) return false;
+    visiting.add(id);
+    const ghosted = resolve(connection.sourceId) || resolve(connection.targetId);
+    visiting.delete(id);
+    cache.set(id, ghosted);
+    return ghosted;
+  };
+  return resolve(connectableId);
+}

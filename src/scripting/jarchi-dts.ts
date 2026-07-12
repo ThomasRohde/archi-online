@@ -28,6 +28,8 @@ declare interface JBounds { x: number; y: number; width: number; height: number 
 declare interface JPoint { x: number; y: number }
 declare interface JBendpoint { startX: number; startY: number; endX: number; endY: number }
 
+type JConnectable = JVisual | JConnection;
+
 declare interface JVisual extends JObject {
   readonly concept?: JConcept;
   readonly view: JView;
@@ -55,8 +57,8 @@ declare interface JVisual extends JObject {
 declare interface JConnection extends JObject {
   readonly concept?: JConcept;
   readonly view: JView;
-  readonly source: JVisual;
-  readonly target: JVisual;
+  readonly source: JConnectable;
+  readonly target: JConnectable;
   lineColor: string | undefined;
   labelExpression: string | undefined;
   lineStyle: number;
@@ -70,7 +72,7 @@ declare interface JView extends JObject {
   readonly viewpoint?: string;
   /** Add an element to the view, or a relationship between two visual objects. */
   add(element: JConcept, x: number, y: number, width: number, height: number): JVisual;
-  add(relationship: JConcept, source: JVisual, target: JVisual): JConnection;
+  add(relationship: JConcept, source: JConnectable, target: JConnectable): JConnection;
   createObject(type: 'note' | 'group', x: number, y: number, width: number, height: number): JVisual;
   nodes(options?: { recursive?: boolean }): JVisual[];
   connections(): JConnection[];

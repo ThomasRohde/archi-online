@@ -13,5 +13,6 @@ export {
   JView,
   JVisual,
   wrap,
+  type JConnectable,
   type JKind,
 } from './jarchi/wrappers';

@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { NodeView } from '../src/canvas/view-editor/NodeView';
 import { isNodeGhosted } from '../src/canvas/view-editor/viewpoint-ghost';
+import * as viewpointGhost from '../src/canvas/view-editor/viewpoint-ghost';
 import {
   addElement,
   addElementNodeToView,
@@ -12,6 +13,7 @@ import {
 } from '../src/model/ops';
 import { replaceModel } from '../src/model/store';
 import { useStore } from '../src/ui/store-hooks';
+import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 function model() {
   const m = useStore.getState().model;
@@ -24,6 +26,38 @@ beforeEach(() => {
 });
 
 describe('isNodeGhosted', () => {
+  it('recursively ghosts connections whose connection endpoint is ghosted', () => {
+    const m = connectionEndpointModel();
+    const business = Object.values(m.folders).find((folder) => folder.folderType === 'business')!;
+    m.elements.actor = {
+      id: 'actor',
+      kind: 'element',
+      type: 'BusinessActor',
+      name: 'Actor',
+      documentation: '',
+      properties: [],
+      profileIds: [],
+      folderId: business.id,
+    };
+    business.itemIds.push('actor');
+    m.nodes['node-a'] = {
+      ...m.nodes['node-a'],
+      nodeType: 'element',
+      elementId: 'actor',
+    };
+    const isConnectableGhosted = (viewpointGhost as typeof viewpointGhost & {
+      isConnectableGhosted?: (
+        model: typeof m,
+        connectableId: string,
+        viewpoint: string | undefined,
+      ) => boolean;
+    }).isConnectableGhosted;
+    expect(isConnectableGhosted).toBeTypeOf('function');
+
+    expect(isConnectableGhosted!(m, 'base', 'application_structure')).toBe(true);
+    expect(isConnectableGhosted!(m, 'dependent', 'application_structure')).toBe(true);
+  });
+
   it('ghosts an element disallowed by the viewpoint, not an allowed one', () => {
     const viewId = addView('V');
     const appId = addElement('ApplicationComponent');

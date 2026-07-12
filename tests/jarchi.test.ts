@@ -13,6 +13,7 @@ import { useStore } from '../src/ui/store-hooks';
 import { JView } from '../src/scripting/jarchi';
 import { JARCHI_CAPABILITY_TEST_SCRIPT } from '../src/scripting/example-scripts';
 import { runScript, type ConsoleEntry } from '../src/scripting/runner';
+import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 function model() {
   return useStore.getState().model!;
@@ -231,6 +232,41 @@ describe('jArchi scripting API', () => {
     ]);
   });
 
+  it('uses connections as connectable endpoints with diagram metadata and properties', () => {
+    const { logs, error } = run(`
+      var a = model.createElement("business-actor", "A");
+      var b = model.createElement("business-role", "B");
+      var c = model.createElement("business-collaboration", "C");
+      var baseRel = model.createRelationship("association-relationship", "base semantic", a, b);
+      var dependentRel = model.createRelationship("association-relationship", "dependent semantic", a, c);
+      var view = model.createArchimateView("Connectables");
+      var aNode = view.add(a, 0, 0, 100, 40);
+      var bNode = view.add(b, 200, 0, 100, 40);
+      var cNode = view.add(c, 100, 160, 100, 40);
+      var base = view.add(baseRel, aNode, bNode);
+      var dependent = view.add(dependentRel, base, cNode);
+      dependent.name = "visual dependent";
+      dependent.documentation = "diagram docs";
+      dependent.prop("owner", "diagram");
+      dependent.setAbsoluteRoute([{ x: 140, y: 100 }]);
+      var route = dependent.absoluteRoute();
+      console.log(dependent.source.kind, dependent.target.kind, dependent.name, dependent.documentation, dependent.prop("owner"));
+      console.log(route.length, Math.round(route[0].x), Math.round(route[0].y));
+    `);
+
+    expect(error).toBeUndefined();
+    expect(logs).toEqual([
+      'log:connection visual visual dependent diagram docs diagram',
+      'log:1 140 100',
+    ]);
+    const connections = Object.values(model().connections);
+    const dependent = connections.find((connection) => connection.name === 'visual dependent')!;
+    const base = connections.find((connection) => connection.id === dependent.sourceId)!;
+    expect(dependent.documentation).toBe('diagram docs');
+    expect(dependent.properties).toEqual([{ key: 'owner', value: 'diagram' }]);
+    expect(base.sourceConnectionIds).toEqual([dependent.id]);
+  });
+
   it('supports raw bendpoints and absolute connection routes', () => {
     const { logs, error } = run(`
       var source = model.createElement("application-component", "Source");
@@ -303,6 +339,22 @@ describe('jArchi scripting API', () => {
     expect(route[0].y).toBeCloseTo(100.25);
     expect(useStore.getState().undoStack).toHaveLength(undoBefore + 1);
     expect(useStore.getState().undoStack.at(-1)?.label).toBe('Layout View');
+  });
+
+  it('applies dependent absolute routes against earlier routes in the same layout', () => {
+    replaceModel(connectionEndpointModel(), null);
+    const view = new JView('view');
+
+    view.layout({
+      connections: {
+        base: { route: [{ x: 150, y: 100 }] },
+        dependent: { route: [{ x: 140, y: 120 }] },
+      },
+    });
+
+    const byId = new Map(view.connections().map((connection) => [connection.id, connection]));
+    expect(byId.get('base')!.absoluteRoute()).toEqual([{ x: 150, y: 100 }]);
+    expect(byId.get('dependent')!.absoluteRoute()).toEqual([{ x: 140, y: 120 }]);
   });
 
   it('rejects invalid bulk layout input without partial mutation', () => {

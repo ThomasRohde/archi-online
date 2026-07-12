@@ -1,15 +1,16 @@
 import { elementLabel, relationshipLabel } from './metamodel';
 import { VIEWPOINTS } from './data/viewpoints';
-import type {
-  ArchimateElement,
-  ArchimateRelationship,
-  DiagramConnection,
-  DiagramNode,
-  DiagramView,
-  Folder,
-  ModelInfo,
-  ModelState,
-  Property,
+import {
+  getConnectable,
+  type ArchimateElement,
+  type ArchimateRelationship,
+  type DiagramConnection,
+  type DiagramNode,
+  type DiagramView,
+  type Folder,
+  type ModelInfo,
+  type ModelState,
+  type Property,
 } from './types';
 
 export interface LabelDiagnostic {
@@ -225,11 +226,14 @@ function objectForPrefix(model: ModelState, context: LabelObject, prefix?: strin
   if (prefix === 'vfolder' && 'viewId' in context) return model.folders[model.views[context.viewId]?.folderId];
   if (prefix === 'parent') {
     if ('nodeType' in context) return actualObject(model, model.nodes[context.parentId] ?? model.views[context.parentId]);
-    if ('connType' in context) return actualObject(model, model.nodes[context.sourceId]);
+    if ('connType' in context) return actualObject(model, getConnectable(model, context.sourceId));
     if ('kind' in context && context.kind === 'folder') return context.parentId ? model.folders[context.parentId] : undefined;
   }
   if ((prefix === 'source' || prefix === 'target') && 'connType' in context) {
-    return actualObject(model, model.nodes[prefix === 'source' ? context.sourceId : context.targetId]);
+    return actualObject(
+      model,
+      getConnectable(model, prefix === 'source' ? context.sourceId : context.targetId),
+    );
   }
   if (prefix.endsWith(':source') || prefix.endsWith(':target')) {
     const direction = prefix.endsWith(':source') ? 'source' : 'target';
@@ -240,14 +244,24 @@ function objectForPrefix(model: ModelState, context: LabelObject, prefix?: strin
 }
 
 function linkedObject(model: ModelState, context: LabelObject, relationKind: string, direction: 'source' | 'target'): LabelObject | undefined {
-  const node = 'nodeType' in context ? context : undefined;
-  if (node) {
-    const connectionIds = direction === 'source' ? node.targetConnectionIds : node.sourceConnectionIds;
+  const connectable = 'nodeType' in context || 'connType' in context ? context : undefined;
+  if (connectable) {
+    const connectionIds = direction === 'source'
+      ? connectable.targetConnectionIds
+      : connectable.sourceConnectionIds;
     for (const id of connectionIds) {
       const connection = model.connections[id];
       const rel = connection?.relationshipId ? model.relationships[connection.relationshipId] : undefined;
       const type = rel?.type.toLowerCase() ?? 'connection';
-      if (type.includes(relationKind)) return actualObject(model, model.nodes[direction === 'source' ? connection.sourceId : connection.targetId]);
+      if (type.includes(relationKind)) {
+        return actualObject(
+          model,
+          getConnectable(
+            model,
+            direction === 'source' ? connection.sourceId : connection.targetId,
+          ),
+        );
+      }
     }
   }
   const actual = actualObject(model, context);

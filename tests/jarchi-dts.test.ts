@@ -5,6 +5,11 @@ describe('jArchi Monaco declarations', () => {
   it('keeps script declarations aligned with script runtime globals', () => {
     expect(JARCHI_SCRIPT_DTS).not.toContain('declare const app');
     expect(JARCHI_SCRIPT_DTS).not.toContain('fitContent');
+    expect(JARCHI_SCRIPT_DTS).toContain('type JConnectable = JVisual | JConnection;');
+    expect(JARCHI_SCRIPT_DTS).toContain('readonly source: JConnectable;');
+    expect(JARCHI_SCRIPT_DTS).toContain(
+      'add(relationship: JConcept, source: JConnectable, target: JConnectable): JConnection;',
+    );
   });
 
   it('keeps extension-only app declarations separate from script declarations', () => {

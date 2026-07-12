@@ -21,6 +21,7 @@ import {
 } from '../src/persistence/share';
 import { AppDialogHost } from '../src/ui/AppDialog';
 import { shareDecisionForInline, shareModel } from '../src/ui/Toolbar';
+import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 const archisuranceXml = readFileSync(
   join(__dirname, 'fixtures', 'Archisurance.archimate'),
@@ -52,6 +53,19 @@ beforeEach(() => {
 });
 
 describe('share link encoding', () => {
+  it('round-trips ordered connection endpoints through an inline share', async () => {
+    const share = await encodeModelToInlineShare(
+      connectionEndpointModel(),
+      'https://example.test/archi/',
+    );
+
+    const decoded = await decodeInlineSharePayload(share.payload);
+
+    expect(decoded.model.connections.dependent.sourceId).toBe('base');
+    expect(decoded.model.connections.base.sourceConnectionIds).toEqual(['dependent']);
+    expect(decoded.model.nodes['node-c'].targetConnectionIds).toEqual(['dependent']);
+  });
+
   it('round-trips image-bearing archive bytes through an inline share', async () => {
     const model = createEmptyModel('Shared images');
     const path = 'images/_abcdefghijklmnopqrstuv.png';

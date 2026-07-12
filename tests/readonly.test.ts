@@ -14,6 +14,7 @@ import { useStore } from '../src/ui/store-hooks';
 import { ViewEditor } from '../src/canvas/ViewEditor';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
 import { ViewerShell } from '../src/ui/ViewerShell';
+import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 function state() {
   return useStore.getState();
@@ -79,6 +80,25 @@ describe('read-only store mode', () => {
 });
 
 describe('read-only UI', () => {
+  it('renders and selects connections attached to other connections', async () => {
+    replaceModel(connectionEndpointModel(), null, false, { readOnly: true });
+
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(createElement(ViewEditor, { viewId: 'view', readOnly: true }));
+    });
+
+    const dependent = host.querySelector('[data-conn-id="dependent"]');
+    expect(dependent).not.toBeNull();
+    await act(async () => {
+      dispatchPointerDown(dependent!);
+    });
+    expect(state().selection).toEqual({ source: 'view', ids: ['dependent'] });
+
+    await act(async () => root.unmount());
+  });
+
   it('renders selected properties as disabled controls in read-only mode', async () => {
     replaceModel(createEmptyModel('Inspectable'), null, false);
     const id = addElement('BusinessActor', 'Actor');

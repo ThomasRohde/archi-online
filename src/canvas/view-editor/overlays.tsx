@@ -45,25 +45,17 @@ export function ResizeHandles({
 
 export function BendpointHandles({
   conn,
-  sourceBounds,
-  targetBounds,
+  sourcePoint,
+  targetPoint,
 }: {
   conn: DiagramConnection | undefined;
-  sourceBounds: Bounds | undefined;
-  targetBounds: Bounds | undefined;
+  sourcePoint: import('../geometry').Point | undefined;
+  targetPoint: import('../geometry').Point | undefined;
 }) {
-  if (!conn || !sourceBounds || !targetBounds) return null;
-  const srcC = {
-    x: sourceBounds.x + sourceBounds.width / 2,
-    y: sourceBounds.y + sourceBounds.height / 2,
-  };
-  const tgtC = {
-    x: targetBounds.x + targetBounds.width / 2,
-    y: targetBounds.y + targetBounds.height / 2,
-  };
+  if (!conn || !sourcePoint || !targetPoint) return null;
   return (
     <>
-      {bendpointPositions(conn.bendpoints, srcC, tgtC).map((bp, i) => (
+      {bendpointPositions(conn.bendpoints, sourcePoint, targetPoint).map((bp, i) => (
         <rect
           key={i}
           data-bendpoint={`${conn.id}@${i}`}
@@ -200,15 +192,13 @@ export function ZoomControls({
 
 export function bendpointPreview(
   conn: DiagramConnection,
-  sourceBounds: Bounds,
-  targetBounds: Bounds,
+  sourcePoint: import('../geometry').Point,
+  targetPoint: import('../geometry').Point,
   inter: Interaction,
 ): DiagramConnection['bendpoints'] {
   if (inter.kind !== 'bend' || inter.connId !== conn.id) return conn.bendpoints;
-  const srcC = { x: sourceBounds.x + sourceBounds.width / 2, y: sourceBounds.y + sourceBounds.height / 2 };
-  const tgtC = { x: targetBounds.x + targetBounds.width / 2, y: targetBounds.y + targetBounds.height / 2 };
   const bendpoints = [...conn.bendpoints];
-  const bp = toRelativeBendpoint(inter.current, srcC, tgtC);
+  const bp = toRelativeBendpoint(inter.current, sourcePoint, targetPoint);
   if (inter.isNew) bendpoints.splice(inter.index, 0, bp);
   else bendpoints[inter.index] = bp;
   return bendpoints;

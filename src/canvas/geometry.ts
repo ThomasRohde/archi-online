@@ -1,8 +1,143 @@
-import type { Bendpoint, Bounds } from '../model/types';
+import type {
+  Bendpoint,
+  Bounds,
+  DiagramConnection,
+  ModelState,
+} from '../model/types';
 
 export interface Point {
   x: number;
   y: number;
+}
+
+export interface ConnectionRouteResolverOptions {
+  /** Read a transient connection override, for example a bendpoint drag preview. */
+  connection?: (connectionId: string) => DiagramConnection | undefined;
+  /** Derived visibility. Hidden dependencies make their dependents unroutable. */
+  isVisible?: (connectionId: string) => boolean;
+}
+
+export interface ConnectionRouteResolver {
+  (connectionId: string): Point[] | undefined;
+  endpointPoints(connectionId: string): { source: Point; target: Point } | undefined;
+}
+
+/**
+ * Build one route projection for a model snapshot. Routes are memoized and
+ * recursively resolve connection endpoints through the midpoint of the
+ * referenced routed polyline. A corrupt dependency cycle resolves to
+ * `undefined` instead of recursing forever.
+ */
+export function createConnectionRouteResolver(
+  model: ModelState,
+  nodeBounds: ReadonlyMap<string, Bounds>,
+  options: ConnectionRouteResolverOptions = {},
+): ConnectionRouteResolver {
+  const cache = new Map<string, Point[] | undefined>();
+  const resolving = new Set<string>();
+  const connection = (id: string) => options.connection?.(id) ?? model.connections[id];
+
+  const connectablePoint = (id: string): Point | undefined => {
+    const bounds = nodeBounds.get(id);
+    if (model.nodes[id] && bounds) return center(bounds);
+    if (!model.connections[id]) return undefined;
+    const route = resolve(id);
+    return route ? pointAlong(route, 0.5).point : undefined;
+  };
+
+  const endpointPoints = (
+    connectionId: string,
+  ): { source: Point; target: Point } | undefined => {
+    const conn = connection(connectionId);
+    if (!conn) return undefined;
+    const source = connectablePoint(conn.sourceId);
+    const target = connectablePoint(conn.targetId);
+    return source && target ? { source, target } : undefined;
+  };
+
+  const resolve = ((connectionId: string): Point[] | undefined => {
+    if (cache.has(connectionId)) return cache.get(connectionId);
+    if (resolving.has(connectionId)) return undefined;
+    const conn = connection(connectionId);
+    if (!conn || (options.isVisible && !options.isVisible(connectionId))) {
+      cache.set(connectionId, undefined);
+      return undefined;
+    }
+
+    resolving.add(connectionId);
+    const endpoints = endpointPoints(connectionId);
+    if (!endpoints) {
+      resolving.delete(connectionId);
+      cache.set(connectionId, undefined);
+      return undefined;
+    }
+
+    const sourceBounds = model.nodes[conn.sourceId] ? nodeBounds.get(conn.sourceId) : undefined;
+    const targetBounds = model.nodes[conn.targetId] ? nodeBounds.get(conn.targetId) : undefined;
+    let route: Point[];
+    if (
+      sourceBounds &&
+      targetBounds &&
+      conn.sourceId === conn.targetId &&
+      conn.bendpoints.length === 0
+    ) {
+      route = connectionPolyline(sourceBounds, targetBounds, conn.bendpoints);
+    } else {
+      const mids = bendpointPositions(conn.bendpoints, endpoints.source, endpoints.target);
+      const source = sourceBounds
+        ? rectAnchor(sourceBounds, mids[0] ?? endpoints.target)
+        : endpoints.source;
+      const target = targetBounds
+        ? rectAnchor(targetBounds, mids[mids.length - 1] ?? endpoints.source)
+        : endpoints.target;
+      route = [source, ...mids, target];
+    }
+    resolving.delete(connectionId);
+    cache.set(connectionId, route);
+    return route;
+  }) as ConnectionRouteResolver;
+  resolve.endpointPoints = endpointPoints;
+  return resolve;
+}
+
+/**
+ * Derive visibility without mutating stored connections. The optional
+ * predicate supplies direct visibility (for nodes or connections); a hidden
+ * endpoint connection recursively hides every dependent connection.
+ */
+export function createConnectionVisibilityResolver(
+  model: ModelState,
+  storedVisible: (connectableId: string) => boolean = () => true,
+): (connectionId: string) => boolean {
+  const cache = new Map<string, boolean>();
+  const resolving = new Set<string>();
+  const resolve = (connectionId: string): boolean => {
+    const cached = cache.get(connectionId);
+    if (cached !== undefined) return cached;
+    if (resolving.has(connectionId)) return false;
+    const connection = model.connections[connectionId];
+    if (!connection || !storedVisible(connectionId)) {
+      cache.set(connectionId, false);
+      return false;
+    }
+    resolving.add(connectionId);
+    const visible = [connection.sourceId, connection.targetId].every((endpointId) => {
+      if (!storedVisible(endpointId)) return false;
+      if (model.nodes[endpointId]) return true;
+      return Boolean(model.connections[endpointId]) && resolve(endpointId);
+    });
+    resolving.delete(connectionId);
+    cache.set(connectionId, visible);
+    return visible;
+  };
+  return resolve;
+}
+
+function center(bounds: Bounds): Point {
+  return {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2,
+  };
 }
 
 /**

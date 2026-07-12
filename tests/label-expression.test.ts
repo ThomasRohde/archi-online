@@ -3,6 +3,7 @@ import { evaluateLabelExpression, labelForModelTreeItem } from '../src/model/lab
 import { parseArchimate, serializeArchimate } from '../src/model/io/archimate-xml';
 import { createEmptyModel } from '../src/model/ops';
 import type { ModelState } from '../src/model/types';
+import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 function fixture(): ModelState {
   const model = createEmptyModel('Expression Model');
@@ -45,6 +46,20 @@ function fixture(): ModelState {
 }
 
 describe('Archi 5.9 label expressions', () => {
+  it('traverses source and relationship prefixes through connection endpoints', () => {
+    const model = connectionEndpointModel();
+
+    expect(
+      evaluateLabelExpression(
+        model,
+        'dependent',
+        '${source:name}|${source:documentation}|${source:property:key}',
+      ).text,
+    ).toBe('base|base documentation|base value');
+    expect(evaluateLabelExpression(model, 'node-c', '${connection:source:name}').text)
+      .toBe('base');
+  });
+
   it('renders core values, duplicate properties, and relationship fields', () => {
     const model = fixture();
     expect(evaluateLabelExpression(model, 'node-source', '${name}|${doc}|${type}|${specialization}|${property:key}|${properties: / :key}').text)

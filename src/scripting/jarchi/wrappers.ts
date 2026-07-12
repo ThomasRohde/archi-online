@@ -32,7 +32,6 @@ import {
 import { openView } from '../../model/store';
 import {
   absoluteBounds as modelAbsoluteBounds,
-  centerOf,
   type Bendpoint,
   type Bounds,
   type Concept,
@@ -42,11 +41,17 @@ import {
   type Property,
 } from '../../model/types';
 import { useSettingsStore } from '../../settings/app-settings';
-import { bendpointPositions, toRelativeBendpoint } from '../../canvas/geometry';
+import {
+  createConnectionRouteResolver,
+  createConnectionVisibilityResolver,
+  toRelativeBendpoint,
+} from '../../canvas/geometry';
 import { state } from './state';
 import { resolveType } from './type-resolution';
 
 export type JKind = 'element' | 'relationship' | 'view' | 'folder' | 'visual' | 'connection' | 'model';
+
+export type JConnectable = JVisual | JConnection;
 
 export interface JPoint {
   x: number;
@@ -89,6 +94,7 @@ function propsOf(id: string): Property[] {
   return (
     m.elements[id]?.properties ??
     m.relationships[id]?.properties ??
+    m.connections[id]?.properties ??
     m.views[id]?.properties ??
     m.folders[id]?.properties ??
     (m.info.id === id ? m.info.properties : []) ??
@@ -188,14 +194,20 @@ function connectionEndpointCenters(
   m: ModelState,
   conn: DiagramConnection,
   boundsForNode: (nodeId: string) => Bounds,
+  connectionOverride?: (connectionId: string) => DiagramConnection | undefined,
 ): { source: JPoint; target: JPoint } {
-  if (!m.nodes[conn.sourceId] || !m.nodes[conn.targetId]) {
-    throw new Error(`Connection ${conn.id} has a missing endpoint`);
-  }
-  return {
-    source: centerOf(boundsForNode(conn.sourceId)),
-    target: centerOf(boundsForNode(conn.targetId)),
-  };
+  const bounds = new Map(
+    Object.values(m.nodes)
+      .filter((node) => node.viewId === conn.viewId)
+      .map((node) => [node.id, boundsForNode(node.id)]),
+  );
+  const visible = createConnectionVisibilityResolver(m);
+  const endpoints = createConnectionRouteResolver(m, bounds, {
+    connection: connectionOverride,
+    isVisible: visible,
+  }).endpointPoints(conn.id);
+  if (!endpoints) throw new Error(`Connection ${conn.id} has a missing endpoint`);
+  return endpoints;
 }
 
 function absoluteRouteForConnection(
@@ -203,9 +215,15 @@ function absoluteRouteForConnection(
   conn: DiagramConnection,
   boundsForNode: (nodeId: string) => Bounds = (nodeId) => modelAbsoluteBounds(m, nodeId),
 ): JPoint[] {
-  const centers = connectionEndpointCenters(m, conn, boundsForNode);
-  return bendpointPositions(conn.bendpoints, centers.source, centers.target)
-    .map((point) => ({ x: point.x, y: point.y }));
+  const bounds = new Map(
+    Object.values(m.nodes)
+      .filter((node) => node.viewId === conn.viewId)
+      .map((node) => [node.id, boundsForNode(node.id)]),
+  );
+  const visible = createConnectionVisibilityResolver(m);
+  const route = createConnectionRouteResolver(m, bounds, { isVisible: visible })(conn.id);
+  if (!route) throw new Error(`Connection ${conn.id} has a missing endpoint`);
+  return route.slice(1, -1).map((point) => ({ ...point }));
 }
 
 function routeToBendpoints(
@@ -213,8 +231,9 @@ function routeToBendpoints(
   conn: DiagramConnection,
   points: JPoint[],
   boundsForNode: (nodeId: string) => Bounds = (nodeId) => modelAbsoluteBounds(m, nodeId),
+  connectionOverride?: (connectionId: string) => DiagramConnection | undefined,
 ): Bendpoint[] {
-  const centers = connectionEndpointCenters(m, conn, boundsForNode);
+  const centers = connectionEndpointCenters(m, conn, boundsForNode, connectionOverride);
   return points.map((point) => toRelativeBendpoint(point, centers.source, centers.target));
 }
 
@@ -452,11 +471,17 @@ export class JView extends JObject {
    * view.add(element, x, y, w, h) -> visual object
    * view.add(relationship, sourceVisual, targetVisual) -> visual connection
    */
-  add(obj: JConcept, a: number | JVisual, b: number | JVisual, w?: number, h?: number): JVisual | JConnection {
+  add(
+    obj: JConcept,
+    a: number | JConnectable,
+    b: number | JConnectable,
+    w?: number,
+    h?: number,
+  ): JVisual | JConnection {
     const m = state();
     if (m.relationships[obj.id]) {
-      if (!(a instanceof JVisual) || !(b instanceof JVisual)) {
-        throw new Error('view.add(relationship, sourceVisual, targetVisual)');
+      if (!isJConnectable(a) || !isJConnectable(b)) {
+        throw new Error('view.add(relationship, sourceConnectable, targetConnectable)');
       }
       const connId = addConnectionToView(this.id, obj.id, a.id, b.id);
       return new JConnection(connId);
@@ -583,7 +608,13 @@ export class JView extends JObject {
       return bounds;
     };
 
-    const connectionUpdates = Object.entries(connectionInputs).flatMap(([connectionId, patch]) => {
+    const pendingConnectionUpdates: {
+      id: string;
+      connection: DiagramConnection;
+      route?: JPoint[];
+      bendpoints?: Bendpoint[];
+    }[] = [];
+    for (const [connectionId, patch] of Object.entries(connectionInputs)) {
       const conn = assertViewConnection(m, this.id, connectionId);
       if (!isRecord(patch)) throw new Error(`Connection layout for ${connectionId} must be an object`);
       const hasRoute = Object.hasOwn(patch, 'route') && patch.route !== undefined;
@@ -592,27 +623,65 @@ export class JView extends JObject {
         throw new Error(`Connection ${connectionId} cannot specify both route and bendpoints`);
       }
       if (hasRoute) {
-        return [{
+        pendingConnectionUpdates.push({
           id: connectionId,
-          bendpoints: routeToBendpoints(
-            m,
-            conn,
-            validatePointArray(patch.route, `connections.${connectionId}.route`),
-            finalAbsoluteBounds,
-          ),
-        }];
-      }
-      if (hasBendpoints) {
-        return [{
+          connection: conn,
+          route: validatePointArray(patch.route, `connections.${connectionId}.route`),
+        });
+      } else if (hasBendpoints) {
+        pendingConnectionUpdates.push({
           id: connectionId,
+          connection: conn,
           bendpoints: validateBendpointArray(
             patch.bendpoints,
             `connections.${connectionId}.bendpoints`,
           ),
-        }];
+        });
       }
-      return [];
-    });
+    }
+
+    const stagedConnections = new Map<string, DiagramConnection>();
+    for (const update of pendingConnectionUpdates) {
+      if (update.bendpoints) {
+        stagedConnections.set(update.id, {
+          ...update.connection,
+          bendpoints: update.bendpoints,
+        });
+      }
+    }
+    const pendingRoutes = new Map(
+      pendingConnectionUpdates
+        .filter((update): update is typeof update & { route: JPoint[] } => Boolean(update.route))
+        .map((update) => [update.id, update]),
+    );
+    while (pendingRoutes.size > 0) {
+      let progressed = false;
+      for (const [connectionId, update] of [...pendingRoutes]) {
+        const waitsForEndpoint = [update.connection.sourceId, update.connection.targetId]
+          .some((endpointId) => pendingRoutes.has(endpointId));
+        if (waitsForEndpoint) continue;
+        const bendpoints = routeToBendpoints(
+          m,
+          update.connection,
+          update.route,
+          finalAbsoluteBounds,
+          (id) => stagedConnections.get(id),
+        );
+        stagedConnections.set(connectionId, {
+          ...update.connection,
+          bendpoints,
+        });
+        pendingRoutes.delete(connectionId);
+        progressed = true;
+      }
+      if (!progressed) throw new Error('Connection layout dependency cycle');
+    }
+    const connectionUpdates = pendingConnectionUpdates.map((update) => ({
+      id: update.id,
+      bendpoints: stagedConnections.get(update.id)!.bendpoints.map((bendpoint) => ({
+        ...bendpoint,
+      })),
+    }));
 
     const nodeUpdates = [...absoluteUpdates.entries()].map(([nodeId, bounds]) => {
       const node = m.nodes[nodeId]!;
@@ -835,9 +904,23 @@ export class JConnection extends JObject {
   }
 
   override get name(): string {
-    const c = this.conn();
-    return c.relationshipId ? (state().relationships[c.relationshipId]?.name ?? '') : '';
+    return this.conn().name;
   }
+
+  override set name(value: string) {
+    renameItem(this.id, value);
+  }
+
+  get documentation(): string {
+    return this.conn().documentation;
+  }
+
+  set documentation(value: string) {
+    setDocumentation(this.id, value);
+  }
+
+  prop = propApi(this).prop;
+  removeProp = propApi(this).removeProp;
 
   get concept(): JConcept | undefined {
     const c = this.conn();
@@ -848,12 +931,12 @@ export class JConnection extends JObject {
     return new JView(this.conn().viewId);
   }
 
-  get source(): JVisual {
-    return new JVisual(this.conn().sourceId);
+  get source(): JConnectable {
+    return wrapConnectable(this.conn().sourceId);
   }
 
-  get target(): JVisual {
-    return new JVisual(this.conn().targetId);
+  get target(): JConnectable {
+    return wrapConnectable(this.conn().targetId);
   }
 
   get lineColor(): string | undefined {
@@ -901,6 +984,17 @@ export class JConnection extends JObject {
   delete(): void {
     deleteViewObjects([this.id]);
   }
+}
+
+function isJConnectable(value: unknown): value is JConnectable {
+  return value instanceof JVisual || value instanceof JConnection;
+}
+
+function wrapConnectable(id: string): JConnectable {
+  const model = state();
+  if (model.nodes[id]) return new JVisual(id);
+  if (model.connections[id]) return new JConnection(id);
+  throw new Error(`Diagram connectable ${id} no longer exists`);
 }
 
 export class JModel extends JObject {

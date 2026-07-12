@@ -190,9 +190,16 @@ export async function runElkLayout(request: ElkLayoutRequest): Promise<ElkLayout
   const nodeIds = new Set(nodes.map((node) => node.id));
   const boundsByNodeId = new Map(nodes.map((node) => [node.id, node.absoluteBounds()]));
   const origin = scopeOrigin([...boundsByNodeId.values()]);
-  const connections = request.view.connections().filter((connection) => (
-    nodeIds.has(connection.source.id) && nodeIds.has(connection.target.id)
-  ));
+  const connections = request.view.connections().filter((connection) => {
+    const source = connection.source;
+    const target = connection.target;
+    return (
+      source instanceof JVisual &&
+      target instanceof JVisual &&
+      nodeIds.has(source.id) &&
+      nodeIds.has(target.id)
+    );
+  });
 
   const graph = {
     id: `${request.view.id}.elk`,

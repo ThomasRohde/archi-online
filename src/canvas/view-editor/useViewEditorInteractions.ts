@@ -44,7 +44,14 @@ import {
 } from '../../settings/app-settings';
 import { showContextMenu } from '../../ui/ContextMenu';
 import { copyNodes, pasteNodes } from '../clipboard';
-import { closestSegment, connectionPolyline, rectsIntersect, toRelativeBendpoint, type Point } from '../geometry';
+import {
+  closestSegment,
+  createConnectionRouteResolver,
+  createConnectionVisibilityResolver,
+  rectsIntersect,
+  toRelativeBendpoint,
+  type Point,
+} from '../geometry';
 import { containerAt, dropTargetFor, selectionRoots } from './bounds';
 import { showEmptyCanvasContextMenu, showViewObjectContextMenu } from './contextMenu';
 import { addDroppedItemsToView } from './drop';
@@ -94,6 +101,12 @@ export function useViewEditorInteractions({
   const [edit, setEdit] = useState<EditState | null>(null);
   const interRef = useRef(inter);
   interRef.current = inter;
+  const isConnectionVisible = model
+    ? createConnectionVisibilityResolver(model)
+    : () => false;
+  const connectionRoutes = model
+    ? createConnectionRouteResolver(model, absBounds, { isVisible: isConnectionVisible })
+    : undefined;
 
   const snap = (v: number, disable?: boolean) =>
     disable || !settings.snapToGrid
@@ -412,10 +425,8 @@ export function useViewEditorInteractions({
           settings.bendDragThreshold
         ) {
           const conn = model.connections[cur.connId];
-          const src = absBounds.get(conn?.sourceId ?? '');
-          const tgt = absBounds.get(conn?.targetId ?? '');
-          if (!conn || !src || !tgt) break;
-          const points = connectionPolyline(src, tgt, conn.bendpoints);
+          const points = conn ? connectionRoutes?.(conn.id) : undefined;
+          if (!conn || !points) break;
           const seg = closestSegment(points, cur.start);
           setInter({
             kind: 'bend',
@@ -560,10 +571,9 @@ export function useViewEditorInteractions({
       }
       case 'bend': {
         const conn = model.connections[cur.connId];
-        const src = absBounds.get(conn?.sourceId ?? '');
-        const tgt = absBounds.get(conn?.targetId ?? '');
+        const endpoints = conn ? connectionRoutes?.endpointPoints(conn.id) : undefined;
         setInter({ kind: 'none' });
-        if (!conn || !src || !tgt) break;
+        if (!conn || !endpoints) break;
         // A plain click on an existing bendpoint is not a drag — committing
         // would snap it to the grid and nudge it under the cursor.
         if (
@@ -573,11 +583,9 @@ export function useViewEditorInteractions({
         ) {
           break;
         }
-        const srcC = { x: src.x + src.width / 2, y: src.y + src.height / 2 };
-        const tgtC = { x: tgt.x + tgt.width / 2, y: tgt.y + tgt.height / 2 };
         const newBps = [...conn.bendpoints];
         const sp = { x: snap(p.x, e.altKey), y: snap(p.y, e.altKey) };
-        const bp = toRelativeBendpoint(sp, srcC, tgtC);
+        const bp = toRelativeBendpoint(sp, endpoints.source, endpoints.target);
         if (cur.isNew) newBps.splice(cur.index, 0, bp);
         else newBps[cur.index] = bp;
         setConnectionBendpoints(cur.connId, newBps, modelStore);

@@ -9,10 +9,14 @@ import { setCanvasStatus } from '../ui/canvas-status';
 import { useSettingsStore } from '../settings/app-settings';
 import { ConnectionView } from './ConnectionView';
 import { evaluateLabelExpression } from '../model/label-expression';
-import { connectionPolyline, type Point } from './geometry';
+import {
+  createConnectionRouteResolver,
+  createConnectionVisibilityResolver,
+  type Point,
+} from './geometry';
 import { computeAbsBounds, deriveLiveViewState } from './view-editor/bounds';
 import { NodeView } from './view-editor/NodeView';
-import { isNodeGhosted } from './view-editor/viewpoint-ghost';
+import { isConnectableGhosted } from './view-editor/viewpoint-ghost';
 import {
   BendpointHandles,
   DirectEditOverlay,
@@ -170,6 +174,30 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     singleSelected && model.nodes[singleSelected] ? singleSelected : null;
   const selectedConnection = singleSelected ? model.connections[singleSelected] : undefined;
   const editNodeAbs = edit ? liveAbs.get(edit.nodeId) : undefined;
+  const isConnectionVisible = createConnectionVisibilityResolver(model);
+  const storedRoutes = createConnectionRouteResolver(model, liveAbs, {
+    isVisible: isConnectionVisible,
+  });
+  const previewConnections = new Map<string, typeof selectedConnection>();
+  if (inter.kind === 'bend') {
+    const connection = model.connections[inter.connId];
+    const endpoints = storedRoutes.endpointPoints(inter.connId);
+    if (connection && endpoints) {
+      previewConnections.set(inter.connId, {
+        ...connection,
+        bendpoints: bendpointPreview(
+          connection,
+          endpoints.source,
+          endpoints.target,
+          inter,
+        ),
+      });
+    }
+  }
+  const routes = createConnectionRouteResolver(model, liveAbs, {
+    connection: (connectionId) => previewConnections.get(connectionId),
+    isVisible: isConnectionVisible,
+  });
 
   return (
     <div className="view-editor">
@@ -206,21 +234,19 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
           ))}
           <g>
             {connections.map((conn) => {
-              const src = liveAbs.get(conn.sourceId);
-              const tgt = liveAbs.get(conn.targetId);
-              if (!src || !tgt) return null;
-              const bendpoints = bendpointPreview(conn, src, tgt, inter);
+              const points = routes(conn.id);
+              if (!points) return null;
+              const displayConnection = previewConnections.get(conn.id) ?? conn;
               return (
                 <ConnectionView
                   key={conn.id}
-                  conn={{ ...conn, bendpoints }}
+                  conn={displayConnection}
                   rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
-                  points={connectionPolyline(src, tgt, bendpoints)}
+                  points={points}
                   selected={viewSelected.has(conn.id)}
                   c4ViewType={activeC4ViewType}
                   ghosted={
-                    isNodeGhosted(model, conn.sourceId, view.viewpoint) ||
-                    isNodeGhosted(model, conn.targetId, view.viewpoint)
+                    isConnectableGhosted(model, conn.id, view.viewpoint)
                   }
                   displayLabel={conn.labelExpression !== undefined ? evaluateLabelExpression(model, conn.id, conn.labelExpression).text : undefined}
                 />
@@ -229,8 +255,8 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
           </g>
           <BendpointHandles
             conn={selectedConnection}
-            sourceBounds={selectedConnection ? liveAbs.get(selectedConnection.sourceId) : undefined}
-            targetBounds={selectedConnection ? liveAbs.get(selectedConnection.targetId) : undefined}
+            sourcePoint={selectedConnection ? routes.endpointPoints(selectedConnection.id)?.source : undefined}
+            targetPoint={selectedConnection ? routes.endpointPoints(selectedConnection.id)?.target : undefined}
           />
           <ResizeHandles
             nodeId={selectedNodeForHandles}
@@ -286,6 +312,10 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
 
   const activeC4ViewType = c4ViewType(view);
   const viewSelected = selection.source === 'view' ? new Set(selection.ids) : new Set<string>();
+  const isConnectionVisible = createConnectionVisibilityResolver(model);
+  const routes = createConnectionRouteResolver(model, absBounds, {
+    isVisible: isConnectionVisible,
+  });
 
   const stopPan = (pointerId: number, target: SVGSVGElement) => {
     if (panRef.current?.pointerId !== pointerId) return;
@@ -350,20 +380,18 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
           ))}
           <g>
             {connections.map((conn) => {
-              const src = absBounds.get(conn.sourceId);
-              const tgt = absBounds.get(conn.targetId);
-              if (!src || !tgt) return null;
+              const points = routes(conn.id);
+              if (!points) return null;
               return (
                 <ConnectionView
                   key={conn.id}
                   conn={conn}
                   rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
-                  points={connectionPolyline(src, tgt, conn.bendpoints)}
+                  points={points}
                   selected={viewSelected.has(conn.id)}
                   c4ViewType={activeC4ViewType}
                   ghosted={
-                    isNodeGhosted(model, conn.sourceId, view.viewpoint) ||
-                    isNodeGhosted(model, conn.targetId, view.viewpoint)
+                    isConnectableGhosted(model, conn.id, view.viewpoint)
                   }
                   displayLabel={conn.labelExpression !== undefined ? evaluateLabelExpression(model, conn.id, conn.labelExpression).text : undefined}
                 />
