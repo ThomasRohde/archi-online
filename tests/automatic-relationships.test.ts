@@ -1354,6 +1354,84 @@ describe('automatic relationship apply', () => {
     expect(store.getState().undoStack).toHaveLength(undoDepth);
   });
 
+  it.each([
+    { mode: 'explicit None', omitSelection: false },
+    { mode: 'omitted selection', omitSelection: true },
+  ])('rejects stale concurrent reuse with $mode', ({ omitSelection }) => {
+    const arm = requireArmFunctions();
+    if (!arm) return;
+    const store = makeStore();
+    const viewId = addViewTo(store);
+    const parentElementId = addElementTo(store, 'ApplicationComponent', 'Parent');
+    const childElementId = addElementTo(store, 'ApplicationComponent', 'Child');
+    const parentNodeId = addNodeTo(
+      store,
+      viewId,
+      parentElementId,
+      viewId,
+      { x: 0, y: 0, width: 320, height: 240 },
+    );
+    const childNodeId = addNodeTo(store, viewId, childElementId, viewId, BOUNDS);
+    const plan = arm.analyze(
+      store.getState().model!,
+      moveInput(viewId, childNodeId, parentNodeId),
+      DEFAULT_SETTINGS,
+    );
+    const concurrentRelationshipId = addRelationship(
+      'CompositionRelationship',
+      parentElementId,
+      childElementId,
+      '',
+      undefined,
+      store,
+    )!;
+    const before = store.getState().model;
+    const undoDepth = store.getState().undoStack.length;
+    const selections = omitSelection ? {} : { [childNodeId]: null };
+
+    const result = arm.apply(plan, selections, store);
+
+    expect(result).toEqual({ nodeIds: [], relationshipIds: [], connectionIds: [] });
+    expect(store.getState().model).toBe(before);
+    expect(store.getState().model!.nodes[childNodeId].parentId).toBe(viewId);
+    expect(Object.keys(store.getState().model!.relationships)).toEqual([
+      concurrentRelationshipId,
+    ]);
+    expect(Object.keys(store.getState().model!.connections)).toHaveLength(0);
+    expect(store.getState().undoStack).toHaveLength(undoDepth);
+  });
+
+  it('applies explicit None when the analyzed model is unchanged', () => {
+    const arm = requireArmFunctions();
+    if (!arm) return;
+    const store = makeStore();
+    const viewId = addViewTo(store);
+    const parentElementId = addElementTo(store, 'ApplicationComponent', 'Parent');
+    const childElementId = addElementTo(store, 'ApplicationComponent', 'Child');
+    const parentNodeId = addNodeTo(
+      store,
+      viewId,
+      parentElementId,
+      viewId,
+      { x: 0, y: 0, width: 320, height: 240 },
+    );
+    const childNodeId = addNodeTo(store, viewId, childElementId, viewId, BOUNDS);
+    const plan = arm.analyze(
+      store.getState().model!,
+      moveInput(viewId, childNodeId, parentNodeId),
+      DEFAULT_SETTINGS,
+    );
+    const undoDepth = store.getState().undoStack.length;
+
+    const result = arm.apply(plan, { [childNodeId]: null }, store);
+
+    expect(result).toEqual({ nodeIds: [], relationshipIds: [], connectionIds: [] });
+    expect(store.getState().model!.nodes[childNodeId].parentId).toBe(parentNodeId);
+    expect(Object.keys(store.getState().model!.relationships)).toHaveLength(0);
+    expect(Object.keys(store.getState().model!.connections)).toHaveLength(0);
+    expect(store.getState().undoStack).toHaveLength(undoDepth + 1);
+  });
+
   it('honors read-only mode and mutates only the explicit model store', () => {
     const arm = requireArmFunctions();
     if (!arm) return;

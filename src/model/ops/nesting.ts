@@ -331,6 +331,15 @@ function planReferencesAreValid(
       }
     }
 
+    const nowReusable = child.candidates.some((currentCandidate) =>
+      Object.values(model.relationships).some(
+        (relationship) =>
+          relationship.type === currentCandidate.relationshipType &&
+          relationshipMatchesCandidate(relationship, currentCandidate),
+      ),
+    );
+    if (nowReusable) return false;
+
     const selectedId = selections[child.childNodeId];
     if (selectedId === undefined || selectedId === null) continue;
     const candidate = child.candidates.find((item) => item.id === selectedId);
@@ -343,14 +352,6 @@ function planReferencesAreValid(
     ) {
       return false;
     }
-    const nowReusable = child.candidates.some((currentCandidate) =>
-      Object.values(model.relationships).some(
-        (relationship) =>
-          relationship.type === currentCandidate.relationshipType &&
-          relationshipMatchesCandidate(relationship, currentCandidate),
-      ),
-    );
-    if (nowReusable) return false;
   }
 
   for (const missing of plan.missingOccurrences) {
