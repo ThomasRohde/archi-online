@@ -12,6 +12,19 @@ import type {
 } from '../../model/ops';
 import { SEPARATOR, type MenuItem } from '../../ui/ContextMenu';
 
+const ARCHI_STRATEGY_ORDER: readonly ElementType[] = [
+  'Resource',
+  'Capability',
+  'ValueStream',
+  'CourseOfAction',
+];
+const ARCHI_MAGIC_ELEMENT_ORDER: readonly ElementType[] = [
+  ...ARCHI_STRATEGY_ORDER,
+  ...ELEMENT_TYPES
+    .map((definition) => definition.type)
+    .filter((type) => !ARCHI_STRATEGY_ORDER.includes(type)),
+];
+
 function elementDefinition(type: ElementType) {
   return ELEMENT_TYPES.find((definition) => definition.type === type)!;
 }
@@ -57,9 +70,10 @@ function relationshipFirstItems(
     );
     if (matching.length === 0) return [];
     const children = LAYERS.flatMap(({ layer, label }) => {
-      const elementTypes = matching
-        .map((pair) => pair.elementType)
-        .filter((type) => elementDefinition(type).layer === layer);
+      const matchingTypes = new Set(matching.map((pair) => pair.elementType));
+      const elementTypes = ARCHI_MAGIC_ELEMENT_ORDER.filter(
+        (type) => matchingTypes.has(type) && elementDefinition(type).layer === layer,
+      );
       if (elementTypes.length === 0) return [];
       return [{
         label,
@@ -78,9 +92,8 @@ function elementFirstItems(
   choose: (pair: MagicTargetCreationPair) => void,
 ): MenuItem[] {
   return LAYERS.flatMap(({ layer, label }) => {
-    const elementTypes = ELEMENT_TYPES
-      .filter((definition) => definition.layer === layer)
-      .map((definition) => definition.type)
+    const elementTypes = ARCHI_MAGIC_ELEMENT_ORDER
+      .filter((elementType) => elementDefinition(elementType).layer === layer)
       .filter((elementType) =>
         analysis.pairs.some((pair) => pair.elementType === elementType),
       );

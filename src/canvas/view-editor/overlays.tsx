@@ -121,12 +121,14 @@ export function DirectEditOverlay({
   editNodeAbs,
   viewport,
   commitEdit,
+  commitEditAndRestoreFocus,
   cancelEdit,
 }: {
   edit: EditState | null;
   editNodeAbs: Bounds | undefined;
   viewport: Viewport;
   commitEdit: (text: string | null) => void;
+  commitEditAndRestoreFocus: (text: string) => void;
   cancelEdit: () => void;
 }) {
   if (!edit || !editNodeAbs) return null;
@@ -147,7 +149,7 @@ export function DirectEditOverlay({
         e.stopPropagation();
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
-          commitEdit((e.target as HTMLTextAreaElement).value);
+          commitEditAndRestoreFocus((e.target as HTMLTextAreaElement).value);
         }
         if (e.key === 'Escape') {
           e.preventDefault();

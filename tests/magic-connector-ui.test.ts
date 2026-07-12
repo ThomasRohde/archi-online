@@ -121,6 +121,53 @@ async function startFrom(svg: SVGSVGElement, nodeId: string): Promise<void> {
 }
 
 describe('Magic Connector canvas workflow', () => {
+  it('returns a sticky Note tool to Select when an ordinary canvas menu is escaped', async () => {
+    const f = fixture();
+    setActiveTool({ kind: 'create-note', sticky: true });
+    const svg = await renderEditor(f.viewId);
+    hit = svg;
+    svg.focus();
+
+    await act(async () => svg.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 500,
+      clientY: 180,
+    })));
+    expect(document.querySelector('.ctx-menu')).not.toBeNull();
+    await act(async () => document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Escape',
+    })));
+
+    expect(document.querySelector('.ctx-menu')).toBeNull();
+    expect(useStore.getState().activeTool).toEqual({ kind: 'select' });
+    expect(document.activeElement === svg).toBe(true);
+  });
+
+  it('keeps a sticky Note tool active when an ordinary canvas menu is dismissed outside', async () => {
+    const f = fixture();
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    setActiveTool({ kind: 'create-note', sticky: true });
+    const svg = await renderEditor(f.viewId);
+    hit = svg;
+
+    await act(async () => svg.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 500,
+      clientY: 180,
+    })));
+    await act(async () => outside.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+    const activeTool = useStore.getState().activeTool;
+    outside.remove();
+
+    expect(document.querySelector('.ctx-menu')).toBeNull();
+    expect(activeTool).toEqual({ kind: 'create-note', sticky: true });
+  });
+
   it('reuses an existing relationship from the forward group and stays one-shot', async () => {
     const f = fixture();
     const relationshipId = addRelationship(
@@ -298,5 +345,45 @@ describe('Magic Connector canvas workflow', () => {
 
     expect(host.querySelector('textarea.direct-edit')).toBeNull();
     expect(useStore.getState().activeTool).toEqual({ kind: 'select' });
+  });
+
+  it('restores canvas focus after Enter naming so Escape clears a sticky Magic tool', async () => {
+    const f = fixture();
+    setActiveTool({ kind: 'magic-connector', sticky: true });
+    const svg = await renderEditor(f.viewId);
+    await startFrom(svg, f.actorNodeId);
+
+    hit = svg;
+    await act(async () => svg.dispatchEvent(pointer(500, 180)));
+    await openSubmenu('Assignment');
+    await openSubmenu('Business');
+    await choose('Business Role');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const editor = host.querySelector<HTMLTextAreaElement>('textarea.direct-edit')!;
+    editor.value = 'Named target';
+
+    await act(async () => editor.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+    })));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(host.querySelector('textarea.direct-edit')).toBeNull();
+    expect(document.activeElement === svg).toBe(true);
+    expect(useStore.getState().activeTool).toEqual({ kind: 'magic-connector', sticky: true });
+    await act(async () => document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Escape',
+    })));
+    expect(useStore.getState().activeTool).toEqual({ kind: 'select' });
+    expect(Object.values(useStore.getState().model!.elements).some(
+      (element) => element.name === 'Named target',
+    )).toBe(true);
   });
 });

@@ -285,4 +285,60 @@ describe('ContextMenuHost', () => {
     host.remove();
     outside.remove();
   });
+
+  it('does not expose or activate children of a disabled parent by pointer', async () => {
+    const onChild = vi.fn();
+    const { host, root } = await render(createElement(ContextMenuHost));
+
+    await act(async () => {
+      showContextMenu(20, 20, [
+        {
+          label: 'Disabled parent',
+          disabled: true,
+          children: [{ label: 'Forbidden child', onClick: onChild }],
+        },
+      ]);
+    });
+
+    const parent = menuItem('Disabled parent');
+    await act(async () => {
+      parent.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    });
+    const child = Array.from(document.querySelectorAll<HTMLElement>('.ctx-item')).find(
+      (candidate) => candidate.querySelector(':scope > .ctx-label')?.textContent === 'Forbidden child',
+    );
+    if (child) await act(async () => child.click());
+
+    expect(child).toBeUndefined();
+    expect(parent.getAttribute('aria-expanded')).toBe('false');
+    expect(onChild).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
+  it('does not expose children of a disabled parent by keyboard', async () => {
+    const onChild = vi.fn();
+    const { host, root } = await render(createElement(ContextMenuHost));
+
+    await act(async () => {
+      showContextMenu(20, 20, [
+        {
+          label: 'Disabled parent',
+          disabled: true,
+          children: [{ label: 'Forbidden child', onClick: onChild }],
+        },
+      ]);
+    });
+    const parent = menuItem('Disabled parent');
+    await act(async () => parent.focus());
+    await pressKey('ArrowRight');
+
+    expect(document.body.textContent).not.toContain('Forbidden child');
+    expect(parent.getAttribute('aria-expanded')).toBe('false');
+    expect(onChild).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+    host.remove();
+  });
 });

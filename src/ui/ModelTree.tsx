@@ -569,6 +569,7 @@ function ModelTreeInner({
           label: C4_VIEW_TYPE_LABELS[viewType],
           onClick: () => {
             const id = createC4TemplateView(viewType, folder.id, modelStore);
+            if (!modelStore.getState().model?.views[id]) return;
             setSelection('tree', [id], modelStore);
             openView(id, modelStore);
           },

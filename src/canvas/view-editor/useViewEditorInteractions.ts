@@ -175,9 +175,19 @@ export function useViewEditorInteractions({
     setEdit(null);
   };
 
+  const restoreCanvasFocus = () => {
+    setTimeout(() => svgRef.current?.focus(), 0);
+  };
+
+  const commitEditAndRestoreFocus = (text: string) => {
+    commitEdit(text);
+    restoreCanvasFocus();
+  };
+
   const cancelEditAndSelect = () => {
     setEdit(null);
     setActiveTool({ kind: 'select' });
+    restoreCanvasFocus();
   };
 
   const finishConnect = (
@@ -993,6 +1003,7 @@ export function useViewEditorInteractions({
     edit,
     connectHover,
     commitEdit,
+    commitEditAndRestoreFocus,
     cancelEditAndSelect,
     cursor,
     handlers: {

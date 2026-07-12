@@ -11,7 +11,7 @@ import {
   reorderNode,
   setConnectionBendpoints,
 } from '../../model/ops';
-import { setSelection, type ModelStore } from '../../model/store';
+import { setActiveTool, setSelection, type ModelStore } from '../../model/store';
 import type { Bounds, ModelState } from '../../model/types';
 import {
   alignmentAnchorMode,
@@ -164,6 +164,9 @@ export function showEmptyCanvasContextMenu({
     clientX,
     clientY,
     extensionItems.length > 0 ? [...items, SEPARATOR, ...extensionItems] : items,
+    (reason) => {
+      if (reason === 'escape') setActiveTool({ kind: 'select' }, modelStore);
+    },
   );
   void extensionRegistry.emitEvent('view.contextMenu', trigger);
 }
@@ -303,6 +306,9 @@ export function showViewObjectContextMenu({
     clientX,
     clientY,
     extensionItems.length > 0 ? [...items, SEPARATOR, ...extensionItems] : items,
+    (reason) => {
+      if (reason === 'escape') setActiveTool({ kind: 'select' }, modelStore);
+    },
   );
   void extensionRegistry.emitEvent('view.contextMenu', trigger);
 }

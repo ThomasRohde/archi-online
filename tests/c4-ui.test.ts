@@ -1,6 +1,6 @@
-import { act, createElement } from 'react';
+import { act, createElement, Fragment } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   C4_PROPERTY_KEYS,
   C4_VISUAL_DEFAULTS,
@@ -21,6 +21,8 @@ import { ConnectionView } from '../src/canvas/ConnectionView';
 import { NodeFigure } from '../src/canvas/figures/NodeFigure';
 import { Palette } from '../src/ui/Palette';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
+import { ContextMenuHost } from '../src/ui/ContextMenu';
+import { Toolbar } from '../src/ui/Toolbar';
 
 function model() {
   return useStore.getState().model!;
@@ -51,10 +53,56 @@ function propertyRow(host: HTMLElement, label: string): HTMLElement {
 }
 
 beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   replaceModel(createEmptyModel('C4 UI Test'), null);
 });
 
+afterEach(() => {
+  delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+  document.body.innerHTML = '';
+});
+
 describe('C4 UI affordances', () => {
+  it('does not consume a phantom C4 view ID from a disabled read-only menu', async () => {
+    const viewId = addView('Existing View');
+    openView(viewId);
+    setSelection('tree', [viewId]);
+    useStore.setState({ readOnly: true });
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(
+      Fragment,
+      null,
+      createElement(ContextMenuHost),
+      createElement(Toolbar),
+    )));
+    const c4Button = host.querySelector<HTMLButtonElement>(
+      'button[aria-label="Create and validate C4 views"]',
+    )!;
+
+    await act(async () => c4Button.click());
+    const parent = Array.from(document.querySelectorAll<HTMLElement>('.ctx-item')).find(
+      (item) => item.querySelector(':scope > .ctx-label')?.textContent === 'New C4 View',
+    )!;
+    await act(async () => parent.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+    const child = Array.from(document.querySelectorAll<HTMLElement>('.ctx-item')).find(
+      (item) => item.querySelector(':scope > .ctx-label')?.textContent === 'System Landscape',
+    );
+    if (child) await act(async () => child.click());
+    const state = useStore.getState();
+    const viewIds = Object.keys(model().views);
+
+    await act(async () => root.unmount());
+    host.remove();
+
+    expect(viewIds).toEqual([viewId]);
+    expect(state.activeViewId).toBe(viewId);
+    expect(state.openViewIds).toEqual([viewId]);
+    expect(state.selection).toEqual({ source: 'tree', ids: [viewId] });
+    expect(child).toBeUndefined();
+  });
+
   it('renders and edits C4 metadata in the properties panel', async () => {
     createC4TemplateView('container');
     const web = Object.values(model().elements).find((element) => element.name === 'Web Application')!;

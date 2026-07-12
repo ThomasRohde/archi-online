@@ -275,6 +275,7 @@ async function validateActiveC4View(): Promise<void> {
 
 function createAndOpenC4View(viewType: (typeof C4_VIEW_TYPES)[number]): void {
   const id = createC4TemplateView(viewType);
+  if (!useStore.getState().model?.views[id]) return;
   setSelection('tree', [id]);
   openView(id);
 }

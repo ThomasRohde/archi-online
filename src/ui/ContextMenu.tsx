@@ -222,7 +222,7 @@ function MenuList({
             aria-expanded={item.children ? openSub?.index === i : undefined}
             onFocus={() => setActiveIndex(i)}
             onMouseEnter={(e) => {
-              if (!item.children) {
+              if (item.disabled || !item.children) {
                 setOpenSub(null);
                 return;
               }

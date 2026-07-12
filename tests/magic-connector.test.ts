@@ -515,6 +515,23 @@ describe('Magic Connector target creation', () => {
       'Business',
       'Application',
     ]);
+    const expectedStrategyOrder = [
+      'Resource',
+      'Capability',
+      'Value Stream',
+      'Course of Action',
+    ];
+    expect(
+      relationshipFirst
+        .find((item) => item.label === 'Association')
+        ?.children?.find((item) => item.label === 'Strategy')
+        ?.children?.map((item) => item.label),
+    ).toEqual(expectedStrategyOrder);
+    expect(
+      elementFirst
+        .find((item) => item.label === 'Strategy')
+        ?.children?.map((item) => item.label),
+    ).toEqual(expectedStrategyOrder);
   });
 
   it('creates element, node, relationship, and connection atomically and returns every ID', () => {
