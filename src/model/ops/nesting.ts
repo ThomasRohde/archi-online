@@ -114,12 +114,36 @@ export interface NestingVisibilityChange {
   after: boolean;
 }
 
+export interface NestingPairRelationshipState {
+  relationshipId: string;
+  relationshipType: RelationshipType;
+  sourceElementId: string;
+  targetElementId: string;
+}
+
+export interface NestingPairOccurrenceState {
+  connectionId: string;
+  relationshipId: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+}
+
+export interface NestingRelationshipPairState {
+  parentNodeId: string;
+  parentElementId: string;
+  childNodeId: string;
+  childElementId: string;
+  relationships: NestingPairRelationshipState[];
+  occurrences: NestingPairOccurrenceState[];
+}
+
 export interface NestingChangePlan {
   input: NestingChangeInput;
   settings: AutomaticRelationshipSettings;
   children: NestingChildAnalysis[];
   missingOccurrences: MissingRelationshipOccurrence[];
   visibilityChanges: NestingVisibilityChange[];
+  relationshipPairStates: NestingRelationshipPairState[];
 }
 
 export interface NestingApplyResult {
@@ -185,6 +209,7 @@ export function analyzeNestingChange(
       children: [],
       missingOccurrences: [],
       visibilityChanges: [],
+      relationshipPairStates: [],
     };
   }
 
@@ -227,12 +252,16 @@ export function analyzeNestingChange(
     const after = afterVisibility(connectionId);
     return before === after ? [] : [{ connectionId, before, after }];
   });
+  const relationshipPairStates = triggerEnabled
+    ? captureRelationshipPairStates(model, staged, input, settings)
+    : [];
   return {
     input: capturedInput,
     settings: capturedSettings,
     children,
     missingOccurrences,
     visibilityChanges,
+    relationshipPairStates,
   };
 }
 
@@ -245,7 +274,19 @@ export function applyNestingChange(
   const state = store.getState();
   if (!state.model || state.readOnly) return result;
   const staged = stageModel(state.model, plan.input);
-  if (!staged || !planReferencesAreValid(staged, plan, selections)) return result;
+  if (!staged) return result;
+  const relationshipPairStateChanged =
+    isAutomaticRelationshipTriggerEnabled(plan.input.trigger, plan.settings) &&
+    !relationshipPairStatesEqual(
+      plan.relationshipPairStates,
+      captureRelationshipPairStates(state.model, staged, plan.input, plan.settings),
+    );
+  if (
+    relationshipPairStateChanged ||
+    !planReferencesAreValid(staged, plan, selections)
+  ) {
+    return result;
+  }
 
   transact('Automatic Relationship Management', (draft) => {
     const createdNodeIds = applyEntriesToDraft(draft, plan.input);
@@ -299,6 +340,123 @@ export function applyNestingChange(
   }, store);
 
   return result;
+}
+
+interface AffectedRelationshipPair {
+  parentNodeId: string;
+  parentElementId: string;
+  childNodeId: string;
+  childElementId: string;
+}
+
+function captureRelationshipPairStates(
+  original: ModelState,
+  staged: ModelState,
+  input: NestingChangeInput,
+  settings: AutomaticRelationshipSettings,
+): NestingRelationshipPairState[] {
+  const relevantTypes = new Set(
+    relationshipTypesInMask(
+      settings.hiddenRelationsTypes |
+        settings.newRelationsTypes |
+        settings.newReverseRelationsTypes,
+    ),
+  );
+  return affectedRelationshipPairs(original, staged, input).map((pair) => {
+    const relationships = Object.values(staged.relationships)
+      .filter(
+        (relationship) =>
+          relevantTypes.has(relationship.type) &&
+          ((relationship.sourceId === pair.parentElementId &&
+            relationship.targetId === pair.childElementId) ||
+            (relationship.sourceId === pair.childElementId &&
+              relationship.targetId === pair.parentElementId)),
+      )
+      .map((relationship) => ({
+        relationshipId: relationship.id,
+        relationshipType: relationship.type,
+        sourceElementId: relationship.sourceId,
+        targetElementId: relationship.targetId,
+      }))
+      .sort((left, right) => left.relationshipId.localeCompare(right.relationshipId));
+    const relationshipIds = new Set(
+      relationships.map((relationship) => relationship.relationshipId),
+    );
+    const occurrences = Object.values(staged.connections)
+      .filter(
+        (connection) =>
+          connection.viewId === input.viewId &&
+          Boolean(connection.relationshipId && relationshipIds.has(connection.relationshipId)) &&
+          ((connection.sourceId === pair.parentNodeId &&
+            connection.targetId === pair.childNodeId) ||
+            (connection.sourceId === pair.childNodeId &&
+              connection.targetId === pair.parentNodeId)),
+      )
+      .map((connection) => ({
+        connectionId: connection.id,
+        relationshipId: connection.relationshipId!,
+        sourceNodeId: connection.sourceId,
+        targetNodeId: connection.targetId,
+      }))
+      .sort((left, right) => left.connectionId.localeCompare(right.connectionId));
+    return { ...pair, relationships, occurrences };
+  });
+}
+
+function affectedRelationshipPairs(
+  original: ModelState,
+  staged: ModelState,
+  input: NestingChangeInput,
+): AffectedRelationshipPair[] {
+  const pairs = new Map<string, AffectedRelationshipPair>();
+  const addPair = (
+    parentNode: ElementNode | undefined,
+    childNode: ElementNode | undefined,
+  ) => {
+    if (!parentNode || !childNode) return;
+    const pair = {
+      parentNodeId: parentNode.id,
+      parentElementId: parentNode.elementId,
+      childNodeId: childNode.id,
+      childElementId: childNode.elementId,
+    };
+    pairs.set(
+      `${pair.parentNodeId}|${pair.parentElementId}|${pair.childNodeId}|${pair.childElementId}`,
+      pair,
+    );
+  };
+
+  for (const entry of input.entries) {
+    if (entry.kind === 'add-view-reference') continue;
+    const stagedChild = asElementNode(staged.nodes[entry.nodeId]);
+    if (!stagedChild) continue;
+    if (entry.kind === 'move' && original.nodes[entry.nodeId]?.parentId === entry.parentId) {
+      continue;
+    }
+    addPair(asElementNode(staged.nodes[stagedChild.parentId]), stagedChild);
+    if (entry.kind === 'move') {
+      const originalChild = asElementNode(original.nodes[entry.nodeId]);
+      if (originalChild) {
+        addPair(asElementNode(staged.nodes[originalChild.parentId]), stagedChild);
+      }
+    }
+  }
+  return [...pairs.values()].sort((left, right) => {
+    const leftKey = `${left.parentNodeId}|${left.childNodeId}`;
+    const rightKey = `${right.parentNodeId}|${right.childNodeId}`;
+    return leftKey.localeCompare(rightKey);
+  });
+}
+
+function asElementNode(node: ModelState['nodes'][string] | undefined): ElementNode | undefined {
+  return node?.nodeType === 'element' ? node : undefined;
+}
+
+function relationshipPairStatesEqual(
+  expected: NestingRelationshipPairState[],
+  actual: NestingRelationshipPairState[],
+): boolean {
+  return JSON.stringify(expected) === JSON.stringify(actual);
 }
 
 function planReferencesAreValid(
