@@ -15,6 +15,8 @@ export interface Transaction {
   label: string;
   patches: Patch[];
   inverse: Patch[];
+  selectionBefore?: SelectionState;
+  selectionAfter?: SelectionState;
 }
 
 type StickyCreationTool<T> = T & { sticky?: boolean };
@@ -51,6 +53,10 @@ export interface SelectionState {
   ids: string[];
 }
 
+export interface TransactionOptions {
+  selectionAfter?: SelectionState;
+}
+
 export interface AppState {
   model: ModelState | null;
   fileName: string | null;
@@ -72,7 +78,11 @@ export interface ReplaceModelOptions {
 }
 
 export interface ModelStore extends StoreApi<AppState> {
-  transact(label: string, recipe: (draft: ModelState) => void): void;
+  transact(
+    label: string,
+    recipe: (draft: ModelState) => void,
+    options?: TransactionOptions,
+  ): void;
   runBatch<T>(label: string, fn: () => T): T;
 }
 
@@ -102,23 +112,48 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
   let batchLabel = '';
   let batchPatches: Patch[] = [];
   let batchInverse: Patch[] = [];
+  let batchSelectionBefore: SelectionState | undefined;
+  let batchSelectionAfter: SelectionState | undefined;
 
   const modelStore = api as ModelStore;
 
-  modelStore.transact = (label, recipe) => {
+  modelStore.transact = (label, recipe, options = {}) => {
     const state = api.getState();
     if (!state.model || state.readOnly) return;
     const [next, patches, inverse] = produceWithPatches(state.model, recipe);
     if (patches.length === 0) return;
+    const selectionBefore = cloneSelection(state.selection);
+    const selectionAfter = options.selectionAfter
+      ? cloneSelection(options.selectionAfter)
+      : undefined;
     if (batchDepth > 0) {
       batchPatches.push(...patches);
       batchInverse.unshift(...inverse);
-      api.setState({ model: next, dirty: true });
+      if (selectionAfter) {
+        batchSelectionBefore ??= selectionBefore;
+        batchSelectionAfter = selectionAfter;
+      }
+      api.setState({
+        model: next,
+        dirty: true,
+        ...(selectionAfter ? { selection: selectionAfter } : {}),
+      });
     } else {
       api.setState((current) => ({
         model: next,
         dirty: true,
-        undoStack: [...current.undoStack, { label, patches, inverse }].slice(-MAX_UNDO),
+        ...(selectionAfter ? { selection: selectionAfter } : {}),
+        undoStack: [
+          ...current.undoStack,
+          {
+            label,
+            patches,
+            inverse,
+            ...(selectionAfter
+              ? { selectionBefore, selectionAfter }
+              : {}),
+          },
+        ].slice(-MAX_UNDO),
         redoStack: [],
       }));
     }
@@ -130,6 +165,8 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
       batchLabel = label;
       batchPatches = [];
       batchInverse = [];
+      batchSelectionBefore = undefined;
+      batchSelectionAfter = undefined;
     }
     batchDepth++;
     try {
@@ -141,6 +178,12 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
           label: batchLabel,
           patches: batchPatches,
           inverse: batchInverse,
+          ...(batchSelectionBefore && batchSelectionAfter
+            ? {
+                selectionBefore: batchSelectionBefore,
+                selectionAfter: batchSelectionAfter,
+              }
+            : {}),
         };
         api.setState((current) => ({
           undoStack: [...current.undoStack, tx].slice(-MAX_UNDO),
@@ -148,6 +191,8 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
         }));
         batchPatches = [];
         batchInverse = [];
+        batchSelectionBefore = undefined;
+        batchSelectionAfter = undefined;
       }
     }
   };
@@ -182,6 +227,15 @@ export function transact(
   targetStore(store).transact(label, recipe);
 }
 
+export function transactWithSelection(
+  label: string,
+  recipe: (draft: ModelState) => void,
+  selectionAfter: SelectionState,
+  store?: ModelStore,
+): void {
+  targetStore(store).transact(label, recipe, { selectionAfter });
+}
+
 export function runBatch<T>(label: string, fn: () => T, store?: ModelStore): T {
   return targetStore(store).runBatch(label, fn);
 }
@@ -197,6 +251,9 @@ export function undo(store?: ModelStore): void {
     dirty: true,
     undoStack: state.undoStack.slice(0, -1),
     redoStack: [...state.redoStack, tx],
+    ...(tx.selectionBefore
+      ? { selection: cloneSelection(tx.selectionBefore) }
+      : {}),
   });
   pruneSelection(target);
 }
@@ -212,8 +269,15 @@ export function redo(store?: ModelStore): void {
     dirty: true,
     undoStack: [...state.undoStack, tx],
     redoStack: state.redoStack.slice(0, -1),
+    ...(tx.selectionAfter
+      ? { selection: cloneSelection(tx.selectionAfter) }
+      : {}),
   });
   pruneSelection(target);
+}
+
+function cloneSelection(selection: SelectionState): SelectionState {
+  return { source: selection.source, ids: [...selection.ids] };
 }
 
 function pruneSelection(store: ModelStore): void {

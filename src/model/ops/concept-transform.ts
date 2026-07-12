@@ -6,7 +6,7 @@ import {
   type ConceptType as MetamodelConceptType,
 } from '../metamodel';
 import { enumerateRelationshipCandidates } from '../rules';
-import { getActiveModelStore, transact, type ModelStore } from '../store';
+import { getActiveModelStore, transactWithSelection, type ModelStore } from '../store';
 import {
   getConcept,
   type ArchimateElement,
@@ -91,7 +91,7 @@ export function analyzeConceptTypeChange(
   }
 
   if (targetKind === 'relationship') {
-    const illegal = changedConceptIds.filter((id) => {
+    const illegal = conceptIds.filter((id) => {
       const relationship = finalModel.relationships[id];
       return !relationship || !isRelationshipLegalInModel(finalModel, relationship);
     });
@@ -201,7 +201,7 @@ export function applyConceptTypeChange(
   const idMap = Object.fromEntries(replacements.map(({ id }) => [id, newId()]));
   const previousSelection = state.selection;
   let applied = false;
-  transact('Set Concept Type', (draft) => {
+  transactWithSelection('Set Concept Type', (draft) => {
     const staged: Array<{
       oldId: string;
       oldFolderId: string;
@@ -270,14 +270,11 @@ export function applyConceptTypeChange(
       connection.relationshipId = idMap[connection.relationshipId] ?? connection.relationshipId;
     }
     applied = true;
+  }, {
+    ...previousSelection,
+    ids: previousSelection.ids.map((id) => idMap[id] ?? id),
   }, store);
   if (!applied) return null;
-  store.setState({
-    selection: {
-      ...previousSelection,
-      ids: previousSelection.ids.map((id) => idMap[id] ?? id),
-    },
-  });
   return { idMap };
 }
 

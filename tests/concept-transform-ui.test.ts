@@ -138,6 +138,54 @@ describe('concept transformation context menus', () => {
     expect(items.find((item) => item.label === 'Invert Connection Direction')?.disabled).toBe(true);
   });
 
+  it('omits a relationship type illegal for an unchanged member of the selected set', () => {
+    const store = createModelStore({
+      model: createEmptyModel('Complete relationship menu state'),
+      fileName: null,
+    });
+    const passiveId = addElement('BusinessObject', 'Passive', undefined, store);
+    const actorId = addElement('BusinessActor', 'Actor', undefined, store);
+    const roleId = addElement('BusinessRole', 'Role', undefined, store);
+    const changeMeId = addRelationship(
+      'AssociationRelationship',
+      actorId,
+      roleId,
+      '',
+      undefined,
+      store,
+    )!;
+    const model = structuredClone(store.getState().model!);
+    const relationsFolderId = model.rootFolderIds.find(
+      (id) => model.folders[id]?.folderType === 'relations',
+    )!;
+    model.relationships['imported-invalid'] = {
+      id: 'imported-invalid',
+      kind: 'relationship',
+      type: 'AssignmentRelationship',
+      name: '',
+      documentation: '',
+      properties: [],
+      profileIds: [],
+      folderId: relationsFolderId,
+      sourceId: passiveId,
+      targetId: roleId,
+    };
+    model.folders[relationsFolderId].itemIds.push('imported-invalid');
+    store.setState({ model });
+
+    const items = conceptTransformationMenuItems(
+      model,
+      ['imported-invalid', changeMeId],
+      store,
+      DEFAULT_SETTINGS,
+    );
+    const typeMenu = items.find((item) => item.label === 'Set Concept Type')!;
+    const labels = typeMenu.children?.map((item) => item.label) ?? [];
+
+    expect(labels).not.toContain('Assignment');
+    expect(labels).toContain('Association');
+  });
+
   it('does not silently drop a selected Junction from a mixed element transformation', () => {
     const store = createModelStore({ model: createEmptyModel('Mixed Junction'), fileName: null });
     const actorId = addElement('BusinessActor', 'Actor', undefined, store);

@@ -10,7 +10,7 @@ import {
   renameItem,
   setNodeStyle,
 } from '../src/model/ops';
-import { redo, replaceModel, runBatch, undo } from '../src/model/store';
+import { redo, replaceModel, runBatch, setSelection, undo } from '../src/model/store';
 import { useStore } from '../src/ui/store-hooks';
 
 function model() {
@@ -54,6 +54,20 @@ describe('model ops + undo/redo', () => {
     expect(model().elements[id].name).toBe('Cap 2');
     undo();
     expect(model().elements[id].name).toBe('Cap 1');
+  });
+
+  it('keeps ordinary transaction selection behavior unchanged during undo and redo', () => {
+    const firstId = addElement('BusinessActor', 'First');
+    const secondId = addElement('BusinessRole', 'Second');
+    setSelection('tree', [firstId]);
+    renameItem(secondId, 'Changed');
+    setSelection('tree', [secondId]);
+
+    undo();
+    expect(useStore.getState().selection).toEqual({ source: 'tree', ids: [secondId] });
+
+    redo();
+    expect(useStore.getState().selection).toEqual({ source: 'tree', ids: [secondId] });
   });
 
   it('deleting an element cascades to relationships and view objects', () => {

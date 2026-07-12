@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import * as ops from '../src/model/ops';
 import { attachConnection } from '../src/model/ops/draft';
 import type { RelationshipType } from '../src/model/metamodel';
-import { createModelStore, setSelection, undo, type ModelStore } from '../src/model/store';
+import {
+  createModelStore,
+  redo,
+  runBatch,
+  setSelection,
+  undo,
+  type ModelStore,
+} from '../src/model/store';
 import type {
   ConceptType,
   DiagramConnection,
@@ -367,6 +374,31 @@ describe('concept type transformations', () => {
     });
   });
 
+  it('rejects a relationship target when an unchanged selected relationship is illegal', () => {
+    const api = transformApi();
+    if (!api) return;
+    const model = ops.createEmptyModel('Complete selected relationship state');
+    putElement(model, 'passive', 'BusinessObject');
+    putElement(model, 'actor', 'BusinessActor');
+    putElement(model, 'role', 'BusinessRole');
+    putRelationship(
+      model,
+      'imported-invalid',
+      'AssignmentRelationship',
+      'passive',
+      'role',
+    );
+    putRelationship(model, 'change-me', 'AssociationRelationship', 'actor', 'role');
+
+    expect(api.analyze(model, {
+      conceptIds: ['imported-invalid', 'change-me'],
+      targetType: 'AssignmentRelationship',
+    })).toMatchObject({
+      valid: false,
+      changedConceptIds: [],
+    });
+  });
+
   it('previews invalid adjacent relationships and converts them to Association only when confirmed', () => {
     const api = transformApi();
     if (!api) return;
@@ -512,6 +544,55 @@ describe('concept type transformations', () => {
     }, readOnly)).toBeNull();
     expect(readOnly.getState().model).toEqual(model);
     expect(readOnly.getState().undoStack).toHaveLength(0);
+  });
+
+  it('restores replacement-aware selection through undo and redo', () => {
+    const api = transformApi();
+    if (!api) return;
+    const model = ops.createEmptyModel('Selection history');
+    putElement(model, 'actor', 'BusinessActor');
+    const store = createModelStore({ model, fileName: null });
+    setSelection('tree', ['actor'], store);
+
+    const result = api.apply(api.analyze(model, {
+      conceptIds: ['actor'],
+      targetType: 'BusinessRole',
+    }), {}, store)!;
+    const replacementId = result.idMap.actor;
+    expect(store.getState().selection).toEqual({ source: 'tree', ids: [replacementId] });
+    expect(store.getState().undoStack).toHaveLength(1);
+
+    undo(store);
+    expect(store.getState().selection).toEqual({ source: 'tree', ids: ['actor'] });
+
+    redo(store);
+    expect(store.getState().selection).toEqual({ source: 'tree', ids: [replacementId] });
+  });
+
+  it('restores replacement-aware selection when transformation runs in a batch', () => {
+    const api = transformApi();
+    if (!api) return;
+    const model = ops.createEmptyModel('Batched selection history');
+    putElement(model, 'actor', 'BusinessActor');
+    const store = createModelStore({ model, fileName: null });
+    setSelection('tree', ['actor'], store);
+
+    let result: ConceptTypeChangeResult | null = null;
+    runBatch('Script', () => {
+      result = api.apply(api.analyze(store.getState().model!, {
+        conceptIds: ['actor'],
+        targetType: 'BusinessRole',
+      }), {}, store);
+    }, store);
+    const replacementId = result!.idMap.actor;
+    expect(store.getState().selection).toEqual({ source: 'tree', ids: [replacementId] });
+    expect(store.getState().undoStack).toHaveLength(1);
+
+    undo(store);
+    expect(store.getState().selection).toEqual({ source: 'tree', ids: ['actor'] });
+
+    redo(store);
+    expect(store.getState().selection).toEqual({ source: 'tree', ids: [replacementId] });
   });
 
   it('isolates explicit stores', () => {
