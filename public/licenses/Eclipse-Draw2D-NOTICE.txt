@@ -1,0 +1,73 @@
+Eclipse Draw2D Manhattan Connection Router Notice
+
+Archi Online as a whole is distributed under the MIT License. The modified
+router source identified below is a derived work of Eclipse Draw2D's
+ManhattanConnectionRouter and is distributed under the Eclipse Public License
+1.0 (EPL-1.0). A complete copy of EPL-1.0 accompanies this notice as
+EPL-1.0.txt.
+
+Original Program and copyright notice
+-------------------------------------
+
+Eclipse Draw2D ManhattanConnectionRouter.java
+Copyright (c) 2000, 2010 IBM Corporation and others.
+All rights reserved.
+
+Original source used for this port:
+https://github.com/archimatetool/archi/blob/release_5.9.0/org.eclipse.draw2d/src/org/eclipse/draw2d/ManhattanConnectionRouter.java
+
+Pinned Archi source tag: release_5.9.0
+Pinned Archi source commit: e0ba88c6b3391e0d3c5839917474d1b6085adbe4
+
+Modified source and contributor identification
+----------------------------------------------
+
+Archi Online contributors created and distribute the behaviorally faithful
+TypeScript port at:
+
+src/canvas/manhattan-router.ts
+
+The Archi Online contribution preserves the original routing decision tree and
+adds an immutable state API for browser use. The modified source file retains
+the IBM and Eclipse Draw2D attribution and is licensed under EPL-1.0.
+
+Object-code distribution terms and corresponding source
+--------------------------------------------------------
+
+The full MIT terms for Archi Online accompany this notice as MIT.txt. Any
+provisions that differ from EPL-1.0 are offered by the Archi Online contributors
+alone and not by IBM, the Eclipse Foundation, or any other EPL Contributor.
+
+On behalf of every EPL Contributor,
+ALL EPL CONTRIBUTORS DISCLAIM ALL WARRANTIES AND CONDITIONS, EXPRESS AND
+IMPLIED, INCLUDING TITLE,
+NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A PARTICULAR PURPOSE.
+
+On behalf of every EPL Contributor, NO EPL CONTRIBUTOR SHALL BE LIABLE FOR ANY
+DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING
+LOST PROFITS.
+
+The exact corresponding modified source accompanies this object-code
+distribution at:
+
+/licenses/source/manhattan-router.ts.txt
+
+Download that file from the same Archi Online distribution or deployment as
+this notice. It is byte-identical to src/canvas/manhattan-router.ts for this
+build, and the production build rejects any mismatch. No external tag lookup is
+required to obtain the corresponding source.
+
+The complete Archi Online project source and history are additionally available
+through the public source repository using a customary software-exchange
+medium:
+
+git clone https://github.com/ThomasRohde/archi-online.git
+
+https://github.com/ThomasRohde/archi-online
+https://github.com/ThomasRohde/archi-online/releases
+
+License
+-------
+
+Eclipse Public License 1.0
+https://www.eclipse.org/legal/epl-v10.html

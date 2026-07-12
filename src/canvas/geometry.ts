@@ -7,6 +7,7 @@ import type {
 import {
   createManhattanRouterState,
   routeManhattanConnection,
+  type ManhattanConnectionReservations,
   type ManhattanRouteInput,
   type ManhattanRouteResult,
   type ManhattanRouterState,
@@ -14,6 +15,7 @@ import {
 export {
   createManhattanRouterState,
   routeManhattanConnection,
+  type ManhattanConnectionReservations,
   type ManhattanRouteInput,
   type ManhattanRouteResult,
   type ManhattanRouterState,
@@ -114,6 +116,7 @@ export function createConnectionRouteResolver(
         : endpoints.target;
       const result = routeManhattanConnection(
         {
+          connectionId: conn.id,
           start: source,
           end: target,
           sourceBounds: endpointGeometry?.source.bounds,

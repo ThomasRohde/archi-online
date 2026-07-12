@@ -37,6 +37,20 @@ Pinned Archi source: tag `release_5.9.0`, commit
 License: Eclipse Public License 1.0 (EPL-1.0),
 https://www.eclipse.org/legal/epl-v10.html
 
+Complete license text: `public/licenses/EPL-1.0.txt`
+
+Complete Archi Online MIT terms: `public/licenses/MIT.txt`
+
+Distributed copyright, modification, and corresponding-source notice:
+`public/licenses/Eclipse-Draw2D-NOTICE.txt`
+
+Exact corresponding modified source included with the object distribution:
+`public/licenses/source/manhattan-router.ts.txt`
+
+Vite copies all four files to `dist/licenses/` so every production object-code
+distribution includes both complete licenses, the IBM/Draw2D notice, explicit
+EPL object-code disclaimers, and the exact corresponding modified source.
+
 Copyright (c) 2000, 2010 IBM Corporation and others.
 
 Derived material in this repository:
