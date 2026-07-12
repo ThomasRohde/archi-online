@@ -15,6 +15,7 @@ import { defaultKeyValueStore, type AsyncKeyValueStore } from '../persistence/ke
 export const SETTINGS_STORAGE_KEY = 'archi-online.settings.v1';
 
 export interface AppSettings {
+  addDocumentationNoteOnRelationChange: boolean;
   snapToGrid: boolean;
   gridSize: number;
   defaultTextAlignment: TextAlignment;
@@ -95,6 +96,7 @@ export interface SettingSection {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  addDocumentationNoteOnRelationChange: false,
   snapToGrid: true,
   gridSize: 12,
   defaultTextAlignment: 2,
@@ -130,6 +132,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export const SETTING_SECTIONS: readonly SettingSection[] = [
+  {
+    id: 'general',
+    title: 'General',
+    description: 'General modeling behavior.',
+    rows: [
+      {
+        key: 'addDocumentationNoteOnRelationChange',
+        kind: 'boolean',
+        label: "Add a note to a Relation's documentation field when changing type",
+        description:
+          "If a connected relation type is changed as a result of changing an Element's type, a note will be added to the Relation's documentation field.",
+      },
+    ],
+  },
   {
     id: 'automatic-relationships',
     title: 'Automatic relationships',

@@ -186,7 +186,15 @@ their name from the underlying relationship and refuse renames.
 ```js
 concept.specialization;          // primary specialization name or undefined
 concept.specialization = "Retail Customer";
+
+var replacement = concept.setType("business-role"); // new ID and wrapper
 ```
+
+`setType()` replaces the concept and returns a wrapper for the replacement.
+Names, documentation, properties, occurrences, and semantic references are
+preserved; incompatible specialization and type-specific fields are cleared.
+Keep the returned wrapper because the original wrapper points to the removed
+concept.
 
 Profiles expose `name`, `type`, `image`, and `delete()`. Profile names are
 unique case-insensitively within a base concept type; deleting a used profile
@@ -200,7 +208,12 @@ relationship.target;              // JConcept
 relationship.accessType;          // "access" | "read" | "write" | "readwrite"
 relationship.influenceStrength;   // e.g. "++"
 relationship.associationDirected; // boolean
+relationship.invert();             // stable relationship ID; throws if illegal
 ```
+
+`invert()` is supported for relationships only. It swaps the semantic ends and
+all visual occurrences, including bendpoint direction and source/target label
+positions.
 
 ## Views
 

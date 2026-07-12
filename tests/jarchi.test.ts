@@ -55,6 +55,44 @@ describe('jArchi scripting API', () => {
     ]);
   });
 
+  it('returns a replacement wrapper from setType and supports relationship-only invert', () => {
+    const { logs, error } = run(`
+      var actor = model.createElement("business-actor", "Actor");
+      var role = model.createElement("business-role", "Role");
+      var relationship = model.createRelationship("association-relationship", "linked", actor, role);
+      var oldActorId = actor.id;
+      var replacement = actor.setType("business-role");
+      console.log(oldActorId !== replacement.id, replacement.type, replacement.name,
+        relationship.source.id === replacement.id);
+      var relationshipId = relationship.id;
+      var inverted = relationship.invert();
+      console.log(inverted.id === relationshipId, inverted.source.name, inverted.target.name);
+    `);
+
+    expect(error).toBeUndefined();
+    expect(logs).toEqual([
+      'log:true business-role Actor true',
+      'log:true Role Actor',
+    ]);
+  });
+
+  it('rejects illegal setType and element inversion without partial mutation', () => {
+    const { error } = run(`
+      var actor = model.createElement("business-actor", "Actor");
+      var role = model.createElement("business-role", "Role");
+      var relationship = model.createRelationship("assignment-relationship", "assigned", actor, role);
+      relationship.setType("access-relationship");
+    `);
+    expect(error).toMatch(/not legal/i);
+    expect(Object.values(model().relationships)[0]).toMatchObject({
+      type: 'AssignmentRelationship',
+      sourceId: Object.values(model().elements).find((element) => element.name === 'Actor')?.id,
+    });
+
+    const elementInvert = run(`$(".Actor").first().invert()`);
+    expect(elementInvert.error).toMatch(/relationships/i);
+  });
+
   it('creates elements, relationships and views', () => {
     const { error } = run(`
       var actor = model.createElement("business-actor", "Bob");

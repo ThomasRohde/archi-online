@@ -65,6 +65,15 @@ asterisk after a root name means that model has unsaved changes.
   element types belonging to that folder's layer, **New ArchiMate View**
   appears under the Views folder, and **New Folder** creates a subfolder.
 - **Rename** — `F2` or the context menu; the model root can be renamed too.
+- **Change a concept type** — select one or more elements or relationships,
+  then right-click → **Set Concept Type**. The replacement keeps names,
+  documentation, properties, occurrences, and semantic links, but receives a
+  fresh ID and drops incompatible specializations and type-specific fields.
+  Element changes that invalidate connected relationships show a preview and
+  require confirmation before those relationships become Associations.
+- **Invert a relationship** — right-click → **Invert Connection Direction**.
+  The command is disabled when the relationship type is not legal in the
+  reverse direction.
 - **Save or close a model** — right-click its root. Dirty models offer
   **Save**, **Don't Save**, and **Cancel**; Close Others/All stops at the first
   cancellation.
@@ -164,6 +173,10 @@ The view editor is a custom SVG canvas. It supports:
   (horizontally/vertically) equalizes the gaps between them, keeping the two
   outermost fixed — PowerPoint semantics. Each action is one undo step.
 - **Direct edit** — `F2` or double-click to rename in place.
+- **Concept commands** — right-click selected element or relationship
+  occurrences to use **Set Concept Type**. Relationship occurrences also offer
+  **Invert Connection Direction**; every occurrence is reversed together,
+  including its route and source/target label position.
 - **Notes, groups, view references** — notes and groups come from the
   palette; view references are created by dragging a view from the tree.
 - **Bendpoints** — drag anywhere on a connection to add a manual bendpoint;
@@ -292,6 +305,7 @@ style. Each row has a reset button, and **Reset all** restores the defaults.
 
 | Section | Settings (defaults) |
 | --- | --- |
+| General | Add a note to a Relation's documentation field when changing type (off). When enabled, an automatically converted Association is prefixed with `(Changed from <type>)`. |
 | Canvas snapping | Snap to grid (on); grid size (12 px) — also the `Shift`+arrow nudge step. |
 | New object defaults | Text align (center) and text position (center) for new objects; default sizes for elements (120×55), junctions (15), notes (185×80), groups (400×140), and view references (200×140). |
 | Canvas interaction | Drop offset (16 px), paste offset (16 px), minimum node size (20 px), move drag threshold (4 px), bendpoint drag threshold (5 px). |

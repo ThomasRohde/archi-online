@@ -2,6 +2,8 @@
 // implementation modules so undo/redo, UI, and scripting behave uniformly.
 
 export * from './ops/concepts';
+export * from './ops/concept-transform';
+export * from './ops/relationship-inversion';
 export * from './ops/alignment';
 export * from './ops/c4';
 export * from './ops/csv-import';

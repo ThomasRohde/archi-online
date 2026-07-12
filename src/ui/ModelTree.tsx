@@ -50,6 +50,8 @@ import {
   closeModelSessions,
   saveModelSession,
 } from './model-session-actions';
+import { useSettingsStore } from '../settings/app-settings';
+import { conceptTransformationMenuItems } from './concept-transform-menu';
 
 const FOLDER_LAYERS: Record<string, Layer[]> = {
   strategy: ['strategy'],
@@ -388,6 +390,7 @@ function ModelTreeInner({
   const filterInputRef = useRef<HTMLInputElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const readOnly = useStore((s) => s.readOnly);
+  const settings = useSettingsStore((s) => s.settings);
   const visible = useMemo(
     () => computeVisibleTreeItems(model, filterText, filterType),
     [model, filterText, filterType],
@@ -465,7 +468,7 @@ function ModelTreeInner({
     const sel = modelStore.getState().selection;
     const ids = sel.source === 'tree' && sel.ids.includes(id) ? sel.ids : [id];
     const canDuplicate = ids.some((i) => model.elements[i] || model.views[i]);
-    return [
+    const items: MenuItem[] = [
       { label: 'Rename', onClick: () => setRenamingId(id) },
       ...(canDuplicate
         ? [
@@ -487,13 +490,22 @@ function ModelTreeInner({
             } as MenuItem,
           ]
         : []),
-      SEPARATOR,
-      {
-        label: ids.length > 1 ? `Delete ${ids.length} items` : 'Delete',
-        danger: true,
-        onClick: () => deleteItems(ids, modelStore),
-      },
     ];
+    const transformationItems = conceptTransformationMenuItems(
+      model,
+      ids,
+      modelStore,
+      settings,
+    );
+    if (transformationItems.length > 0) {
+      items.push(SEPARATOR, ...transformationItems);
+    }
+    items.push(SEPARATOR, {
+      label: ids.length > 1 ? `Delete ${ids.length} items` : 'Delete',
+      danger: true,
+      onClick: () => deleteItems(ids, modelStore),
+    });
+    return items;
   };
 
   const folderMenu = (folder: Folder): MenuItem[] => {

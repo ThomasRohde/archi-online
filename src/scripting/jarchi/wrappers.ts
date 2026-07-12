@@ -13,8 +13,12 @@ import {
   addNoteToView,
   addRelationship,
   addView,
+  analyzeConceptTypeChange,
   analyzeConnectionReconnection,
+  analyzeRelationshipInversion,
+  applyConceptTypeChange,
   applyConnectionReconnection,
+  applyRelationshipInversion,
   createNestedConnectionVisibilityResolver,
   createProfile,
   deleteItems,
@@ -293,6 +297,41 @@ export class JConcept extends JObject {
   get target(): JConcept | undefined {
     const c = this.concept();
     return c.kind === 'relationship' ? new JConcept(c.targetId) : undefined;
+  }
+
+  setType(type: string): JConcept {
+    const targetType = resolveType(type);
+    if (!targetType || (!isElementType(targetType) && !isRelationshipType(targetType))) {
+      throw new Error(`Unknown concept type: ${type}`);
+    }
+    const concept = this.concept();
+    if (concept.type === targetType) return new JConcept(this.id);
+    const plan = analyzeConceptTypeChange(state(), {
+      conceptIds: [this.id],
+      targetType,
+    });
+    if (!plan.valid) throw new Error(plan.reason ?? 'Concept type change is not legal');
+    const result = applyConceptTypeChange(plan, {
+      convertInvalidRelationshipsToAssociation: plan.requiresConfirmation,
+      addDocumentationNote:
+        useSettingsStore.getState().settings.addDocumentationNoteOnRelationChange,
+    });
+    const replacementId = result?.idMap[this.id];
+    if (!replacementId) throw new Error('Concept type change could not be applied');
+    return new JConcept(replacementId);
+  }
+
+  invert(): JConcept {
+    const concept = this.concept();
+    if (concept.kind !== 'relationship') {
+      throw new Error('invert() is supported for relationships only');
+    }
+    const plan = analyzeRelationshipInversion(state(), { ids: [this.id] });
+    if (!plan.valid) throw new Error(plan.reason ?? 'Relationship cannot be inverted');
+    if (!applyRelationshipInversion(plan)) {
+      throw new Error('Relationship inversion could not be applied');
+    }
+    return new JConcept(this.id);
   }
 
   get accessType(): string | undefined {

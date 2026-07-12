@@ -22,6 +22,21 @@ describe('app settings', () => {
     await expect(loadSettings(memoryKeyValueStore())).resolves.toEqual(DEFAULT_SETTINGS);
   });
 
+  it('defaults the Desktop documentation note preference off and persists booleans', async () => {
+    const defaults = DEFAULT_SETTINGS as typeof DEFAULT_SETTINGS & {
+      addDocumentationNoteOnRelationChange?: boolean;
+    };
+    expect(defaults.addDocumentationNoteOnRelationChange).toBe(false);
+
+    const loaded = await loadSettings(memoryKeyValueStore([[
+      SETTINGS_STORAGE_KEY,
+      { addDocumentationNoteOnRelationChange: true },
+    ]]));
+    expect((loaded as typeof loaded & {
+      addDocumentationNoteOnRelationChange?: boolean;
+    }).addDocumentationNoteOnRelationChange).toBe(true);
+  });
+
   it('defaults new text style to center alignment and center position', () => {
     expect(defaultTextStyle(DEFAULT_SETTINGS)).toEqual({
       textAlignment: 2,

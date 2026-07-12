@@ -15,6 +15,8 @@ describe('jArchi Monaco declarations', () => {
       "reconnect(end: 'source' | 'target', endpoint: JConnectable): void;",
     );
     expect(JARCHI_SCRIPT_DTS).toContain('routedPoints(): JPoint[];');
+    expect(JARCHI_SCRIPT_DTS).toContain('setType(type: string): JConcept;');
+    expect(JARCHI_SCRIPT_DTS).toContain('invert(): JConcept;');
   });
 
   it('keeps extension-only app declarations separate from script declarations', () => {

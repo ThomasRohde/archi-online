@@ -47,6 +47,7 @@ import {
   pasteNodes,
 } from '../clipboard';
 import type { Point } from '../geometry';
+import { conceptTransformationMenuItems } from '../../ui/concept-transform-menu';
 
 export function showEmptyCanvasContextMenu({
   clientX,
@@ -248,6 +249,15 @@ export function showViewObjectContextMenu({
       return c?.relationshipId;
     })
     .filter((x): x is string => !!x);
+  const transformationItems = conceptTransformationMenuItems(
+    model,
+    ids,
+    modelStore,
+    settings,
+  );
+  if (transformationItems.length > 0) {
+    items.push(SEPARATOR, ...transformationItems);
+  }
   if (conceptIds.length > 0) {
     items.push({
       label: 'Delete from Model',

@@ -14,6 +14,10 @@ declare interface JObject {
 }
 
 declare interface JConcept extends JObject {
+  /** Replace this concept with a new concept of another ArchiMate type. */
+  setType(type: string): JConcept;
+  /** Invert a relationship in place. Throws for elements or illegal reversals. */
+  invert(): JConcept;
   specialization?: string;
   /** Relationship source/target (relationships only) */
   readonly source?: JConcept;
