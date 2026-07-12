@@ -1,8 +1,28 @@
-import type { Bounds, DiagramConnection, ModelState } from '../../types';
+import {
+  connectionGraphError,
+  type Bounds,
+  type ConnectableRefs,
+  type DiagramConnection,
+  type ModelState,
+} from '../../types';
 import { ARCHIMATE_NS, docTag, featureTags, propertyTags, serializeFontStyle, tag, textTag, type Attr } from './xml';
 
 export function serializeArchimate(state: ModelState): string {
   const IND = '  ';
+  const graphError = connectionGraphError(state);
+  if (graphError) throw new Error(graphError);
+  const writingConnections = new Set<string>();
+  const writtenConnections = new Set<string>();
+  const connectionsBySource = new Map<string, string[]>();
+  const connectionsByTarget = new Map<string, string[]>();
+  for (const connection of Object.values(state.connections)) {
+    const sourceIds = connectionsBySource.get(connection.sourceId) ?? [];
+    sourceIds.push(connection.id);
+    connectionsBySource.set(connection.sourceId, sourceIds);
+    const targetIds = connectionsByTarget.get(connection.targetId) ?? [];
+    targetIds.push(connection.id);
+    connectionsByTarget.set(connection.targetId, targetIds);
+  }
 
   function writeBounds(indent: string, b: Bounds): string {
     return tag(indent, 'bounds', [
@@ -13,12 +33,41 @@ export function serializeArchimate(state: ModelState): string {
     ]);
   }
 
+  function orderedConnectionIds(
+    connectable: ConnectableRefs & { id: string },
+    direction: 'source' | 'target',
+  ): string[] {
+    const preferred = direction === 'source'
+      ? connectable.sourceConnectionIds
+      : connectable.targetConnectionIds;
+    const candidates = (direction === 'source' ? connectionsBySource : connectionsByTarget)
+      .get(connectable.id) ?? [];
+    const valid = new Set(candidates);
+    const ordered = preferred.filter(
+      (connectionId, index) => valid.has(connectionId) && preferred.indexOf(connectionId) === index,
+    );
+    for (const connectionId of candidates) {
+      if (!ordered.includes(connectionId)) ordered.push(connectionId);
+    }
+    return ordered;
+  }
+
   function writeConnection(indent: string, conn: DiagramConnection): string {
-    const children: string[] = featureTags(indent + IND, {
+    if (writingConnections.has(conn.id)) {
+      throw new Error(`Connection endpoint cycle: ${conn.id}`);
+    }
+    if (writtenConnections.has(conn.id)) return '';
+    writingConnections.add(conn.id);
+    const children: string[] = [];
+    for (const connectionId of orderedConnectionIds(conn, 'source')) {
+      const child = state.connections[connectionId];
+      if (child) children.push(writeConnection(indent + IND, child));
+    }
+    children.push(...featureTags(indent + IND, {
       labelExpression: conn.labelExpression,
       lineStyle: conn.lineStyle,
       fontAlpha: conn.fontAlpha,
-    });
+    }));
     children.push(...conn.bendpoints.map((bp) =>
       tag(indent + IND, 'bendpoint', [
         ['startX', bp.startX !== 0 ? bp.startX : undefined],
@@ -27,12 +76,21 @@ export function serializeArchimate(state: ModelState): string {
         ['endY', bp.endY !== 0 ? bp.endY : undefined],
       ]),
     ));
-    return tag(
+    children.push(...docTag(indent + IND, conn.documentation));
+    children.push(...propertyTags(indent + IND, conn.properties));
+    const result = tag(
       indent,
       'sourceConnection',
       [
         ['xsi:type', 'archimate:Connection'],
         ['id', conn.id],
+        ['name', conn.name !== '' ? conn.name : undefined],
+        [
+          'targetConnections',
+          orderedConnectionIds(conn, 'target').length > 0
+            ? orderedConnectionIds(conn, 'target').join(' ')
+            : undefined,
+        ],
         ['font', conn.font ?? serializeFontStyle(conn.fontStyle)],
         ['fontColor', conn.fontColor],
         ['lineColor', conn.lineColor],
@@ -40,10 +98,19 @@ export function serializeArchimate(state: ModelState): string {
         ['textPosition', conn.textPosition],
         ['source', conn.sourceId],
         ['target', conn.targetId],
+        [
+          'type',
+          conn.connType === 'plain' && conn.connectionType !== 0
+            ? conn.connectionType
+            : undefined,
+        ],
         ['archimateRelationship', conn.relationshipId],
       ],
       children,
     );
+    writingConnections.delete(conn.id);
+    writtenConnections.add(conn.id);
+    return result;
   }
 
   function writeNode(indent: string, nodeId: string): string {
@@ -65,7 +132,9 @@ export function serializeArchimate(state: ModelState): string {
       ['name', node.nodeType === 'group' ? node.name : undefined],
       [
         'targetConnections',
-        node.targetConnectionIds.length > 0 ? node.targetConnectionIds.join(' ') : undefined,
+        orderedConnectionIds(node, 'target').length > 0
+          ? orderedConnectionIds(node, 'target').join(' ')
+          : undefined,
       ],
       ['font', node.font ?? serializeFontStyle(node.fontStyle)],
       ['fontColor', node.fontColor],
@@ -96,7 +165,7 @@ export function serializeArchimate(state: ModelState): string {
       lineAlpha: node.lineAlpha,
       imageSource: node.imageSource,
     })];
-    for (const connId of node.sourceConnectionIds) {
+    for (const connId of orderedConnectionIds(node, 'source')) {
       const conn = state.connections[connId];
       if (conn) children.push(writeConnection(indent + IND, conn));
     }

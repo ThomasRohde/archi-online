@@ -54,6 +54,14 @@ export type LineWidth = 1 | 2 | 3;
 export type IconVisibility = 0 | 1 | 2;
 export type ImageSource = 0 | 1;
 export type ImagePosition = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export type ConnectionRouterType = 0 | 2;
+
+export interface ConnectableRefs {
+  /** Ordered connections for which this connectable is the source. */
+  sourceConnectionIds: string[];
+  /** Ordered connections for which this connectable is the target. */
+  targetConnectionIds: string[];
+}
 
 /**
  * Bendpoint stored Archi-style: offsets from the source and target anchor
@@ -138,10 +146,10 @@ export interface DiagramView {
   viewpoint?: string;
   /** Top-level diagram node ids in z-order (first = back). */
   childIds: string[];
-  connectionRouterType?: number;
+  connectionRouterType?: ConnectionRouterType;
 }
 
-export interface DiagramNodeBase {
+export interface DiagramNodeBase extends ConnectableRefs {
   id: string;
   viewId: string;
   /** Parent node id, or the view id for top-level nodes. */
@@ -149,8 +157,6 @@ export interface DiagramNodeBase {
   /** Bounds relative to parent. */
   bounds: Bounds;
   childIds: string[];
-  sourceConnectionIds: string[];
-  targetConnectionIds: string[];
   fillColor?: string;
   lineColor?: string;
   fontColor?: string;
@@ -214,15 +220,21 @@ export interface ImageNode extends DiagramNodeBase {
 
 export type DiagramNode = ElementNode | GroupNode | NoteNode | RefNode | ImageNode;
 
-export interface DiagramConnection {
+export interface DiagramConnection extends ConnectableRefs {
   id: string;
   viewId: string;
   connType: 'relationship' | 'plain';
   /** Set when connType === 'relationship'. */
   relationshipId?: string;
-  /** Diagram node ids (Archi also allows connection ends; not supported yet). */
+  name: string;
+  documentation: string;
+  /** Ordered editable properties. */
+  properties: Property[];
+  /** Diagram node or connection ids. */
   sourceId: string;
   targetId: string;
+  /** Native plain-connection arrow/line bitmask. Defaults to 0. */
+  connectionType?: number;
   bendpoints: Bendpoint[];
   lineColor?: string;
   fontColor?: string;
@@ -267,6 +279,73 @@ export type ModelItem =
   | DiagramView
   | Folder;
 
+export type DiagramConnectable = DiagramNode | DiagramConnection;
+
+/** Look up a diagram node or connection through their shared topology. */
+export function getConnectable(state: ModelState, id: string): DiagramConnectable | undefined {
+  return state.nodes[id] ?? state.connections[id];
+}
+
+/** Resolve the ArchiMate concept represented by a visual endpoint, if any. */
+export function resolveSemanticEndpoint(state: ModelState, id: string): Concept | undefined {
+  const connectable = getConnectable(state, id);
+  if (!connectable) return undefined;
+  if ('nodeType' in connectable) {
+    return connectable.nodeType === 'element' ? state.elements[connectable.elementId] : undefined;
+  }
+  return connectable.connType === 'relationship' && connectable.relationshipId
+    ? state.relationships[connectable.relationshipId]
+    : undefined;
+}
+
+/** Alias for callers that prefer an explicit getter name. */
+export const getSemanticEndpoint = resolveSemanticEndpoint;
+
+/** Resolve only the represented ArchiMate concept id for endpoint comparisons. */
+export function connectableConceptId(state: ModelState, id: string): string | undefined {
+  return resolveSemanticEndpoint(state, id)?.id;
+}
+
+/** Return a missing-endpoint or recursive connection-dependency error. */
+export function connectionGraphError(state: ModelState): string | undefined {
+  for (const connection of Object.values(state.connections)) {
+    const source = getConnectable(state, connection.sourceId);
+    const target = getConnectable(state, connection.targetId);
+    if (!source) {
+      return `Connection endpoint missing: ${connection.id} source ${connection.sourceId}`;
+    }
+    if (!target) {
+      return `Connection endpoint missing: ${connection.id} target ${connection.targetId}`;
+    }
+    if (source.viewId !== connection.viewId || target.viewId !== connection.viewId) {
+      return `Connection endpoint belongs to another view: ${connection.id}`;
+    }
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (connectionId: string): string | undefined => {
+    if (visiting.has(connectionId)) return `Connection endpoint cycle: ${connectionId}`;
+    if (visited.has(connectionId)) return undefined;
+    const connection = state.connections[connectionId];
+    if (!connection) return undefined;
+    visiting.add(connectionId);
+    for (const endpointId of [connection.sourceId, connection.targetId]) {
+      if (!state.connections[endpointId]) continue;
+      const error = visit(endpointId);
+      if (error) return error;
+    }
+    visiting.delete(connectionId);
+    visited.add(connectionId);
+    return undefined;
+  };
+  for (const connectionId of Object.keys(state.connections)) {
+    const error = visit(connectionId);
+    if (error) return error;
+  }
+  return undefined;
+}
+
 /** Look up any identifiable object in the model. */
 export function getItem(state: ModelState, id: string): ModelItem | DiagramNode | DiagramConnection | undefined {
   return (
@@ -274,8 +353,7 @@ export function getItem(state: ModelState, id: string): ModelItem | DiagramNode 
     state.relationships[id] ??
     state.views[id] ??
     state.folders[id] ??
-    state.nodes[id] ??
-    state.connections[id]
+    getConnectable(state, id)
   );
 }
 

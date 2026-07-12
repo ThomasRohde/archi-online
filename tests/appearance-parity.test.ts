@@ -33,7 +33,7 @@ describe('VIEW-08 rendering', () => {
 
   it('lets expression labels and line style override relationship defaults', () => {
     const html = renderToStaticMarkup(createElement(ConnectionView, {
-      conn: { id: 'conn', viewId: 'view', connType: 'plain', sourceId: 'one', targetId: 'two', bendpoints: [], lineStyle: 1, lineWidth: 2 },
+      conn: { id: 'conn', viewId: 'view', connType: 'plain', name: '', documentation: '', properties: [], sourceConnectionIds: [], targetConnectionIds: [], sourceId: 'one', targetId: 'two', bendpoints: [], lineStyle: 1, lineWidth: 2 },
       rel: undefined,
       points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
       selected: false,

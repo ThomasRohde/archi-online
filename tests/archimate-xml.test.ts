@@ -163,6 +163,74 @@ describe('.archimate round-trip', () => {
   });
 });
 
+describe('.archimate connectable connections', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="Connectables" id="model" version="5.0.0">
+  <folder name="Views" id="diagrams" type="diagrams">
+    <element xsi:type="archimate:ArchimateDiagramModel" name="View" id="view" connectionRouterType="2">
+      <child xsi:type="archimate:Note" id="n1">
+        <bounds x="10" y="10" width="180" height="80"/>
+        <sourceConnection xsi:type="archimate:Connection" id="c1" name="Root line" type="65" targetConnections="c4 c3" source="n1" target="n2">
+          <sourceConnection xsi:type="archimate:Connection" id="c2" source="c1" target="n2"/>
+          <documentation>Connection docs</documentation>
+          <property key="ordered" value="first"/>
+          <property key="ordered" value="second"/>
+        </sourceConnection>
+      </child>
+      <child xsi:type="archimate:Note" id="n2" targetConnections="c2 c1">
+        <bounds x="300" y="10" width="180" height="80"/>
+        <sourceConnection xsi:type="archimate:Connection" id="c3" source="n2" target="c1"/>
+        <sourceConnection xsi:type="archimate:Connection" id="c4" source="n2" target="c1"/>
+      </child>
+    </element>
+  </folder>
+</archimate:model>`;
+
+  it('parses recursive source containment and ordered adjacency on nodes and connections', () => {
+    const model = parseArchimate(xml);
+
+    expect(model.views.view.connectionRouterType).toBe(2);
+    expect(model.nodes.n1.sourceConnectionIds).toEqual(['c1']);
+    expect(model.connections.c1.sourceConnectionIds).toEqual(['c2']);
+    expect(model.nodes.n2.sourceConnectionIds).toEqual(['c3', 'c4']);
+    expect(model.nodes.n2.targetConnectionIds).toEqual(['c2', 'c1']);
+    expect(model.connections.c1.targetConnectionIds).toEqual(['c4', 'c3']);
+    expect(model.connections.c1).toMatchObject({
+      name: 'Root line',
+      documentation: 'Connection docs',
+      properties: [
+        { key: 'ordered', value: 'first' },
+        { key: 'ordered', value: 'second' },
+      ],
+      connectionType: 65,
+    });
+  });
+
+  it('serializes each connection beneath its source and round-trips all ordering', () => {
+    const model = parseArchimate(xml);
+    const serialized = serializeArchimate(model);
+    const doc = new DOMParser().parseFromString(serialized, 'application/xml');
+    const c1 = doc.querySelector('sourceConnection[id="c1"]')!;
+    const n2 = doc.querySelector('child[id="n2"]')!;
+
+    expect(Array.from(c1.children).filter((child) => child.localName === 'sourceConnection')
+      .map((child) => child.getAttribute('id'))).toEqual(['c2']);
+    expect(c1.getAttribute('targetConnections')).toBe('c4 c3');
+    expect(n2.getAttribute('targetConnections')).toBe('c2 c1');
+    expect(normalize(parseArchimate(serialized))).toEqual(normalize(model));
+  });
+
+  it('rejects missing connection endpoints atomically', () => {
+    expect(() => parseArchimate(xml.replace('target="n2"', 'target="missing"')))
+      .toThrow(/endpoint.*missing/i);
+  });
+
+  it('rejects recursive endpoint cycles atomically', () => {
+    const cyclic = xml.replace('target="n2">\n          <sourceConnection', 'target="c2">\n          <sourceConnection');
+    expect(() => parseArchimate(cyclic)).toThrow(/cycle/i);
+  });
+});
+
 function expectReferencesResolve(m: ModelState): void {
   for (const rel of Object.values(m.relationships)) {
     expect(m.elements[rel.sourceId] ?? m.relationships[rel.sourceId], rel.id).toBeDefined();
@@ -175,7 +243,7 @@ function expectReferencesResolve(m: ModelState): void {
   }
   for (const conn of Object.values(m.connections)) {
     if (conn.relationshipId) expect(m.relationships[conn.relationshipId], conn.id).toBeDefined();
-    expect(m.nodes[conn.sourceId], conn.id).toBeDefined();
-    expect(m.nodes[conn.targetId], conn.id).toBeDefined();
+    expect(m.nodes[conn.sourceId] ?? m.connections[conn.sourceId], conn.id).toBeDefined();
+    expect(m.nodes[conn.targetId] ?? m.connections[conn.targetId], conn.id).toBeDefined();
   }
 }

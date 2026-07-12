@@ -277,3 +277,70 @@ describe('Open Exchange round-trip of editable non-concept properties', () => {
     });
   });
 });
+
+describe('Open Exchange connectable connection endpoints', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" identifier="model-connectables">
+  <name xml:lang="en">Connectables</name>
+  <elements>
+    <element identifier="a" xsi:type="BusinessActor"><name xml:lang="en">A</name></element>
+    <element identifier="b" xsi:type="BusinessRole"><name xml:lang="en">B</name></element>
+  </elements>
+  <relationships>
+    <relationship identifier="base" source="a" target="b" xsi:type="Assignment"/>
+    <relationship identifier="meta" source="base" target="b" xsi:type="Association"/>
+  </relationships>
+  <views>
+    <diagrams>
+      <view identifier="view" xsi:type="Diagram">
+        <name xml:lang="en">View</name>
+        <node identifier="node-a" elementRef="a" xsi:type="Element" x="0" y="0" w="120" h="55"/>
+        <node identifier="node-b" elementRef="b" xsi:type="Element" x="240" y="0" w="120" h="55"/>
+        <node identifier="note" xsi:type="Label" x="120" y="120" w="180" h="80"><label xml:lang="en">Note</label></node>
+        <connection identifier="meta-connection" relationshipRef="meta" xsi:type="Relationship" source="base-connection" target="node-b">
+          <label xml:lang="en">Metadata link</label>
+          <documentation xml:lang="en">Connection documentation</documentation>
+        </connection>
+        <connection identifier="line" xsi:type="Line" source="note" target="base-connection"/>
+        <connection identifier="base-connection" relationshipRef="base" xsi:type="Relationship" source="node-a" target="node-b"/>
+      </view>
+    </diagrams>
+  </views>
+</model>`;
+
+  it('resolves forward node-or-connection IDREF endpoints in two passes', () => {
+    const model = parseExchange(xml);
+
+    expect(model.connections['meta-connection']).toMatchObject({
+      sourceId: 'base-connection',
+      targetId: 'node-b',
+      name: 'Metadata link',
+      documentation: 'Connection documentation',
+      properties: [],
+    });
+    expect(model.connections.line).toBeUndefined();
+    expect(model.connections['base-connection'].sourceConnectionIds).toEqual(['meta-connection']);
+    expect(model.connections['base-connection'].targetConnectionIds).toEqual([]);
+  });
+
+  it('serializes connection IDREF endpoints and editable fields losslessly', () => {
+    const model = parseExchange(xml);
+    const serialized = serializeExchange(model);
+    const back = parseExchange(serialized);
+
+    expect(serialized).toContain('source="base-connection" target="node-b"');
+    expect(serialized).not.toContain('source="note" target="base-connection"');
+    expect(back.connections['meta-connection']).toMatchObject({
+      sourceId: 'base-connection',
+      targetId: 'node-b',
+      name: 'Metadata link',
+      documentation: 'Connection documentation',
+      properties: [],
+    });
+  });
+
+  it('rejects missing connection endpoints instead of partially importing the view', () => {
+    expect(() => parseExchange(xml.replace('target="base-connection"', 'target="missing"')))
+      .toThrow(/endpoint.*missing/i);
+  });
+});

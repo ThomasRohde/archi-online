@@ -389,7 +389,12 @@ function connectionTags(
     attrs.push(['source', exchangeId(conn.sourceId)]);
     attrs.push(['target', exchangeId(conn.targetId)]);
 
-    const children: string[] = [connectionStyleTag(conn, '          ')];
+    const children: string[] = [];
+    if (conn.name !== '') children.push(textTag('          ', 'label', conn.name));
+    if (conn.documentation !== '') {
+      children.push(textTag('          ', 'documentation', conn.documentation));
+    }
+    children.push(connectionStyleTag(conn, '          '));
     const src = absBounds.get(conn.sourceId);
     const tgt = absBounds.get(conn.targetId);
     if (src && tgt) {

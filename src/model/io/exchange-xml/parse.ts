@@ -17,7 +17,13 @@ import type {
   ModelState,
   Property,
 } from '../../types';
-import { DUBLIN_CORE_FIELDS } from '../../types';
+import {
+  connectionGraphError,
+  DUBLIN_CORE_FIELDS,
+  getConnectable,
+  resolveSemanticEndpoint,
+} from '../../types';
+import { rebuildConnectionAdjacency } from '../../ops/draft';
 import type { ExchangeImportOptions, ExchangeImportResult } from './contracts';
 import {
   buildFontString,
@@ -344,42 +350,32 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
   }
 
   function parseConnections(viewEl: Element, view: DiagramView): void {
+    const pending: DiagramConnection[] = [];
     for (const connEl of children(viewEl, 'connection')) {
       const relationshipRef = connEl.getAttribute('relationshipRef');
       const isRelationship = relationshipRef !== null && relationshipRef !== '';
       if (isRelationship && !state.relationships[relationshipRef]) {
         throw new ExchangeParseError(`Connection references missing relationship: ${relationshipRef}`);
       }
+      const id = connEl.getAttribute('identifier') ?? newId();
+      if (state.connections[id] || state.nodes[id]) {
+        throw new ExchangeParseError(`Duplicate diagram object id: ${id}`);
+      }
       const sourceId = connEl.getAttribute('source') ?? '';
       const targetId = connEl.getAttribute('target') ?? '';
-      const srcNode = state.nodes[sourceId];
-      const tgtNode = state.nodes[targetId];
-      if (!srcNode || !tgtNode) {
-        // Our model has no connection-to-connection support; Archi skips
-        // plain connections to connections and rejects relationship ones.
-        if (isRelationship) {
-          throw new ExchangeParseError(`Connection endpoint not found: ${sourceId} → ${targetId}`);
-        }
-        continue;
-      }
-      if (isRelationship) {
-        if (srcNode.nodeType !== 'element' || tgtNode.nodeType !== 'element') {
-          throw new ExchangeParseError(
-            `Relationship connection must join element nodes: ${sourceId} → ${targetId}`,
-          );
-        }
-      } else if (srcNode.nodeType === 'element' && tgtNode.nodeType === 'element') {
-        continue; // plain lines only connect notes/groups, per Archi
-      }
-
-      const id = connEl.getAttribute('identifier') ?? newId();
       const conn: DiagramConnection = {
         id,
         viewId: view.id,
         connType: isRelationship ? 'relationship' : 'plain',
         relationshipId: isRelationship ? relationshipRef : undefined,
+        name: readText(connEl, 'label', true) ?? '',
+        documentation: readText(connEl, 'documentation', false) ?? '',
+        properties: readProperties(connEl),
+        sourceConnectionIds: [],
+        targetConnectionIds: [],
         sourceId,
         targetId,
+        connectionType: isRelationship ? undefined : 0,
         bendpoints: readBendpoints(connEl, sourceId, targetId),
       };
       const styleEl = child(connEl, 'style');
@@ -393,9 +389,46 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
         applyFont(styleEl, conn);
       }
       state.connections[id] = conn;
-      srcNode.sourceConnectionIds.push(id);
-      tgtNode.targetConnectionIds.push(id);
+      pending.push(conn);
     }
+
+    for (const connection of pending) {
+      const source = getConnectable(state, connection.sourceId);
+      const target = getConnectable(state, connection.targetId);
+      if (!source) {
+        throw new ExchangeParseError(
+          `Connection endpoint missing: ${connection.id} source ${connection.sourceId}`,
+        );
+      }
+      if (!target) {
+        throw new ExchangeParseError(
+          `Connection endpoint missing: ${connection.id} target ${connection.targetId}`,
+        );
+      }
+      if (source.viewId !== view.id || target.viewId !== view.id) {
+        throw new ExchangeParseError(`Connection endpoint belongs to another view: ${connection.id}`);
+      }
+      const sourceConcept = resolveSemanticEndpoint(state, connection.sourceId);
+      const targetConcept = resolveSemanticEndpoint(state, connection.targetId);
+      if (connection.connType === 'relationship') {
+        if (!sourceConcept || !targetConcept) {
+          throw new ExchangeParseError(
+            `Relationship connection must join ArchiMate components: ${connection.sourceId} → ${connection.targetId}`,
+          );
+        }
+      } else if (
+        'connType' in source ||
+        'connType' in target ||
+        (sourceConcept && targetConcept)
+      ) {
+        // Desktop Archi skips ordinary lines attached to another connection,
+        // as well as lines between two ArchiMate components.
+        delete state.connections[connection.id];
+      }
+    }
+    const graphError = connectionGraphError(state);
+    if (graphError) throw new ExchangeParseError(graphError);
+    rebuildConnectionAdjacency(state);
   }
 
   function readBendpoints(connEl: Element, sourceId: string, targetId: string): Bendpoint[] {
@@ -629,6 +662,11 @@ function addImplicitNestedConnections(state: ModelState): void {
           viewId: parent.viewId,
           connType: 'relationship',
           relationshipId: rel.id,
+          name: '',
+          documentation: '',
+          properties: [],
+          sourceConnectionIds: [],
+          targetConnectionIds: [],
           sourceId: srcNode.id,
           targetId: tgtNode.id,
           bendpoints: [],

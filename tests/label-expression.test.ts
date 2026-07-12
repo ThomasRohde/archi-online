@@ -39,7 +39,7 @@ function fixture(): ModelState {
   model.nodes['node-source'] = { ...base, id: 'node-source', nodeType: 'element', elementId: 'source', sourceConnectionIds: ['conn'] };
   model.nodes['node-target'] = { ...base, id: 'node-target', nodeType: 'element', elementId: 'target', targetConnectionIds: ['conn'] };
   model.connections.conn = {
-    id: 'conn', viewId: 'view', connType: 'relationship', relationshipId: 'rel', sourceId: 'node-source', targetId: 'node-target', bendpoints: [],
+    id: 'conn', viewId: 'view', connType: 'relationship', relationshipId: 'rel', name: '', documentation: '', properties: [], sourceConnectionIds: [], targetConnectionIds: [], sourceId: 'node-source', targetId: 'node-target', bendpoints: [],
   };
   return model;
 }

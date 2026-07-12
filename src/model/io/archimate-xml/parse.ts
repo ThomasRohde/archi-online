@@ -14,6 +14,12 @@ import type {
   ProfileDefinition,
 } from '../../types';
 import {
+  connectionGraphError,
+  getConnectable,
+  type ConnectionRouterType,
+} from '../../types';
+import { rebuildConnectionAdjacency } from '../../ops/draft';
+import {
   ARCHIMATE_NS,
   childText,
   intAttr,
@@ -36,11 +42,6 @@ const DEFAULT_SIZES: Record<string, { width: number; height: number }> = {
   DiagramModelReference: { width: 200, height: 140 },
   DiagramModelImage: { width: 120, height: 80 },
 };
-
-interface PendingConnection {
-  xml: Element;
-  sourceNodeId: string;
-}
 
 export function parseArchimate(xml: string): ModelState {
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
@@ -71,8 +72,67 @@ export function parseArchimate(xml: string): ModelState {
     connections: {},
   };
 
-  const pendingConnections: PendingConnection[] = [];
-  const targetOrder = new Map<string, string[]>(); // nodeId -> targetConnections attr order
+  const targetOrder = new Map<string, string[]>();
+
+  function readTargetOrder(el: Element, connectableId: string): void {
+    const value = el.getAttribute('targetConnections');
+    if (value !== null) targetOrder.set(connectableId, value.split(/\s+/).filter(Boolean));
+  }
+
+  function parseConnection(el: Element, ownerId: string, viewId: string): string {
+    const id = el.getAttribute('id') ?? newId();
+    if (state.connections[id] || state.nodes[id]) {
+      throw new ArchimateParseError(`Duplicate diagram object id: ${id}`);
+    }
+    const bendpoints: Bendpoint[] = [];
+    for (const child of el.children) {
+      if (child.localName !== 'bendpoint') continue;
+      const num = (name: string) => {
+        const value = child.getAttribute(name);
+        return value === null ? 0 : parseInt(value, 10);
+      };
+      bendpoints.push({
+        startX: num('startX'),
+        startY: num('startY'),
+        endX: num('endX'),
+        endY: num('endY'),
+      });
+    }
+    const relationshipId = el.getAttribute('archimateRelationship') ?? undefined;
+    const conn: DiagramConnection = {
+      id,
+      viewId,
+      connType: relationshipId ? 'relationship' : 'plain',
+      relationshipId,
+      name: el.getAttribute('name') ?? '',
+      documentation: parseDocumentation(el),
+      properties: parseProperties(el),
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      sourceId: el.getAttribute('source') ?? ownerId,
+      targetId: el.getAttribute('target') ?? '',
+      connectionType: relationshipId ? undefined : (intAttr(el, 'type') ?? 0),
+      bendpoints,
+      lineColor: strAttr(el, 'lineColor'),
+      fontColor: strAttr(el, 'fontColor'),
+      font: strAttr(el, 'font'),
+      fontStyle: undefined,
+      lineWidth: intAttr(el, 'lineWidth') as DiagramConnection['lineWidth'],
+      textPosition: intAttr(el, 'textPosition'),
+      labelExpression: feature(el, 'labelExpression'),
+      lineStyle: intFeature(el, 'lineStyle') as DiagramConnection['lineStyle'],
+      fontAlpha: intFeature(el, 'fontAlpha'),
+    };
+    conn.fontStyle = parseFontStyle(conn.font);
+    state.connections[id] = conn;
+    readTargetOrder(el, id);
+    for (const child of el.children) {
+      if (child.localName === 'sourceConnection') {
+        conn.sourceConnectionIds.push(parseConnection(child, id, viewId));
+      }
+    }
+    return id;
+  }
 
   function parseViewNode(el: Element, viewId: string, parentId: string): string | null {
     const t = typeOf(el);
@@ -123,15 +183,14 @@ export function parseArchimate(xml: string): ModelState {
     node.imagePath = strAttr(el, 'imagePath') ?? node.imagePath;
     node.imageSource = node.imageSource ?? (intAttr(el, 'imageSource') as 0 | 1 | undefined);
     node.imagePosition = intAttr(el, 'imagePosition') as DiagramNode['imagePosition'];
-    const tc = el.getAttribute('targetConnections');
-    if (tc) targetOrder.set(id, tc.split(/\s+/).filter(Boolean));
+    readTargetOrder(el, id);
     state.nodes[id] = node;
     for (const child of el.children) {
       if (child.localName === 'child') {
         const childId = parseViewNode(child, viewId, id);
         if (childId) node.childIds.push(childId);
       } else if (child.localName === 'sourceConnection') {
-        pendingConnections.push({ xml: child, sourceNodeId: id });
+        node.sourceConnectionIds.push(parseConnection(child, id, viewId));
       }
     }
     return id;
@@ -148,7 +207,7 @@ export function parseArchimate(xml: string): ModelState {
       folderId,
       viewpoint: strAttr(el, 'viewpoint'),
       childIds: [],
-      connectionRouterType: intAttr(el, 'connectionRouterType'),
+      connectionRouterType: parseConnectionRouterType(el),
     };
     for (const child of el.children) {
       if (child.localName === 'child') {
@@ -244,65 +303,36 @@ export function parseArchimate(xml: string): ModelState {
     }
   }
 
-  // Second pass: connections (targets may be forward references).
-  for (const pc of pendingConnections) {
-    const el = pc.xml;
-    const id = el.getAttribute('id') ?? newId();
-    const bendpoints: Bendpoint[] = [];
-    for (const bp of el.children) {
-      if (bp.localName === 'bendpoint') {
-        const num = (n: string) => {
-          const v = bp.getAttribute(n);
-          return v === null ? 0 : parseInt(v, 10);
-        };
-        bendpoints.push({
-          startX: num('startX'),
-          startY: num('startY'),
-          endX: num('endX'),
-          endY: num('endY'),
-        });
+  const graphError = connectionGraphError(state);
+  if (graphError) throw new ArchimateParseError(graphError);
+
+  // Seed explicit target order before deriving and completing adjacency.
+  for (const [connectableId, order] of targetOrder) {
+    const connectable = getConnectable(state, connectableId);
+    if (!connectable) continue;
+    for (const connectionId of order) {
+      const connection = state.connections[connectionId];
+      if (!connection) {
+        throw new ArchimateParseError(
+          `Connection endpoint missing: ${connectableId} target connection ${connectionId}`,
+        );
+      }
+      if (connection.targetId !== connectableId) {
+        throw new ArchimateParseError(
+          `Target connection order mismatch: ${connectableId} does not target ${connectionId}`,
+        );
       }
     }
-    const relationshipId = el.getAttribute('archimateRelationship') ?? undefined;
-    const conn: DiagramConnection = {
-      id,
-      viewId: state.nodes[pc.sourceNodeId].viewId,
-      connType: relationshipId ? 'relationship' : 'plain',
-      relationshipId,
-      sourceId: el.getAttribute('source') ?? pc.sourceNodeId,
-      targetId: el.getAttribute('target') ?? '',
-      bendpoints,
-      lineColor: strAttr(el, 'lineColor'),
-      fontColor: strAttr(el, 'fontColor'),
-      font: strAttr(el, 'font'),
-      fontStyle: undefined,
-      lineWidth: intAttr(el, 'lineWidth') as DiagramConnection['lineWidth'],
-      textPosition: intAttr(el, 'textPosition'),
-      labelExpression: feature(el, 'labelExpression'),
-      lineStyle: intFeature(el, 'lineStyle') as DiagramConnection['lineStyle'],
-      fontAlpha: intFeature(el, 'fontAlpha'),
-    };
-    conn.fontStyle = parseFontStyle(conn.font);
-    state.connections[id] = conn;
-    state.nodes[pc.sourceNodeId].sourceConnectionIds.push(id);
+    connectable.targetConnectionIds = [...order];
   }
-
-  // Target connection lists, preserving the file's targetConnections order.
-  for (const conn of Object.values(state.connections)) {
-    const tgt = state.nodes[conn.targetId];
-    if (tgt) tgt.targetConnectionIds.push(conn.id);
-  }
-  for (const [nodeId, order] of targetOrder) {
-    const node = state.nodes[nodeId];
-    if (!node) continue;
-    node.targetConnectionIds.sort((a, b) => {
-      const ia = order.indexOf(a);
-      const ib = order.indexOf(b);
-      return (ia === -1 ? order.length : ia) - (ib === -1 ? order.length : ib);
-    });
-  }
+  rebuildConnectionAdjacency(state);
 
   return state;
+}
+
+function parseConnectionRouterType(el: Element): ConnectionRouterType | undefined {
+  const value = intAttr(el, 'connectionRouterType');
+  return value === 0 || value === 2 ? value : undefined;
 }
 
 function parseNativeMetadata(root: Element): ModelState['info']['metadata'] {
