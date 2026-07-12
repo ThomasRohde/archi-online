@@ -179,6 +179,9 @@ export function parseArchimate(xml: string): ModelState {
     } else {
       return null; // unsupported child (e.g. sketch/canvas types)
     }
+    if (state.nodes[id] || state.connections[id]) {
+      throw new ArchimateParseError(`Duplicate diagram object id: ${id}`);
+    }
     parseNodeStyle(el, node);
     node.imagePath = strAttr(el, 'imagePath') ?? node.imagePath;
     node.imageSource = node.imageSource ?? (intAttr(el, 'imageSource') as 0 | 1 | undefined);

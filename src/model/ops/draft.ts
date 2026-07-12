@@ -86,17 +86,15 @@ export function attachConnection(draft: ModelState, conn: DiagramConnection): vo
     }
   }
   const existing = draft.connections[conn.id];
-  if (
-    existing &&
-    existing.sourceId === conn.sourceId &&
-    existing.targetId === conn.targetId
-  ) {
+  if (existing) {
     conn.sourceConnectionIds = [...existing.sourceConnectionIds];
     conn.targetConnectionIds = [...existing.targetConnectionIds];
-    draft.connections[conn.id] = conn;
-    return;
+    if (existing.sourceId === conn.sourceId && existing.targetId === conn.targetId) {
+      draft.connections[conn.id] = conn;
+      return;
+    }
+    detachConnection(draft, conn.id);
   }
-  if (existing) detachConnection(draft, conn.id);
   draft.connections[conn.id] = conn;
   if (!src.sourceConnectionIds.includes(conn.id)) src.sourceConnectionIds.push(conn.id);
   if (!tgt.targetConnectionIds.includes(conn.id)) tgt.targetConnectionIds.push(conn.id);

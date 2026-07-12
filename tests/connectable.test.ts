@@ -201,6 +201,37 @@ describe('connectable topology', () => {
     expect(model.nodes['node-b'].targetConnectionIds).toEqual(['first', 'second']);
   });
 
+  it('preserves attached connection order and deletion cascade when replacing endpoints', () => {
+    const model = connectableModel();
+    const root = connection('root', 'node-a', 'node-b');
+    const outgoingFirst = connection('outgoing-first', 'root', 'node-b');
+    const outgoingSecond = connection('outgoing-second', 'root', 'node-b');
+    const incoming = connection('incoming', 'note', 'root');
+    attachConnection(model, root);
+    attachConnection(model, outgoingFirst);
+    attachConnection(model, outgoingSecond);
+    attachConnection(model, incoming);
+
+    attachConnection(model, connection('root', 'node-a', 'note'));
+
+    expect(model.connections.root.sourceConnectionIds).toEqual([
+      'outgoing-first',
+      'outgoing-second',
+    ]);
+    expect(model.connections.root.targetConnectionIds).toEqual(['incoming']);
+    expect(model.nodes['node-b'].targetConnectionIds).toEqual([
+      'outgoing-first',
+      'outgoing-second',
+    ]);
+    expect(model.nodes.note.targetConnectionIds).toEqual(['root']);
+
+    const store = createModelStore({ model });
+    replaceModel(model, null, false, {}, store);
+    deleteViewObjects(['root'], store);
+
+    expect(Object.keys(store.getState().model!.connections)).toEqual([]);
+  });
+
   it('recursively deletes connections attached to a deleted connection with cycle guards', () => {
     const model = connectableModel();
     const root = connection('root', 'node-a', 'dependent');

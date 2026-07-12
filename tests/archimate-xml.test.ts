@@ -229,6 +229,17 @@ describe('.archimate connectable connections', () => {
     const cyclic = xml.replace('target="n2">\n          <sourceConnection', 'target="c2">\n          <sourceConnection');
     expect(() => parseArchimate(cyclic)).toThrow(/cycle/i);
   });
+
+  it('rejects a later node whose id collides with a nested connection', () => {
+    const colliding = xml.replace(
+      '      </child>\n    </element>\n  </folder>',
+      '      </child>\n      <child xsi:type="archimate:Note" id="c3">\n' +
+        '        <bounds x="520" y="10" width="180" height="80"/>\n' +
+        '      </child>\n    </element>\n  </folder>',
+    );
+
+    expect(() => parseArchimate(colliding)).toThrow(/duplicate.*c3/i);
+  });
 });
 
 function expectReferencesResolve(m: ModelState): void {
