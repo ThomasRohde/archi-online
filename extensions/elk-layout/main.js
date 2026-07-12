@@ -1,7 +1,7 @@
 app.extension({
   id: 'examples.elk-layout',
   name: 'ELK Layout',
-  version: '1.3.0'
+  version: '1.3.1'
 });
 
 var config = app.assets.json('data/defaults.json');

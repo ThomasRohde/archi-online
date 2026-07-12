@@ -17,6 +17,8 @@ const MEDIA_TYPES: Record<string, string> = {
   ico: 'image/x-icon',
 };
 
+const dataUrlCache = new WeakMap<ModelAsset, string>();
+
 export function imageExtension(fileName: string): string {
   const extension = fileName.split('.').pop()?.toLowerCase() ?? '';
   if (!(extension in MEDIA_TYPES)) throw new Error(`Unsupported image format: ${fileName}`);
@@ -136,12 +138,16 @@ function tiffDimensions(bytes: Uint8Array, view: DataView): [number, number] | u
 }
 
 export function assetDataUrl(asset: ModelAsset): string {
+  const cached = dataUrlCache.get(asset);
+  if (cached !== undefined) return cached;
   let binary = '';
   const chunkSize = 0x8000;
   for (let offset = 0; offset < asset.renderBytes.length; offset += chunkSize) {
     binary += String.fromCharCode(...asset.renderBytes.subarray(offset, offset + chunkSize));
   }
-  return `data:${asset.renderMediaType};base64,${btoa(binary)}`;
+  const url = `data:${asset.renderMediaType};base64,${btoa(binary)}`;
+  dataUrlCache.set(asset, url);
+  return url;
 }
 
 export function referencedAssetPaths(state: ModelState): Set<string> {
