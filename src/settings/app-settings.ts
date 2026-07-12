@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 import type { ElementType } from '../model/metamodel';
+import {
+  ARM_ALL_RELATIONSHIPS_MASK,
+  ARM_DEFAULT_NEW_RELATIONSHIPS_MASK,
+} from '../model/automatic-relationships';
+export {
+  ARM_ALL_RELATIONSHIPS_MASK,
+  ARM_DEFAULT_NEW_RELATIONSHIPS_MASK,
+  ARM_RELATIONSHIP_BITS,
+  ARM_RELATIONSHIP_ORDER,
+} from '../model/automatic-relationships';
 import { defaultKeyValueStore, type AsyncKeyValueStore } from '../persistence/keyval';
 
 export const SETTINGS_STORAGE_KEY = 'archi-online.settings.v1';
@@ -30,6 +40,13 @@ export interface AppSettings {
   fitMaxZoom: number;
   fitPadding: number;
   alignmentAnchor: number;
+  useNestedConnections: boolean;
+  createRelationWhenAddingNewElementToContainer: boolean;
+  createRelationWhenAddingModelTreeElementToContainer: boolean;
+  createRelationWhenMovingElementToContainer: boolean;
+  newRelationsTypes: number;
+  newReverseRelationsTypes: number;
+  hiddenRelationsTypes: number;
 }
 
 export type SettingKey = keyof AppSettings;
@@ -60,7 +77,15 @@ export interface SelectSettingRow extends BaseSettingRow {
   options: readonly { value: number; label: string }[];
 }
 
-export type SettingRow = BooleanSettingRow | NumberSettingRow | SelectSettingRow;
+export interface RelationshipMaskSettingRow extends BaseSettingRow {
+  kind: 'relationship-mask';
+}
+
+export type SettingRow =
+  | BooleanSettingRow
+  | NumberSettingRow
+  | SelectSettingRow
+  | RelationshipMaskSettingRow;
 
 export interface SettingSection {
   id: string;
@@ -95,9 +120,65 @@ export const DEFAULT_SETTINGS: AppSettings = {
   fitMaxZoom: 1.5,
   fitPadding: 24,
   alignmentAnchor: 1,
+  useNestedConnections: true,
+  createRelationWhenAddingNewElementToContainer: true,
+  createRelationWhenAddingModelTreeElementToContainer: true,
+  createRelationWhenMovingElementToContainer: true,
+  newRelationsTypes: ARM_DEFAULT_NEW_RELATIONSHIPS_MASK,
+  newReverseRelationsTypes: 0,
+  hiddenRelationsTypes: ARM_ALL_RELATIONSHIPS_MASK,
 };
 
 export const SETTING_SECTIONS: readonly SettingSection[] = [
+  {
+    id: 'automatic-relationships',
+    title: 'Automatic relationships',
+    description: 'Create and hide semantic relationships for visually nested elements.',
+    rows: [
+      {
+        key: 'useNestedConnections',
+        kind: 'boolean',
+        label: 'Use nested connections',
+        description: 'Represent configured connections by direct visual nesting.',
+      },
+      {
+        key: 'createRelationWhenAddingNewElementToContainer',
+        kind: 'boolean',
+        label: 'Palette creation',
+        description: 'Offer a relationship when creating an element inside another element.',
+      },
+      {
+        key: 'createRelationWhenAddingModelTreeElementToContainer',
+        kind: 'boolean',
+        label: 'Model tree drop',
+        description: 'Offer relationships when dropping model-tree elements into an element.',
+      },
+      {
+        key: 'createRelationWhenMovingElementToContainer',
+        kind: 'boolean',
+        label: 'Canvas movement',
+        description: 'Offer relationships when moving diagram elements into an element.',
+      },
+      {
+        key: 'newRelationsTypes',
+        kind: 'relationship-mask',
+        label: 'Normal candidates',
+        description: 'Relationship types offered from parent to child.',
+      },
+      {
+        key: 'newReverseRelationsTypes',
+        kind: 'relationship-mask',
+        label: 'Reverse candidates',
+        description: 'Relationship types offered from child to parent.',
+      },
+      {
+        key: 'hiddenRelationsTypes',
+        kind: 'relationship-mask',
+        label: 'Hidden while nested',
+        description: 'Relationship connections represented by direct nesting.',
+      },
+    ],
+  },
   {
     id: 'snapping',
     title: 'Canvas snapping',
@@ -403,6 +484,10 @@ export function sanitizeSettingValue(key: SettingKey, value: unknown): AppSettin
   const row = settingRow(key);
   const fallback = DEFAULT_SETTINGS[key];
   if (row.kind === 'boolean') return typeof value === 'boolean' ? value : fallback;
+  if (row.kind === 'relationship-mask') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+    return Math.min(ARM_ALL_RELATIONSHIPS_MASK, Math.max(0, Math.trunc(value)));
+  }
   if (row.kind === 'select') {
     if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
     return (row.options.some((option) => option.value === value) ? value : fallback) as AppSettings[SettingKey];

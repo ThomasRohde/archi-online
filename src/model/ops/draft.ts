@@ -1,3 +1,4 @@
+import { newId } from '../id';
 import { getConnectable, type DiagramConnection, type DiagramNode, type ModelState } from '../types';
 
 export function removeFromFolder(draft: ModelState, id: string): void {
@@ -98,6 +99,68 @@ export function attachConnection(draft: ModelState, conn: DiagramConnection): vo
   draft.connections[conn.id] = conn;
   if (!src.sourceConnectionIds.includes(conn.id)) src.sourceConnectionIds.push(conn.id);
   if (!tgt.targetConnectionIds.includes(conn.id)) tgt.targetConnectionIds.push(conn.id);
+}
+
+/** Add every missing relationship occurrence connected to one element node. */
+export function addMissingRelationshipConnectionsForNode(
+  draft: ModelState,
+  viewId: string,
+  nodeId: string,
+): string[] {
+  const node = draft.nodes[nodeId];
+  if (!node || node.nodeType !== 'element') return [];
+  const nodesByElement = new Map<string, string[]>();
+  for (const candidate of Object.values(draft.nodes)) {
+    if (candidate.viewId !== viewId || candidate.nodeType !== 'element') continue;
+    const ids = nodesByElement.get(candidate.elementId) ?? [];
+    ids.push(candidate.id);
+    nodesByElement.set(candidate.elementId, ids);
+  }
+  const connected = new Set(
+    Object.values(draft.connections)
+      .filter((connection) => connection.viewId === viewId && connection.relationshipId)
+      .map(
+        (connection) =>
+          `${connection.relationshipId}|${connection.sourceId}|${connection.targetId}`,
+      ),
+  );
+  const created: string[] = [];
+  const add = (relationshipId: string, sourceId: string, targetId: string) => {
+    const key = `${relationshipId}|${sourceId}|${targetId}`;
+    if (connected.has(key)) return;
+    const id = newId();
+    attachConnection(draft, {
+      id,
+      viewId,
+      connType: 'relationship',
+      relationshipId,
+      name: '',
+      documentation: '',
+      properties: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      sourceId,
+      targetId,
+      bendpoints: [],
+    });
+    connected.add(key);
+    created.push(id);
+  };
+  for (const relationship of Object.values(draft.relationships)) {
+    if (relationship.sourceId === node.elementId) {
+      for (const otherId of nodesByElement.get(relationship.targetId) ?? []) {
+        if (otherId !== nodeId || relationship.sourceId === relationship.targetId) {
+          add(relationship.id, nodeId, otherId);
+        }
+      }
+    }
+    if (relationship.targetId === node.elementId) {
+      for (const otherId of nodesByElement.get(relationship.sourceId) ?? []) {
+        if (otherId !== nodeId) add(relationship.id, otherId, nodeId);
+      }
+    }
+  }
+  return created;
 }
 
 function connectionDependsOn(

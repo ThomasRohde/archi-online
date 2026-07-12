@@ -4,6 +4,7 @@ import type {
   DiagramConnection,
   ModelState,
 } from '../model/types';
+export { createConnectionVisibilityResolver } from '../model/connection-visibility';
 
 export interface Point {
   x: number;
@@ -97,39 +98,6 @@ export function createConnectionRouteResolver(
     return route;
   }) as ConnectionRouteResolver;
   resolve.endpointPoints = endpointPoints;
-  return resolve;
-}
-
-/**
- * Derive visibility without mutating stored connections. The optional
- * predicate supplies direct visibility (for nodes or connections); a hidden
- * endpoint connection recursively hides every dependent connection.
- */
-export function createConnectionVisibilityResolver(
-  model: ModelState,
-  storedVisible: (connectableId: string) => boolean = () => true,
-): (connectionId: string) => boolean {
-  const cache = new Map<string, boolean>();
-  const resolving = new Set<string>();
-  const resolve = (connectionId: string): boolean => {
-    const cached = cache.get(connectionId);
-    if (cached !== undefined) return cached;
-    if (resolving.has(connectionId)) return false;
-    const connection = model.connections[connectionId];
-    if (!connection || !storedVisible(connectionId)) {
-      cache.set(connectionId, false);
-      return false;
-    }
-    resolving.add(connectionId);
-    const visible = [connection.sourceId, connection.targetId].every((endpointId) => {
-      if (!storedVisible(endpointId)) return false;
-      if (model.nodes[endpointId]) return true;
-      return Boolean(model.connections[endpointId]) && resolve(endpointId);
-    });
-    resolving.delete(connectionId);
-    cache.set(connectionId, visible);
-    return visible;
-  };
   return resolve;
 }
 

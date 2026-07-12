@@ -1,5 +1,5 @@
 import { transact, type ModelStore } from '../store';
-import type { Bounds } from '../types';
+import type { Bounds, ModelState } from '../types';
 import { pruneUnreferencedAssets } from '../assets';
 import { deleteConnectionFromDraft, deleteNodeFromDraft } from './draft';
 
@@ -9,36 +9,41 @@ export interface MoveEntry {
   bounds: Bounds;
 }
 
+/** Apply validated relative moves to a model draft without opening a transaction. */
+export function applyMoveEntriesToDraft(draft: ModelState, entries: MoveEntry[]): void {
+  for (const entry of entries) {
+    const node = draft.nodes[entry.id];
+    if (!node) continue;
+    if (node.parentId !== entry.parentId) {
+      if (entry.id === entry.parentId || !draft.views[node.viewId]) continue;
+      let parentId: string | undefined = entry.parentId;
+      let cyclic = false;
+      while (parentId && draft.nodes[parentId]) {
+        if (parentId === entry.id) {
+          cyclic = true;
+          break;
+        }
+        parentId = draft.nodes[parentId]!.parentId;
+      }
+      if (cyclic || (entry.parentId !== node.viewId && !draft.nodes[entry.parentId])) continue;
+      const oldParent = draft.nodes[node.parentId];
+      if (oldParent) oldParent.childIds = oldParent.childIds.filter((id) => id !== entry.id);
+      else {
+        const view = draft.views[node.viewId];
+        view.childIds = view.childIds.filter((id) => id !== entry.id);
+      }
+      node.parentId = entry.parentId;
+      if (entry.parentId === node.viewId) draft.views[node.viewId].childIds.push(entry.id);
+      else draft.nodes[entry.parentId].childIds.push(entry.id);
+    }
+    node.bounds = { ...entry.bounds };
+  }
+}
+
 /** Commit a drag: move and/or reparent several nodes in one undo step. */
 export function commitMove(entries: MoveEntry[], store?: ModelStore): void {
   transact('Move', (draft) => {
-    for (const entry of entries) {
-      const node = draft.nodes[entry.id];
-      if (!node) continue;
-      if (node.parentId !== entry.parentId) {
-        if (entry.id === entry.parentId) continue;
-        let p: string | undefined = entry.parentId;
-        let cyclic = false;
-        while (p && draft.nodes[p]) {
-          if (p === entry.id) {
-            cyclic = true;
-            break;
-          }
-          p = draft.nodes[p]!.parentId;
-        }
-        if (cyclic) continue;
-        const oldParent = draft.nodes[node.parentId];
-        if (oldParent) oldParent.childIds = oldParent.childIds.filter((c) => c !== entry.id);
-        else {
-          const view = draft.views[node.viewId];
-          view.childIds = view.childIds.filter((c) => c !== entry.id);
-        }
-        node.parentId = entry.parentId;
-        if (entry.parentId === node.viewId) draft.views[node.viewId].childIds.push(entry.id);
-        else draft.nodes[entry.parentId].childIds.push(entry.id);
-      }
-      node.bounds = { ...entry.bounds };
-    }
+    applyMoveEntriesToDraft(draft, entries);
   }, store);
 }
 

@@ -38,11 +38,19 @@ interface ChoiceDialogRequest extends DialogBase {
   resolve: (value: string | null) => void;
 }
 
+interface NestingRelationshipDialogRequest extends DialogBase {
+  kind: 'nesting-relationships';
+  cancelLabel: string;
+  rows: NestingRelationshipDialogRow[];
+  resolve: (value: Record<string, string | null> | null) => void;
+}
+
 type DialogRequest =
   | AlertDialogRequest
   | ConfirmDialogRequest
   | PromptDialogRequest
-  | ChoiceDialogRequest;
+  | ChoiceDialogRequest
+  | NestingRelationshipDialogRequest;
 
 export interface AlertDialogOptions {
   title: string;
@@ -85,6 +93,22 @@ export interface ChoiceDialogOptions<T extends string> {
   intent?: DialogIntent;
   choices: ChoiceDialogChoice<T>[];
   cancelLabel?: string;
+}
+
+export interface NestingRelationshipDialogChoice {
+  value: string;
+  label: string;
+}
+
+export interface NestingRelationshipDialogRow {
+  childId: string;
+  childLabel: string;
+  choices: NestingRelationshipDialogChoice[];
+}
+
+export interface NestingRelationshipDialogOptions {
+  parentLabel: string;
+  rows: NestingRelationshipDialogRow[];
 }
 
 let nextDialogId = 1;
@@ -164,10 +188,31 @@ export function showChoiceDialog<T extends string>(
   });
 }
 
+export function showNestingRelationshipDialog(
+  options: NestingRelationshipDialogOptions,
+): Promise<Record<string, string | null> | null> {
+  return new Promise((resolve) => {
+    present({
+      id: nextDialogId++,
+      kind: 'nesting-relationships',
+      title:
+        options.rows.length === 1 ? 'New Nested Relationship' : 'New Nested Relationships',
+      message: `Choose how nested elements relate to ${options.parentLabel}.`,
+      intent: 'default',
+      confirmLabel: 'Apply',
+      cancelLabel: 'Cancel',
+      rows: options.rows,
+      resolve,
+    });
+  });
+}
+
 export function AppDialogHost() {
   const [queue, setQueue] = useState<DialogRequest[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [nestingSelections, setNestingSelections] = useState<Record<string, string | null>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  const firstSelectRef = useRef<HTMLSelectElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const active = queue[0] ?? null;
 
@@ -180,9 +225,15 @@ export function AppDialogHost() {
     if (active.kind === 'alert') active.resolve();
     else if (active.kind === 'confirm') active.resolve(true);
     else if (active.kind === 'prompt') active.resolve(inputValue);
-    else active.resolve(active.choices.find((choice) => choice.primary)?.value ?? active.choices[0]?.value ?? null);
+    else if (active.kind === 'choice') {
+      active.resolve(
+        active.choices.find((choice) => choice.primary)?.value ??
+          active.choices[0]?.value ??
+          null,
+      );
+    } else active.resolve({ ...nestingSelections });
     closeActive();
-  }, [active, closeActive, inputValue]);
+  }, [active, closeActive, inputValue, nestingSelections]);
 
   const cancelActive = useCallback(() => {
     if (!active) return;
@@ -206,11 +257,23 @@ export function AppDialogHost() {
   useEffect(() => {
     if (!active) return;
     setInputValue(active.kind === 'prompt' ? active.defaultValue : '');
+    setNestingSelections(
+      active.kind === 'nesting-relationships'
+        ? Object.fromEntries(
+            active.rows.map((row) => [row.childId, row.choices[0]?.value ?? null]),
+          )
+        : {},
+    );
   }, [active]);
 
   useEffect(() => {
     if (!active) return;
-    const focusTarget = active.kind === 'prompt' ? inputRef.current : primaryRef.current;
+    const focusTarget =
+      active.kind === 'prompt'
+        ? inputRef.current
+        : active.kind === 'nesting-relationships'
+          ? firstSelectRef.current
+          : primaryRef.current;
     focusTarget?.focus();
   }, [active]);
 
@@ -264,6 +327,37 @@ export function AppDialogHost() {
               onChange={(event) => setInputValue(event.target.value)}
             />
           )}
+          {active.kind === 'nesting-relationships' && (
+            <div className="app-dialog-nesting-rows">
+              {active.rows.map((row, index) => {
+                const selectId = `app-dialog-nesting-${active.id}-${index}`;
+                return (
+                  <div className="app-dialog-nesting-row" key={row.childId}>
+                    <label htmlFor={selectId}>{row.childLabel}</label>
+                    <select
+                      ref={index === 0 ? firstSelectRef : undefined}
+                      id={selectId}
+                      aria-label={`Relationship for ${row.childLabel}`}
+                      value={nestingSelections[row.childId] ?? ''}
+                      onChange={(event) =>
+                        setNestingSelections((current) => ({
+                          ...current,
+                          [row.childId]: event.target.value || null,
+                        }))
+                      }
+                    >
+                      <option value="">None</option>
+                      {row.choices.map((choice) => (
+                        <option key={choice.value} value={choice.value}>
+                          {choice.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div className="app-dialog-actions">
           {active.kind !== 'alert' && (
@@ -305,6 +399,7 @@ export function AppDialogHost() {
 function dialogKicker(kind: DialogRequest['kind']): string {
   if (kind === 'prompt') return 'Input';
   if (kind === 'choice') return 'Unsaved changes';
+  if (kind === 'nesting-relationships') return 'Automatic relationships';
   if (kind === 'confirm') return 'Confirm';
   return 'Notice';
 }

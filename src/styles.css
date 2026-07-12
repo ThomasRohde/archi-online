@@ -1947,6 +1947,30 @@ body {
   user-select: none;
 }
 
+.settings-relationship-mask {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-mask-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 12px;
+  user-select: none;
+}
+
+.settings-mask-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-number {
   display: grid;
   grid-template-columns: minmax(52px, 1fr) 68px auto;
@@ -2274,6 +2298,44 @@ body {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.app-dialog-nesting-rows {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.app-dialog-nesting-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.8fr) minmax(190px, 1.4fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.app-dialog-nesting-row label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-dialog-nesting-row select {
+  min-width: 0;
+  height: 28px;
+  padding: 2px 24px 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+}
+
+.app-dialog-nesting-row select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .app-dialog-actions {

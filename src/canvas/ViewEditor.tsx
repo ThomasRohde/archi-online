@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { c4ViewType } from '../model/c4';
-import { alignableNodeIds, deleteViewObjects, duplicateViewObjects } from '../model/ops';
+import {
+  alignableNodeIds,
+  createNestedConnectionVisibilityResolver,
+  deleteViewObjects,
+  duplicateViewObjects,
+} from '../model/ops';
 import { getActiveModelStore, setSelection } from '../model/store';
 import { useModelStoreApi, useStore } from '../ui/store-hooks';
 import { getActiveModelSession } from '../model/workspace';
@@ -11,7 +16,6 @@ import { ConnectionView } from './ConnectionView';
 import { evaluateLabelExpression } from '../model/label-expression';
 import {
   createConnectionRouteResolver,
-  createConnectionVisibilityResolver,
   type Point,
 } from './geometry';
 import { computeAbsBounds, deriveLiveViewState } from './view-editor/bounds';
@@ -62,8 +66,9 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   const model = useStore((s) => s.model);
   const selection = useStore((s) => s.selection);
   const activeTool = useStore((s) => s.activeTool);
-  const alignmentAnchor = useSettingsStore((s) => s.settings.alignmentAnchor);
-  const pasteOffset = useSettingsStore((s) => s.settings.pasteOffset);
+  const settings = useSettingsStore((s) => s.settings);
+  const alignmentAnchor = settings.alignmentAnchor;
+  const pasteOffset = settings.pasteOffset;
   const svgRef = useRef<SVGSVGElement>(null);
 
   const view = model?.views[viewId];
@@ -172,9 +177,13 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   const singleSelected = viewSelected.size === 1 && inter.kind === 'none' ? [...viewSelected][0] : null;
   const selectedNodeForHandles =
     singleSelected && model.nodes[singleSelected] ? singleSelected : null;
-  const selectedConnection = singleSelected ? model.connections[singleSelected] : undefined;
+  const selectedConnectionCandidate = singleSelected ? model.connections[singleSelected] : undefined;
   const editNodeAbs = edit ? liveAbs.get(edit.nodeId) : undefined;
-  const isConnectionVisible = createConnectionVisibilityResolver(model);
+  const isConnectionVisible = createNestedConnectionVisibilityResolver(model, settings);
+  const selectedConnection =
+    selectedConnectionCandidate && isConnectionVisible(selectedConnectionCandidate.id)
+      ? selectedConnectionCandidate
+      : undefined;
   const storedRoutes = createConnectionRouteResolver(model, liveAbs, {
     isVisible: isConnectionVisible,
   });
@@ -283,6 +292,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
 function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
   const model = useStore((s) => s.model);
   const selection = useStore((s) => s.selection);
+  const settings = useSettingsStore((s) => s.settings);
   const svgRef = useRef<SVGSVGElement>(null);
   const panRef = useRef<{
     pointerId: number;
@@ -312,7 +322,7 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
 
   const activeC4ViewType = c4ViewType(view);
   const viewSelected = selection.source === 'view' ? new Set(selection.ids) : new Set<string>();
-  const isConnectionVisible = createConnectionVisibilityResolver(model);
+  const isConnectionVisible = createNestedConnectionVisibilityResolver(model, settings);
   const routes = createConnectionRouteResolver(model, absBounds, {
     isVisible: isConnectionVisible,
   });

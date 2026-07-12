@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { ARM_RELATIONSHIP_BITS, ARM_RELATIONSHIP_ORDER } from '../model/automatic-relationships';
+import { relationshipLabel } from '../model/metamodel';
 import {
   DEFAULT_SETTINGS,
   SETTING_KEYS,
@@ -14,6 +16,12 @@ function formatValue(value: AppSettings[SettingKey], row: SettingRow): string {
   if (row.kind === 'boolean') return value ? 'On' : 'Off';
   if (row.kind === 'select') {
     return row.options.find((option) => option.value === value)?.label ?? String(value);
+  }
+  if (row.kind === 'relationship-mask') {
+    const count = ARM_RELATIONSHIP_ORDER.filter(
+      (type) => ((value as number) & ARM_RELATIONSHIP_BITS[type]) !== 0,
+    ).length;
+    return `${count} selected`;
   }
   return `${value}${row.unit ? ` ${row.unit}` : ''}`;
 }
@@ -61,6 +69,34 @@ function SettingsRow({
               </option>
             ))}
           </select>
+        ) : row.kind === 'relationship-mask' ? (
+          <div
+            className="settings-relationship-mask"
+            role="group"
+            aria-label={row.label}
+            data-setting-mask={row.key}
+          >
+            {ARM_RELATIONSHIP_ORDER.map((type) => {
+              const bit = ARM_RELATIONSHIP_BITS[type];
+              const checked = ((value as number) & bit) !== 0;
+              return (
+                <label className="settings-mask-option" key={type}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    aria-label={`${relationshipLabel(type)} ${row.label.toLowerCase()}`}
+                    onChange={(event) =>
+                      setSetting(
+                        row.key,
+                        event.target.checked ? (value as number) | bit : (value as number) & ~bit,
+                      )
+                    }
+                  />
+                  <span>{relationshipLabel(type)}</span>
+                </label>
+              );
+            })}
+          </div>
         ) : (
           <div className="settings-number">
             <input

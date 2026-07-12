@@ -1,9 +1,8 @@
 import type { ModelState } from '../../model/types';
+import { createNestedConnectionVisibilityResolver } from '../../model/ops';
+import { useSettingsStore } from '../../settings/app-settings';
 import { ConnectionView } from '../ConnectionView';
-import {
-  createConnectionRouteResolver,
-  createConnectionVisibilityResolver,
-} from '../geometry';
+import { createConnectionRouteResolver } from '../geometry';
 import { NodeFigure } from '../figures/NodeFigure';
 import { computeAbsBounds } from '../view-editor/bounds';
 import { assetDataUrl } from '../../model/assets';
@@ -40,17 +39,18 @@ function StaticNode({ model, nodeId }: { model: ModelState; nodeId: string }) {
 }
 
 /**
- * Pure, store-free render of a view's full content in model coordinates.
+ * Shared render of a view's full content in model coordinates.
  * Mirrors the read-only editor's scene graph (nodes in z-order, then
  * connections) without selection, handles, or overlays — used for image
  * export and anywhere a view must be drawn outside the live canvas.
  */
 export function StaticViewContent({ model, viewId }: { model: ModelState; viewId: string }) {
+  const settings = useSettingsStore((state) => state.settings);
   const view = model.views[viewId];
   if (!view) return null;
   const absBounds = computeAbsBounds(model, viewId);
   const connections = Object.values(model.connections).filter((c) => c.viewId === viewId);
-  const isConnectionVisible = createConnectionVisibilityResolver(model);
+  const isConnectionVisible = createNestedConnectionVisibilityResolver(model, settings);
   const route = createConnectionRouteResolver(model, absBounds, {
     isVisible: isConnectionVisible,
   });

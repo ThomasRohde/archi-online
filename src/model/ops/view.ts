@@ -7,11 +7,14 @@ import type {
   ElementNode,
   GroupNode,
   ImageNode,
-  ModelState,
   NoteNode,
 } from '../types';
 import { defaultFolderId, folderForElementType } from './concepts';
-import { attachConnection, attachNode } from './draft';
+import {
+  addMissingRelationshipConnectionsForNode,
+  attachConnection,
+  attachNode,
+} from './draft';
 
 export interface DiagramNodeDefaults {
   textAlignment?: number;
@@ -28,67 +31,6 @@ export interface DiagramNodeDefaults {
  * Archi behaviour: when an element is placed on a view, connections are added
  * for every model relationship between it and elements already on the view.
  */
-function addMissingConnections(draft: ModelState, viewId: string, nodeId: string): void {
-  const node = draft.nodes[nodeId];
-  if (!node || node.nodeType !== 'element') return;
-  const elementId = node.elementId;
-  const nodesByElement = new Map<string, string[]>();
-  for (const n of Object.values(draft.nodes)) {
-    if (n.viewId === viewId && n.nodeType === 'element') {
-      const list = nodesByElement.get(n.elementId) ?? [];
-      list.push(n.id);
-      nodesByElement.set(n.elementId, list);
-    }
-  }
-  const connected = new Set(
-    Object.values(draft.connections)
-      .filter((c) => c.viewId === viewId && c.relationshipId)
-      .map((c) => `${c.relationshipId}|${c.sourceId}|${c.targetId}`),
-  );
-  for (const rel of Object.values(draft.relationships)) {
-    const asSource = rel.sourceId === elementId ? nodesByElement.get(rel.targetId) : undefined;
-    const asTarget = rel.targetId === elementId ? nodesByElement.get(rel.sourceId) : undefined;
-    for (const otherId of asSource ?? []) {
-      if (otherId === nodeId && rel.sourceId !== rel.targetId) continue;
-      if (!connected.has(`${rel.id}|${nodeId}|${otherId}`)) {
-        attachConnection(draft, {
-          id: newId(),
-          viewId,
-          connType: 'relationship',
-          relationshipId: rel.id,
-          name: '',
-          documentation: '',
-          properties: [],
-          sourceConnectionIds: [],
-          targetConnectionIds: [],
-          sourceId: nodeId,
-          targetId: otherId,
-          bendpoints: [],
-        });
-      }
-    }
-    for (const otherId of asTarget ?? []) {
-      if (otherId === nodeId) continue;
-      if (!connected.has(`${rel.id}|${otherId}|${nodeId}`)) {
-        attachConnection(draft, {
-          id: newId(),
-          viewId,
-          connType: 'relationship',
-          relationshipId: rel.id,
-          name: '',
-          documentation: '',
-          properties: [],
-          sourceConnectionIds: [],
-          targetConnectionIds: [],
-          sourceId: otherId,
-          targetId: nodeId,
-          bendpoints: [],
-        });
-      }
-    }
-  }
-}
-
 export function addElementNodeToView(
   viewId: string,
   elementId: string,
@@ -116,7 +58,7 @@ export function addElementNodeToView(
     attachNode(draft, node);
     // UI drops auto-connect existing relationships (Archi preference default);
     // scripted view.add() does not (jArchi semantics).
-    if (autoConnect) addMissingConnections(draft, viewId, id);
+    if (autoConnect) addMissingRelationshipConnectionsForNode(draft, viewId, id);
   }, store);
   return id;
 }

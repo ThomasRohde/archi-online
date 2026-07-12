@@ -7,7 +7,8 @@ import type {
   PointerEvent as ReactPointerEvent,
   RefObject,
 } from 'react';
-import { relationshipLabel } from '../../model/metamodel';
+import { elementLabel, relationshipLabel } from '../../model/metamodel';
+import { newId } from '../../model/id';
 import { C4_ELEMENT_TYPES } from '../../model/c4';
 import {
   addGroupToView,
@@ -17,11 +18,13 @@ import {
   commitMove,
   createElementOnView,
   createRelationshipOnView,
+  createNestedConnectionVisibilityResolver,
   deleteViewObjects,
   duplicateViewObjects,
   renameItem,
   setConceptProfiles,
   setConnectionBendpoints,
+  isAutomaticRelationshipTriggerEnabled,
   type MoveEntry,
 } from '../../model/ops';
 import { isAllowedRelationship, validRelationshipTypes } from '../../model/rules';
@@ -43,18 +46,18 @@ import {
   useSettingsStore,
 } from '../../settings/app-settings';
 import { showContextMenu } from '../../ui/ContextMenu';
+import { requestNestingChange } from '../../ui/automatic-relationships';
 import { copyNodes, pasteNodes } from '../clipboard';
 import {
   closestSegment,
   createConnectionRouteResolver,
-  createConnectionVisibilityResolver,
   rectsIntersect,
   toRelativeBendpoint,
   type Point,
 } from '../geometry';
 import { containerAt, dropTargetFor, selectionRoots } from './bounds';
 import { showEmptyCanvasContextMenu, showViewObjectContextMenu } from './contextMenu';
-import { addDroppedItemsToView } from './drop';
+import { addDroppedItemsToView, planDroppedItemsToView } from './drop';
 import type { EditState, Interaction, Viewport } from './types';
 
 interface UseViewEditorInteractionsParams {
@@ -102,7 +105,7 @@ export function useViewEditorInteractions({
   const interRef = useRef(inter);
   interRef.current = inter;
   const isConnectionVisible = model
-    ? createConnectionVisibilityResolver(model)
+    ? createNestedConnectionVisibilityResolver(model, settings)
     : () => false;
   const connectionRoutes = model
     ? createConnectionRouteResolver(model, absBounds, { isVisible: isConnectionVisible })
@@ -237,23 +240,57 @@ export function useViewEditorInteractions({
           width: def.width,
           height: def.height,
         };
-        let nodeId = '';
-        runBatch('Create Specialized Element', () => {
-          const created = createElementOnView(
-            tool.type,
-            viewId,
-            parentId,
-            bounds,
-            undefined,
-            textDefaults,
+        const automatic =
+          model.nodes[parentId]?.nodeType === 'element' &&
+          isAutomaticRelationshipTriggerEnabled('palette', settings);
+        if (automatic) {
+          const nodeId = newId();
+          const elementId = newId();
+          void requestNestingChange(
+            {
+              viewId,
+              trigger: 'palette',
+              entries: [
+                {
+                  kind: 'create-element',
+                  nodeId,
+                  elementId,
+                  elementType: tool.type,
+                  name: elementLabel(tool.type),
+                  profileIds: tool.profileId ? [tool.profileId] : [],
+                  parentId,
+                  bounds,
+                  defaults: textDefaults,
+                },
+              ],
+            },
+            settings,
             modelStore,
-          );
-          nodeId = created.nodeId;
-          if (tool.profileId) setConceptProfiles(created.elementId, [tool.profileId], modelStore);
-        }, modelStore);
-        setSelection('view', [nodeId]);
-        setActiveTool({ kind: 'select' });
-        setTimeout(() => startEdit(nodeId), 0);
+          ).then((result) => {
+            setActiveTool({ kind: 'select' });
+            if (!result || !modelStore.getState().model?.nodes[nodeId]) return;
+            setSelection('view', [nodeId]);
+            setTimeout(() => startEdit(nodeId), 0);
+          });
+        } else {
+          let nodeId = '';
+          runBatch('Create Specialized Element', () => {
+            const created = createElementOnView(
+              tool.type,
+              viewId,
+              parentId,
+              bounds,
+              undefined,
+              textDefaults,
+              modelStore,
+            );
+            nodeId = created.nodeId;
+            if (tool.profileId) setConceptProfiles(created.elementId, [tool.profileId], modelStore);
+          }, modelStore);
+          setSelection('view', [nodeId]);
+          setActiveTool({ kind: 'select' });
+          setTimeout(() => startEdit(nodeId), 0);
+        }
       } else if (tool.kind === 'create-c4-element') {
         const def = defaultElementSize(C4_ELEMENT_TYPES[tool.c4Kind], settings);
         const bounds = {
@@ -514,7 +551,39 @@ export function useViewEditorInteractions({
           };
         });
         setInter({ kind: 'none' });
-        commitMove(entries, modelStore);
+        const changesParent = entries.some(
+          (entry) => model.nodes[entry.id]?.parentId !== entry.parentId,
+        );
+        const changesElementNesting = entries.some((entry) => {
+          const node = model.nodes[entry.id];
+          if (node?.nodeType !== 'element') return false;
+          return (
+            model.nodes[node.parentId]?.nodeType === 'element' ||
+            model.nodes[entry.parentId]?.nodeType === 'element'
+          );
+        });
+        if (
+          changesParent &&
+          changesElementNesting &&
+          isAutomaticRelationshipTriggerEnabled('move', settings)
+        ) {
+          void requestNestingChange(
+            {
+              viewId,
+              trigger: 'move',
+              entries: entries.map((entry) => ({
+                kind: 'move',
+                nodeId: entry.id,
+                parentId: entry.parentId,
+                bounds: entry.bounds,
+              })),
+            },
+            settings,
+            modelStore,
+          );
+        } else {
+          commitMove(entries, modelStore);
+        }
         break;
       }
       case 'resize': {
@@ -762,7 +831,7 @@ export function useViewEditorInteractions({
     }
     if (!Array.isArray(ids)) return;
     const p = toView(e.clientX, e.clientY);
-    const created = addDroppedItemsToView({
+    const input = planDroppedItemsToView({
       ids,
       model,
       viewId,
@@ -770,9 +839,34 @@ export function useViewEditorInteractions({
       point: p,
       snap,
       settings,
-      modelStore,
     });
-    if (created.length > 0) setSelection('view', created);
+    const entersElementParent = input.entries.some(
+      (entry) =>
+        entry.kind === 'add-occurrence' &&
+        model.nodes[entry.parentId]?.nodeType === 'element',
+    );
+    if (
+      entersElementParent &&
+      isAutomaticRelationshipTriggerEnabled('tree', settings)
+    ) {
+      void requestNestingChange(input, settings, modelStore).then((result) => {
+        if (result && result.applied.nodeIds.length > 0) {
+          setSelection('view', result.applied.nodeIds);
+        }
+      });
+    } else {
+      const created = addDroppedItemsToView({
+        ids,
+        model,
+        viewId,
+        absBounds,
+        point: p,
+        snap,
+        settings,
+        modelStore,
+      });
+      if (created.length > 0) setSelection('view', created);
+    }
   };
 
   const connectHover: { id: string; valid: boolean } | null = (() => {
