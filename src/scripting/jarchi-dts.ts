@@ -32,6 +32,19 @@ declare interface JBounds { x: number; y: number; width: number; height: number 
 declare interface JPoint { x: number; y: number }
 declare interface JBendpoint { startX: number; startY: number; endX: number; endY: number }
 
+declare interface JLegendOptions {
+  displayElements: boolean;
+  displayRelations: boolean;
+  displaySpecializationElements: boolean;
+  displaySpecializationRelations: boolean;
+  rowsPerColumn: number;
+  widthOffset: number;
+  /** 0=None, 1=Core, 2=User. */
+  colorScheme: 0 | 1 | 2;
+  /** 0=Name, 1=Category. */
+  sortMethod: 0 | 1;
+}
+
 type JConnectable = JVisual | JConnection;
 
 declare interface JVisual extends JObject {
@@ -50,6 +63,8 @@ declare interface JVisual extends JObject {
   imageSource: number;
   imagePosition: number;
   text: string;
+  legendOptions: JLegendOptions | undefined;
+  setLegendOptimalSize(): void;
   /** Add a nested element (coordinates relative to this container). */
   add(element: JConcept, x: number, y: number, width: number, height: number): JVisual;
   parent(): JView | JVisual;
@@ -86,6 +101,7 @@ declare interface JView extends JObject {
   add(element: JConcept, x: number, y: number, width: number, height: number): JVisual;
   add(relationship: JConcept, source: JConnectable, target: JConnectable): JConnection;
   createObject(type: 'note' | 'group', x: number, y: number, width: number, height: number): JVisual;
+  createLegend(x: number, y: number, options?: Partial<JLegendOptions>): JVisual;
   createPlainConnection(source: JConnectable, target: JConnectable, connectionType?: number): JConnection;
   nodes(options?: { recursive?: boolean }): JVisual[];
   connections(): JConnection[];

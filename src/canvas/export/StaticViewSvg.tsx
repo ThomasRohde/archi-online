@@ -8,7 +8,15 @@ import { computeAbsBounds } from '../view-editor/bounds';
 import { assetDataUrl } from '../../model/assets';
 import { evaluateLabelExpression } from '../../model/label-expression';
 
-function StaticNode({ model, nodeId }: { model: ModelState; nodeId: string }) {
+function StaticNode({
+  model,
+  nodeId,
+  settings,
+}: {
+  model: ModelState;
+  nodeId: string;
+  settings: ReturnType<typeof useSettingsStore.getState>['settings'];
+}) {
   const node = model.nodes[nodeId];
   if (!node) return null;
   const element = node.nodeType === 'element' ? model.elements[node.elementId] : undefined;
@@ -30,9 +38,14 @@ function StaticNode({ model, nodeId }: { model: ModelState; nodeId: string }) {
         height={height}
         imageUrl={imageUrl}
         displayLabel={node.labelExpression !== undefined ? evaluateLabelExpression(model, nodeId, node.labelExpression).text : undefined}
+        model={model}
+        legendPreferences={{
+          labels: settings.legendLabels,
+          userColors: settings.legendUserColors,
+        }}
       />
       {node.childIds.map((cid) => (
-        <StaticNode key={cid} model={model} nodeId={cid} />
+        <StaticNode key={cid} model={model} nodeId={cid} settings={settings} />
       ))}
     </g>
   );
@@ -57,7 +70,7 @@ export function StaticViewContent({ model, viewId }: { model: ModelState; viewId
   return (
     <>
       {view.childIds.map((id) => (
-        <StaticNode key={id} model={model} nodeId={id} />
+        <StaticNode key={id} model={model} nodeId={id} settings={settings} />
       ))}
       <g>
         {connections.map((conn) => {

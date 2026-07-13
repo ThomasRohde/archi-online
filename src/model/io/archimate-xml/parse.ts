@@ -18,6 +18,7 @@ import {
   getConnectable,
   type ConnectionRouterType,
 } from '../../types';
+import { parseLegendFeature } from '../../legend';
 import { rebuildConnectionAdjacency } from '../../ops/draft';
 import {
   ARCHIMATE_NS,
@@ -138,11 +139,17 @@ export function parseArchimate(xml: string): ModelState {
   function parseViewNode(el: Element, viewId: string, parentId: string): string | null {
     const t = typeOf(el);
     const id = el.getAttribute('id') ?? newId();
+    const legendFeature = t === 'Note' ? feature(el, 'legend') : undefined;
     const base = {
       id,
       viewId,
       parentId,
-      bounds: parseBounds(el, DEFAULT_SIZES[t] ?? DEFAULT_SIZES.DiagramObject),
+      bounds: parseBounds(
+        el,
+        legendFeature === undefined
+          ? DEFAULT_SIZES[t] ?? DEFAULT_SIZES.DiagramObject
+          : { width: 210, height: 320 },
+      ),
       childIds: [] as string[],
       sourceConnectionIds: [] as string[],
       targetConnectionIds: [] as string[],
@@ -165,8 +172,10 @@ export function parseArchimate(xml: string): ModelState {
       node = {
         ...base,
         nodeType: 'note',
+        name: strAttr(el, 'name'),
         content: childText(el, 'content'),
         properties: parseProperties(el),
+        legendOptions: legendFeature === undefined ? undefined : parseLegendFeature(legendFeature),
         borderType: intAttr(el, 'borderType'),
       };
     } else if (t === 'DiagramModelReference') {

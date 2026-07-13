@@ -139,6 +139,26 @@ describe('Archi 5.9 label expressions', () => {
     expect(reparsed.folders[model.elements.source.folderId].labelExpression).toBe('${name} folder');
   });
 
+  it('keeps ordinary Note content as the name expression after XML round-trip', () => {
+    const model = fixture();
+    model.nodes.note = {
+      id: 'note',
+      viewId: 'view',
+      parentId: 'view',
+      bounds: { x: 20, y: 100, width: 180, height: 80 },
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'note',
+      content: 'Visible note',
+      properties: [],
+    };
+    model.views.view.childIds.push('note');
+    const reparsed = parseArchimate(serializeArchimate(model));
+
+    expect(evaluateLabelExpression(reparsed, 'note', '${name}').text).toBe('Visible note');
+  });
+
   it('applies the nearest ancestor folder expression to model-tree labels', () => {
     const model = fixture();
     model.folders[model.elements.source.folderId].labelExpression = '${type}: ${name}';

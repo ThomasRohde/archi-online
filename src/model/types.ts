@@ -1,4 +1,5 @@
 import type { ElementType, RelationshipType } from './metamodel';
+import type { LegendOptions } from './legend';
 
 export type ConceptType = ElementType | RelationshipType;
 
@@ -225,8 +226,12 @@ export interface GroupNode extends DiagramNodeBase {
 
 export interface NoteNode extends DiagramNodeBase {
   nodeType: 'note';
+  /** Native component name. Legends use "Legend" while their text content stays empty. */
+  name?: string;
   content: string;
   properties: Property[];
+  /** Present only when this native Note is repurposed as an Archi 5.8+ live legend. */
+  legendOptions?: LegendOptions;
   /** 0=dog-ear (default), 1=rectangle, 2=none */
   borderType?: number;
 }

@@ -229,6 +229,7 @@ view.add(element, x, y, width, height);        // returns JVisual
 view.add(relationship, sourceVisual, targetVisual); // returns JConnection
 view.createObject("note", x, y, width, height);
 view.createObject("group", x, y, width, height);
+view.createLegend(x, y, options); // native live legend, returns JVisual
 view.createPlainConnection(source, target, connectionType); // returns JConnection
 
 view.nodes();                     // top-level visual objects
@@ -252,6 +253,23 @@ var annotation = view.createPlainConnection(note, actorVisual, 64);
 annotation.name = "Context";
 ```
 
+`createLegend()` uses Desktop defaults for omitted options. A legend visual
+has type `diagram-model-legend`, exposes a writable `legendOptions` object,
+and can resize itself to its live contents:
+
+```js
+var legend = view.createLegend(40, 40, {
+  rowsPerColumn: 10,
+  colorScheme: 1, // 0 None, 1 Core, 2 User
+  sortMethod: 1   // 0 Name, 1 Category
+});
+legend.legendOptions = Object.assign({}, legend.legendOptions, {
+  displayRelations: false,
+  widthOffset: 8
+});
+legend.setLegendOptimalSize();
+```
+
 ## Visual objects
 
 `JVisual` wraps a diagram node — an element visual, note, group, or view
@@ -262,6 +280,8 @@ visual.concept;          // underlying JConcept (undefined for notes/groups)
 visual.view;             // owning JView
 visual.bounds;           // parent-relative {x, y, width, height}
 visual.text;             // note text
+visual.legendOptions;    // native LegendOptions, or undefined
+visual.setLegendOptimalSize(); // legends only
 visual.fillColor;        // "#rrggbb" or undefined for the type default
 visual.lineColor;
 visual.fontColor;

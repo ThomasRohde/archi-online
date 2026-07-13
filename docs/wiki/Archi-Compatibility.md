@@ -64,6 +64,12 @@ and atomic failure. See [[Import & Export|Import-and-Export]] for the workflows.
   creation on canvas or in Groups, desktop menu polarity, and sticky palette
   tools.
 - **Default sizes and fill colors** for new elements follow Archi's defaults.
+- Native Archi 5.8/5.9 **legends** round-trip as Note figures with the exact
+  `legend` feature encoding. Their contents are derived live from recursively
+  nested element and relationship occurrences, including primary
+  specializations, and render identically in the editor, read-only viewer,
+  outline, and image export. Older Archi versions safely see a blank Note
+  named `Legend`; the existing C4 textual legend remains a separate feature.
 - The **viewpoint definitions** (which element types each ArchiMate viewpoint
   allows) are ported from Archi's `viewpoints.xml`; the palette greys out
   disallowed element types on views that declare a viewpoint, matching

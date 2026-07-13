@@ -1460,6 +1460,56 @@ body {
   border-radius: 4px;
 }
 
+.legend-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 8px 12px;
+}
+
+.legend-controls .prop-option-group {
+  min-width: 0;
+  margin: 0;
+  padding: 6px 8px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.legend-controls .prop-option-group legend,
+.legend-controls .prop-row > label {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+.legend-controls .prop-option-group label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.legend-controls .prop-option-group input {
+  margin: 0;
+}
+
+.legend-controls .prop-number,
+.legend-controls select {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.legend-controls > button {
+  justify-self: start;
+  align-self: end;
+}
+
 .appearance-form {
   padding: 0 16px 18px;
   display: grid;
@@ -2007,6 +2057,59 @@ body {
   justify-self: end;
 }
 
+.settings-legend-custom {
+  border-top: 1px solid #ececec;
+}
+
+.settings-legend-custom > summary {
+  padding: 8px 10px;
+  color: var(--accent);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-legend-head,
+.settings-legend-row {
+  display: grid;
+  grid-template-columns: minmax(126px, 1fr) minmax(150px, 1.25fr) 72px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 10px;
+}
+
+.settings-legend-head {
+  color: var(--text-dim);
+  font-size: 11px;
+  border-top: 1px solid #ececec;
+  border-bottom: 1px solid #ececec;
+  background: #fbfcfd;
+}
+
+.settings-legend-row {
+  min-height: 27px;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.settings-legend-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-legend-row input[type='color'] {
+  width: 62px;
+  height: 25px;
+  padding: 1px;
+  border: 1px solid var(--border);
+}
+
+.settings-legend-na {
+  color: var(--text-dim);
+  text-align: center;
+}
+
 @container (max-width: 390px) {
   .settings-row {
     grid-template-columns: 1fr;
@@ -2015,6 +2118,18 @@ body {
 
   .settings-reset-row {
     justify-self: start;
+  }
+
+  .settings-legend-head {
+    display: none;
+  }
+
+  .settings-legend-row {
+    grid-template-columns: minmax(0, 1fr) 62px auto;
+  }
+
+  .settings-legend-name {
+    grid-column: 1 / -1;
   }
 }
 

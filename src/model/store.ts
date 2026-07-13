@@ -33,6 +33,7 @@ export type Tool =
   | StickyCreationTool<{ kind: 'create-plain-connection' }>
   | StickyCreationTool<{ kind: 'magic-connector' }>
   | StickyCreationTool<{ kind: 'create-note' }>
+  | StickyCreationTool<{ kind: 'create-legend' }>
   | StickyCreationTool<{ kind: 'create-group' }>
   | StickyCreationTool<{ kind: 'create-image'; imagePath: string }>;
 

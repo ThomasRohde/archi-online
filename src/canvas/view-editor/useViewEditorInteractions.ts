@@ -13,6 +13,7 @@ import { C4_ELEMENT_TYPES } from '../../model/c4';
 import {
   addGroupToView,
   addImageToView,
+  addLegendToView,
   addNoteToView,
   analyzeConnectionReconnection,
   analyzeMagicConnectionTarget,
@@ -175,6 +176,7 @@ export function useViewEditorInteractions({
     const m = modelStore.getState().model;
     const node = m?.nodes[nodeId];
     if (!m || !node) return;
+    if (node.nodeType === 'note' && node.legendOptions) return;
     let initial: string;
     if (node.nodeType === 'element') initial = m.elements[node.elementId]?.name ?? '';
     else if (node.nodeType === 'group') initial = node.name;
@@ -337,6 +339,7 @@ export function useViewEditorInteractions({
       tool.kind === 'create-c4-element' ||
       tool.kind === 'create-image' ||
       tool.kind === 'create-note' ||
+      tool.kind === 'create-legend' ||
       tool.kind === 'create-group'
     ) {
       const parentId = containerAt(model, viewId, absBounds, p, new Set()) ?? viewId;
@@ -458,6 +461,26 @@ export function useViewEditorInteractions({
         setSelection('view', [id]);
         finishPaletteToolUse(tool, modelStore);
         setTimeout(() => startEdit(id), 0);
+      } else if (tool.kind === 'create-legend') {
+        const id = addLegendToView(
+          viewId,
+          parentId,
+          {
+            x: snap(p.x - parentAbs.x),
+            y: snap(p.y - parentAbs.y),
+            width: 210,
+            height: 320,
+          },
+          {
+            rowsPerColumn: settings.legendRowsPerColumn,
+            colorScheme: settings.legendColorScheme as 0 | 1 | 2,
+            sortMethod: settings.legendSortMethod as 0 | 1,
+          },
+          {},
+          modelStore,
+        );
+        if (id) setSelection('view', [id]);
+        finishPaletteToolUse(tool, modelStore);
       } else {
         const def = defaultGroupSize(settings);
         const id = addGroupToView(

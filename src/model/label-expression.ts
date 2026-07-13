@@ -294,8 +294,10 @@ function specialization(model: ModelState, object: LabelObject): string {
 }
 
 function objectName(object: LabelObject): string {
-  if ('name' in object) return object.name;
-  if ('nodeType' in object && object.nodeType === 'note') return object.content;
+  if ('nodeType' in object && object.nodeType === 'note') {
+    return object.legendOptions ? object.name ?? 'Legend' : object.content;
+  }
+  if ('name' in object) return object.name ?? '';
   return '';
 }
 

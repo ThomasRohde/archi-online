@@ -5,6 +5,7 @@ import {
   type DiagramConnection,
   type ModelState,
 } from '../../types';
+import { serializeLegendFeature } from '../../legend';
 import { ARCHIMATE_NS, docTag, featureTags, propertyTags, serializeFontStyle, tag, textTag, type Attr } from './xml';
 
 export function serializeArchimate(state: ModelState): string {
@@ -130,7 +131,7 @@ export function serializeArchimate(state: ModelState): string {
     const attrs: Attr[] = [
       ['xsi:type', xsiType],
       ['id', node.id],
-      ['name', node.nodeType === 'group' ? node.name : undefined],
+      ['name', node.nodeType === 'group' || node.nodeType === 'note' ? node.name : undefined],
       [
         'targetConnections',
         orderedConnectionIds(node, 'target').length > 0
@@ -156,6 +157,9 @@ export function serializeArchimate(state: ModelState): string {
       ['model', node.nodeType === 'ref' ? node.refViewId : undefined],
     ];
     const children: string[] = [writeBounds(indent + IND, node.bounds), ...featureTags(indent + IND, {
+      legend: node.nodeType === 'note' && node.legendOptions
+        ? serializeLegendFeature(node.legendOptions)
+        : undefined,
       labelExpression: node.labelExpression,
       gradient: node.gradient,
       lineStyle: node.lineStyle,

@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import type { ElementType } from '../model/metamodel';
+import {
+  isElementType,
+  isRelationshipType,
+  type ConceptType,
+  type ElementType,
+} from '../model/metamodel';
 import {
   ARM_ALL_RELATIONSHIPS_MASK,
   ARM_DEFAULT_NEW_RELATIONSHIPS_MASK,
@@ -48,6 +53,13 @@ export interface AppSettings {
   newRelationsTypes: number;
   newReverseRelationsTypes: number;
   hiddenRelationsTypes: number;
+  /** Desktop defaults for newly created native legends. */
+  legendRowsPerColumn: number;
+  legendColorScheme: number;
+  legendSortMethod: number;
+  /** Browser-local overrides; Desktop stores these in preferences, never model files. */
+  legendLabels: Partial<Record<ConceptType, string>>;
+  legendUserColors: Partial<Record<ConceptType, string>>;
 }
 
 export type SettingKey = keyof AppSettings;
@@ -129,6 +141,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   newRelationsTypes: ARM_DEFAULT_NEW_RELATIONSHIPS_MASK,
   newReverseRelationsTypes: 0,
   hiddenRelationsTypes: ARM_ALL_RELATIONSHIPS_MASK,
+  legendRowsPerColumn: 15,
+  legendColorScheme: 1,
+  legendSortMethod: 1,
+  legendLabels: {},
+  legendUserColors: {},
 };
 
 export const SETTING_SECTIONS: readonly SettingSection[] = [
@@ -192,6 +209,43 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
         kind: 'relationship-mask',
         label: 'Hidden while nested',
         description: 'Relationship connections represented by direct nesting.',
+      },
+    ],
+  },
+  {
+    id: 'legends',
+    title: 'Legends',
+    description: 'Desktop-compatible defaults for new live legends.',
+    rows: [
+      {
+        key: 'legendRowsPerColumn',
+        kind: 'number',
+        label: 'Rows per column',
+        description: 'Rows used when a new legend is created.',
+        min: 1,
+        max: 100,
+        step: 1,
+      },
+      {
+        key: 'legendColorScheme',
+        kind: 'select',
+        label: 'Colour scheme',
+        description: 'Icon colours used when a new legend is created.',
+        options: [
+          { value: 0, label: 'None' },
+          { value: 1, label: 'Core' },
+          { value: 2, label: 'User' },
+        ],
+      },
+      {
+        key: 'legendSortMethod',
+        kind: 'select',
+        label: 'Sort',
+        description: 'Entry ordering used when a new legend is created.',
+        options: [
+          { value: 0, label: 'Name' },
+          { value: 1, label: 'Category' },
+        ],
       },
     ],
   },
@@ -496,7 +550,30 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function sanitizeLegendLabels(value: unknown): Partial<Record<ConceptType, string>> {
+  if (!isRecord(value)) return {};
+  const labels: Partial<Record<ConceptType, string>> = {};
+  for (const [type, label] of Object.entries(value)) {
+    if ((!isElementType(type) && !isRelationshipType(type)) || typeof label !== 'string') continue;
+    const normalized = label.trim();
+    if (normalized) labels[type] = normalized;
+  }
+  return labels;
+}
+
+function sanitizeLegendUserColors(value: unknown): Partial<Record<ConceptType, string>> {
+  if (!isRecord(value)) return {};
+  const colors: Partial<Record<ConceptType, string>> = {};
+  for (const [type, color] of Object.entries(value)) {
+    if (!isElementType(type) || typeof color !== 'string') continue;
+    if (/^#[0-9a-f]{6}$/i.test(color)) colors[type] = color.toLowerCase();
+  }
+  return colors;
+}
+
 export function sanitizeSettingValue(key: SettingKey, value: unknown): AppSettings[SettingKey] {
+  if (key === 'legendLabels') return sanitizeLegendLabels(value);
+  if (key === 'legendUserColors') return sanitizeLegendUserColors(value);
   const row = settingRow(key);
   const fallback = DEFAULT_SETTINGS[key];
   if (row.kind === 'boolean') return typeof value === 'boolean' ? value : fallback;
@@ -514,7 +591,11 @@ export function sanitizeSettingValue(key: SettingKey, value: unknown): AppSettin
 
 export function normalizeSettings(value: unknown): AppSettings {
   const source = isRecord(value) ? value : {};
-  const next: AppSettings = { ...DEFAULT_SETTINGS };
+  const next: AppSettings = {
+    ...DEFAULT_SETTINGS,
+    legendLabels: {},
+    legendUserColors: {},
+  };
   for (const key of SETTING_KEYS) {
     if (source[key] !== undefined) {
       (next as Record<SettingKey, AppSettings[SettingKey]>)[key] = sanitizeSettingValue(
@@ -567,10 +648,17 @@ export function resetSetting(settings: AppSettings, key: SettingKey): AppSetting
 }
 
 export function resetAllSettings(): AppSettings {
-  return { ...DEFAULT_SETTINGS };
+  return { ...DEFAULT_SETTINGS, legendLabels: {}, legendUserColors: {} };
 }
 
 export function isSettingAtDefault(settings: AppSettings, key: SettingKey): boolean {
+  if (key === 'legendLabels' || key === 'legendUserColors') {
+    const current = settings[key];
+    const defaults = DEFAULT_SETTINGS[key];
+    const currentEntries = Object.entries(current).sort(([a], [b]) => a.localeCompare(b));
+    const defaultEntries = Object.entries(defaults).sort(([a], [b]) => a.localeCompare(b));
+    return JSON.stringify(currentEntries) === JSON.stringify(defaultEntries);
+  }
   return settings[key] === DEFAULT_SETTINGS[key];
 }
 

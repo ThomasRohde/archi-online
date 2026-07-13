@@ -10,6 +10,7 @@ import type {
   ModelState,
   Property,
 } from '../../model/types';
+import { isLegendNote } from '../../model/legend';
 
 /** What the current selection resolves to for the properties panel. */
 export interface Target {
@@ -125,9 +126,9 @@ export function resolveTarget(model: ModelState, source: 'tree' | 'view', ids: s
     }
     if (node.nodeType === 'note') {
       base.conceptId = id;
-      base.name = node.content;
-      base.nameEditable = true;
-      base.typeLabel = 'Note';
+      base.name = isLegendNote(node) ? node.name ?? 'Legend' : node.content;
+      base.nameEditable = !isLegendNote(node);
+      base.typeLabel = isLegendNote(node) ? 'Legend' : 'Note';
       base.properties = node.properties;
       return base;
     }

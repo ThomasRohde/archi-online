@@ -6,6 +6,7 @@ import { NodeFigure } from '../figures/NodeFigure';
 import { GHOST_OPACITY, isNodeGhosted } from './viewpoint-ghost';
 import { assetDataUrl } from '../../model/assets';
 import { evaluateLabelExpression } from '../../model/label-expression';
+import { useSettingsStore } from '../../settings/app-settings';
 
 export function NodeView({
   model,
@@ -31,6 +32,7 @@ export function NodeView({
   viewpoint?: string;
 }) {
   const node = model.nodes[nodeId];
+  const settings = useSettingsStore((state) => state.settings);
   const selected = useStore(
     (s) => s.selection.source === 'view' && s.selection.ids.includes(nodeId),
   );
@@ -76,6 +78,11 @@ export function NodeView({
           c4ViewType={c4ViewType}
           imageUrl={imageUrl}
           displayLabel={displayLabel}
+          model={model}
+          legendPreferences={{
+            labels: settings.legendLabels,
+            userColors: settings.legendUserColors,
+          }}
         />
       </g>
       {(selected || highlight || invalid) && (

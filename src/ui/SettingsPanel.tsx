@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ARM_RELATIONSHIP_BITS, ARM_RELATIONSHIP_ORDER } from '../model/automatic-relationships';
-import { relationshipLabel } from '../model/metamodel';
+import {
+  ELEMENT_TYPES,
+  RELATIONSHIP_TYPES,
+  relationshipLabel,
+  type ConceptType,
+} from '../model/metamodel';
 import {
   DEFAULT_SETTINGS,
   SETTING_KEYS,
@@ -134,6 +139,89 @@ function SettingsRow({
   );
 }
 
+const LEGEND_PREFERENCE_ROWS = [
+  ...[...ELEMENT_TYPES]
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .map((definition) => ({
+      type: definition.type as ConceptType,
+      label: definition.label,
+      color: definition.fill,
+    })),
+  ...[...RELATIONSHIP_TYPES]
+    .map((definition) => ({
+      type: definition.type as ConceptType,
+      label: `${relationshipLabel(definition.type)} relation`,
+      color: undefined,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label)),
+];
+
+function LegendCustomPreferences({
+  settings,
+  setSetting,
+}: {
+  settings: AppSettings;
+  setSetting: (key: SettingKey, value: unknown) => void;
+}) {
+  const updateLabel = (type: ConceptType, value: string) => {
+    const next = { ...settings.legendLabels };
+    if (value.trim()) next[type] = value;
+    else delete next[type];
+    setSetting('legendLabels', next);
+  };
+  const updateColor = (type: ConceptType, value: string | undefined) => {
+    const next = { ...settings.legendUserColors };
+    if (value) next[type] = value;
+    else delete next[type];
+    setSetting('legendUserColors', next);
+  };
+  return (
+    <details className="settings-legend-custom">
+      <summary>Custom labels and user colours</summary>
+      <div className="settings-legend-head" aria-hidden="true">
+        <span>Concept</span><span>Legend label</span><span>User colour</span><span />
+      </div>
+      <div className="settings-legend-grid">
+        {LEGEND_PREFERENCE_ROWS.map((row) => {
+          const hasLabel = Boolean(settings.legendLabels[row.type]);
+          const hasColor = Boolean(settings.legendUserColors[row.type]);
+          return (
+            <div className="settings-legend-row" key={row.type}>
+              <span className="settings-legend-name">{row.label}</span>
+              <input
+                className="prop-input"
+                aria-label={`${row.label} legend label`}
+                value={settings.legendLabels[row.type] ?? ''}
+                placeholder={row.label}
+                onChange={(event) => updateLabel(row.type, event.target.value)}
+              />
+              {row.color ? (
+                <input
+                  type="color"
+                  aria-label={`${row.label} legend user color`}
+                  value={settings.legendUserColors[row.type] ?? row.color}
+                  onChange={(event) => updateColor(row.type, event.target.value)}
+                />
+              ) : <span className="settings-legend-na">—</span>}
+              <button
+                className="tb-btn small"
+                aria-label={`Reset ${row.label} legend preferences`}
+                disabled={!hasLabel && !hasColor}
+                onClick={() => {
+                  updateLabel(row.type, '');
+                  updateColor(row.type, undefined);
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
 export function SettingsPanel() {
   const [query, setQuery] = useState('');
   const settings = useSettingsStore((s) => s.settings);
@@ -191,6 +279,9 @@ export function SettingsPanel() {
                 resetSetting={resetSetting}
               />
             ))}
+            {section.id === 'legends' && (
+              <LegendCustomPreferences settings={settings} setSetting={setSetting} />
+            )}
           </section>
         ))}
       </div>

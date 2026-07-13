@@ -10,6 +10,7 @@ import {
   addElement,
   addElementNodeToView,
   addGroupToView,
+  addLegendToView,
   addNoteToView,
   addRelationship,
   addView,
@@ -33,6 +34,8 @@ import {
   setDocumentation,
   setNodeStyle,
   setLabelExpression,
+  setLegendOptimalSize,
+  setLegendOptions,
   setProperties,
   setPlainConnectionAttributes,
   setRelationshipAttrs,
@@ -50,6 +53,7 @@ import {
   type ProfileDefinition,
   type Property,
 } from '../../model/types';
+import { isLegendNote, type LegendOptions } from '../../model/legend';
 import { useSettingsStore } from '../../settings/app-settings';
 import {
   bendpointPositions,
@@ -577,6 +581,28 @@ export class JView extends JObject {
     throw new Error(`Unsupported view object type: ${type}`);
   }
 
+  createLegend(
+    x: number,
+    y: number,
+    options: Partial<LegendOptions> = {},
+  ): JVisual {
+    if (!isRecord(options)) throw new Error('view.createLegend options must be an object');
+    const settings = useSettingsStore.getState().settings;
+    const legendId = addLegendToView(
+      this.id,
+      this.id,
+      { x, y, width: 210, height: 320 },
+      {
+        rowsPerColumn: settings.legendRowsPerColumn,
+        colorScheme: settings.legendColorScheme as 0 | 1 | 2,
+        sortMethod: settings.legendSortMethod as 0 | 1,
+        ...options,
+      },
+    );
+    if (!legendId) throw new Error(`Could not create legend in view ${this.id}`);
+    return new JVisual(legendId);
+  }
+
   createPlainConnection(
     source: JConnectable,
     target: JConnectable,
@@ -832,7 +858,7 @@ export class JVisual extends JObject {
       case 'group':
         return 'diagram-model-group';
       case 'note':
-        return 'diagram-model-note';
+        return isLegendNote(n) ? 'diagram-model-legend' : 'diagram-model-note';
       case 'ref':
         return 'archimate-diagram-model-reference';
       case 'image':
@@ -844,7 +870,7 @@ export class JVisual extends JObject {
     const n = this.node();
     if (n.nodeType === 'element') return state().elements[n.elementId]?.name ?? '';
     if (n.nodeType === 'group') return n.name;
-    if (n.nodeType === 'note') return n.content;
+    if (n.nodeType === 'note') return isLegendNote(n) ? n.name ?? 'Legend' : n.content;
     if (n.nodeType === 'image') return '';
     return state().views[n.refViewId]?.name ?? '';
   }
@@ -852,6 +878,7 @@ export class JVisual extends JObject {
   override set name(v: string) {
     const n = this.node();
     if (n.nodeType === 'element') renameItem(n.elementId, v);
+    else if (isLegendNote(n)) throw new Error('Legend name is fixed');
     else renameItem(this.id, v);
   }
 
@@ -862,6 +889,29 @@ export class JVisual extends JObject {
 
   set text(v: string) {
     this.name = v;
+  }
+
+  get legendOptions(): LegendOptions | undefined {
+    const n = this.node();
+    return isLegendNote(n) ? { ...n.legendOptions } : undefined;
+  }
+
+  set legendOptions(value: LegendOptions | undefined) {
+    const n = this.node();
+    if (!isLegendNote(n) || value === undefined || !isRecord(value)) {
+      throw new Error('legendOptions are only available on native legends');
+    }
+    setLegendOptions(this.id, value);
+  }
+
+  setLegendOptimalSize(): void {
+    const n = this.node();
+    if (!isLegendNote(n)) throw new Error('setLegendOptimalSize() requires a native legend');
+    const settings = useSettingsStore.getState().settings;
+    setLegendOptimalSize(this.id, {
+      labels: settings.legendLabels,
+      userColors: settings.legendUserColors,
+    });
   }
 
   get concept(): JConcept | undefined {

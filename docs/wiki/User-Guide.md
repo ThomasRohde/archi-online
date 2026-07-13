@@ -110,6 +110,10 @@ From top to bottom:
   semantic relationships can be reused; **New** creates a distinct one.
 - **Relationship tools** — one per ArchiMate relationship type.
 - **Note** and **Group** — plain annotation objects.
+- **Legend** — a native Archi 5.8/5.9 live legend. It lists each unique
+  element, relationship, and specialization that occurs in the view and
+  updates automatically as the view changes. This is separate from the C4
+  command that inserts a textual C4 legend.
 - **Element types** — grouped by layer: Strategy, Business, Application,
   Technology, Physical, Motivation, Implementation & Migration, and Other
   (including Junction).
@@ -248,6 +252,11 @@ canvas. Depending on what is selected it edits:
   relationships. Use the Specializations Manager to create, edit, preview, and
   delete model profiles transactionally; specialized palette and tree entries
   create already-assigned concepts.
+- **Legend** (native legend Notes) — choose core and specialization
+  element/relationship scopes, name or category sort, None/Core/User icon
+  colours, rows per column, width offset, and **Optimal size**. Legend labels
+  and User colours come from browser-local settings and are not written into
+  the model.
 - **Figure** (elements with two notations) — switch between the default
   box-with-icon figure and the classic ArchiMate shape.
 - **Relationship specifics** — access type (access relationships), influence
@@ -306,6 +315,7 @@ style. Each row has a reset button, and **Reset all** restores the defaults.
 | Section | Settings (defaults) |
 | --- | --- |
 | General | Add a note to a Relation's documentation field when changing type (off). When enabled, an automatically converted Association is prefixed with `(Changed from <type>)`. |
+| Legends | New legends use 15 rows per column, Core colours, and Category sort. Custom labels and User colours are browser-local and never enter `.archimate` files. |
 | Canvas snapping | Snap to grid (on); grid size (12 px) — also the `Shift`+arrow nudge step. |
 | New object defaults | Text align (center) and text position (center) for new objects; default sizes for elements (120×55), junctions (15), notes (185×80), groups (400×140), and view references (200×140). |
 | Canvas interaction | Drop offset (16 px), paste offset (16 px), minimum node size (20 px), move drag threshold (4 px), bendpoint drag threshold (5 px). |

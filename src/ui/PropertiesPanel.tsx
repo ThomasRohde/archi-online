@@ -17,6 +17,8 @@ import {
   setConceptProfiles,
   setDocumentation,
   setJunctionType,
+  setLegendOptimalSize,
+  setLegendOptions,
   setProperties,
   setPlainConnectionAttributes,
   setRelationshipAttrs,
@@ -30,11 +32,13 @@ import { AnalysisTab } from './properties/AnalysisTab';
 import { ImageTab } from './properties/ImageTab';
 import { LabelTab } from './properties/LabelTab';
 import { conceptName, resolveTarget, type Target } from './properties/target';
+import { isLegendNote } from '../model/legend';
+import { useSettingsStore } from '../settings/app-settings';
 
 // Well-known viewpoints for the picker, sorted by their friendly display name.
 const VIEWPOINTS_BY_NAME = [...VIEWPOINTS].sort((a, b) => a.name.localeCompare(b.name));
 
-type Tab = 'main' | 'properties' | 'analysis' | 'appearance' | 'label' | 'image';
+type Tab = 'main' | 'properties' | 'analysis' | 'appearance' | 'label' | 'image' | 'legend';
 
 /** Text input that keeps local state and commits on blur/Enter. */
 function CommitInput({
@@ -134,6 +138,7 @@ function PropertiesTable({ target, readOnly }: { target: Target; readOnly: boole
 }
 
 function targetTitle(target: Target): string {
+  if (target.typeLabel === 'Legend') return 'Legend';
   if (target.count === 1 && target.name) return `${target.name} (${target.typeLabel})`;
   return target.typeLabel;
 }
@@ -285,6 +290,127 @@ function C4Fields({
   );
 }
 
+function LegendControls({ target, readOnly }: { target: Target; readOnly: boolean }) {
+  const modelStore = useModelStoreApi();
+  const settings = useSettingsStore((state) => state.settings);
+  const node = target.node;
+  if (!isLegendNote(node)) return null;
+  const options = node.legendOptions;
+  const update = (patch: Parameters<typeof setLegendOptions>[1]) =>
+    setLegendOptions(node.id, patch, modelStore);
+  return (
+    <div className="legend-controls prop-form" aria-label="Legend options">
+      <fieldset className="prop-option-group">
+        <legend>Concepts</legend>
+        <label>
+          <input
+            type="checkbox"
+            aria-label="Core elements"
+            checked={options.displayElements}
+            disabled={readOnly}
+            onChange={(event) => update({ displayElements: event.target.checked })}
+          /> Core elements
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            aria-label="Core relationships"
+            checked={options.displayRelations}
+            disabled={readOnly}
+            onChange={(event) => update({ displayRelations: event.target.checked })}
+          /> Core relationships
+        </label>
+      </fieldset>
+      <fieldset className="prop-option-group">
+        <legend>Specializations</legend>
+        <label>
+          <input
+            type="checkbox"
+            aria-label="Specialized elements"
+            checked={options.displaySpecializationElements}
+            disabled={readOnly}
+            onChange={(event) => update({ displaySpecializationElements: event.target.checked })}
+          /> Specialized elements
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            aria-label="Specialized relationships"
+            checked={options.displaySpecializationRelations}
+            disabled={readOnly}
+            onChange={(event) => update({ displaySpecializationRelations: event.target.checked })}
+          /> Specialized relationships
+        </label>
+      </fieldset>
+      <div className="prop-row">
+        <label htmlFor={`legend-sort-${node.id}`}>Sort</label>
+        <select
+          id={`legend-sort-${node.id}`}
+          aria-label="Legend sort"
+          value={options.sortMethod}
+          disabled={readOnly}
+          onChange={(event) => update({ sortMethod: Number(event.target.value) as 0 | 1 })}
+        >
+          <option value={0}>Name</option>
+          <option value={1}>Category</option>
+        </select>
+      </div>
+      <div className="prop-row">
+        <label htmlFor={`legend-colors-${node.id}`}>Colour scheme</label>
+        <select
+          id={`legend-colors-${node.id}`}
+          aria-label="Legend colors"
+          value={options.colorScheme}
+          disabled={readOnly}
+          onChange={(event) => update({ colorScheme: Number(event.target.value) as 0 | 1 | 2 })}
+        >
+          <option value={0}>None</option>
+          <option value={1}>Core</option>
+          <option value={2}>User</option>
+        </select>
+      </div>
+      <div className="prop-row">
+        <label htmlFor={`legend-rows-${node.id}`}>Rows per column</label>
+        <input
+          id={`legend-rows-${node.id}`}
+          className="prop-number"
+          type="number"
+          aria-label="Legend rows per column"
+          min={1}
+          max={100}
+          value={options.rowsPerColumn}
+          disabled={readOnly}
+          onChange={(event) => update({ rowsPerColumn: Number(event.target.value) })}
+        />
+      </div>
+      <div className="prop-row">
+        <label htmlFor={`legend-offset-${node.id}`}>Width offset</label>
+        <input
+          id={`legend-offset-${node.id}`}
+          className="prop-number"
+          type="number"
+          aria-label="Legend width offset"
+          min={-200}
+          max={200}
+          value={options.widthOffset}
+          disabled={readOnly}
+          onChange={(event) => update({ widthOffset: Number(event.target.value) })}
+        />
+      </div>
+      <button
+        className="tb-btn"
+        disabled={readOnly}
+        onClick={() => setLegendOptimalSize(node.id, {
+          labels: settings.legendLabels,
+          userColors: settings.legendUserColors,
+        }, undefined, modelStore)}
+      >
+        Optimal size
+      </button>
+    </div>
+  );
+}
+
 export function PropertiesPanel() {
   const modelStore = useModelStoreApi();
   const model = useStore((s) => s.model);
@@ -292,21 +418,26 @@ export function PropertiesPanel() {
   const readOnly = useStore((s) => s.readOnly);
   const [tab, setTab] = useState<Tab>('main');
   const target = model ? resolveTarget(model, selection.source, selection.ids) : null;
+  const supportsLegend = Boolean(target?.count === 1 && isLegendNote(target.node));
   const supportsAnalysis = Boolean(
     model &&
       target?.count === 1 &&
       target.conceptId &&
       (model.elements[target.conceptId] || model.relationships[target.conceptId]),
   );
-  const supportsImage = Boolean(target?.count === 1 && target.node);
+  const supportsImage = Boolean(target?.count === 1 && target.node && !supportsLegend);
   const labelObjectId = target?.count === 1
-    ? target.node?.id ?? target.connection?.id ?? (target.conceptId && model?.folders[target.conceptId] ? target.conceptId : undefined)
+    ? (!supportsLegend ? target.node?.id : undefined) ?? target.connection?.id ?? (target.conceptId && model?.folders[target.conceptId] ? target.conceptId : undefined)
     : undefined;
   useEffect(() => {
-    if ((readOnly && tab === 'appearance') || (tab === 'analysis' && !supportsAnalysis)) {
+    if (
+      (readOnly && tab === 'appearance') ||
+      (tab === 'analysis' && !supportsAnalysis) ||
+      (tab === 'legend' && !supportsLegend)
+    ) {
       setTab('main');
     }
-  }, [readOnly, supportsAnalysis, tab]);
+  }, [readOnly, supportsAnalysis, supportsLegend, tab]);
 
   if (!model) return <div className="properties-panel empty-hint">No model open</div>;
   if (!target) return <div className="properties-panel empty-hint">Nothing selected</div>;
@@ -320,6 +451,7 @@ export function PropertiesPanel() {
             'main',
             'properties',
             ...(supportsAnalysis ? ['analysis'] : []),
+            ...(supportsLegend ? ['legend'] : []),
             ...(readOnly ? [] : ['appearance']),
             ...(labelObjectId ? ['label'] : []),
             ...(supportsImage ? ['image'] : []),
@@ -335,6 +467,8 @@ export function PropertiesPanel() {
                   ? 'Properties'
                   : t === 'analysis'
                   ? 'Analysis'
+                    : t === 'legend'
+                      ? 'Legend'
                     : t === 'appearance'
                       ? 'Appearance'
                       : t === 'label'
@@ -547,6 +681,9 @@ export function PropertiesPanel() {
           {tab === 'properties' && <PropertiesTable target={target} readOnly={readOnly} />}
           {tab === 'analysis' && supportsAnalysis && target.conceptId && (
             <AnalysisTab model={model} conceptId={target.conceptId} />
+          )}
+          {tab === 'legend' && supportsLegend && (
+            <LegendControls target={target} readOnly={readOnly} />
           )}
           {tab === 'appearance' && !readOnly && <AppearanceTab target={target} readOnly={readOnly} />}
           {tab === 'label' && labelObjectId && <LabelTab model={model} objectId={labelObjectId} readOnly={readOnly} />}

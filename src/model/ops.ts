@@ -9,6 +9,7 @@ export * from './ops/c4';
 export * from './ops/csv-import';
 export * from './ops/profiles';
 export * from './ops/plain-connection';
+export * from './ops/legend';
 export * from './ops/reconnection';
 export * from './ops/assets';
 export * from './ops/deletion';

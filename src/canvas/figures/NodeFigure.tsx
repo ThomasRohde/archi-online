@@ -7,9 +7,11 @@ import {
   type C4VisualStyle,
 } from '../../model/c4';
 import { ELEMENT_TYPE_MAP, type ElementType } from '../../model/metamodel';
-import type { ArchimateElement, DiagramNode, DiagramView } from '../../model/types';
+import type { LegendPreferences } from '../../model/legend';
+import type { ArchimateElement, DiagramNode, DiagramView, ModelState } from '../../model/types';
 import { parseFont } from '../geometry';
 import { ARCHI_ICONS, NodeIcon } from './icons';
+import { LegendFigure } from './LegendFigure';
 
 const DEFAULT_LINE = '#5c5c5c';
 
@@ -219,6 +221,9 @@ export interface FigureProps {
   imageUrl?: string;
   /** Evaluated label expression. Undefined keeps the native/default label. */
   displayLabel?: string;
+  /** Required only for native live legend Notes. */
+  model?: ModelState;
+  legendPreferences?: LegendPreferences;
 }
 
 /** The visual shape + label of one diagram node (position handled by parent <g>). */
@@ -231,6 +236,8 @@ export function NodeFigure({
   c4ViewType,
   imageUrl,
   displayLabel,
+  model,
+  legendPreferences,
 }: FigureProps) {
   const font = node.fontStyle
     ? { family: node.fontStyle.family, sizePx: node.fontStyle.sizePt * (4 / 3), bold: node.fontStyle.bold, italic: node.fontStyle.italic }
@@ -512,6 +519,27 @@ export function NodeFigure({
   if (node.nodeType === 'note') {
     const fill = node.fillColor ?? '#ffffff';
     const paint = gradientPaint(fill);
+    if (node.legendOptions && model && legendPreferences) {
+      return (
+        <g>
+          {paint.definition}
+          <rect
+            width={w}
+            height={h}
+            fill={paint.fill}
+            fillOpacity={paint.opacity}
+            {...outline}
+          />
+          <LegendFigure
+            model={model}
+            node={node as typeof node & { legendOptions: NonNullable<typeof node.legendOptions> }}
+            preferences={legendPreferences}
+            font={font}
+            color={fontColor}
+          />
+        </g>
+      );
+    }
     const border = node.borderType ?? 0;
     return (
       <g>

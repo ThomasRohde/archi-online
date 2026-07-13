@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { StandaloneIcon } from '../canvas/figures/icons';
+import { RelationshipIcon } from '../canvas/figures/RelationshipIcon';
 import {
   C4_ELEMENT_KIND_LABELS,
   C4_PALETTE_KINDS,
@@ -12,7 +13,6 @@ import {
   ELEMENT_TYPES,
   LAYERS,
   RELATIONSHIP_TYPES,
-  type RelationshipType,
 } from '../model/metamodel';
 import {
   isStickyCreationTool,
@@ -130,91 +130,6 @@ function C4PaletteGlyph({ icon }: { icon: C4PaletteIcon }) {
   }
 }
 
-function relGlyph(type: RelationshipType): ReactNode {
-  const line = (dash?: string, x1 = 3, x2 = 21) => (
-    <line x1={x1} y1={9} x2={x2} y2={9} stroke="currentColor" strokeWidth="1.2" strokeDasharray={dash} />
-  );
-  switch (type) {
-    case 'CompositionRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line(undefined, 10)}
-          <path d="M2,9 L6,6.5 L10,9 L6,11.5 Z" fill="currentColor" />
-        </svg>
-      );
-    case 'AggregationRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line(undefined, 10)}
-          <path d="M2,9 L6,6.5 L10,9 L6,11.5 Z" fill="#fff" stroke="currentColor" />
-        </svg>
-      );
-    case 'AssignmentRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line()}
-          <circle cx="4" cy="9" r="2" fill="currentColor" />
-          <path d="M21,9 L15,6 V12 Z" fill="currentColor" />
-        </svg>
-      );
-    case 'RealizationRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line('2 2', 3, 14)}
-          <path d="M21,9 L14,5.5 V12.5 Z" fill="#fff" stroke="currentColor" />
-        </svg>
-      );
-    case 'ServingRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line()}
-          <path d="M16,5 L21,9 L16,13" fill="none" stroke="currentColor" strokeWidth="1.2" />
-        </svg>
-      );
-    case 'AccessRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line('2 2')}
-          <path d="M17,6 L21,9 L17,12" fill="none" stroke="currentColor" strokeWidth="1.1" />
-        </svg>
-      );
-    case 'InfluenceRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line('5 3')}
-          <path d="M16,5 L21,9 L16,13" fill="none" stroke="currentColor" strokeWidth="1.2" />
-        </svg>
-      );
-    case 'TriggeringRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line()}
-          <path d="M21,9 L15,6 V12 Z" fill="currentColor" />
-        </svg>
-      );
-    case 'FlowRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line('5 3', 3, 15)}
-          <path d="M21,9 L15,6 V12 Z" fill="currentColor" />
-        </svg>
-      );
-    case 'SpecializationRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line(undefined, 3, 14)}
-          <path d="M21,9 L14,5.5 V12.5 Z" fill="#fff" stroke="currentColor" />
-        </svg>
-      );
-    case 'AssociationRelationship':
-      return (
-        <svg viewBox="0 0 24 18" width="22" height="17">
-          {line()}
-        </svg>
-      );
-  }
-}
-
 function toolEq(a: Tool, b: Tool): boolean {
   if (a.kind !== b.kind) return false;
   if ('type' in a && 'type' in b) {
@@ -307,7 +222,7 @@ export function Palette() {
       <div className="pal-sep" />
       {RELATIONSHIP_TYPES.map((r) => (
         <ToolButton key={r.type} tool={{ kind: 'create-relationship', type: r.type }} title={r.label}>
-          {relGlyph(r.type)}
+          <RelationshipIcon type={r.type} />
         </ToolButton>
       ))}
       <div className="pal-sep" />
@@ -334,6 +249,15 @@ export function Palette() {
       <ToolButton tool={{ kind: 'create-note' }} title="Note">
         <svg viewBox="0 0 16 16" width="16" height="16">
           <path d="M2.5,2.5 H13.5 V10 L10,13.5 H2.5 Z M13.5,10 H10 V13.5" fill="none" stroke="currentColor" />
+        </svg>
+      </ToolButton>
+      <ToolButton tool={{ kind: 'create-legend' }} title="Legend">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <rect x="2" y="2" width="12" height="12" fill="none" stroke="currentColor" />
+          <circle cx="5" cy="5" r="1.25" fill="currentColor" />
+          <circle cx="5" cy="8" r="1.25" fill="currentColor" />
+          <circle cx="5" cy="11" r="1.25" fill="currentColor" />
+          <path d="M8 5 H12 M8 8 H12 M8 11 H12" stroke="currentColor" strokeWidth="1" />
         </svg>
       </ToolButton>
       <ToolButton tool={{ kind: 'create-plain-connection' }} title="Plain connection">
