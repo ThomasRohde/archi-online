@@ -1,4 +1,4 @@
-import { act, createElement } from 'react';
+import { act, createElement, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -162,5 +162,21 @@ describe('shared application dialog modal behavior', () => {
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Fresh alert');
     await act(async () => button('OK').click());
     expect(freshResult).toHaveBeenCalledOnce();
+  });
+
+  it('does not render a settled prequeued request after StrictMode replays effects', async () => {
+    await act(async () => root.unmount());
+    const result = vi.fn();
+    void showConfirmDialog({ title: 'Prequeued confirmation' }).then(result);
+
+    root = createRoot(host);
+    await act(async () => {
+      root.render(createElement(StrictMode, null, createElement(AppDialogHost)));
+      await Promise.resolve();
+    });
+
+    expect(result).toHaveBeenCalledOnce();
+    expect(result).toHaveBeenCalledWith(false);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 });

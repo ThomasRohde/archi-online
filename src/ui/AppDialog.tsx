@@ -294,6 +294,10 @@ export function AppDialogHost() {
     };
     presenter = hostPresenter;
     pendingDialogs.splice(0).forEach(hostPresenter);
+    // StrictMode replays setup after cleanup without resetting component state.
+    // Reconcile that retained state with the authoritative unresolved queue so
+    // requests cancelled by the replay cleanup cannot render as ghosts.
+    setQueue(queueRef.current);
     return () => {
       if (presenter === hostPresenter) presenter = null;
       const unresolved = queueRef.current;
