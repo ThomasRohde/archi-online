@@ -24,7 +24,17 @@
     <property value="blank-key"/>
     <property key="probe" value="desktop:folder"/>
   </folder>
-  <folder name="Application" id="p2d-folder-application" type="application"/>
+  <folder name="Application" id="p2d-folder-application" type="application">
+    <element xsi:type="archimate:ApplicationComponent" name="Desktop Nested Runtime" id="p2d-element-arm-service">
+      <documentation>Desktop child occurrence authored directly inside another element occurrence</documentation>
+      <property key="probe" value="desktop:arm-service"/>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Desktop Platform Boundary" id="p2d-element-arm-platform">
+      <documentation>Desktop parent occurrence with independently ordered properties and geometry</documentation>
+      <property key="origin-order" value="child-first"/>
+      <property key="probe" value="desktop:arm-platform"/>
+    </element>
+  </folder>
   <folder name="Technology &amp; Physical" id="p2d-folder-technology" type="technology"/>
   <folder name="Motivation" id="p2d-folder-motivation" type="motivation"/>
   <folder name="Implementation &amp; Migration" id="p2d-folder-implementation_migration" type="implementation_migration"/>
@@ -33,6 +43,11 @@
     <element xsi:type="archimate:AssociationRelationship" name="Independent recursive chain" id="p2d-relationship-chain" source="p2d-relationship-node-to-relationship" target="p2d-element-role">
       <documentation>Phase 2 Recursive chain documentation</documentation>
       <property key="probe" value="desktop:relationship:chain"/>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="Desktop ARM containment" id="p2d-relationship-arm-composition" source="p2d-element-arm-platform" target="p2d-element-arm-service">
+      <documentation>Desktop-native stored occurrence is hidden only while directly nested</documentation>
+      <property key="origin-order" value="desktop-independent"/>
+      <property key="probe" value="desktop:relationship:arm-composition"/>
     </element>
     <element xsi:type="archimate:AssignmentRelationship" name="Desktop Assignment" id="p2d-relationship-assignment" source="p2d-element-actor" target="p2d-element-role">
       <documentation>Phase 2 Assignment documentation</documentation>
@@ -79,6 +94,13 @@
         </sourceConnection>
         <content>desktop-authored searchable note</content>
         <property key="probe" value="desktop:note"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="p2d-node-arm-platform" archimateElement="p2d-element-arm-platform">
+        <bounds x="60" y="370" width="480" height="250"/>
+        <sourceConnection xsi:type="archimate:Connection" id="p2d-connection-arm-composition" source="p2d-node-arm-platform" target="p2d-node-arm-service" archimateRelationship="p2d-relationship-arm-composition"/>
+        <child xsi:type="archimate:DiagramObject" id="p2d-node-arm-service" targetConnections="p2d-connection-arm-composition" archimateElement="p2d-element-arm-service">
+          <bounds x="260" y="105" width="155" height="65"/>
+        </child>
       </child>
       <child xsi:type="archimate:Group" id="p2d-node-group" name="Desktop Authored Probe Group" borderType="1">
         <bounds x="40" y="30" width="560" height="280"/>

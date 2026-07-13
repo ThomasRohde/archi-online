@@ -7,7 +7,14 @@ import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseArchimateDocument, serializeArchimateDocument } from '../src/model/io/archimate-xml';
 import { isLegendNote } from '../src/model/legend';
+import {
+  analyzeNestingChange,
+  applyNestingChange,
+  createNestedConnectionVisibilityResolver,
+} from '../src/model/ops';
+import { createModelStore } from '../src/model/store';
 import type { ModelState } from '../src/model/types';
+import { DEFAULT_SETTINGS } from '../src/settings/app-settings';
 
 const root = join(__dirname, '..');
 const fixtureDir = join(__dirname, 'fixtures', 'phase2');
@@ -95,9 +102,13 @@ describe('Phase 2 reciprocal Archi 5.9 fixtures', () => {
       id('element-role'),
       id(desktop ? 'element-actor' : 'element-process'),
     ]);
+    expect(model.folders[id('folder-application')].itemIds).toEqual((desktop
+      ? ['element-arm-service', 'element-arm-platform']
+      : ['element-arm-parent', 'element-arm-child'])
+      .map(id));
     expect(model.folders[id('folder-relations')].itemIds).toEqual((desktop
-      ? ['relationship-chain', 'relationship-assignment', 'relationship-relationship-to-node', 'relationship-node-to-relationship']
-      : ['relationship-assignment', 'relationship-node-to-relationship', 'relationship-relationship-to-node', 'relationship-chain'])
+      ? ['relationship-chain', 'relationship-arm-composition', 'relationship-assignment', 'relationship-relationship-to-node', 'relationship-node-to-relationship']
+      : ['relationship-assignment', 'relationship-arm-composition', 'relationship-node-to-relationship', 'relationship-relationship-to-node', 'relationship-chain'])
       .map(id));
     expect(model.folders[id('folder-diagrams')].itemIds).toEqual((desktop
       ? ['view-manhattan', 'view-manual']
@@ -105,8 +116,8 @@ describe('Phase 2 reciprocal Archi 5.9 fixtures', () => {
       .map(id));
 
     expect(model.views[id('view-manual')].childIds).toEqual((desktop
-      ? ['node-note', 'node-group', 'node-legend', 'node-role']
-      : ['node-group', 'node-role', 'node-note', 'node-legend'])
+      ? ['node-note', 'node-arm-platform', 'node-group', 'node-legend', 'node-role']
+      : ['node-group', 'node-role', 'node-note', 'node-legend', 'node-arm-parent'])
       .map(id));
     expect(model.nodes[id('node-group')]).toMatchObject({
       childIds: (desktop ? ['node-process', 'node-actor'] : ['node-actor', 'node-process']).map(id),
@@ -277,6 +288,87 @@ describe('Phase 2 reciprocal Archi 5.9 fixtures', () => {
     ]);
   });
 
+  it.each(['online', 'desktop'])('pins an ARM element nesting relationship and derived hide/reveal behavior in %s', async (origin) => {
+    const model = await parseArchimateDocument(fixture(`phase2-${origin}.archimate`));
+    const desktop = origin === 'desktop';
+    const ids = desktop ? {
+      view: 'p2d-view-manual',
+      parentElement: 'p2d-element-arm-platform',
+      childElement: 'p2d-element-arm-service',
+      relationship: 'p2d-relationship-arm-composition',
+      parentNode: 'p2d-node-arm-platform',
+      childNode: 'p2d-node-arm-service',
+      connection: 'p2d-connection-arm-composition',
+    } : {
+      view: 'p2o-view-manual',
+      parentElement: 'p2o-element-arm-parent',
+      childElement: 'p2o-element-arm-child',
+      relationship: 'p2o-relationship-arm-composition',
+      parentNode: 'p2o-node-arm-parent',
+      childNode: 'p2o-node-arm-child',
+      connection: 'p2o-connection-arm-composition',
+    };
+
+    expect(model.elements[ids.parentElement]).toMatchObject({ type: 'ApplicationComponent' });
+    expect(model.elements[ids.childElement]).toMatchObject({ type: 'ApplicationComponent' });
+    expect(model.nodes[ids.parentNode]).toMatchObject({
+      nodeType: 'element',
+      elementId: ids.parentElement,
+      parentId: ids.view,
+      childIds: [ids.childNode],
+    });
+    expect(model.nodes[ids.childNode]).toMatchObject({
+      nodeType: 'element',
+      elementId: ids.childElement,
+      parentId: ids.parentNode,
+      childIds: [],
+    });
+    expect(model.relationships[ids.relationship]).toMatchObject({
+      type: 'CompositionRelationship',
+      sourceId: ids.parentElement,
+      targetId: ids.childElement,
+    });
+    expect(model.connections[ids.connection]).toMatchObject({
+      viewId: ids.view,
+      connType: 'relationship',
+      relationshipId: ids.relationship,
+      sourceId: ids.parentNode,
+      targetId: ids.childNode,
+    });
+    expect(model.nodes[ids.parentNode].sourceConnectionIds).toContain(ids.connection);
+    expect(model.nodes[ids.childNode].targetConnectionIds).toContain(ids.connection);
+
+    const nestedVisibility = createNestedConnectionVisibilityResolver(model, DEFAULT_SETTINGS);
+    expect(nestedVisibility(ids.connection)).toBe(false);
+
+    const store = createModelStore({ model });
+    const unnestPlan = analyzeNestingChange(model, {
+      viewId: ids.view,
+      trigger: 'move',
+      entries: [{
+        kind: 'move',
+        nodeId: ids.childNode,
+        parentId: ids.view,
+        bounds: desktop
+          ? { x: 1120, y: 520, width: 155, height: 65 }
+          : { x: 470, y: 410, width: 150, height: 70 },
+      }],
+    }, DEFAULT_SETTINGS);
+    expect(unnestPlan.visibilityChanges).toContainEqual({
+      connectionId: ids.connection,
+      before: false,
+      after: true,
+    });
+
+    applyNestingChange(unnestPlan, {}, store);
+    const unnested = store.getState().model!;
+    expect(unnested.nodes[ids.childNode].parentId).toBe(ids.view);
+    expect(unnested.nodes[ids.parentNode].childIds).not.toContain(ids.childNode);
+    expect(unnested.connections[ids.connection]).toBeDefined();
+    expect(createNestedConnectionVisibilityResolver(unnested, DEFAULT_SETTINGS)(ids.connection))
+      .toBe(true);
+  });
+
   it.each([
     ['phase2-malformed-missing-endpoint.archimate', /endpoint missing/i],
     ['phase2-malformed-endpoint-cycle.archimate', /endpoint cycle/i],
@@ -301,6 +393,11 @@ describe('Phase 2 reciprocal Archi 5.9 fixtures', () => {
     const desktopBefore = digest(desktopArtifacts);
     const generator = readFileSync(join(root, 'tools', 'generate-phase2-fixtures.mjs'), 'utf8');
     expect(generator).not.toMatch(/desktop|--desktop-seed|--desktop-semantics/i);
+    const captureIndex = generator.indexOf('const onlineSemantics = canonicalizePhase2Model(online);');
+    const serializeIndex = generator.indexOf('await serializeArchimateDocument(online)');
+    expect(captureIndex).toBeGreaterThan(-1);
+    expect(captureIndex).toBeLessThan(serializeIndex);
+    expect(generator).toContain('JSON.stringify(onlineSemantics, null, 2)');
 
     const temporaryOutput = mkdtempSync(join(tmpdir(), 'archi-online-phase2-generation-'));
     try {

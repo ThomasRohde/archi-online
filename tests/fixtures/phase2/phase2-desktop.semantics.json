@@ -38,7 +38,10 @@
       "properties": [],
       "parentId": null,
       "folderIds": [],
-      "itemIds": []
+      "itemIds": [
+        "p2d-element-arm-service",
+        "p2d-element-arm-platform"
+      ]
     },
     {
       "id": "p2d-folder-business",
@@ -139,6 +142,7 @@
       "folderIds": [],
       "itemIds": [
         "p2d-relationship-chain",
+        "p2d-relationship-arm-composition",
         "p2d-relationship-assignment",
         "p2d-relationship-relationship-to-node",
         "p2d-relationship-node-to-relationship"
@@ -189,6 +193,40 @@
       "folderId": "p2d-folder-business-nested"
     },
     {
+      "id": "p2d-element-arm-platform",
+      "kind": "element",
+      "type": "ApplicationComponent",
+      "name": "Desktop Platform Boundary",
+      "documentation": "Desktop parent occurrence with independently ordered properties and geometry",
+      "properties": [
+        {
+          "key": "origin-order",
+          "value": "child-first"
+        },
+        {
+          "key": "probe",
+          "value": "desktop:arm-platform"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-application"
+    },
+    {
+      "id": "p2d-element-arm-service",
+      "kind": "element",
+      "type": "ApplicationComponent",
+      "name": "Desktop Nested Runtime",
+      "documentation": "Desktop child occurrence authored directly inside another element occurrence",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:arm-service"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-application"
+    },
+    {
       "id": "p2d-element-process",
       "kind": "element",
       "type": "BusinessProcess",
@@ -224,6 +262,27 @@
     }
   ],
   "relationships": [
+    {
+      "id": "p2d-relationship-arm-composition",
+      "kind": "relationship",
+      "type": "CompositionRelationship",
+      "name": "Desktop ARM containment",
+      "documentation": "Desktop-native stored occurrence is hidden only while directly nested",
+      "properties": [
+        {
+          "key": "origin-order",
+          "value": "desktop-independent"
+        },
+        {
+          "key": "probe",
+          "value": "desktop:relationship:arm-composition"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-relations",
+      "sourceId": "p2d-element-arm-platform",
+      "targetId": "p2d-element-arm-service"
+    },
     {
       "id": "p2d-relationship-assignment",
       "kind": "relationship",
@@ -327,6 +386,7 @@
       "viewpoint": "business_process_cooperation",
       "childIds": [
         "p2d-node-note",
+        "p2d-node-arm-platform",
         "p2d-node-group",
         "p2d-node-legend",
         "p2d-node-role"
@@ -353,6 +413,54 @@
       ],
       "targetConnectionIds": [
         "p2d-connection-plain-chain"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2d-node-arm-platform",
+      "nodeType": "element",
+      "elementId": "p2d-element-arm-platform",
+      "viewId": "p2d-view-manual",
+      "parentId": "p2d-view-manual",
+      "bounds": {
+        "x": 60,
+        "y": 370,
+        "width": 480,
+        "height": 250
+      },
+      "childIds": [
+        "p2d-node-arm-service"
+      ],
+      "sourceConnectionIds": [
+        "p2d-connection-arm-composition"
+      ],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2d-node-arm-service",
+      "nodeType": "element",
+      "elementId": "p2d-element-arm-service",
+      "viewId": "p2d-view-manual",
+      "parentId": "p2d-node-arm-platform",
+      "bounds": {
+        "x": 260,
+        "y": 105,
+        "width": 155,
+        "height": 65
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [
+        "p2d-connection-arm-composition"
       ],
       "lineWidth": 1,
       "alpha": 255,
@@ -557,6 +665,24 @@
     }
   ],
   "connections": [
+    {
+      "id": "p2d-connection-arm-composition",
+      "viewId": "p2d-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "relationship",
+      "relationshipId": "p2d-relationship-arm-composition",
+      "sourceId": "p2d-node-arm-platform",
+      "targetId": "p2d-node-arm-service",
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
     {
       "id": "p2d-connection-assignment",
       "viewId": "p2d-view-manual",

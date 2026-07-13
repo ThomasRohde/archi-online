@@ -24,7 +24,17 @@
     <property key="probe" value="online:folder"/>
     <property value="blank-key"/>
   </folder>
-  <folder name="Application" id="p2o-folder-application" type="application"/>
+  <folder name="Application" id="p2o-folder-application" type="application">
+    <element xsi:type="archimate:ApplicationComponent" name="Online ARM Container" id="p2o-element-arm-parent">
+      <documentation>Online direct element nesting parent</documentation>
+      <property key="probe" value="online:arm-parent"/>
+      <property key="origin-order" value="parent-first"/>
+    </element>
+    <element xsi:type="archimate:ApplicationComponent" name="Online ARM Nested Component" id="p2o-element-arm-child">
+      <documentation>Online direct element nesting child</documentation>
+      <property key="probe" value="online:arm-child"/>
+    </element>
+  </folder>
   <folder name="Technology &amp; Physical" id="p2o-folder-technology" type="technology"/>
   <folder name="Motivation" id="p2o-folder-motivation" type="motivation"/>
   <folder name="Implementation &amp; Migration" id="p2o-folder-implementation_migration" type="implementation_migration"/>
@@ -33,6 +43,10 @@
     <element xsi:type="archimate:AssignmentRelationship" name="Assignment" id="p2o-relationship-assignment" source="p2o-element-actor" target="p2o-element-role">
       <documentation>Phase 2 Assignment documentation</documentation>
       <property key="probe" value="online:relationship:assignment"/>
+    </element>
+    <element xsi:type="archimate:CompositionRelationship" name="Online ARM Composition" id="p2o-relationship-arm-composition" source="p2o-element-arm-parent" target="p2o-element-arm-child">
+      <documentation>Stored relationship hidden only while its occurrences are directly nested</documentation>
+      <property key="probe" value="online:relationship:arm-composition"/>
     </element>
     <element xsi:type="archimate:AssociationRelationship" name="Node to relationship" id="p2o-relationship-node-to-relationship" source="p2o-element-process" target="p2o-relationship-assignment">
       <documentation>Phase 2 Node to relationship documentation</documentation>
@@ -91,6 +105,13 @@
         <bounds x="875" y="20" width="240" height="300"/>
         <feature name="legend" value="display=11,rows=4,offset=12,color=2,sort=0"/>
         <property key="probe" value="online:legend"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="p2o-node-arm-parent" archimateElement="p2o-element-arm-parent">
+        <bounds x="20" y="300" width="400" height="220"/>
+        <sourceConnection xsi:type="archimate:Connection" id="p2o-connection-arm-composition" source="p2o-node-arm-parent" target="p2o-node-arm-child" archimateRelationship="p2o-relationship-arm-composition"/>
+        <child xsi:type="archimate:DiagramObject" id="p2o-node-arm-child" targetConnections="p2o-connection-arm-composition" archimateElement="p2o-element-arm-child">
+          <bounds x="35" y="80" width="150" height="70"/>
+        </child>
       </child>
       <documentation>Manual router, topology, annotation, legend, and productivity probes</documentation>
       <property key="probe" value="online:view:manual"/>

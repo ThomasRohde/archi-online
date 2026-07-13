@@ -38,7 +38,10 @@
       "properties": [],
       "parentId": null,
       "folderIds": [],
-      "itemIds": []
+      "itemIds": [
+        "p2o-element-arm-parent",
+        "p2o-element-arm-child"
+      ]
     },
     {
       "id": "p2o-folder-business",
@@ -139,6 +142,7 @@
       "folderIds": [],
       "itemIds": [
         "p2o-relationship-assignment",
+        "p2o-relationship-arm-composition",
         "p2o-relationship-node-to-relationship",
         "p2o-relationship-relationship-to-node",
         "p2o-relationship-chain"
@@ -189,6 +193,40 @@
       "folderId": "p2o-folder-business-nested"
     },
     {
+      "id": "p2o-element-arm-child",
+      "kind": "element",
+      "type": "ApplicationComponent",
+      "name": "Online ARM Nested Component",
+      "documentation": "Online direct element nesting child",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:arm-child"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-application"
+    },
+    {
+      "id": "p2o-element-arm-parent",
+      "kind": "element",
+      "type": "ApplicationComponent",
+      "name": "Online ARM Container",
+      "documentation": "Online direct element nesting parent",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:arm-parent"
+        },
+        {
+          "key": "origin-order",
+          "value": "parent-first"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-application"
+    },
+    {
       "id": "p2o-element-process",
       "kind": "element",
       "type": "BusinessProcess",
@@ -224,6 +262,23 @@
     }
   ],
   "relationships": [
+    {
+      "id": "p2o-relationship-arm-composition",
+      "kind": "relationship",
+      "type": "CompositionRelationship",
+      "name": "Online ARM Composition",
+      "documentation": "Stored relationship hidden only while its occurrences are directly nested",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:relationship:arm-composition"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-relations",
+      "sourceId": "p2o-element-arm-parent",
+      "targetId": "p2o-element-arm-child"
+    },
     {
       "id": "p2o-relationship-assignment",
       "kind": "relationship",
@@ -329,7 +384,8 @@
         "p2o-node-group",
         "p2o-node-role",
         "p2o-node-note",
-        "p2o-node-legend"
+        "p2o-node-legend",
+        "p2o-node-arm-parent"
       ],
       "connectionRouterType": 0
     }
@@ -354,6 +410,54 @@
       "targetConnectionIds": [
         "p2o-connection-chain"
       ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2o-node-arm-child",
+      "nodeType": "element",
+      "elementId": "p2o-element-arm-child",
+      "viewId": "p2o-view-manual",
+      "parentId": "p2o-node-arm-parent",
+      "bounds": {
+        "x": 35,
+        "y": 80,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [
+        "p2o-connection-arm-composition"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2o-node-arm-parent",
+      "nodeType": "element",
+      "elementId": "p2o-element-arm-parent",
+      "viewId": "p2o-view-manual",
+      "parentId": "p2o-view-manual",
+      "bounds": {
+        "x": 20,
+        "y": 300,
+        "width": 400,
+        "height": 220
+      },
+      "childIds": [
+        "p2o-node-arm-child"
+      ],
+      "sourceConnectionIds": [
+        "p2o-connection-arm-composition"
+      ],
+      "targetConnectionIds": [],
       "lineWidth": 1,
       "alpha": 255,
       "lineAlpha": 255,
@@ -557,6 +661,24 @@
     }
   ],
   "connections": [
+    {
+      "id": "p2o-connection-arm-composition",
+      "viewId": "p2o-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "relationship",
+      "relationshipId": "p2o-relationship-arm-composition",
+      "sourceId": "p2o-node-arm-parent",
+      "targetId": "p2o-node-arm-child",
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
     {
       "id": "p2o-connection-assignment",
       "viewId": "p2o-view-manual",

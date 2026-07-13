@@ -48,8 +48,13 @@ export function buildPhase2OnlineFixtureModel() {
     folderIds: [],
     itemIds: [id('element-actor'), id('element-role'), id('element-process')],
   };
+  folders[id('folder-application')].itemIds = [
+    id('element-arm-parent'),
+    id('element-arm-child'),
+  ];
   folders[id('folder-relations')].itemIds = [
     id('relationship-assignment'),
+    id('relationship-arm-composition'),
     id('relationship-node-to-relationship'),
     id('relationship-relationship-to-node'),
     id('relationship-chain'),
@@ -75,6 +80,21 @@ export function buildPhase2OnlineFixtureModel() {
       properties: [{ key: 'probe', value: `${origin}:process` }],
       profileIds: [], folderId: id('folder-business-nested'),
     },
+    [id('element-arm-parent')]: {
+      id: id('element-arm-parent'), kind: 'element', type: 'ApplicationComponent',
+      name: 'Online ARM Container', documentation: 'Online direct element nesting parent',
+      properties: [
+        { key: 'probe', value: `${origin}:arm-parent` },
+        { key: 'origin-order', value: 'parent-first' },
+      ],
+      profileIds: [], folderId: id('folder-application'),
+    },
+    [id('element-arm-child')]: {
+      id: id('element-arm-child'), kind: 'element', type: 'ApplicationComponent',
+      name: 'Online ARM Nested Component', documentation: 'Online direct element nesting child',
+      properties: [{ key: 'probe', value: `${origin}:arm-child` }],
+      profileIds: [], folderId: id('folder-application'),
+    },
   };
 
   const relationship = (suffix, sourceId, targetId, name) => ({
@@ -87,6 +107,14 @@ export function buildPhase2OnlineFixtureModel() {
     [id('relationship-assignment')]: relationship(
       'assignment', id('element-actor'), id('element-role'), 'Assignment',
     ),
+    [id('relationship-arm-composition')]: {
+      id: id('relationship-arm-composition'), kind: 'relationship',
+      type: 'CompositionRelationship', name: 'Online ARM Composition',
+      documentation: 'Stored relationship hidden only while its occurrences are directly nested',
+      properties: [{ key: 'probe', value: `${origin}:relationship:arm-composition` }],
+      profileIds: [], folderId: id('folder-relations'),
+      sourceId: id('element-arm-parent'), targetId: id('element-arm-child'),
+    },
     [id('relationship-node-to-relationship')]: relationship(
       'node-to-relationship', id('element-process'), id('relationship-assignment'), 'Node to relationship',
     ),
@@ -139,6 +167,15 @@ export function buildPhase2OnlineFixtureModel() {
       },
       viewId: id('view-manual'), parentId: id('view-manual'), bounds: bounds(875, 20, 240, 300), childIds: [],
     }),
+    [id('node-arm-parent')]: connectable({
+      id: id('node-arm-parent'), nodeType: 'element', elementId: id('element-arm-parent'),
+      viewId: id('view-manual'), parentId: id('view-manual'), bounds: bounds(20, 300, 400, 220),
+      childIds: [id('node-arm-child')],
+    }),
+    [id('node-arm-child')]: connectable({
+      id: id('node-arm-child'), nodeType: 'element', elementId: id('element-arm-child'),
+      viewId: id('view-manual'), parentId: id('node-arm-parent'), bounds: bounds(35, 80), childIds: [],
+    }),
     [id('node-manhattan-actor')]: connectable({
       id: id('node-manhattan-actor'), nodeType: 'element', elementId: id('element-actor'),
       viewId: id('view-manhattan'), parentId: id('view-manhattan'), bounds: bounds(80, 100), childIds: [],
@@ -164,6 +201,10 @@ export function buildPhase2OnlineFixtureModel() {
       connType: 'relationship', relationshipId: id('relationship-assignment'),
       sourceId: id('node-actor'), targetId: id('node-role'),
       bendpoints: [{ startX: 30, startY: 20, endX: -20, endY: -15 }],
+    }),
+    [id('connection-arm-composition')]: connection('arm-composition', {
+      connType: 'relationship', relationshipId: id('relationship-arm-composition'),
+      sourceId: id('node-arm-parent'), targetId: id('node-arm-child'),
     }),
     [id('connection-node-to-relationship')]: connection('node-to-relationship', {
       connType: 'relationship', relationshipId: id('relationship-node-to-relationship'),
@@ -208,6 +249,8 @@ export function buildPhase2OnlineFixtureModel() {
   nodes[id('node-process')].targetConnectionIds = [id('connection-relationship-to-node')];
   nodes[id('node-role')].targetConnectionIds = [id('connection-assignment'), id('connection-plain-chain')];
   nodes[id('node-note')].sourceConnectionIds = [id('connection-plain-note')];
+  nodes[id('node-arm-parent')].sourceConnectionIds = [id('connection-arm-composition')];
+  nodes[id('node-arm-child')].targetConnectionIds = [id('connection-arm-composition')];
   connections[id('connection-assignment')].sourceConnectionIds = [id('connection-relationship-to-node')];
   connections[id('connection-assignment')].targetConnectionIds = [
     id('connection-node-to-relationship'),
@@ -224,7 +267,9 @@ export function buildPhase2OnlineFixtureModel() {
       documentation: 'Manual router, topology, annotation, legend, and productivity probes',
       properties: [{ key: 'probe', value: `${origin}:view:manual` }], folderId: id('folder-diagrams'),
       viewpoint: 'business_process_cooperation',
-      childIds: [id('node-group'), id('node-role'), id('node-note'), id('node-legend')],
+      childIds: [
+        id('node-group'), id('node-role'), id('node-note'), id('node-legend'), id('node-arm-parent'),
+      ],
       connectionRouterType: 0,
     },
     [id('view-manhattan')]: {
@@ -267,12 +312,13 @@ export async function generatePhase2Fixtures({
   try {
     const { serializeArchimateDocument } = await server.ssrLoadModule('/src/model/io/archimate-document.ts');
     const online = buildPhase2OnlineFixtureModel();
+    const onlineSemantics = canonicalizePhase2Model(online);
     const onlineBytes = await serializeArchimateDocument(online);
     await mkdir(outputDir, { recursive: true });
     await writeFile(join(outputDir, 'phase2-online.archimate'), onlineBytes);
     await writeFile(
       join(outputDir, 'phase2-online.semantics.json'),
-      `${JSON.stringify(canonicalizePhase2Model(online), null, 2)}\n`,
+      `${JSON.stringify(onlineSemantics, null, 2)}\n`,
     );
 
     const onlineXml = new TextDecoder().decode(onlineBytes);

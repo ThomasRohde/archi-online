@@ -16,7 +16,8 @@ deliberately distinct from the Online pair. Together the fixtures cover:
 - the complete root-folder set and a nested custom folder;
 - properties on the model, folders, concepts, views, groups, notes, legends,
   and plain connections, including blank, duplicate, ordered, and rename keys;
-- nested elements and semantic nesting candidates;
+- directly nested Application Components with a legal Composition relationship,
+  stored diagram occurrence, and derived hidden/revealed rendering;
 - node-to-connection, connection-to-node, and recursive semantic/visual chains;
 - manual and Manhattan routers, including dormant manual bendpoints;
 - a named, documented, property-bearing note connection; and

@@ -13,7 +13,7 @@ byte-for-byte unchanged.
 | Check | Desktop Archi 5.9 | Archi Online |
 | --- | --- | --- |
 | Full root folders and nested custom folder | Verified semantically | Verified semantically and in tree |
-| Nested element topology | Verified semantically | Verified semantically and visually |
+| Directly nested Application Components, stored Composition, and hide/reveal behavior | Verified semantically | Verified semantically, visually, and through ARM apply/undo |
 | Node-to-connection and connection-to-node endpoints | Verified semantically | Verified semantically and visually |
 | Recursive relationship/visual endpoint chains | Verified semantically | Verified semantically and visually |
 | Manual router and explicit bendpoints | Verified semantically | Verified semantically and visually |
