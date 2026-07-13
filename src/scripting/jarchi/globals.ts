@@ -1,16 +1,14 @@
 import { getActiveModelStore, type ModelStore } from '../../model/store';
+import { captureThen, promiseFromCapturedThen } from '../../model/promise-like';
+import {
+  getModelStoreWorkspaceLease,
+  isModelStoreWorkspaceLeaseOpen,
+} from '../../model/workspace';
 import { JCollection } from './collection';
 import { $$ } from './query';
 import { JModel, JObject } from './wrappers';
 
 type Dollar = ((selector: string | JObject | JCollection) => JCollection) & { model: JModel };
-
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return (
-    (typeof value === 'object' && value !== null)
-    || typeof value === 'function'
-  ) && typeof (value as PromiseLike<unknown>).then === 'function';
-}
 
 export function createJArchiGlobals(
   modelStore: ModelStore = getActiveModelStore(),
@@ -44,6 +42,14 @@ interface SynchronousExtensionInvocation {
 
 interface ExtensionInvocationOptions {
   caller?: object;
+  requireImmediate?: boolean;
+}
+
+export class ExtensionInvocationBusyError extends Error {
+  constructor() {
+    super('Extension invocation cannot start because the model store is busy.');
+    this.name = 'ExtensionInvocationBusyError';
+  }
 }
 
 const activeExtensionInvocationStores = new WeakSet<ModelStore>();
@@ -180,8 +186,25 @@ export function createExtensionJArchiGlobals() {
         .then(() => { throw error; })
         .finally(() => finish(store, ownsStoreLease)) as Promise<Awaited<T>>;
     }
-    if (isPromiseLike(result) || runtime.children.size > 0) {
-      return Promise.resolve(result)
+    let resultPromise: Promise<Awaited<T>> | null = null;
+    try {
+      if (runtime.children.size > 0) {
+        resultPromise = Promise.resolve(result);
+      } else {
+        const capturedThen = captureThen(result);
+        if (capturedThen) resultPromise = promiseFromCapturedThen<T>(capturedThen);
+      }
+    } catch (error) {
+      if (runtime.children.size === 0) {
+        finish(store, ownsStoreLease);
+        throw error;
+      }
+      return waitForInvocationChildren(runtime)
+        .then(() => { throw error; })
+        .finally(() => finish(store, ownsStoreLease)) as Promise<Awaited<T>>;
+    }
+    if (resultPromise) {
+      return resultPromise
         .then(
           async (value) => {
             await waitForInvocationChildren(runtime);
@@ -198,19 +221,55 @@ export function createExtensionJArchiGlobals() {
     return result;
   };
 
+  const trackNestedResult = <T>(
+    parentRuntime: ExtensionInvocationRuntime,
+    result: T,
+  ): T | Promise<Awaited<T>> => {
+    const capturedThen = captureThen(result);
+    if (!capturedThen) return result;
+    const promise = promiseFromCapturedThen<T>(capturedThen);
+    trackInvocationChild(parentRuntime, promise);
+    return promise;
+  };
+
   const enqueue = <T>(
     store: ModelStore,
     callback: () => T,
-  ): Promise<Awaited<T>> => new Promise((resolve, reject) => {
-    extensionInvocationQueue.push({
-      runtime,
-      store,
-      start: () => start(store, callback),
-      resolve: (value) => resolve(value as Awaited<T>),
-      reject,
+  ): Promise<Awaited<T>> => {
+    const modelEpoch = store.getState().modelEpoch;
+    const workspaceLease = getModelStoreWorkspaceLease(store) ?? null;
+    const assertCurrentBinding = () => {
+      const currentLease = getModelStoreWorkspaceLease(store) ?? null;
+      if (
+        currentLease !== workspaceLease
+        || (
+          workspaceLease !== null
+          && !isModelStoreWorkspaceLeaseOpen(
+            store,
+            workspaceLease,
+          )
+        )
+      ) {
+        throw new Error('Queued extension model session is no longer available.');
+      }
+      if (store.getState().modelEpoch !== modelEpoch) {
+        throw new Error('Queued extension model context changed before invocation.');
+      }
+    };
+    return new Promise((resolve, reject) => {
+      extensionInvocationQueue.push({
+        runtime,
+        store,
+        start: () => {
+          assertCurrentBinding();
+          return start(store, callback);
+        },
+        resolve: (value) => resolve(value as Awaited<T>),
+        reject,
+      });
+      drainExtensionInvocations();
     });
-    drainExtensionInvocations();
-  });
+  };
 
   const invoke = <T>(
     store: ModelStore,
@@ -221,14 +280,23 @@ export function createExtensionJArchiGlobals() {
       ? extensionInvokerRuntimes.get(options.caller)
       : undefined;
     if (
+      options?.requireImmediate
+      && (
+        runtime.running
+        || activeExtensionInvocationStores.has(store)
+        || hasQueuedInvocationConflict(runtime, store)
+      )
+    ) {
+      throw new ExtensionInvocationBusyError();
+    }
+    if (
       runtime.running
       && synchronousDepth > 0
       && store === runtime.store
       && (!callerRuntime || callerRuntime === runtime)
     ) {
       const result = runCallback(store, callback);
-      if (isPromiseLike(result)) trackInvocationChild(runtime, Promise.resolve(result));
-      return result;
+      return trackNestedResult(runtime, result);
     }
     const synchronousParent = synchronousExtensionInvocations.at(-1);
     if (
@@ -237,22 +305,17 @@ export function createExtensionJArchiGlobals() {
       && activeExtensionInvocationStores.has(store)
     ) {
       const result = start(store, callback, false);
-      if (isPromiseLike(result)) {
-        trackInvocationChild(synchronousParent.runtime, Promise.resolve(result));
-      }
+      if (result instanceof Promise) trackInvocationChild(synchronousParent.runtime, result);
       return result;
     }
     if (callerRuntime?.running && callerRuntime.store === store) {
       if (runtime === callerRuntime) {
         const result = runCallback(store, callback);
-        if (isPromiseLike(result)) trackInvocationChild(runtime, Promise.resolve(result));
-        return result;
+        return trackNestedResult(runtime, result);
       }
       if (!runtime.running) {
         const result = start(store, callback, false);
-        if (isPromiseLike(result)) {
-          trackInvocationChild(callerRuntime, Promise.resolve(result));
-        }
+        if (result instanceof Promise) trackInvocationChild(callerRuntime, result);
         return result;
       }
       const reason = runtime.store === store

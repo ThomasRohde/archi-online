@@ -32,6 +32,14 @@ function storage(initial?: unknown) {
 
 let persistenceStore = memoryKeyValueStore();
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   persistenceStore = memoryKeyValueStore();
   setDefaultKeyValueStoreForTests(persistenceStore);
@@ -537,6 +545,159 @@ describe('extension app API and runtime', () => {
     expect(useStore.getState().undoStack.map((tx) => tx.label)).toEqual([
       'Extension load: Load Batch',
     ]);
+  });
+
+  it('rejects a successful extension load immediately while its model store is busy', async () => {
+    replaceModel(createEmptyModel('Busy load'), null);
+    const registry = createExtensionRegistry();
+    const gate = deferred();
+    expect(runExtensionRecord({
+      id: 'local.load-blocker',
+      name: 'Load blocker',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.load-blocker.wait", {
+          title: "Wait",
+          async run(_context, args) { await args.gate; }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    const blocker = registry.runCommand('local.load-blocker.wait', { gate: gate.promise });
+
+    const result = runExtensionRecord({
+      id: 'local.busy-success',
+      name: 'Busy success',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.busy-success.command", {
+          title: "Should not register",
+          run() {}
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry);
+    const registeredImmediately = registry.getSnapshot().commands
+      .some((command) => command.id === 'local.busy-success.command');
+    gate.resolve();
+    await blocker;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(result.error).toMatch(/busy/i);
+    expect(registeredImmediately).toBe(false);
+    expect(registry.getSnapshot().commands.map((command) => command.id))
+      .not.toContain('local.busy-success.command');
+    expect(registry.getSnapshot().errors.at(-1)).toMatchObject({
+      extensionId: 'local.busy-success',
+      message: expect.stringMatching(/busy/i),
+    });
+  });
+
+  it('preserves existing contributions when the same extension reload is busy', async () => {
+    replaceModel(createEmptyModel('Busy reload'), null);
+    const registry = createExtensionRegistry();
+    const gate = deferred();
+    expect(runExtensionRecord({
+      id: 'local.busy-reload',
+      name: 'Busy reload',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.busy-reload.wait", {
+          title: "Wait",
+          async run(_context, args) { await args.gate; }
+        });
+        app.commands.register("local.busy-reload.stable", {
+          title: "Stable",
+          run() { return "old contribution"; }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    const blocker = registry.runCommand('local.busy-reload.wait', { gate: gate.promise });
+
+    const result = runExtensionRecord({
+      id: 'local.busy-reload',
+      name: 'Busy reload',
+      version: '0.2.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.busy-reload.replacement", {
+          title: "Replacement",
+          run() { return "new contribution"; }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 2,
+    }, registry);
+    const commandIdsWhileBusy = registry.getSnapshot().commands
+      .map((command) => command.id);
+    gate.resolve();
+    await blocker;
+
+    expect(result.error).toMatch(/busy/i);
+    expect(commandIdsWhileBusy).toEqual([
+      'local.busy-reload.wait',
+      'local.busy-reload.stable',
+    ]);
+    await expect(registry.runCommand('local.busy-reload.stable'))
+      .resolves.toBe('old contribution');
+    expect(registry.getSnapshot().commands.map((command) => command.id))
+      .not.toContain('local.busy-reload.replacement');
+  });
+
+  it('rejects a failing extension load before partial registration while busy', async () => {
+    replaceModel(createEmptyModel('Busy failing load'), null);
+    const registry = createExtensionRegistry();
+    const gate = deferred();
+    expect(runExtensionRecord({
+      id: 'local.error-load-blocker',
+      name: 'Error load blocker',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.error-load-blocker.wait", {
+          title: "Wait",
+          async run(_context, args) { await args.gate; }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    const blocker = registry.runCommand('local.error-load-blocker.wait', { gate: gate.promise });
+
+    const result = runExtensionRecord({
+      id: 'local.busy-error',
+      name: 'Busy error',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.busy-error.partial", {
+          title: "Partial",
+          run() {}
+        });
+        throw new Error("late load failure");
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry);
+    if (result.error) {
+      gate.resolve();
+      await blocker;
+    }
+
+    expect(result.error).toMatch(/busy/i);
+    expect(registry.getSnapshot().commands.map((command) => command.id))
+      .not.toContain('local.busy-error.partial');
+    expect(registry.getSnapshot().errors.at(-1)).toMatchObject({
+      extensionId: 'local.busy-error',
+      message: expect.stringMatching(/busy/i),
+    });
   });
 
   it('records command errors without rejecting callers', async () => {

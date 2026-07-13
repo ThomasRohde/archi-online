@@ -3,7 +3,8 @@ import { createExtensionRegistry } from '../src/extensions/registry';
 import { startExtensionEventBridge } from '../src/extensions/events';
 import { runExtensionRecord } from '../src/extensions/runtime';
 import { addElement, createEmptyModel } from '../src/model/ops';
-import { undo } from '../src/model/store';
+import { replaceModel, undo } from '../src/model/store';
+import { createExtensionJArchiGlobals } from '../src/scripting/jarchi/globals';
 import {
   activateModelSession,
   addModelSession,
@@ -67,6 +68,35 @@ function installAsyncScopeExtension(
       });
       app.events.on("view.contextMenu", async function(payload) {
         await mutate(payload.label, payload);
+      });
+    `,
+    createdAt: 1,
+    updatedAt: 1,
+  }, registry);
+}
+
+function installQueuedScopeExtension(
+  registry: ReturnType<typeof createExtensionRegistry>,
+) {
+  return runExtensionRecord({
+    id: 'local.queued-scope',
+    name: 'Queued scope',
+    version: '0.1.0',
+    enabled: true,
+    source: `
+      app.commands.register("local.queued-scope.wait", {
+        title: "Wait",
+        async run(_context, args) {
+          args.started();
+          await args.gate;
+        }
+      });
+      app.commands.register("local.queued-scope.mutate", {
+        title: "Queued mutate",
+        run(_context, args) {
+          args.started();
+          model.name = model.name + " queued";
+        }
       });
     `,
     createdAt: 1,
@@ -255,7 +285,7 @@ describe('multi-model extension integration', () => {
     expect(registry.getSnapshot().errors).toEqual([]);
   });
 
-  it('keeps an async command bound and batched to its captured invocation model', async () => {
+  it('keeps an async command bound with chronological undo on its captured model', async () => {
     const registry = createExtensionRegistry();
     const { firstId, first, secondId, second, actorId } = asyncExtensionSessions();
     activateModelSession(firstId);
@@ -278,17 +308,21 @@ describe('multi-model extension integration', () => {
     expect(first.getState().model!.elements[actorId].name).toBe('Actor A command');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
       'Extension: Async mutate',
+      'Rename',
+      'Rename',
     ]);
     expect(second.getState().model!.info.name).toBe('Async B');
     expect(second.getState().model!.elements[actorId].name).toBe('Actor B');
     expect(second.getState().undoStack).toHaveLength(0);
+    undo(first);
+    undo(first);
     undo(first);
     expect(first.getState().model!.info.documentation).toBe('');
     expect(first.getState().model!.info.name).toBe('Async A');
     expect(first.getState().model!.elements[actorId].name).toBe('Actor A');
   });
 
-  it('keeps an async event bound and batched to its captured invocation model', async () => {
+  it('keeps an async event bound with chronological undo on its captured model', async () => {
     const registry = createExtensionRegistry();
     const { firstId, first, secondId, second, actorId } = asyncExtensionSessions();
     activateModelSession(firstId);
@@ -311,6 +345,8 @@ describe('multi-model extension integration', () => {
     expect(first.getState().model!.elements[actorId].name).toBe('Actor A event');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
       'Extension event: view.contextMenu',
+      'Rename',
+      'Rename',
     ]);
     expect(second.getState().model!.info.name).toBe('Async B');
     expect(second.getState().model!.elements[actorId].name).toBe('Actor B');
@@ -369,7 +405,7 @@ describe('multi-model extension integration', () => {
 
     expect(first.getState().model!.info.name).toBe('Async A child');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
-      'Extension: Parent mutate',
+      'Rename',
     ]);
     expect(second.getState().model!.info.name).toBe('Async B');
     expect(second.getState().undoStack).toHaveLength(0);
@@ -438,7 +474,7 @@ describe('multi-model extension integration', () => {
     expect(result).toBe('parent result');
     expect(first.getState().model!.info.name).toBe('Async A pending');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
-      'Extension: Multiple-child parent',
+      'Rename',
     ]);
     expect(second.getState().model!.info.name).toBe('Async B');
     expect(second.getState().undoStack).toHaveLength(0);
@@ -479,10 +515,10 @@ describe('multi-model extension integration', () => {
 
     expect(first.getState().model!.info.name).toBe('Async A first');
     expect(first.getState().model!.elements[actorId].name).toBe('Actor A first');
-    expect(first.getState().undoStack).toHaveLength(1);
+    expect(first.getState().undoStack).toHaveLength(3);
     expect(second.getState().model!.info.name).toBe('Async B second');
     expect(second.getState().model!.elements[actorId].name).toBe('Actor B second');
-    expect(second.getState().undoStack).toHaveLength(1);
+    expect(second.getState().undoStack).toHaveLength(3);
   });
 
   it('serializes overlapping async invocations on one store into separate undo entries', async () => {
@@ -516,14 +552,80 @@ describe('multi-model extension integration', () => {
     expect(first.getState().model!.elements[actorId].name).toBe('Actor A first second');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
       'Extension: Async mutate',
+      'Rename',
+      'Rename',
       'Extension: Async mutate',
+      'Rename',
+      'Rename',
     ]);
+    undo(first);
+    undo(first);
     undo(first);
     expect(first.getState().model!.info.name).toBe('Async A first');
     expect(first.getState().model!.elements[actorId].name).toBe('Actor A first');
     undo(first);
+    undo(first);
+    undo(first);
     expect(first.getState().model!.info.name).toBe('Async A');
     expect(first.getState().model!.elements[actorId].name).toBe('Actor A');
+  });
+
+  it('rejects queued work when its workspace lease closes before start', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(installQueuedScopeExtension(registry)).toEqual({});
+    const gate = deferred();
+    let blockerStarted = false;
+    let queuedStarted = false;
+
+    const blocker = registry.runCommand('local.queued-scope.wait', {
+      gate: gate.promise,
+      started() { blockerStarted = true; },
+    });
+    expect(blockerStarted).toBe(true);
+    const queued = registry.runCommand('local.queued-scope.mutate', {
+      started() { queuedStarted = true; },
+    });
+    removeModelSession(firstId);
+    gate.resolve();
+    await Promise.all([blocker, queued]);
+
+    expect(queuedStarted).toBe(false);
+    expect(first.getState().model!.info.name).toBe('Async A');
+    expect(first.getState().undoStack).toHaveLength(0);
+    expect(registry.getSnapshot().errors.at(-1)).toMatchObject({
+      extensionId: 'local.queued-scope',
+      message: expect.stringMatching(/no longer available/i),
+    });
+  });
+
+  it('rejects queued work when the store model epoch changes before start', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(installQueuedScopeExtension(registry)).toEqual({});
+    const gate = deferred();
+    let queuedStarted = false;
+
+    const blocker = registry.runCommand('local.queued-scope.wait', {
+      gate: gate.promise,
+      started() {},
+    });
+    const queued = registry.runCommand('local.queued-scope.mutate', {
+      started() { queuedStarted = true; },
+    });
+    replaceModel(createEmptyModel('Replacement'), null, false, {}, first);
+    gate.resolve();
+    await Promise.all([blocker, queued]);
+
+    expect(queuedStarted).toBe(false);
+    expect(first.getState().model!.info.name).toBe('Replacement');
+    expect(first.getState().undoStack).toHaveLength(0);
+    expect(registry.getSnapshot().errors.at(-1)).toMatchObject({
+      extensionId: 'local.queued-scope',
+      message: expect.stringMatching(/model context changed/i),
+    });
   });
 
   it('serializes overlapping async invocations from different extensions on one store', async () => {
@@ -582,12 +684,17 @@ describe('multi-model extension integration', () => {
     expect(first.getState().model!.info.name).toBe('Async A first second');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
       'Extension: First mutate',
+      'Rename',
       'Extension: Second mutate',
+      'Rename',
     ]);
     undo(first);
     expect(first.getState().model!.info.name).toBe('Async A first');
     undo(first);
+    expect(first.getState().model!.info.documentation).toBe('first before;');
+    undo(first);
     expect(first.getState().model!.info.name).toBe('Async A');
+    undo(first);
     expect(first.getState().model!.info.documentation).toBe('');
   });
 
@@ -643,8 +750,10 @@ describe('multi-model extension integration', () => {
 
     expect(first.getState().model!.info.name).toBe('Async A child parent');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
-      'Extension: Nested parent mutate',
+      'Rename',
+      'Rename',
     ]);
+    undo(first);
     undo(first);
     expect(first.getState().model!.info.name).toBe('Async A');
   });
@@ -694,7 +803,7 @@ describe('multi-model extension integration', () => {
     expect(result).toBe('parent result');
     expect(first.getState().model!.info.name).toBe('Async A parent');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
-      'Extension: Successful parent',
+      'Rename',
     ]);
     expect(registry.getSnapshot().errors).toHaveLength(1);
     expect(registry.getSnapshot().errors[0]).toMatchObject({
@@ -769,7 +878,8 @@ describe('multi-model extension integration', () => {
     expect(result).toBe('child');
     expect(first.getState().model!.info.name).toBe('Async A child parent');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
-      'Extension: Post-yield parent',
+      'Rename',
+      'Rename',
     ]);
     expect(registry.getSnapshot().errors).toEqual([]);
   });
@@ -827,7 +937,8 @@ describe('multi-model extension integration', () => {
     expect(leafStarted).toBe(false);
     expect(first.getState().model!.info.name).toBe('Async A b a');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
-      'Extension: Cycle parent',
+      'Rename',
+      'Rename',
     ]);
     expect(registry.getSnapshot().errors).toHaveLength(1);
     expect(registry.getSnapshot().errors[0]).toMatchObject({
@@ -899,10 +1010,56 @@ describe('multi-model extension integration', () => {
     expect(first.getState().model!.info.documentation).toBe('parent;');
     expect(first.getState().model!.info.name).toBe('Async A child');
     expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
-      'Extension: Fire parent',
+      'Edit Documentation',
+      'Rename',
     ]);
     expect(second.getState().model!.info.name).toBe('Async B');
     expect(second.getState().undoStack).toHaveLength(0);
+  });
+
+  it('reads a custom invocation then getter only once', async () => {
+    const { first } = asyncExtensionSessions();
+    const { invoke } = createExtensionJArchiGlobals();
+    let thenReads = 0;
+    const statefulThenable = Object.defineProperty({}, 'then', {
+      get() {
+        thenReads += 1;
+        if (thenReads > 1) throw new Error('then getter read twice');
+        return (resolve: (value: string) => void) => resolve('read once');
+      },
+    }) as PromiseLike<string>;
+
+    const result = invoke(first, () => statefulThenable);
+
+    expect(result).toBeInstanceOf(Promise);
+    await expect(Promise.resolve(result)).resolves.toBe('read once');
+    expect(thenReads).toBe(1);
+  });
+
+  it('releases runtime and store leases when a then getter throws', async () => {
+    const { first, second } = asyncExtensionSessions();
+    const { invoke } = createExtensionJArchiGlobals();
+    const throwingThen = Object.defineProperty({}, 'then', {
+      get() { throw new Error('then getter failed'); },
+    });
+
+    expect(() => invoke(first, () => throwingThen)).toThrow('then getter failed');
+    const { invoke: probeStore } = createExtensionJArchiGlobals();
+    let sameStoreStarted = false;
+    const sameStore = probeStore(first, () => {
+      sameStoreStarted = true;
+      return 'same store';
+    });
+    let nextStarted = false;
+    const next = invoke(second, () => {
+      nextStarted = true;
+      return 'next result';
+    });
+
+    expect(sameStoreStarted).toBe(true);
+    expect(nextStarted).toBe(true);
+    await expect(Promise.resolve(sameStore)).resolves.toBe('same store');
+    await expect(Promise.resolve(next)).resolves.toBe('next result');
   });
 });
 

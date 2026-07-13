@@ -8,6 +8,7 @@ import {
 import type { ModelState } from './types';
 import type { ElementType, RelationshipType } from './metamodel';
 import type { C4ElementKind } from './c4';
+import { captureThen, promiseFromCapturedThen } from './promise-like';
 
 enablePatches();
 
@@ -85,17 +86,11 @@ export interface ModelStore extends StoreApi<AppState> {
     recipe: (draft: ModelState) => void,
     options?: TransactionOptions,
   ): void;
+  runBatch<T>(label: string, fn: () => PromiseLike<T>): Promise<Awaited<T>>;
   runBatch<T>(label: string, fn: () => T): T;
 }
 
 const MAX_UNDO = 200;
-
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return (
-    (typeof value === 'object' && value !== null)
-    || typeof value === 'function'
-  ) && typeof (value as PromiseLike<unknown>).then === 'function';
-}
 
 function initialState(overrides: Partial<AppState> = {}): AppState {
   return {
@@ -169,7 +164,12 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
     pruneSelection(modelStore);
   };
 
-  modelStore.runBatch = (label, fn) => {
+  function executeBatch<T>(label: string, fn: () => PromiseLike<T>): Promise<Awaited<T>>;
+  function executeBatch<T>(label: string, fn: () => T): T;
+  function executeBatch<T>(
+    label: string,
+    fn: () => T,
+  ): T | Promise<Awaited<T>> {
     if (batchDepth === 0) {
       batchLabel = label;
       batchPatches = [];
@@ -178,7 +178,10 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
       batchSelectionAfter = undefined;
     }
     batchDepth++;
+    let finished = false;
     const finish = () => {
+      if (finished) return;
+      finished = true;
       batchDepth--;
       if (batchDepth === 0 && batchPatches.length > 0) {
         const tx: Transaction = {
@@ -192,28 +195,30 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
               }
             : {}),
         };
-        api.setState((current) => ({
-          undoStack: [...current.undoStack, tx].slice(-MAX_UNDO),
-          redoStack: [],
-        }));
         batchPatches = [];
         batchInverse = [];
         batchSelectionBefore = undefined;
         batchSelectionAfter = undefined;
+        api.setState((current) => ({
+          undoStack: [...current.undoStack, tx].slice(-MAX_UNDO),
+          redoStack: [],
+        }));
       }
     };
+    let result: T;
     try {
-      const result = fn();
-      if (isPromiseLike(result)) {
-        return Promise.resolve(result).finally(finish) as unknown as typeof result;
-      }
-      finish();
-      return result;
+      result = fn();
     } catch (error) {
       finish();
       throw error;
     }
-  };
+    finish();
+    const capturedThen = captureThen(result);
+    if (capturedThen) return promiseFromCapturedThen<T>(capturedThen);
+    return result;
+  }
+
+  modelStore.runBatch = executeBatch;
 
   return modelStore;
 }
@@ -254,7 +259,17 @@ export function transactWithSelection(
   targetStore(store).transact(label, recipe, { selectionAfter });
 }
 
-export function runBatch<T>(label: string, fn: () => T, store?: ModelStore): T {
+export function runBatch<T>(
+  label: string,
+  fn: () => PromiseLike<T>,
+  store?: ModelStore,
+): Promise<Awaited<T>>;
+export function runBatch<T>(label: string, fn: () => T, store?: ModelStore): T;
+export function runBatch<T>(
+  label: string,
+  fn: () => T,
+  store?: ModelStore,
+): T | Promise<Awaited<T>> {
   return targetStore(store).runBatch(label, fn);
 }
 

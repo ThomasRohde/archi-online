@@ -28,6 +28,7 @@ interface Owned<T> {
 
 export interface ExtensionModelStoreInvocationOptions {
   caller?: ExtensionModelStoreInvoker;
+  requireImmediate?: boolean;
 }
 
 export type ExtensionModelStoreInvoker = <T>(

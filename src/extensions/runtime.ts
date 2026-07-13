@@ -1,5 +1,8 @@
 import { JCollection } from '../scripting/jarchi';
-import { createExtensionJArchiGlobals } from '../scripting/jarchi/globals';
+import {
+  createExtensionJArchiGlobals,
+  ExtensionInvocationBusyError,
+} from '../scripting/jarchi/globals';
 import { getActiveModelStore, runBatch } from '../model/store';
 import type { ConsoleEntry } from '../scripting/runner';
 import { createAppApi } from './app-api';
@@ -75,7 +78,6 @@ export function runExtensionRecord(
   onConsole?: (entry: ConsoleEntry) => void,
   options?: { packageRecord?: InstalledExtensionPackage },
 ): { error?: string } {
-  registry.clearExtension(record.id);
   const loadStore = getActiveModelStore();
   const { $, model, invoke, resolveStore } = createExtensionJArchiGlobals();
   const app = createAppApi(record.id, registry, {
@@ -99,16 +101,21 @@ export function runExtensionRecord(
     );
     runBatch(
       `Extension load: ${record.name}`,
-      () => invoke(loadStore, () => {
-        fn($, model, app, extensionConsole(record.id, registry, onConsole), extensionWindow(), exit);
-      }),
+      () => invoke(
+        loadStore,
+        () => {
+          registry.clearExtension(record.id);
+          fn($, model, app, extensionConsole(record.id, registry, onConsole), extensionWindow(), exit);
+        },
+        { requireImmediate: true },
+      ),
       loadStore,
     );
     return {};
   } catch (error) {
     if (error instanceof ExtensionExitSignal) return {};
     const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    registry.clearExtension(record.id);
+    if (!(error instanceof ExtensionInvocationBusyError)) registry.clearExtension(record.id);
     registry.recordError(record.id, error);
     return { error: message };
   }

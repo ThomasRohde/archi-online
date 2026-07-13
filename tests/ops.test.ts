@@ -10,7 +10,15 @@ import {
   renameItem,
   setNodeStyle,
 } from '../src/model/ops';
-import { redo, replaceModel, runBatch, setSelection, undo } from '../src/model/store';
+import {
+  createModelStore,
+  getActiveModelStore,
+  redo,
+  replaceModel,
+  runBatch,
+  setSelection,
+  undo,
+} from '../src/model/store';
 import { useStore } from '../src/ui/store-hooks';
 
 function model() {
@@ -125,7 +133,7 @@ describe('model ops + undo/redo', () => {
     expect(Object.keys(model().elements)).toHaveLength(0);
   });
 
-  it('keeps an asynchronous batch open through promise settlement', async () => {
+  it('batches only the synchronous prefix of an asynchronous callback', async () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -139,7 +147,9 @@ describe('model ops + undo/redo', () => {
 
     expect(Object.values(model().elements).map((element) => element.name))
       .toEqual(['Before await']);
-    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(useStore.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'async script',
+    ]);
     release();
     await pending;
 
@@ -147,9 +157,146 @@ describe('model ops + undo/redo', () => {
       .toEqual(['Before await', 'After await']);
     expect(useStore.getState().undoStack.map((entry) => entry.label)).toEqual([
       'async script',
+      'Create Business Role',
     ]);
     undo();
+    expect(Object.values(model().elements).map((element) => element.name))
+      .toEqual(['Before await']);
+    undo();
     expect(Object.keys(model().elements)).toHaveLength(0);
+  });
+
+  it('keeps external edits immediately undoable outside a pending async batch', async () => {
+    const store = getActiveModelStore();
+    const initialVersion = store.getState().model!.info.version;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const pending = store.runBatch('Async extension', async () => {
+      store.transact('Extension before await', (draft) => {
+        draft.info.name = 'Extension before await';
+      });
+      await gate;
+      store.transact('Extension after await', (draft) => {
+        draft.info.documentation = 'Extension after await';
+      });
+    });
+    store.transact('External edit', (draft) => {
+      draft.info.version = 'External edit';
+    });
+    const undoLabelsWhilePending = store.getState().undoStack.map((entry) => entry.label);
+    undo(store);
+    const versionAfterExternalUndo = store.getState().model!.info.version;
+    release();
+    await pending;
+
+    expect(undoLabelsWhilePending).toEqual(['Async extension', 'External edit']);
+    expect(versionAfterExternalUndo).toBe(initialVersion);
+    expect(store.getState().model!.info.name).toBe('Extension before await');
+    expect(store.getState().model!.info.documentation).toBe('Extension after await');
+    expect(store.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Async extension',
+      'Extension after await',
+    ]);
+    undo(store);
+    expect(store.getState().model!.info.documentation).toBe('');
+    expect(store.getState().model!.info.name).toBe('Extension before await');
+    undo(store);
+    expect(store.getState().model!.info.name).toBe('Test');
+  });
+
+  it('does not retain the batch lease for a never-settling promise', () => {
+    const store = getActiveModelStore();
+    const pending = store.runBatch('Never settles', () => {
+      store.transact('Extension prefix', (draft) => {
+        draft.info.name = 'Extension prefix';
+      });
+      return new Promise<void>(() => undefined);
+    });
+
+    store.transact('External edit', (draft) => {
+      draft.info.documentation = 'External edit';
+    });
+
+    expect(pending).toBeInstanceOf(Promise);
+    expect(store.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Never settles',
+      'External edit',
+    ]);
+    undo(store);
+    expect(store.getState().model!.info.documentation).toBe('');
+    expect(store.getState().model!.info.name).toBe('Extension prefix');
+  });
+
+  it('cleans up a batch exactly once when undo notification throws', () => {
+    const store = createModelStore({ model: createEmptyModel('Cleanup') });
+    let throwOnUndo = true;
+    const unsubscribe = store.subscribe((next, previous) => {
+      if (throwOnUndo && next.undoStack.length > previous.undoStack.length) {
+        throwOnUndo = false;
+        throw new Error('undo subscriber failed');
+      }
+    });
+
+    expect(() => store.runBatch('Failing notification', () => {
+      store.transact('First mutation', (draft) => {
+        draft.info.name = 'First';
+      });
+    })).toThrow('undo subscriber failed');
+    store.setState({ undoStack: [], redoStack: [] });
+    store.runBatch('Recovered batch', () => {
+      store.transact('Second mutation', (draft) => {
+        draft.info.documentation = 'Second';
+      });
+    });
+    unsubscribe();
+
+    expect(store.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Recovered batch',
+    ]);
+  });
+
+  it('normalizes custom thenables and recovers from a throwing then getter', async () => {
+    const store = createModelStore({ model: createEmptyModel('Thenables') });
+    const customThenable = {
+      then(resolve: (value: string) => void) { resolve('settled'); },
+    } as PromiseLike<string>;
+
+    const normalized: Promise<string> = store.runBatch('Custom thenable', () => customThenable);
+    expect(normalized).toBeInstanceOf(Promise);
+    await expect(normalized).resolves.toBe('settled');
+
+    let thenReads = 0;
+    const statefulThenable = Object.defineProperty({}, 'then', {
+      get() {
+        thenReads += 1;
+        if (thenReads > 1) throw new Error('then getter read twice');
+        return (resolve: (value: string) => void) => resolve('read once');
+      },
+    }) as PromiseLike<string>;
+    const stateful: Promise<string> = store.runBatch(
+      'Stateful thenable',
+      () => statefulThenable,
+    );
+    await expect(stateful).resolves.toBe('read once');
+    expect(thenReads).toBe(1);
+
+    const throwingThen = Object.defineProperty({}, 'then', {
+      get() { throw new Error('then getter failed'); },
+    }) as PromiseLike<never>;
+    expect(() => store.runBatch('Throwing then', () => throwingThen))
+      .toThrow('then getter failed');
+    store.runBatch('After throwing then', () => {
+      store.transact('Recovered mutation', (draft) => {
+        draft.info.name = 'Recovered';
+      });
+    });
+
+    expect(store.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'After throwing then',
+    ]);
   });
 
   it('applies connection appearance through one undoable style operation', () => {
