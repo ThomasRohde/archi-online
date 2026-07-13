@@ -145,7 +145,12 @@ export function resolveTarget(model: ModelState, source: 'tree' | 'view', ids: s
     base.styleIds = [id];
     base.connection = conn;
     if (conn.relationshipId) return resolveConcept(conn.relationshipId, base);
-    base.typeLabel = 'Connection';
+    base.conceptId = conn.id;
+    base.name = conn.name;
+    base.nameEditable = true;
+    base.typeLabel = 'Plain Connection';
+    base.documentation = conn.documentation;
+    base.properties = conn.properties;
     return base;
   }
   return null;

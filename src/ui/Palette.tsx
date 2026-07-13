@@ -336,6 +336,11 @@ export function Palette() {
           <path d="M2.5,2.5 H13.5 V10 L10,13.5 H2.5 Z M13.5,10 H10 V13.5" fill="none" stroke="currentColor" />
         </svg>
       </ToolButton>
+      <ToolButton tool={{ kind: 'create-plain-connection' }} title="Plain connection">
+        <svg viewBox="0 0 24 18" width="22" height="17" aria-hidden="true">
+          <line x1="3" y1="14" x2="21" y2="4" stroke="currentColor" strokeWidth="1.2" />
+        </svg>
+      </ToolButton>
       <ToolButton tool={{ kind: 'create-group' }} title="Group">
         <svg viewBox="0 0 16 16" width="16" height="16">
           <path d="M2,5 V2.5 H8 V5 M2,5 V13.5 H14 V5 H2" fill="none" stroke="currentColor" />

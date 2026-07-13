@@ -30,6 +30,7 @@ export type Tool =
       c4Properties?: Record<string, string>;
     }>
   | StickyCreationTool<{ kind: 'create-relationship'; type: RelationshipType }>
+  | StickyCreationTool<{ kind: 'create-plain-connection' }>
   | StickyCreationTool<{ kind: 'magic-connector' }>
   | StickyCreationTool<{ kind: 'create-note' }>
   | StickyCreationTool<{ kind: 'create-group' }>

@@ -229,12 +229,27 @@ view.add(element, x, y, width, height);        // returns JVisual
 view.add(relationship, sourceVisual, targetVisual); // returns JConnection
 view.createObject("note", x, y, width, height);
 view.createObject("group", x, y, width, height);
+view.createPlainConnection(source, target, connectionType); // returns JConnection
 
 view.nodes();                     // top-level visual objects
 view.nodes({ recursive: true }); // including nested children
 view.connections();
 view.bounds();                    // union of node bounds, or null when empty
 view.bounds({ recursive: false });
+```
+
+`createPlainConnection()` adds a native, non-semantic diagram connection. A
+Note must be one endpoint; the other can be any connectable object or
+connection in the same view. `connectionType` is optional and uses Archi's
+native bitmask (`1` target filled, `2` dashed, `4` dotted, `8` source filled,
+`16` target hollow, `32` source hollow, `64` target open, `128` source open):
+
+```js
+var note = view.createObject("note", 40, 40, 180, 80);
+var actor = model.createElement("business-actor", "Customer");
+var actorVisual = view.add(actor, 300, 40, 140, 60);
+var annotation = view.createPlainConnection(note, actorVisual, 64);
+annotation.name = "Context";
 ```
 
 ## Visual objects
@@ -280,6 +295,11 @@ connection.source;        // JVisual
 connection.target;        // JVisual
 connection.concept;       // underlying relationship
 connection.lineColor;
+connection.fontColor;
+connection.font;          // raw Archi font string
+connection.textPosition;  // 0 source, 1 middle, 2 target
+connection.connectionType; // native plain-connection bitmask
+connection.nameVisible;   // plain-connection label visibility
 connection.labelExpression;
 connection.lineStyle;
 connection.lineWidth;
@@ -302,6 +322,10 @@ console.log(connection.absoluteRoute());
 
 `absoluteRoute()` returns only the intermediate points — the source and
 target anchors are not included.
+
+`connectionType` and `nameVisible` are writable only for plain connections.
+The remaining appearance fields above apply to semantic and plain
+connections.
 
 ## Bulk layout
 
@@ -394,6 +418,11 @@ many published jArchi scripts run unchanged. APIs tied to the desktop
 platform (file system access, Java interop, UI toolkits, `load()` of external
 scripts) do not exist here. When in doubt, the Monaco IntelliSense shows
 exactly what is available.
+
+`view.createPlainConnection()` and writable plain-connection appearance
+fields are additive Archi Online APIs. They persist Archi's native diagram
+connection attributes but are not currently part of desktop jArchi's public
+API.
 
 Related pages:
 

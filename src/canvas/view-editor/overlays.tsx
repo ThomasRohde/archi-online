@@ -125,20 +125,16 @@ export function MarqueeOverlay({ inter }: { inter: Interaction }) {
 
 export function PendingConnectionOverlay({
   inter,
-  sourceBounds,
+  sourcePoint,
 }: {
   inter: Interaction;
-  sourceBounds: Bounds | undefined;
+  sourcePoint: import('../geometry').Point | undefined;
 }) {
-  if (inter.kind !== 'connect' || !sourceBounds) return null;
-  const srcC = {
-    x: sourceBounds.x + sourceBounds.width / 2,
-    y: sourceBounds.y + sourceBounds.height / 2,
-  };
+  if (inter.kind !== 'connect' || !sourcePoint) return null;
   return (
     <line
-      x1={srcC.x}
-      y1={srcC.y}
+      x1={sourcePoint.x}
+      y1={sourcePoint.y}
       x2={inter.current.x}
       y2={inter.current.y}
       stroke="#2a6cc4"

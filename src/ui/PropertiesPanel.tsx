@@ -18,6 +18,7 @@ import {
   setDocumentation,
   setJunctionType,
   setProperties,
+  setPlainConnectionAttributes,
   setRelationshipAttrs,
   setViewConnectionRouterType,
   setViewpoint,
@@ -368,6 +369,26 @@ export function PropertiesPanel() {
                           target.conceptId && setDocumentation(target.conceptId, v, modelStore)
                         }
                       />
+                    </div>
+                  )}
+                  {target.connection?.connType === 'plain' && (
+                    <div className="prop-row">
+                      <label>
+                        <input
+                          type="checkbox"
+                          aria-label="Show connection label"
+                          checked={target.connection.nameVisible !== false}
+                          disabled={readOnly}
+                          onChange={(event) =>
+                            setPlainConnectionAttributes(
+                              target.connection!.id,
+                              { nameVisible: event.target.checked },
+                              modelStore,
+                            )
+                          }
+                        />{' '}
+                        Show label
+                      </label>
                     </div>
                   )}
                   {target.relationship?.type === 'AccessRelationship' && (

@@ -17,11 +17,13 @@ import {
   analyzeConnectionReconnection,
   analyzeMagicConnectionTarget,
   analyzeMagicTargetCreation,
+  canCreatePlainConnection,
   createC4ElementOnView,
   commitMove,
   createElementOnView,
   createMagicConnectionOnView,
   createMagicTargetOnView,
+  createPlainConnectionOnView,
   createRelationshipOnView,
   createNestedConnectionVisibilityResolver,
   deleteViewObjects,
@@ -206,7 +208,7 @@ export function useViewEditorInteractions({
   };
 
   const finishConnect = (
-    targetNodeId: string | undefined,
+    targetId: string | undefined,
     clientX: number,
     clientY: number,
     elementFirst = false,
@@ -217,8 +219,16 @@ export function useViewEditorInteractions({
     if (cur.kind !== 'connect') return;
     const tool = modelStore.getState().activeTool;
     setInter({ kind: 'none' });
-    const srcNode = currentModel.nodes[cur.sourceNodeId];
-    const tgtNode = targetNodeId ? currentModel.nodes[targetNodeId] : undefined;
+    const srcNode = currentModel.nodes[cur.sourceId];
+    const tgtNode = targetId ? currentModel.nodes[targetId] : undefined;
+    if (tool.kind === 'create-plain-connection') {
+      const connectionId = targetId
+        ? createPlainConnectionOnView(viewId, cur.sourceId, targetId, modelStore)
+        : null;
+      if (connectionId) setSelection('view', [connectionId]);
+      finishPaletteToolUse(tool, modelStore);
+      return;
+    }
     if (srcNode?.nodeType !== 'element') return;
     if (tool.kind === 'create-relationship') {
       if (tgtNode?.nodeType !== 'element') {
@@ -228,7 +238,7 @@ export function useViewEditorInteractions({
       const res = createRelationshipOnView(
         tool.type,
         viewId,
-        cur.sourceNodeId,
+        cur.sourceId,
         tgtNode.id,
         modelStore,
       );
@@ -238,7 +248,7 @@ export function useViewEditorInteractions({
       if (tgtNode?.nodeType === 'element') {
         const analysis = analyzeMagicConnectionTarget(currentModel, {
           viewId,
-          sourceNodeId: cur.sourceNodeId,
+          sourceNodeId: cur.sourceId,
           targetNodeId: tgtNode.id,
         });
         const items = buildMagicConnectionMenuItems(
@@ -246,7 +256,7 @@ export function useViewEditorInteractions({
           (option, relationshipId) => {
             const res = createMagicConnectionOnView({
               viewId,
-              sourceNodeId: cur.sourceNodeId,
+              sourceNodeId: cur.sourceId,
               targetNodeId: tgtNode.id,
               direction: option.direction,
               relationshipType: option.relationshipType,
@@ -274,13 +284,13 @@ export function useViewEditorInteractions({
           parentId === viewId ? { x: 0, y: 0 } : (absBounds.get(parentId) ?? { x: 0, y: 0 });
         const analysis = analyzeMagicTargetCreation(currentModel, {
           viewId,
-          sourceNodeId: cur.sourceNodeId,
+          sourceNodeId: cur.sourceId,
         });
         const items = buildMagicTargetMenuItems(analysis, elementFirst, (pair) => {
           const size = defaultElementSize(pair.elementType, settings);
           const result = createMagicTargetOnView({
             viewId,
-            sourceNodeId: cur.sourceNodeId,
+            sourceNodeId: cur.sourceId,
             parentId,
             bounds: {
               x: snap(point.x - parentAbs.x - size.width / 2),
@@ -469,12 +479,24 @@ export function useViewEditorInteractions({
       return;
     }
 
-    if (tool.kind === 'create-relationship' || tool.kind === 'magic-connector') {
+    if (
+      tool.kind === 'create-relationship' ||
+      tool.kind === 'create-plain-connection' ||
+      tool.kind === 'magic-connector'
+    ) {
       const cur = interRef.current;
       if (cur.kind === 'connect') {
-        finishConnect(hit.nodeId, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
-      } else if (hit.nodeId && model.nodes[hit.nodeId]?.nodeType === 'element') {
-        setInter({ kind: 'connect', sourceNodeId: hit.nodeId, current: p, hoverNodeId: null });
+        finishConnect(hit.nodeId ?? hit.connId, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
+      } else {
+        const sourceId = hit.nodeId ?? hit.connId;
+        const sourceIsValid = sourceId && (
+          tool.kind === 'create-plain-connection'
+            ? Boolean(model.nodes[sourceId] ?? model.connections[sourceId])
+            : model.nodes[sourceId]?.nodeType === 'element'
+        );
+        if (sourceId && sourceIsValid) {
+          setInter({ kind: 'connect', sourceId, current: p, hoverConnectableId: null });
+        }
       }
       return;
     }
@@ -621,7 +643,7 @@ export function useViewEditorInteractions({
         break;
       case 'connect': {
         const hit = hitFromEvent(e);
-        setInter({ ...cur, current: p, hoverNodeId: hit.nodeId ?? null });
+        setInter({ ...cur, current: p, hoverConnectableId: hit.nodeId ?? hit.connId ?? null });
         break;
       }
       case 'reconnect': {
@@ -750,10 +772,9 @@ export function useViewEditorInteractions({
       }
       case 'connect': {
         const hit = hitFromEvent(e);
-        if (hit.nodeId && hit.nodeId !== cur.sourceNodeId) {
-          finishConnect(hit.nodeId, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
-        } else if (!hit.nodeId) {
-          finishConnect(undefined, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
+        const targetId = hit.nodeId ?? hit.connId;
+        if (!targetId || targetId !== cur.sourceId) {
+          finishConnect(targetId, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
         }
         break;
       }
@@ -1002,38 +1023,44 @@ export function useViewEditorInteractions({
   };
 
   const connectHover: { id: string; valid: boolean } | null = (() => {
-    if (!model || inter.kind !== 'connect' || !inter.hoverNodeId) return null;
+    if (!model || inter.kind !== 'connect' || !inter.hoverConnectableId) return null;
     const tool = activeTool;
-    const srcNode = model.nodes[inter.sourceNodeId];
-    const tgtNode = model.nodes[inter.hoverNodeId];
+    const srcNode = model.nodes[inter.sourceId];
+    const tgtNode = model.nodes[inter.hoverConnectableId];
+    if (tool.kind === 'create-plain-connection') {
+      return {
+        id: inter.hoverConnectableId,
+        valid: canCreatePlainConnection(model, viewId, inter.sourceId, inter.hoverConnectableId),
+      };
+    }
     if (srcNode?.nodeType !== 'element')
-      return { id: inter.hoverNodeId, valid: false };
+      return { id: inter.hoverConnectableId, valid: false };
     if (tool.kind === 'magic-connector' && tgtNode?.nodeType === 'group') {
       return {
-        id: inter.hoverNodeId,
+        id: inter.hoverConnectableId,
         valid: analyzeMagicTargetCreation(model, {
           viewId,
-          sourceNodeId: inter.sourceNodeId,
+          sourceNodeId: inter.sourceId,
         }).pairs.length > 0,
       };
     }
     if (tgtNode?.nodeType !== 'element') {
       return tool.kind === 'magic-connector'
         ? null
-        : { id: inter.hoverNodeId, valid: false };
+        : { id: inter.hoverConnectableId, valid: false };
     }
     const srcType = model.elements[srcNode.elementId]?.type;
     const tgtType = model.elements[tgtNode.elementId]?.type;
-    if (!srcType || !tgtType) return { id: inter.hoverNodeId, valid: false };
+    if (!srcType || !tgtType) return { id: inter.hoverConnectableId, valid: false };
     const valid =
       tool.kind === 'create-relationship'
         ? isAllowedRelationship(tool.type, srcType, tgtType)
         : analyzeMagicConnectionTarget(model, {
             viewId,
-            sourceNodeId: inter.sourceNodeId,
-            targetNodeId: inter.hoverNodeId,
+            sourceNodeId: inter.sourceId,
+            targetNodeId: inter.hoverConnectableId,
           }).groups.some((group) => group.options.length > 0);
-    return { id: inter.hoverNodeId, valid };
+    return { id: inter.hoverConnectableId, valid };
   })();
 
   const reconnectHover: { id: string; valid: boolean } | null = (() => {
@@ -1055,7 +1082,9 @@ export function useViewEditorInteractions({
           ? 'grab'
           : activeTool.kind === 'select'
             ? undefined
-            : activeTool.kind === 'create-relationship' || activeTool.kind === 'magic-connector'
+            : activeTool.kind === 'create-relationship' ||
+                activeTool.kind === 'create-plain-connection' ||
+                activeTool.kind === 'magic-connector'
               ? 'crosshair'
               : 'copy';
 

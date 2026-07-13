@@ -6,6 +6,7 @@ import {
   type C4ViewType,
 } from '../model/c4';
 import type { ArchimateRelationship, DiagramConnection } from '../model/types';
+import { PLAIN_CONNECTION_TYPE } from '../model/types';
 import { parseFont, pointAlong, type Point } from './geometry';
 import { GHOST_OPACITY } from './view-editor/viewpoint-ghost';
 
@@ -178,9 +179,65 @@ function styleFor(rel: ArchimateRelationship | undefined): ConnStyle {
         },
       };
     default:
-      // plain (note) connection: dotted line, no decoration
-      return { dash: type ? undefined : '4 3', decorations: () => null };
+      return { decorations: () => null };
   }
+}
+
+function plainStyleFor(connectionType: number): ConnStyle {
+  const dash = (connectionType & PLAIN_CONNECTION_TYPE.DASHED) !== 0
+    ? '4'
+    : (connectionType & PLAIN_CONNECTION_TYPE.DOTTED) !== 0
+      ? '1 4'
+      : undefined;
+  return {
+    dash,
+    decorations: (points, color) => {
+      const { start, end, startAngle, endAngle } = endAngles(points);
+      let source: ReactNode = null;
+      let target: ReactNode = null;
+      if ((connectionType & PLAIN_CONNECTION_TYPE.SOURCE_FILLED) !== 0) {
+        source = <Triangle p={start} angle={startAngle + Math.PI} color={color} />;
+      } else if ((connectionType & PLAIN_CONNECTION_TYPE.SOURCE_OPEN) !== 0) {
+        source = <OpenArrow p={start} angle={startAngle + Math.PI} color={color} />;
+      } else if ((connectionType & PLAIN_CONNECTION_TYPE.SOURCE_HOLLOW) !== 0) {
+        source = <Triangle p={start} angle={startAngle + Math.PI} color={color} hollow />;
+      }
+      if ((connectionType & PLAIN_CONNECTION_TYPE.TARGET_FILLED) !== 0) {
+        target = <Triangle p={end} angle={endAngle} color={color} />;
+      } else if ((connectionType & PLAIN_CONNECTION_TYPE.TARGET_OPEN) !== 0) {
+        target = <OpenArrow p={end} angle={endAngle} color={color} />;
+      } else if ((connectionType & PLAIN_CONNECTION_TYPE.TARGET_HOLLOW) !== 0) {
+        target = <Triangle p={end} angle={endAngle} color={color} hollow />;
+      }
+      const sourceMarker: string | undefined = source ? (
+        (connectionType & PLAIN_CONNECTION_TYPE.SOURCE_FILLED) !== 0
+          ? 'source-filled'
+          : (connectionType & PLAIN_CONNECTION_TYPE.SOURCE_OPEN) !== 0
+            ? 'source-open'
+            : 'source-hollow'
+      ) : undefined;
+      const targetMarker: string | undefined = target ? (
+        (connectionType & PLAIN_CONNECTION_TYPE.TARGET_FILLED) !== 0
+          ? 'target-filled'
+          : (connectionType & PLAIN_CONNECTION_TYPE.TARGET_OPEN) !== 0
+            ? 'target-open'
+            : 'target-hollow'
+      ) : undefined;
+      return (
+        <g>
+          {source && <g data-plain-arrow={sourceMarker}>{source}</g>}
+          {target && <g data-plain-arrow={targetMarker}>{target}</g>}
+        </g>
+      );
+    },
+  };
+}
+
+function appearanceDash(lineStyle: DiagramConnection['lineStyle'], nativeDash: string | undefined) {
+  if (lineStyle === 0) return undefined;
+  if (lineStyle === 1) return '6 4';
+  if (lineStyle === 2) return '2 3';
+  return nativeDash;
 }
 
 function c4StyleFor(): ConnStyle {
@@ -211,21 +268,23 @@ export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghoste
   if (points.length < 2) return null;
   const isC4Relationship = !!c4ViewType && !!rel;
   const color = conn.lineColor ?? (isC4Relationship ? C4_VISUAL_DEFAULTS.relationshipLine : DEFAULT_LINE);
-  const nativeStyle = isC4Relationship ? c4StyleFor() : styleFor(rel);
+  const nativeStyle = isC4Relationship
+    ? c4StyleFor()
+    : rel
+      ? styleFor(rel)
+      : plainStyleFor(conn.connectionType ?? 0);
   const style = {
     ...nativeStyle,
-    dash: conn.lineStyle === 0 || conn.lineStyle === -1
-      ? undefined
-      : conn.lineStyle === 1
-        ? '6 4'
-        : conn.lineStyle === 2
-          ? '2 3'
-          : nativeStyle.dash,
+    // Appearance lineStyle is an explicit Online override. Native type bits
+    // remain persisted and render when appearance is Default/unspecified.
+    dash: appearanceDash(conn.lineStyle, nativeStyle.dash),
   };
   const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
 
-  let labelLines: string[] = [];
-  if (displayLabel !== undefined) {
+  let labelLines: string[];
+  if (conn.nameVisible === false) {
+    labelLines = [];
+  } else if (displayLabel !== undefined) {
     labelLines = displayLabel.split(/\r?\n/).filter(Boolean);
   } else if (rel && isC4Relationship) {
     const parts = c4RelationshipLabelParts(rel);
@@ -239,6 +298,8 @@ export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghoste
       labelText = labelText ? `${labelText} [${rel.strength}]` : `[${rel.strength}]`;
     }
     labelLines = labelText.split(/\r?\n/).filter(Boolean);
+  } else {
+    labelLines = conn.name.split(/\r?\n/).filter(Boolean);
   }
   const font = conn.fontStyle
     ? { family: conn.fontStyle.family, sizePx: conn.fontStyle.sizePt * (4 / 3), bold: conn.fontStyle.bold, italic: conn.fontStyle.italic }
@@ -263,7 +324,7 @@ export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghoste
         strokeWidth={(conn.lineWidth ?? 1) * (selected ? 1.6 : 1)}
         strokeDasharray={style.dash}
       />
-      {style.decorations(points, selected ? '#2a6cc4' : color)}
+      {conn.lineStyle !== 3 && style.decorations(points, selected ? '#2a6cc4' : color)}
       {labelLines.length > 0 && (
         <text
           x={mid.x}

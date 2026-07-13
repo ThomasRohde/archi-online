@@ -21,6 +21,7 @@ import {
   applyRelationshipInversion,
   createNestedConnectionVisibilityResolver,
   createProfile,
+  createPlainConnectionOnView,
   deleteItems,
   deleteProfile,
   deleteViewObjects,
@@ -33,6 +34,7 @@ import {
   setNodeStyle,
   setLabelExpression,
   setProperties,
+  setPlainConnectionAttributes,
   setRelationshipAttrs,
   setConceptProfiles,
   updateProfile,
@@ -575,6 +577,27 @@ export class JView extends JObject {
     throw new Error(`Unsupported view object type: ${type}`);
   }
 
+  createPlainConnection(
+    source: JConnectable,
+    target: JConnectable,
+    connectionType = 0,
+  ): JConnection {
+    if (!isJConnectable(source) || !isJConnectable(target)) {
+      throw new Error('view.createPlainConnection(source, target, connectionType?)');
+    }
+    const connectionId = createPlainConnectionOnView(
+      this.id,
+      source.id,
+      target.id,
+      undefined,
+      connectionType,
+    );
+    if (!connectionId) {
+      throw new Error('Plain connection requires a Note endpoint in this view');
+    }
+    return new JConnection(connectionId);
+  }
+
   nodes(options?: { recursive?: boolean }): JVisual[] {
     const m = state();
     const view = this.view();
@@ -1027,6 +1050,29 @@ export class JConnection extends JObject {
     setNodeStyle([this.id], { lineColor: v });
   }
 
+  get fontColor(): string | undefined { return this.conn().fontColor; }
+  set fontColor(value: string | undefined) { setNodeStyle([this.id], { fontColor: value }); }
+
+  get font(): string | undefined { return this.conn().font; }
+  set font(value: string | undefined) { setNodeStyle([this.id], { font: value }); }
+
+  get textPosition(): number { return this.conn().textPosition ?? 1; }
+  set textPosition(value: number) {
+    setNodeStyle([this.id], { textPosition: Math.max(0, Math.min(2, Math.trunc(value))) });
+  }
+
+  get connectionType(): number { return this.conn().connectionType ?? 0; }
+  set connectionType(value: number) {
+    this.assertPlain();
+    setPlainConnectionAttributes(this.id, { connectionType: value });
+  }
+
+  get nameVisible(): boolean { return this.conn().nameVisible !== false; }
+  set nameVisible(value: boolean) {
+    this.assertPlain();
+    setPlainConnectionAttributes(this.id, { nameVisible: value });
+  }
+
   get labelExpression(): string | undefined { return this.conn().labelExpression; }
   set labelExpression(value: string | undefined) { setLabelExpression(this.id, value); }
 
@@ -1083,6 +1129,12 @@ export class JConnection extends JObject {
 
   delete(): void {
     deleteViewObjects([this.id]);
+  }
+
+  private assertPlain(): void {
+    if (this.conn().connType !== 'plain') {
+      throw new Error('Field is only writable on plain connections');
+    }
   }
 }
 

@@ -16,6 +16,7 @@ import { ConnectionView } from './ConnectionView';
 import { evaluateLabelExpression } from '../model/label-expression';
 import {
   createConnectionRouteResolver,
+  pointAlong,
   type Point,
 } from './geometry';
 import { computeAbsBounds, deriveLiveViewState } from './view-editor/bounds';
@@ -219,6 +220,15 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     connection: (connectionId) => previewConnections.get(connectionId),
     isVisible: isConnectionVisible,
   });
+  const pendingConnectionSourcePoint = (() => {
+    if (inter.kind !== 'connect') return undefined;
+    const bounds = liveAbs.get(inter.sourceId);
+    if (bounds) {
+      return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    }
+    const route = routes(inter.sourceId);
+    return route && route.length >= 2 ? pointAlong(route, 0.5).point : undefined;
+  })();
 
   return (
     <div className="view-editor">
@@ -246,7 +256,9 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
               moveDelta={moveDelta}
               resize={resizeOverride}
               dropParentId={dropParentId}
-              connectSource={inter.kind === 'connect' ? inter.sourceNodeId : null}
+              connectSource={
+                inter.kind === 'connect' && model.nodes[inter.sourceId] ? inter.sourceId : null
+              }
               connectHover={connectHover}
               anchorId={anchorId}
               c4ViewType={activeC4ViewType}
@@ -290,7 +302,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
           <MarqueeOverlay inter={inter} />
           <PendingConnectionOverlay
             inter={inter}
-            sourceBounds={inter.kind === 'connect' ? liveAbs.get(inter.sourceNodeId) : undefined}
+            sourcePoint={pendingConnectionSourcePoint}
           />
           <PendingReconnectionOverlay
             inter={inter}

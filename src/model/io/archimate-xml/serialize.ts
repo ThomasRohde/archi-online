@@ -67,6 +67,7 @@ export function serializeArchimate(state: ModelState): string {
       labelExpression: conn.labelExpression,
       lineStyle: conn.lineStyle,
       fontAlpha: conn.fontAlpha,
+      nameVisible: conn.nameVisible === false ? false : undefined,
     }));
     children.push(...conn.bendpoints.map((bp) =>
       tag(indent + IND, 'bendpoint', [
@@ -82,7 +83,7 @@ export function serializeArchimate(state: ModelState): string {
       indent,
       'sourceConnection',
       [
-        ['xsi:type', 'archimate:Connection'],
+        ['xsi:type', conn.connType === 'relationship' ? 'archimate:Connection' : undefined],
         ['id', conn.id],
         ['name', conn.name !== '' ? conn.name : undefined],
         [

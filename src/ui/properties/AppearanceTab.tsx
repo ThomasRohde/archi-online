@@ -1,12 +1,54 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ELEMENT_TYPE_MAP } from '../../model/metamodel';
 import { parseFontStyle } from '../../model/font-style';
-import { setNodeStyle, type NodeStyle } from '../../model/ops';
+import { setNodeStyle, setPlainConnectionAttributes, type NodeStyle } from '../../model/ops';
 import { useModelStoreApi, useStore } from '../store-hooks';
 import type { Target } from './target';
+import {
+  PLAIN_CONNECTION_LINE_MASK,
+  PLAIN_CONNECTION_SOURCE_ARROW_MASK,
+  PLAIN_CONNECTION_TARGET_ARROW_MASK,
+  PLAIN_CONNECTION_TYPE,
+} from '../../model/types';
 
 const DEFAULT_LINE = '#5c5c5c';
 const DEFAULT_FONT = '#000000';
+
+function effectivePlainLine(connectionType: number): number {
+  if ((connectionType & PLAIN_CONNECTION_TYPE.DASHED) !== 0) {
+    return PLAIN_CONNECTION_TYPE.DASHED;
+  }
+  if ((connectionType & PLAIN_CONNECTION_TYPE.DOTTED) !== 0) {
+    return PLAIN_CONNECTION_TYPE.DOTTED;
+  }
+  return 0;
+}
+
+function effectivePlainSourceArrow(connectionType: number): number {
+  if ((connectionType & PLAIN_CONNECTION_TYPE.SOURCE_FILLED) !== 0) {
+    return PLAIN_CONNECTION_TYPE.SOURCE_FILLED;
+  }
+  if ((connectionType & PLAIN_CONNECTION_TYPE.SOURCE_OPEN) !== 0) {
+    return PLAIN_CONNECTION_TYPE.SOURCE_OPEN;
+  }
+  if ((connectionType & PLAIN_CONNECTION_TYPE.SOURCE_HOLLOW) !== 0) {
+    return PLAIN_CONNECTION_TYPE.SOURCE_HOLLOW;
+  }
+  return 0;
+}
+
+function effectivePlainTargetArrow(connectionType: number): number {
+  if ((connectionType & PLAIN_CONNECTION_TYPE.TARGET_FILLED) !== 0) {
+    return PLAIN_CONNECTION_TYPE.TARGET_FILLED;
+  }
+  if ((connectionType & PLAIN_CONNECTION_TYPE.TARGET_OPEN) !== 0) {
+    return PLAIN_CONNECTION_TYPE.TARGET_OPEN;
+  }
+  if ((connectionType & PLAIN_CONNECTION_TYPE.TARGET_HOLLOW) !== 0) {
+    return PLAIN_CONNECTION_TYPE.TARGET_HOLLOW;
+  }
+  return 0;
+}
 
 const FONT_OPTIONS = [
   { label: 'Segoe UI 9', value: buildFontString('Segoe UI', 9, false, false) },
@@ -154,6 +196,7 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
   const apply = (style: NodeStyle) => setNodeStyle(target.styleIds, style, modelStore);
   const node = target.node;
   const conn = target.connection;
+  const plainConnection = conn?.connType === 'plain' ? conn : undefined;
   const isConnection = !!conn && !node;
   const currentFont = node?.font ?? conn?.font ?? FONT_OPTIONS[0].value;
   const currentFontStyle = node?.fontStyle ?? conn?.fontStyle ?? parseFontStyle(currentFont) ?? {
@@ -169,6 +212,14 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const updateFont = (patch: Partial<typeof currentFontStyle>) => apply({ fontStyle: { ...currentFontStyle, ...patch } });
+  const updatePlainPart = (mask: number, value: number) => {
+    if (!plainConnection) return;
+    setPlainConnectionAttributes(
+      plainConnection.id,
+      { connectionType: ((plainConnection.connectionType ?? 0) & ~mask) | value },
+      modelStore,
+    );
+  };
   if (target.styleIds.length === 0) {
     return <div className="empty-hint">Select objects on a view to edit their appearance.</div>;
   }
@@ -182,6 +233,48 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
   return (
     <div className="appearance-form">
       <div className="appearance-column">
+        {plainConnection && (
+          <>
+            <AppearanceField label="Plain Line">
+              <select
+                aria-label="Plain line style"
+                value={effectivePlainLine(plainConnection.connectionType ?? 0)}
+                disabled={readOnly}
+                onChange={(event) => updatePlainPart(PLAIN_CONNECTION_LINE_MASK, Number(event.target.value))}
+              >
+                <option value={0}>Solid</option>
+                <option value={PLAIN_CONNECTION_TYPE.DASHED}>Dashed</option>
+                <option value={PLAIN_CONNECTION_TYPE.DOTTED}>Dotted</option>
+              </select>
+            </AppearanceField>
+            <AppearanceField label="Source Arrow">
+              <select
+                aria-label="Plain source arrow"
+                value={effectivePlainSourceArrow(plainConnection.connectionType ?? 0)}
+                disabled={readOnly}
+                onChange={(event) => updatePlainPart(PLAIN_CONNECTION_SOURCE_ARROW_MASK, Number(event.target.value))}
+              >
+                <option value={0}>None</option>
+                <option value={PLAIN_CONNECTION_TYPE.SOURCE_FILLED}>Filled</option>
+                <option value={PLAIN_CONNECTION_TYPE.SOURCE_HOLLOW}>Hollow</option>
+                <option value={PLAIN_CONNECTION_TYPE.SOURCE_OPEN}>Open</option>
+              </select>
+            </AppearanceField>
+            <AppearanceField label="Target Arrow">
+              <select
+                aria-label="Plain target arrow"
+                value={effectivePlainTargetArrow(plainConnection.connectionType ?? 0)}
+                disabled={readOnly}
+                onChange={(event) => updatePlainPart(PLAIN_CONNECTION_TARGET_ARROW_MASK, Number(event.target.value))}
+              >
+                <option value={0}>None</option>
+                <option value={PLAIN_CONNECTION_TYPE.TARGET_FILLED}>Filled</option>
+                <option value={PLAIN_CONNECTION_TYPE.TARGET_HOLLOW}>Hollow</option>
+                <option value={PLAIN_CONNECTION_TYPE.TARGET_OPEN}>Open</option>
+              </select>
+            </AppearanceField>
+          </>
+        )}
         <AppearanceField label="Fill Colour">
           <ColourControl
             value={node?.fillColor}

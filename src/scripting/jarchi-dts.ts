@@ -64,9 +64,14 @@ declare interface JConnection extends JObject {
   readonly source: JConnectable;
   readonly target: JConnectable;
   lineColor: string | undefined;
+  fontColor: string | undefined;
+  font: string | undefined;
   labelExpression: string | undefined;
   lineStyle: number;
   lineWidth: number;
+  connectionType: number;
+  nameVisible: boolean;
+  textPosition: number;
   bendpoints: JBendpoint[];
   absoluteRoute(): JPoint[];
   setAbsoluteRoute(points: JPoint[]): void;
@@ -81,6 +86,7 @@ declare interface JView extends JObject {
   add(element: JConcept, x: number, y: number, width: number, height: number): JVisual;
   add(relationship: JConcept, source: JConnectable, target: JConnectable): JConnection;
   createObject(type: 'note' | 'group', x: number, y: number, width: number, height: number): JVisual;
+  createPlainConnection(source: JConnectable, target: JConnectable, connectionType?: number): JConnection;
   nodes(options?: { recursive?: boolean }): JVisual[];
   connections(): JConnection[];
   bounds(options?: { recursive?: boolean }): JBounds | null;

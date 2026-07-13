@@ -42,6 +42,7 @@ export function setNodeStyle(ids: string[], style: NodeStyle, store?: ModelStore
         if ('lineColor' in style) conn.lineColor = style.lineColor;
         if ('fontColor' in style) conn.fontColor = style.fontColor;
         if ('font' in style) conn.font = style.font;
+        if ('font' in style) conn.fontStyle = undefined;
         if ('lineWidth' in style) conn.lineWidth = style.lineWidth;
         if ('textPosition' in style) conn.textPosition = style.textPosition;
         if ('lineStyle' in style) conn.lineStyle = style.lineStyle;

@@ -56,6 +56,29 @@ export type ImageSource = 0 | 1;
 export type ImagePosition = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 export type ConnectionRouterType = 0 | 2;
 
+/** Native Archi IDiagramModelConnection.type flags (release_5.9.0). */
+export const PLAIN_CONNECTION_TYPE = {
+  TARGET_FILLED: 1,
+  DASHED: 2,
+  DOTTED: 4,
+  SOURCE_FILLED: 8,
+  TARGET_HOLLOW: 16,
+  SOURCE_HOLLOW: 32,
+  TARGET_OPEN: 64,
+  SOURCE_OPEN: 128,
+} as const;
+
+export const PLAIN_CONNECTION_LINE_MASK =
+  PLAIN_CONNECTION_TYPE.DASHED | PLAIN_CONNECTION_TYPE.DOTTED;
+export const PLAIN_CONNECTION_SOURCE_ARROW_MASK =
+  PLAIN_CONNECTION_TYPE.SOURCE_FILLED |
+  PLAIN_CONNECTION_TYPE.SOURCE_HOLLOW |
+  PLAIN_CONNECTION_TYPE.SOURCE_OPEN;
+export const PLAIN_CONNECTION_TARGET_ARROW_MASK =
+  PLAIN_CONNECTION_TYPE.TARGET_FILLED |
+  PLAIN_CONNECTION_TYPE.TARGET_HOLLOW |
+  PLAIN_CONNECTION_TYPE.TARGET_OPEN;
+
 export interface ConnectableRefs {
   /** Ordered connections for which this connectable is the source. */
   sourceConnectionIds: string[];
@@ -235,6 +258,8 @@ export interface DiagramConnection extends ConnectableRefs {
   targetId: string;
   /** Native plain-connection arrow/line bitmask. Defaults to 0. */
   connectionType?: number;
+  /** Native nameVisible feature. Defaults to true. */
+  nameVisible?: boolean;
   bendpoints: Bendpoint[];
   lineColor?: string;
   fontColor?: string;

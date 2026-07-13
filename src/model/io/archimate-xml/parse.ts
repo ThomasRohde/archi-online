@@ -112,6 +112,7 @@ export function parseArchimate(xml: string): ModelState {
       sourceId: el.getAttribute('source') ?? ownerId,
       targetId: el.getAttribute('target') ?? '',
       connectionType: relationshipId ? undefined : (intAttr(el, 'type') ?? 0),
+      nameVisible: feature(el, 'nameVisible') !== 'false',
       bendpoints,
       lineColor: strAttr(el, 'lineColor'),
       fontColor: strAttr(el, 'fontColor'),

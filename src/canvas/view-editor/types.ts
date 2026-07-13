@@ -27,7 +27,7 @@ export type Interaction =
       currentAbs: Bounds;
     }
   | { kind: 'marquee'; start: Point; current: Point; additive: boolean }
-  | { kind: 'connect'; sourceNodeId: string; current: Point; hoverNodeId: string | null }
+  | { kind: 'connect'; sourceId: string; current: Point; hoverConnectableId: string | null }
   | {
       kind: 'reconnect';
       connId: string;
