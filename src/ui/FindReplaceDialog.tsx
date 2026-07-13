@@ -39,6 +39,20 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function preventAppShortcutDefault(event: Pick<
+  KeyboardEvent,
+  'ctrlKey' | 'key' | 'metaKey' | 'preventDefault' | 'target'
+>): void {
+  if (!event.ctrlKey && !event.metaKey) return;
+  const key = event.key.toLowerCase();
+  const editable = event.target instanceof HTMLInputElement
+    || event.target instanceof HTMLTextAreaElement
+    || (event.target instanceof HTMLElement && event.target.isContentEditable);
+  if (key === 's' || key === 'o' || (!editable && ['d', 'z', 'y'].includes(key))) {
+    event.preventDefault();
+  }
+}
+
 function previewRowContext(row: FindReplacePreview['rows'][number], index: number): string {
   const before = row.before || 'empty';
   const after = row.after || 'empty';
@@ -116,6 +130,7 @@ export function FindReplaceDialog({
       const dialog = dialogRef.current;
       if (dialog && event.target instanceof Node && dialog.contains(event.target)) return;
       event.stopImmediatePropagation();
+      preventAppShortcutDefault(event);
       if (event.key === 'Escape') {
         event.preventDefault();
         onClose();
@@ -142,6 +157,7 @@ export function FindReplaceDialog({
 
   const onDialogKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     event.stopPropagation();
+    preventAppShortcutDefault(event);
     if (event.key === 'Escape') {
       event.preventDefault();
       onClose();

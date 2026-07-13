@@ -223,6 +223,41 @@ describe('find and replace dialog', () => {
     }
   });
 
+  it('prevents app shortcut defaults without consuming native dialog editing keys', async () => {
+    const store = createModelStore({ model: fixture(), activeViewId: 'view-a' });
+    await renderDialog(store);
+    const previewButton = button('Preview');
+    const findInput = document.querySelector<HTMLInputElement>('input[name="find"]')!;
+    const appShortcuts = [
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 's', ctrlKey: true }),
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'o', metaKey: true }),
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'd', ctrlKey: true }),
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'z', ctrlKey: true }),
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'y', metaKey: true }),
+    ];
+
+    for (const event of appShortcuts) {
+      previewButton.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+    }
+
+    const nativeEditingKeys = [
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'z', ctrlKey: true }),
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'y', metaKey: true }),
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'a', ctrlKey: true }),
+    ];
+    for (const event of nativeEditingKeys) {
+      findInput.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+
+    for (const key of ['Enter', ' ']) {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key });
+      previewButton.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+  });
+
   it('gives duplicate property rows unique contextual control names', async () => {
     const model = fixture();
     model.elements['shared-object'].properties = [
