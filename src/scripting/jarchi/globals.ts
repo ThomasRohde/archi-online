@@ -52,11 +52,26 @@ export class ExtensionInvocationBusyError extends Error {
   }
 }
 
-const activeExtensionInvocationStores = new WeakSet<ModelStore>();
+const activeExtensionInvocationStores = new Set<ModelStore>();
 const extensionInvocationQueue: QueuedExtensionInvocation[] = [];
 const synchronousExtensionInvocations: SynchronousExtensionInvocation[] = [];
 const extensionInvokerRuntimes = new WeakMap<object, ExtensionInvocationRuntime>();
 let drainingExtensionInvocations = false;
+
+export function assertExtensionInvocationStoreAvailable(store: ModelStore): void {
+  if (
+    activeExtensionInvocationStores.has(store)
+    || extensionInvocationQueue.some((queued) => queued.store === store)
+  ) {
+    throw new ExtensionInvocationBusyError();
+  }
+}
+
+export function assertExtensionInvocationSystemIdle(): void {
+  if (activeExtensionInvocationStores.size > 0 || extensionInvocationQueue.length > 0) {
+    throw new ExtensionInvocationBusyError();
+  }
+}
 
 function drainExtensionInvocations(): void {
   if (drainingExtensionInvocations) return;
@@ -279,15 +294,14 @@ export function createExtensionJArchiGlobals() {
     const callerRuntime = options?.caller
       ? extensionInvokerRuntimes.get(options.caller)
       : undefined;
-    if (
-      options?.requireImmediate
-      && (
+    if (options?.requireImmediate) {
+      assertExtensionInvocationStoreAvailable(store);
+      if (
         runtime.running
-        || activeExtensionInvocationStores.has(store)
         || hasQueuedInvocationConflict(runtime, store)
-      )
-    ) {
-      throw new ExtensionInvocationBusyError();
+      ) {
+        throw new ExtensionInvocationBusyError();
+      }
     }
     if (
       runtime.running

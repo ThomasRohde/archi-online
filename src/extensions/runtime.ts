@@ -1,5 +1,6 @@
 import { JCollection } from '../scripting/jarchi';
 import {
+  assertExtensionInvocationSystemIdle,
   createExtensionJArchiGlobals,
   ExtensionInvocationBusyError,
 } from '../scripting/jarchi/globals';
@@ -132,6 +133,13 @@ export function runInstalledPackage(
 }
 
 export function reloadEnabledExtensions(registry: ExtensionRegistry = extensionRegistry): void {
+  try {
+    assertExtensionInvocationSystemIdle();
+  } catch (error) {
+    if (!(error instanceof ExtensionInvocationBusyError)) throw error;
+    registry.recordError('extensions.reload', error);
+    return;
+  }
   registry.clearAll();
   const sourceIds = new Set<string>();
   for (const record of useExtensionStore.getState().extensions) {

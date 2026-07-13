@@ -6,6 +6,7 @@ import {
   loadExtensionRecords,
   normalizeExtensionRecords,
   persistExtensionRecords,
+  useExtensionStore,
 } from '../src/extensions/extension-store';
 import { clearExtensionStorage, createAppApi, extensionStorageKey } from '../src/extensions/app-api';
 import { startExtensionEventBridge } from '../src/extensions/events';
@@ -14,7 +15,11 @@ import {
   createExtensionRegistry,
   extensionRegistry,
 } from '../src/extensions/registry';
-import { runExtensionRecord, runInstalledPackage } from '../src/extensions/runtime';
+import {
+  reloadEnabledExtensions,
+  runExtensionRecord,
+  runInstalledPackage,
+} from '../src/extensions/runtime';
 import { runScript } from '../src/scripting/runner';
 import {
   addElement,
@@ -649,6 +654,80 @@ describe('extension app API and runtime', () => {
       .resolves.toBe('old contribution');
     expect(registry.getSnapshot().commands.map((command) => command.id))
       .not.toContain('local.busy-reload.replacement');
+  });
+
+  it('preserves every existing contribution when reload all is busy', async () => {
+    replaceModel(createEmptyModel('Busy reload all'), null);
+    const registry = createExtensionRegistry();
+    const gate = deferred();
+    const record = {
+      id: 'local.busy-reload-all',
+      name: 'Busy reload all',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.busy-reload-all.wait", {
+          title: "Wait",
+          async run(_context, args) { await args.gate; }
+        });
+        app.commands.register("local.busy-reload-all.stable", {
+          title: "Stable",
+          run() { return "old contribution"; }
+        });
+        app.toolbar.addButton({
+          id: "local.busy-reload-all.button",
+          label: "Stable",
+          command: "local.busy-reload-all.stable"
+        });
+        app.menus.addItem("extensions.menu", {
+          id: "local.busy-reload-all.menu",
+          label: "Stable",
+          command: "local.busy-reload-all.stable"
+        });
+        app.panels.register("local.busy-reload-all.panel", {
+          title: "Stable",
+          render() {}
+        });
+        app.events.on("app.ready", function(payload) { payload.handled(); });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    useExtensionStore.setState({ extensions: [record] });
+    expect(runExtensionRecord(record, registry)).toEqual({});
+    const blocker = registry.runCommand('local.busy-reload-all.wait', { gate: gate.promise });
+
+    reloadEnabledExtensions(registry);
+    const snapshotWhileBusy = registry.getSnapshot();
+    gate.resolve();
+    await blocker;
+
+    try {
+      expect(snapshotWhileBusy.commands.map((command) => command.id)).toEqual([
+        'local.busy-reload-all.wait',
+        'local.busy-reload-all.stable',
+      ]);
+      expect(snapshotWhileBusy.toolbarButtons.map((button) => button.id)).toEqual([
+        'local.busy-reload-all.button',
+      ]);
+      expect(snapshotWhileBusy.menus['extensions.menu'].map((item) => item.id)).toEqual([
+        'local.busy-reload-all.menu',
+      ]);
+      expect(snapshotWhileBusy.panels.map((panel) => panel.id)).toEqual([
+        'local.busy-reload-all.panel',
+      ]);
+      let handled = false;
+      await registry.emitEvent('app.ready', { handled() { handled = true; } });
+      expect(handled).toBe(true);
+      await expect(registry.runCommand('local.busy-reload-all.stable'))
+        .resolves.toBe('old contribution');
+      expect(registry.getSnapshot().errors.at(-1)).toMatchObject({
+        extensionId: 'extensions.reload',
+        message: expect.stringMatching(/busy/i),
+      });
+    } finally {
+      useExtensionStore.setState({ extensions: [] });
+    }
   });
 
   it('rejects a failing extension load before partial registration while busy', async () => {

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createExtensionRegistry } from '../src/extensions/registry';
 import { startExtensionEventBridge } from '../src/extensions/events';
-import { runExtensionRecord } from '../src/extensions/runtime';
+import { useExtensionStore } from '../src/extensions/extension-store';
+import { reloadEnabledExtensions, runExtensionRecord } from '../src/extensions/runtime';
 import { addElement, createEmptyModel } from '../src/model/ops';
 import { replaceModel, undo } from '../src/model/store';
 import { createExtensionJArchiGlobals } from '../src/scripting/jarchi/globals';
@@ -519,6 +520,75 @@ describe('multi-model extension integration', () => {
     expect(second.getState().model!.info.name).toBe('Async B second');
     expect(second.getState().model!.elements[actorId].name).toBe('Actor B second');
     expect(second.getState().undoStack).toHaveLength(3);
+  });
+
+  it('preserves global contributions when reload all sees work on a non-active store', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, secondId } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    const loadedRecord = {
+      id: 'local.multimodel-reload',
+      name: 'Multi-model reload',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.multimodel-reload.wait", {
+          title: "Wait",
+          async run(_context, args) {
+            args.started();
+            await args.gate;
+          }
+        });
+        app.commands.register("local.multimodel-reload.stable", {
+          title: "Stable",
+          run() { return "old contribution"; }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const replacementRecord = {
+      ...loadedRecord,
+      source: `
+        app.commands.register("local.multimodel-reload.replacement", {
+          title: "Replacement",
+          run() { return "new contribution"; }
+        });
+      `,
+      updatedAt: 2,
+    };
+    expect(runExtensionRecord(loadedRecord, registry)).toEqual({});
+    useExtensionStore.setState({ extensions: [replacementRecord] });
+    const gate = deferred();
+    let started = false;
+    const blocker = registry.runCommand('local.multimodel-reload.wait', {
+      gate: gate.promise,
+      started() { started = true; },
+    });
+    expect(started).toBe(true);
+    activateModelSession(secondId);
+
+    reloadEnabledExtensions(registry);
+    const commandIdsWhileBusy = registry.getSnapshot().commands.map((command) => command.id);
+    gate.resolve();
+    await blocker;
+
+    try {
+      expect(commandIdsWhileBusy).toEqual([
+        'local.multimodel-reload.wait',
+        'local.multimodel-reload.stable',
+      ]);
+      await expect(registry.runCommand('local.multimodel-reload.stable'))
+        .resolves.toBe('old contribution');
+      expect(registry.getSnapshot().commands.map((command) => command.id))
+        .not.toContain('local.multimodel-reload.replacement');
+      expect(registry.getSnapshot().errors.at(-1)).toMatchObject({
+        extensionId: 'extensions.reload',
+        message: expect.stringMatching(/busy/i),
+      });
+    } finally {
+      useExtensionStore.setState({ extensions: [] });
+    }
   });
 
   it('serializes overlapping async invocations on one store into separate undo entries', async () => {
