@@ -32,6 +32,8 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 const LEDGER_PAGE_SIZE = 50;
+const COLLAPSED_VALUE_CHARACTER_LIMIT = 96;
+const COLLAPSED_VALUE_LINE_LIMIT = 3;
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -65,6 +67,11 @@ function accessiblePropertyKey(key: string): string {
   if (key === '(blank)') return '"(blank)" — literal text';
   if (/^\s+$/u.test(key)) return `${JSON.stringify(key)} — whitespace-only key`;
   return key;
+}
+
+function propertyValueNeedsExpansion(value: string): boolean {
+  return value.length > COLLAPSED_VALUE_CHARACTER_LIMIT
+    || value.split(/\r\n?|\n/u).length > COLLAPSED_VALUE_LINE_LIMIT;
 }
 
 function initialLedger(capture: PropertyManagerSessionCapture): Readonly<{
@@ -136,6 +143,9 @@ export function PropertiesManagerDialog({
   const [search, setSearch] = useState('');
   const [keyPage, setKeyPage] = useState(0);
   const [occurrencePage, setOccurrencePage] = useState(0);
+  const [expandedValueIds, setExpandedValueIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [selectedKey, setSelectedKey] = useState<string | null>(usage[0]?.key ?? null);
   const [operation, setOperation] = useState<PropertyMutationOperation | null>(null);
   const [newKey, setNewKey] = useState('');
@@ -506,37 +516,61 @@ export function PropertiesManagerDialog({
                   <tr><th>Value</th><th>Owner</th><th>Location</th></tr>
                 </thead>
                 <tbody>
-                  {pagedOccurrences.map((occurrence, index) => (
-                    <tr key={occurrence.id} data-property-coordinate={occurrence.id}>
-                      <td>
-                        <code
-                          className="property-manager-value"
-                          tabIndex={0}
-                          title={occurrence.value === '' ? 'Empty property value' : occurrence.value}
-                          aria-label={occurrence.value === ''
-                            ? 'Empty property value'
-                            : `Property value: ${occurrence.value}`}
-                        >
-                          {occurrence.value === '' ? '(empty)' : occurrence.value}
-                        </code>
-                      </td>
-                      <td>{occurrence.ownerType}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="property-manager-navigate"
-                          aria-label={`Go to ${occurrenceContext(occurrence, occurrenceStart + index, selectedKey ?? occurrence.key)}`}
-                          onClick={() => {
-                            if (!navigateToPropertyOccurrence(capture, occurrence.id)) {
-                              setError('This property occurrence is no longer available. Open the manager again.');
-                            }
-                          }}
-                        >
-                          {occurrence.location}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {pagedOccurrences.map((occurrence, index) => {
+                    const occurrenceIndex = occurrenceStart + index;
+                    const valueId = `${titleId}-property-value-${occurrenceIndex}`;
+                    const expanded = expandedValueIds.has(occurrence.id);
+                    const expandable = propertyValueNeedsExpansion(occurrence.value);
+                    return (
+                      <tr key={occurrence.id} data-property-coordinate={occurrence.id}>
+                        <td>
+                          <code
+                            id={valueId}
+                            className={`property-manager-value${expanded ? ' expanded' : ''}`}
+                            tabIndex={0}
+                            title={occurrence.value === '' ? 'Empty property value' : occurrence.value}
+                            aria-label={occurrence.value === ''
+                              ? 'Empty property value'
+                              : `Property value: ${occurrence.value}`}
+                          >
+                            {occurrence.value === '' ? '(empty)' : occurrence.value}
+                          </code>
+                          {expandable && (
+                            <button
+                              type="button"
+                              className="property-manager-value-toggle"
+                              aria-controls={valueId}
+                              aria-expanded={expanded}
+                              aria-label={`${expanded ? 'Collapse' : 'Show full'} property value ${occurrenceIndex + 1}`}
+                              onClick={() => setExpandedValueIds((current) => {
+                                const next = new Set(current);
+                                if (next.has(occurrence.id)) next.delete(occurrence.id);
+                                else next.add(occurrence.id);
+                                return next;
+                              })}
+                            >
+                              {expanded ? 'Collapse value' : 'Show full value'}
+                            </button>
+                          )}
+                        </td>
+                        <td>{occurrence.ownerType}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="property-manager-navigate"
+                            aria-label={`Go to ${occurrenceContext(occurrence, occurrenceIndex, selectedKey ?? occurrence.key)}`}
+                            onClick={() => {
+                              if (!navigateToPropertyOccurrence(capture, occurrence.id)) {
+                                setError('This property occurrence is no longer available. Open the manager again.');
+                              }
+                            }}
+                          >
+                            {occurrence.location}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {occurrenceSource.length === 0 && (

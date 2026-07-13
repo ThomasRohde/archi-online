@@ -226,9 +226,14 @@ describe('global properties manager dialog', () => {
     ]);
   });
 
-  it('distinguishes empty and literal value sentinels and exposes unclipped values', async () => {
+  it('distinguishes value sentinels and lets keyboard users expand long whitespace', async () => {
     const model = fixture();
-    const longValue = 'Full property value '.repeat(24);
+    const longValue = [
+      'Full property value with  two spaces',
+      '\tIndented second line',
+      'Third line',
+      'Fourth line remains available in full',
+    ].join('\n');
     model.info.properties = [
       { key: 'values', value: '' },
       { key: 'values', value: '∅' },
@@ -244,6 +249,26 @@ describe('global properties manager dialog', () => {
     expect(values[1].getAttribute('aria-label')).toBe('Property value: ∅');
     expect(values[2].title).toBe(longValue);
     expect(values[2].tabIndex).toBe(0);
+
+    const toggles = [...document.querySelectorAll<HTMLButtonElement>(
+      'button.property-manager-value-toggle',
+    )];
+    expect(toggles).toHaveLength(1);
+    expect(toggles[0].textContent).toBe('Show full value');
+    expect(toggles[0].getAttribute('aria-expanded')).toBe('false');
+    expect(toggles[0].getAttribute('aria-controls')).toBe(values[2].id);
+
+    toggles[0].focus();
+    expect(document.activeElement).toBe(toggles[0]);
+    await act(async () => toggles[0].click());
+    expect(toggles[0].getAttribute('aria-expanded')).toBe('true');
+    expect(toggles[0].textContent).toBe('Collapse value');
+    expect(values[2].classList.contains('expanded')).toBe(true);
+    expect(values[2].textContent).toBe(longValue);
+
+    await act(async () => toggles[0].click());
+    expect(toggles[0].getAttribute('aria-expanded')).toBe('false');
+    expect(values[2].classList.contains('expanded')).toBe(false);
   });
 
   it('stages only one operation and requires collision acknowledgement plus a fresh preview', async () => {

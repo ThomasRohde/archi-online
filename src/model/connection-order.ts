@@ -3,12 +3,14 @@ import type { ConnectableRefs, ModelState } from './types';
 export interface ConnectionOrderIndex {
   readonly bySource: ReadonlyMap<string, readonly string[]>;
   readonly byTarget: ReadonlyMap<string, readonly string[]>;
+  readonly byView: ReadonlyMap<string, readonly string[]>;
 }
 
 /** Index connection endpoints once while preserving normalized record insertion order. */
 export function createConnectionOrderIndex(model: ModelState): ConnectionOrderIndex {
   const bySource = new Map<string, string[]>();
   const byTarget = new Map<string, string[]>();
+  const byView = new Map<string, string[]>();
   for (const connection of Object.values(model.connections)) {
     const sourceIds = bySource.get(connection.sourceId) ?? [];
     sourceIds.push(connection.id);
@@ -16,8 +18,11 @@ export function createConnectionOrderIndex(model: ModelState): ConnectionOrderIn
     const targetIds = byTarget.get(connection.targetId) ?? [];
     targetIds.push(connection.id);
     byTarget.set(connection.targetId, targetIds);
+    const viewIds = byView.get(connection.viewId) ?? [];
+    viewIds.push(connection.id);
+    byView.set(connection.viewId, viewIds);
   }
-  return { bySource, byTarget };
+  return { bySource, byTarget, byView };
 }
 
 /** Apply explicit adjacency order, then retain deterministic endpoint-index fallbacks. */
@@ -32,12 +37,17 @@ export function orderedConnectableConnectionIds(
   const candidates = (direction === 'source' ? index.bySource : index.byTarget)
     .get(connectable.id) ?? [];
   const valid = new Set(candidates);
-  const ordered = preferred.filter(
-    (connectionId, position) => valid.has(connectionId)
-      && preferred.indexOf(connectionId) === position,
-  );
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const connectionId of preferred) {
+    if (!valid.has(connectionId) || seen.has(connectionId)) continue;
+    seen.add(connectionId);
+    ordered.push(connectionId);
+  }
   for (const connectionId of candidates) {
-    if (!ordered.includes(connectionId)) ordered.push(connectionId);
+    if (seen.has(connectionId)) continue;
+    seen.add(connectionId);
+    ordered.push(connectionId);
   }
   return ordered;
 }
@@ -78,8 +88,8 @@ export function orderedViewConnectionIds(
   };
 
   model.views[viewId]?.childIds.forEach(visitNode);
-  for (const connection of Object.values(model.connections)) {
-    if (connection.viewId === viewId) visitConnection(connection.id);
+  for (const connectionId of index.byView.get(viewId) ?? []) {
+    visitConnection(connectionId);
   }
   return Object.freeze(ordered);
 }
