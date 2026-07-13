@@ -2,18 +2,20 @@ import { getActiveModelStore, type ModelStore } from '../../model/store';
 import { JCollection } from './collection';
 import { allObjects, matchesSelector } from './selectors';
 import { JObject } from './wrappers';
+import { boundModelStore } from './binding';
 
 export function $$(
   selector: string | JObject | JCollection,
   modelStore?: ModelStore,
 ): JCollection {
   if (selector instanceof JCollection) {
-    assertRequestedStore(selector.modelStore, modelStore);
+    assertRequestedStore(boundModelStore(selector), modelStore);
     return selector.clone();
   }
   if (selector instanceof JObject) {
-    assertRequestedStore(selector.modelStore, modelStore);
-    return new JCollection([selector], modelStore ?? selector.modelStore);
+    const selectorStore = boundModelStore(selector);
+    assertRequestedStore(selectorStore, modelStore);
+    return new JCollection([selector], modelStore ?? selectorStore);
   }
   const store = modelStore ?? getActiveModelStore();
   if (typeof selector !== 'string') return new JCollection([], store);

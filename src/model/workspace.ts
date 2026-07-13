@@ -10,6 +10,39 @@ import type { ModelState } from './types';
 
 export type ModelSessionId = string;
 
+/** Opaque provenance token retained after a workspace session closes. */
+export type ModelStoreWorkspaceLease = object;
+
+interface WorkspaceLeaseState {
+  readonly token: ModelStoreWorkspaceLease;
+  open: boolean;
+}
+
+const workspaceLeases = new WeakMap<ModelStore, WorkspaceLeaseState>();
+
+export function getModelStoreWorkspaceLease(
+  store: ModelStore,
+): ModelStoreWorkspaceLease | undefined {
+  return workspaceLeases.get(store)?.token;
+}
+
+export function isModelStoreWorkspaceLeaseOpen(
+  store: ModelStore,
+  token: ModelStoreWorkspaceLease,
+): boolean {
+  const lease = workspaceLeases.get(store);
+  return lease?.token === token && lease.open;
+}
+
+function openWorkspaceLease(store: ModelStore): void {
+  workspaceLeases.set(store, { token: Object.freeze({}), open: true });
+}
+
+function closeWorkspaceLease(store: ModelStore): void {
+  const lease = workspaceLeases.get(store);
+  if (lease) lease.open = false;
+}
+
 export interface ModelSession {
   id: ModelSessionId;
   store: ModelStore;
@@ -61,6 +94,7 @@ export function addModelSession(options: AddModelSessionOptions): ModelSessionId
     openViewIds: options.openViewIds ?? [],
     activeViewId: options.activeViewId ?? null,
   });
+  openWorkspaceLease(store);
   const session: ModelSession = {
     id,
     store,
@@ -118,6 +152,7 @@ export function removeModelSession(id: ModelSessionId): void {
   if (!state.sessions[id]) return;
   const sessions = { ...state.sessions };
   state.sessions[id].unsubscribe();
+  closeWorkspaceLease(state.sessions[id].store);
   delete sessions[id];
   const order = state.order.filter((entry) => entry !== id);
   const activationOrder = state.activationOrder.filter((entry) => entry !== id);
@@ -125,8 +160,8 @@ export function removeModelSession(id: ModelSessionId): void {
     state.activeSessionId === id
       ? (activationOrder[activationOrder.length - 1] ?? order[order.length - 1] ?? null)
       : state.activeSessionId;
-  workspaceStore.setState({ sessions, order, activationOrder, activeSessionId });
   setActiveModelStore(activeSessionId ? sessions[activeSessionId]?.store ?? null : null);
+  workspaceStore.setState({ sessions, order, activationOrder, activeSessionId });
 }
 
 export function setModelSessionFileHandle(
@@ -151,6 +186,7 @@ export function setWorkspaceBooted(booted: boolean): void {
 export function clearWorkspace(): void {
   for (const session of Object.values(workspaceStore.getState().sessions)) {
     session.unsubscribe();
+    closeWorkspaceLease(session.store);
   }
   workspaceStore.setState({ ...EMPTY_WORKSPACE });
   setActiveModelStore(null);

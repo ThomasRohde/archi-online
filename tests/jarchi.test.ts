@@ -15,10 +15,17 @@ import { attachConnection } from '../src/model/ops/draft';
 import {
   createModelStore,
   getActiveModelStore,
+  redo,
   replaceModel,
   setActiveModelStore,
   undo,
 } from '../src/model/store';
+import {
+  addModelSession,
+  getModelSession,
+  removeModelSession,
+  resetWorkspaceForTests,
+} from '../src/model/workspace';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 import { useStore } from '../src/ui/store-hooks';
 import { createJArchiGlobals, JConcept, JView } from '../src/scripting/jarchi';
@@ -228,6 +235,112 @@ describe('jArchi scripting API', () => {
     } finally {
       setActiveModelStore(previous);
     }
+  });
+
+  it('invalidates wrappers, profiles, and collections when their workspace session closes', () => {
+    resetWorkspaceForTests();
+    const sessionId = addModelSession({
+      id: 'stale-jarchi-session',
+      model: createEmptyModel('Session model'),
+      fileName: null,
+    });
+    const store = getModelSession(sessionId)!.store;
+    const actorId = addElement('BusinessActor', 'Session actor', undefined, store);
+    const globals = createJArchiGlobals(store);
+    const actor = globals.$(`#${actorId}`).first()!;
+    const collection = globals.$(`#${actorId}`);
+    const profile = globals.model.createSpecialization('Session profile', 'business-actor');
+    store.setState({ dirty: false, undoStack: [], redoStack: [] });
+
+    removeModelSession(sessionId);
+
+    expect(() => actor.name).toThrow(/stale.*session/i);
+    expect(() => collection.size()).toThrow(/stale.*session/i);
+    expect(() => profile.name).toThrow(/stale.*session/i);
+    expect(() => createJArchiGlobals(store).model.name).toThrow(/stale.*session/i);
+    expect(() => {
+      actor.name = 'Must not apply';
+    }).toThrow(/stale.*session/i);
+    expect(store.getState().model!.elements[actorId].name).toBe('Session actor');
+    expect(store.getState().dirty).toBe(false);
+    expect(store.getState().undoStack).toHaveLength(0);
+  });
+
+  it('invalidates retained wrappers when their store model is replaced', () => {
+    const store = createModelStore({ model: createEmptyModel('Original model') });
+    const actorId = addElement('BusinessActor', 'Original actor', undefined, store);
+    const globals = createJArchiGlobals(store);
+    const actor = globals.$(`#${actorId}`).first()!;
+    const collection = globals.$(`#${actorId}`);
+    const emptyCollection = globals.$('#missing-id');
+    store.setState({ dirty: false, undoStack: [], redoStack: [] });
+
+    replaceModel(createEmptyModel('Replacement model'), null, false, {}, store);
+
+    expect(() => actor.name).toThrow(/stale.*session/i);
+    expect(() => collection.toArray()).toThrow(/stale.*session/i);
+    expect(() => emptyCollection.isEmpty()).toThrow(/stale.*session/i);
+    expect(() => globals.model.name).toThrow(/stale.*session/i);
+    expect(() => {
+      actor.name = 'Must not apply';
+    }).toThrow(/stale.*session/i);
+    expect(store.getState().model!.info.name).toBe('Replacement model');
+    expect(store.getState().dirty).toBe(false);
+    expect(store.getState().undoStack).toHaveLength(0);
+    expect(createJArchiGlobals(store).model.name).toBe('Replacement model');
+  });
+
+  it('keeps wrapper, profile, and collection model bindings opaque and non-bypassable', () => {
+    const first = createModelStore({ model: createEmptyModel('Read-only first') });
+    const actorId = addElement('BusinessActor', 'First actor', undefined, first);
+    const globals = createJArchiGlobals(first);
+    const actor = globals.$(`#${actorId}`).first()!;
+    const collection = globals.$(`#${actorId}`);
+    const profile = globals.model.createSpecialization('First profile', 'business-actor');
+    const secondModel = structuredClone(first.getState().model!);
+    secondModel.info.name = 'Writable second';
+    secondModel.elements[actorId].name = 'Second actor';
+    const second = createModelStore({ model: secondModel });
+    const secondActor = createJArchiGlobals(second).$(`#${actorId}`).first()!;
+    first.setState({ readOnly: true, dirty: false, undoStack: [], redoStack: [] });
+
+    for (const value of [actor, profile, collection]) {
+      expect('modelStore' in value).toBe(false);
+      expect(Object.getOwnPropertyNames(value)).not.toContain('modelStore');
+      expect(Object.getOwnPropertyNames(Object.getPrototypeOf(value))).not.toContain('modelStore');
+      expect((value as unknown as Record<string, unknown>).modelStore).toBeUndefined();
+    }
+
+    Object.defineProperty(actor, 'modelStore', { value: second, configurable: true });
+    Object.defineProperty(profile, 'modelStore', { value: second, configurable: true });
+    Object.defineProperty(collection, 'modelStore', { value: second, configurable: true });
+    expect(actor.name).toBe('First actor');
+    actor.name = 'Bypassed actor';
+    profile.name = 'Bypassed profile';
+    expect(() => collection.add(secondActor)).toThrow(/different model session/i);
+    expect(first.getState().model!.elements[actorId].name).toBe('First actor');
+    expect(second.getState().model!.elements[actorId].name).toBe('Second actor');
+    expect(first.getState().undoStack).toHaveLength(0);
+    expect(second.getState().undoStack).toHaveLength(0);
+  });
+
+  it('keeps wrappers valid through undo, redo, and read-only state changes', () => {
+    const store = createModelStore({ model: createEmptyModel('Stable model') });
+    const actorId = addElement('BusinessActor', 'Before', undefined, store);
+    const actor = createJArchiGlobals(store).$(`#${actorId}`).first()!;
+    store.setState({ dirty: false, undoStack: [], redoStack: [] });
+
+    actor.name = 'After';
+    expect(actor.name).toBe('After');
+    undo(store);
+    expect(actor.name).toBe('Before');
+    redo(store);
+    expect(actor.name).toBe('After');
+
+    store.setState({ readOnly: true });
+    expect(actor.name).toBe('After');
+    actor.name = 'Ignored';
+    expect(actor.name).toBe('After');
   });
 
   it('matches the jArchi specialization API', () => {

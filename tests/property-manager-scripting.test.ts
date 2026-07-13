@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
-import { undo } from '../src/model/store';
+import { createModelStore, undo } from '../src/model/store';
 import {
   activateModelSession,
   addModelSession,
@@ -124,6 +124,22 @@ describe('jArchi global property manager wrappers', () => {
     expect(getModelSession(firstId)!.store.getState().model!.info.properties).toHaveLength(2);
     expect(getModelSession(secondId)!.store.getState().model!.info.properties).toHaveLength(2);
     activateModelSession(firstId);
+  });
+
+  it('rejects property previews applied through a model wrapper from another store', () => {
+    const first = createModelStore({ model: modelWithProperties('First') });
+    const second = createModelStore({ model: modelWithProperties('Second') });
+    const firstModel = new JModel('model', first) as unknown as ScriptPropertyModel;
+    const secondModel = new JModel('model', second) as unknown as ScriptPropertyModel;
+    const rename = firstModel.previewRenamePropertyKey('owner', 'steward');
+    const deletion = firstModel.previewDeletePropertyKey('owner');
+
+    expect(() => secondModel.renamePropertyKey(rename)).toThrow(/different model session/i);
+    expect(() => secondModel.deletePropertyKey(deletion)).toThrow(/different model session/i);
+    expect(first.getState().model!.info.properties[0].key).toBe('owner');
+    expect(second.getState().model!.info.properties[0].key).toBe('owner');
+    expect(first.getState().undoStack).toHaveLength(0);
+    expect(second.getState().undoStack).toHaveLength(0);
   });
 
   it('batches real runScript property mutations into one captured Script undo step', () => {

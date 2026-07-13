@@ -262,6 +262,7 @@ export function preparePropertyNavigation(
 export function preparePropertyMutation(
   preview: PropertyMutationPreview | undefined,
   operation: PropertyMutationOperation,
+  expectedStore?: ModelStore,
 ): Readonly<{
   store: ModelStore;
   preview: PropertyMutationPreview;
@@ -272,6 +273,9 @@ export function preparePropertyMutation(
     throw new Error('Preview is invalid. Preview again.');
   }
   if (preview.operation !== operation) throw new Error('Preview operation does not match.');
+  if (expectedStore && expectedStore !== source.capture.store) {
+    throw new Error('Preview belongs to a different model session.');
+  }
   const captureSource = captureSources.get(source.capture);
   if (!captureSource || !captureIsCurrent(source.capture, captureSource)) {
     throw new Error('Preview is stale. Preview again.');

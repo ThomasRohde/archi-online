@@ -1,5 +1,6 @@
-import { createJArchiGlobals, JCollection } from '../scripting/jarchi';
-import { runBatch } from '../model/store';
+import { JCollection } from '../scripting/jarchi';
+import { createExtensionJArchiGlobals } from '../scripting/jarchi/globals';
+import { getActiveModelStore, runBatch } from '../model/store';
 import type { ConsoleEntry } from '../scripting/runner';
 import { createAppApi } from './app-api';
 import { useExtensionStore } from './extension-store';
@@ -75,10 +76,13 @@ export function runExtensionRecord(
   options?: { packageRecord?: InstalledExtensionPackage },
 ): { error?: string } {
   registry.clearExtension(record.id);
-  const { $, model } = createJArchiGlobals();
+  const loadStore = getActiveModelStore();
+  const { $, model, invoke, resolveStore } = createExtensionJArchiGlobals();
   const app = createAppApi(record.id, registry, {
     sourceRecord: record,
     packageRecord: options?.packageRecord,
+    resolveModelStore: resolveStore,
+    invokeWithModelStore: invoke,
   });
   const exit = () => {
     throw new ExtensionExitSignal('exit');
@@ -93,9 +97,13 @@ export function runExtensionRecord(
       'exit',
       `"use strict";\n${record.source}`,
     );
-    runBatch(`Extension load: ${record.name}`, () => {
-      fn($, model, app, extensionConsole(record.id, registry, onConsole), extensionWindow(), exit);
-    });
+    runBatch(
+      `Extension load: ${record.name}`,
+      () => invoke(loadStore, () => {
+        fn($, model, app, extensionConsole(record.id, registry, onConsole), extensionWindow(), exit);
+      }),
+      loadStore,
+    );
     return {};
   } catch (error) {
     if (error instanceof ExtensionExitSignal) return {};

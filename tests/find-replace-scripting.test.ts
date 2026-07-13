@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
-import { replaceModel, undo } from '../src/model/store';
+import { createModelStore, replaceModel, undo } from '../src/model/store';
 import { JModel } from '../src/scripting/jarchi';
 import { JARCHI_SCRIPT_DTS } from '../src/scripting/jarchi-dts';
 import { resetWorkspaceForTests } from '../src/model/workspace';
@@ -70,6 +70,34 @@ describe('jArchi find and replace wrappers', () => {
       .toThrow('Invalid regular expression.');
     expect(() => model.search({ find: 'Alpha', scope: 'active-view' }))
       .toThrow('No active view.');
+  });
+
+  it('rejects applying a preview through a model wrapper from another store', () => {
+    const first = createModelStore({ model: createEmptyModel('Alpha first') });
+    const second = createModelStore({ model: createEmptyModel('Alpha second') });
+    const firstModel = new JModel('model', first) as unknown as ScriptFindReplaceModel;
+    const secondModel = new JModel('model', second) as unknown as ScriptFindReplaceModel;
+    const preview = firstModel.previewReplace({ find: 'Alpha', replace: 'Omega' });
+
+    expect(() => secondModel.applyReplace(preview)).toThrow(/different model session/i);
+    expect(first.getState().model!.info.name).toBe('Alpha first');
+    expect(second.getState().model!.info.name).toBe('Alpha second');
+    expect(first.getState().undoStack).toHaveLength(0);
+    expect(second.getState().undoStack).toHaveLength(0);
+  });
+
+  it('rejects a preview after same-reference model replacement advances the epoch', () => {
+    const store = createModelStore({ model: createEmptyModel('Alpha model') });
+    const model = new JModel('model', store) as unknown as ScriptFindReplaceModel;
+    const preview = model.previewReplace({ find: 'Alpha', replace: 'Omega' });
+    const sameModel = store.getState().model!;
+
+    replaceModel(sameModel, null, false, {}, store);
+
+    const freshModel = new JModel('model', store) as unknown as ScriptFindReplaceModel;
+    expect(() => freshModel.applyReplace(preview)).toThrow('Preview is stale. Preview again.');
+    expect(store.getState().model!.info.name).toBe('Alpha model');
+    expect(store.getState().undoStack).toHaveLength(0);
   });
 
   it('declares search, preview, row, and selective apply contracts', () => {

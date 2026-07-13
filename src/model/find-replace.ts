@@ -76,6 +76,7 @@ export interface FindReplacePreview {
 interface FindReplacePreviewSource {
   readonly capture: FindReplaceSessionCapture;
   readonly sourceModel: ModelState | null;
+  readonly sourceModelEpoch: number;
   readonly sourceActiveViewId: string | null;
 }
 
@@ -116,6 +117,7 @@ export function previewFindReplace(
       sessionId: capture.sessionId,
     }),
     sourceModel: model,
+    sourceModelEpoch: state.modelEpoch,
     sourceActiveViewId: state.activeViewId,
   });
   const result = (
@@ -201,19 +203,24 @@ function previewSource(preview: FindReplacePreview): FindReplacePreviewSource | 
 export function prepareFindReplaceApply(
   preview: FindReplacePreview | undefined,
   selectedRowIds?: readonly string[],
+  expectedStore?: ModelStore,
 ): { store: ModelStore; rows: readonly FindReplaceRow[] } {
   if (!preview) throw new Error('Preview is required.');
   const source = previewSource(preview);
   if (!preview.valid || !source?.sourceModel) throw new Error('Preview is invalid. Preview again.');
 
-  const { capture, sourceModel, sourceActiveViewId } = source;
+  const { capture, sourceModel, sourceModelEpoch, sourceActiveViewId } = source;
   const { store, sessionId } = capture;
+  if (expectedStore && expectedStore !== store) {
+    throw new Error('Preview belongs to a different model session.');
+  }
   const state = store.getState();
   const sessionIsCurrent = sessionId === null
     || getModelSession(sessionId)?.store === store;
   if (
     !sessionIsCurrent
     || state.model !== sourceModel
+    || state.modelEpoch !== sourceModelEpoch
     || state.activeViewId !== sourceActiveViewId
   ) {
     throw new Error('Preview is stale. Preview again.');
@@ -244,11 +251,15 @@ export function prepareFindReplaceNavigation(
   if (!preview.valid || !source?.sourceModel) return undefined;
   const row = preview.rows.find((candidate) => candidate.id === rowId);
   if (!row) return undefined;
-  const { capture, sourceModel, sourceActiveViewId } = source;
+  const { capture, sourceModel, sourceModelEpoch, sourceActiveViewId } = source;
   const { store, sessionId } = capture;
   if (sessionId !== null && getModelSession(sessionId)?.store !== store) return undefined;
   const state = store.getState();
-  if (state.model !== sourceModel || state.activeViewId !== sourceActiveViewId) return undefined;
+  if (
+    state.model !== sourceModel
+    || state.modelEpoch !== sourceModelEpoch
+    || state.activeViewId !== sourceActiveViewId
+  ) return undefined;
   return Object.freeze({ store, sessionId, row });
 }
 

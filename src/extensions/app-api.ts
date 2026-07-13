@@ -1,4 +1,4 @@
-import { getActiveModelStore, openView, setSelection } from '../model/store';
+import { getActiveModelStore, openView, setSelection, type ModelStore } from '../model/store';
 import { defaultKeyValueStore } from '../persistence/keyval';
 import { JView, JVisual, wrap } from '../scripting/jarchi';
 import { showAlertDialog, showConfirmDialog } from '../ui/AppDialog';
@@ -12,7 +12,11 @@ import {
   readPackageJsonFile,
   readPackageTextFile,
 } from './package-validation';
-import { extensionRegistry, type ExtensionRegistry } from './registry';
+import {
+  extensionRegistry,
+  type ExtensionModelStoreInvoker,
+  type ExtensionRegistry,
+} from './registry';
 import type {
   ExtensionCommand,
   ExtensionEventHandler,
@@ -70,6 +74,8 @@ function withId<T extends { id?: string }>(
 interface AppApiRuntimeContext {
   sourceRecord?: LocalExtensionRecord;
   packageRecord?: InstalledExtensionPackage;
+  resolveModelStore?: () => ModelStore;
+  invokeWithModelStore?: ExtensionModelStoreInvoker;
 }
 
 type AppExtensionFunction = ((meta: { id: string; name: string; version: string }) => void) & {
@@ -104,16 +110,17 @@ function requirePackage(context: AppApiRuntimeContext | undefined): InstalledExt
   return context.packageRecord;
 }
 
-function activeView(): JView | null {
-  const appState = getActiveModelStore().getState();
+function activeView(store: ModelStore): JView | null {
+  const appState = store.getState();
   const viewId = appState.activeViewId;
-  return viewId && appState.model?.views[viewId] ? new JView(viewId) : null;
+  return viewId && appState.model?.views[viewId] ? new JView(viewId, store) : null;
 }
 
-function selectedVisuals(): JVisual[] {
-  if (!getActiveModelStore().getState().model) return [];
-  return getActiveModelStore().getState().selection.ids
-    .map((id) => wrap(id))
+function selectedVisuals(store: ModelStore): JVisual[] {
+  const state = store.getState();
+  if (!state.model) return [];
+  return state.selection.ids
+    .map((id) => wrap(id, store))
     .filter((item): item is JVisual => item instanceof JVisual);
 }
 
@@ -126,6 +133,7 @@ export function createAppApi(
   registry: ExtensionRegistry = extensionRegistry,
   context?: AppApiRuntimeContext,
 ) {
+  const resolveModelStore = context?.resolveModelStore ?? getActiveModelStore;
   const extension = ((meta: { id: string; name: string; version: string }) => {
     if (meta.id !== extensionId) throw new Error(`Extension id mismatch: ${meta.id}`);
   }) as AppExtensionFunction;
@@ -145,47 +153,54 @@ export function createAppApi(
     },
     views: {
       active() {
-        return activeView();
+        return activeView(resolveModelStore());
       },
       open(id: string) {
-        const model = getActiveModelStore().getState().model;
+        const store = resolveModelStore();
+        const model = store.getState().model;
         if (!model?.views[id]) return null;
-        openView(id);
-        return new JView(id);
+        openView(id, store);
+        return new JView(id, store);
       },
       get(id: string) {
-        return getActiveModelStore().getState().model?.views[id] ? new JView(id) : null;
+        const store = resolveModelStore();
+        return store.getState().model?.views[id] ? new JView(id, store) : null;
       },
       all() {
-        const model = getActiveModelStore().getState().model;
-        return model ? Object.values(model.views).map((view) => new JView(view.id)) : [];
+        const store = resolveModelStore();
+        const model = store.getState().model;
+        return model ? Object.values(model.views).map((view) => new JView(view.id, store)) : [];
       },
     },
     selection: {
       ids() {
-        return [...getActiveModelStore().getState().selection.ids];
+        return [...resolveModelStore().getState().selection.ids];
       },
       items() {
-        if (!getActiveModelStore().getState().model) return [];
-        return getActiveModelStore().getState().selection.ids
-          .map((id) => wrap(id))
+        const store = resolveModelStore();
+        const state = store.getState();
+        if (!state.model) return [];
+        return state.selection.ids
+          .map((id) => wrap(id, store))
           .filter((item) => item !== undefined);
       },
       visuals() {
-        return selectedVisuals();
+        return selectedVisuals(resolveModelStore());
       },
       clear() {
-        setSelection(getActiveModelStore().getState().selection.source, []);
+        const store = resolveModelStore();
+        setSelection(store.getState().selection.source, [], store);
       },
     },
     layout: {
       elk(options: AppElkLayoutOptions = {}) {
-        const view = options.view ?? activeView();
+        const store = resolveModelStore();
+        const view = options.view ?? activeView(store);
         if (!view) throw new Error('No active view');
         return runElkLayout({
           ...options,
           view,
-          selectedVisuals: selectedVisuals(),
+          selectedVisuals: selectedVisuals(store),
         });
       },
     },
@@ -202,10 +217,14 @@ export function createAppApi(
     },
     commands: {
       register(id: string, options: Omit<ExtensionCommand, 'id'>) {
-        registry.registerCommand(extensionId, { ...options, id });
+        registry.registerCommand(
+          extensionId,
+          { ...options, id },
+          context?.invokeWithModelStore,
+        );
       },
       run(id: string, args?: unknown) {
-        return registry.runCommand(id, args);
+        return registry.runCommand(id, args, undefined, resolveModelStore());
       },
     },
     toolbar: {
@@ -235,7 +254,7 @@ export function createAppApi(
     },
     events: {
       on(name: ExtensionEventName, handler: ExtensionEventHandler) {
-        registry.onEvent(extensionId, name, handler);
+        registry.onEvent(extensionId, name, handler, context?.invokeWithModelStore);
       },
       off(name: ExtensionEventName, handler: ExtensionEventHandler) {
         registry.offEvent(extensionId, name, handler);
@@ -261,7 +280,7 @@ export function createAppApi(
     },
     model: {
       current() {
-        return getActiveModelStore().getState().model;
+        return resolveModelStore().getState().model;
       },
     },
   };

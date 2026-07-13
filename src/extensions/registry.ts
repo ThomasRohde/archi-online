@@ -1,5 +1,5 @@
-import { getActiveModelStore, runBatch } from '../model/store';
-import { getActiveModelSession } from '../model/workspace';
+import { getActiveModelStore, runBatch, type ModelStore } from '../model/store';
+import { getModelSessionForStore } from '../model/workspace';
 import type {
   ExtensionCommand,
   ExtensionCommandContext,
@@ -23,7 +23,10 @@ const MENU_LOCATIONS: ExtensionMenuLocation[] = [
 interface Owned<T> {
   extensionId: string;
   value: T;
+  invoke?: ExtensionModelStoreInvoker;
 }
+
+export type ExtensionModelStoreInvoker = <T>(store: ModelStore, callback: () => T) => T;
 
 type Listener = () => void;
 
@@ -98,9 +101,13 @@ export class ExtensionRegistry {
     this.notify();
   }
 
-  registerCommand(extensionId: string, command: ExtensionCommand): void {
+  registerCommand(
+    extensionId: string,
+    command: ExtensionCommand,
+    invoke?: ExtensionModelStoreInvoker,
+  ): void {
     this.assertAvailable(this.commands, command.id, 'command');
-    this.commands.set(command.id, { extensionId, value: command });
+    this.commands.set(command.id, { extensionId, value: command, invoke });
     this.notify();
   }
 
@@ -132,9 +139,14 @@ export class ExtensionRegistry {
     return this.panels.get(id)?.extensionId ?? null;
   }
 
-  onEvent(extensionId: string, name: ExtensionEventName, handler: ExtensionEventHandler): void {
+  onEvent(
+    extensionId: string,
+    name: ExtensionEventName,
+    handler: ExtensionEventHandler,
+    invoke?: ExtensionModelStoreInvoker,
+  ): void {
     const handlers = this.eventHandlers.get(name) ?? [];
-    this.eventHandlers.set(name, [...handlers, { extensionId, value: handler }]);
+    this.eventHandlers.set(name, [...handlers, { extensionId, value: handler, invoke }]);
   }
 
   offEvent(extensionId: string, name: ExtensionEventName, handler: ExtensionEventHandler): void {
@@ -145,26 +157,44 @@ export class ExtensionRegistry {
     );
   }
 
-  async emitEvent(name: ExtensionEventName, payload?: unknown): Promise<void> {
+  async emitEvent(
+    name: ExtensionEventName,
+    payload?: unknown,
+    modelStore: ModelStore = getActiveModelStore(),
+  ): Promise<void> {
     const handlers = this.eventHandlers.get(name) ?? [];
     for (const handler of handlers) {
       try {
-        await handler.value(payload);
+        await runBatch(
+          `Extension event: ${name}`,
+          () => handler.invoke
+            ? handler.invoke(modelStore, () => handler.value(payload))
+            : handler.value(payload),
+          modelStore,
+        );
       } catch (error) {
         this.recordError(handler.extensionId, error);
       }
     }
   }
 
-  async runCommand(id: string, args?: unknown, trigger?: unknown): Promise<unknown> {
+  async runCommand(
+    id: string,
+    args?: unknown,
+    trigger?: unknown,
+    modelStore: ModelStore = getActiveModelStore(),
+  ): Promise<unknown> {
     const owned = this.commands.get(id);
     if (!owned) throw new Error(`Unknown extension command: ${id}`);
     try {
-      const session = getActiveModelSession();
+      const session = getModelSessionForStore(modelStore);
+      const context = this.createContext(owned.extensionId, modelStore, trigger);
       return await runBatch(
         `Extension: ${owned.value.title}`,
-        () => owned.value.run(this.createContext(owned.extensionId, trigger), args),
-        session?.store,
+        () => owned.invoke
+          ? owned.invoke(modelStore, () => owned.value.run(context, args))
+          : owned.value.run(context, args),
+        session?.store ?? modelStore,
       );
     } catch (error) {
       this.recordError(owned.extensionId, error);
@@ -178,9 +208,13 @@ export class ExtensionRegistry {
     this.notify();
   }
 
-  private createContext(extensionId: string, trigger?: unknown): ExtensionCommandContext {
-    const session = getActiveModelSession();
-    const state = session?.store.getState() ?? getActiveModelStore().getState();
+  private createContext(
+    extensionId: string,
+    modelStore: ModelStore,
+    trigger?: unknown,
+  ): ExtensionCommandContext {
+    const session = getModelSessionForStore(modelStore);
+    const state = modelStore.getState();
     return {
       extensionId,
       modelSessionId: session?.id ?? null,
