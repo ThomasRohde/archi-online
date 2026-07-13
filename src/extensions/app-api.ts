@@ -224,7 +224,13 @@ export function createAppApi(
         );
       },
       run(id: string, args?: unknown) {
-        return registry.runCommand(id, args, undefined, resolveModelStore());
+        return registry.runCommand(
+          id,
+          args,
+          undefined,
+          resolveModelStore(),
+          context?.invokeWithModelStore,
+        );
       },
     },
     toolbar: {

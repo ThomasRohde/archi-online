@@ -14,6 +14,66 @@ import {
 
 beforeEach(() => resetWorkspaceForTests());
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+function asyncExtensionSessions() {
+  const firstId = addModelSession({
+    id: 'async-extension-a',
+    model: createEmptyModel('Async A'),
+    fileName: null,
+  });
+  const first = getModelSession(firstId)!.store;
+  const actorId = addElement('BusinessActor', 'Actor A', undefined, first);
+  first.setState({ dirty: false, undoStack: [], redoStack: [] });
+  const secondModel = structuredClone(first.getState().model!);
+  secondModel.info.name = 'Async B';
+  secondModel.elements[actorId].name = 'Actor B';
+  const secondId = addModelSession({
+    id: 'async-extension-b',
+    model: secondModel,
+    fileName: null,
+  });
+  const second = getModelSession(secondId)!.store;
+  return { firstId, first, secondId, second, actorId };
+}
+
+function installAsyncScopeExtension(
+  registry: ReturnType<typeof createExtensionRegistry>,
+  actorId: string,
+) {
+  return runExtensionRecord({
+    id: 'local.async-scope',
+    name: 'Async scope',
+    version: '0.1.0',
+    enabled: true,
+    source: `
+      async function mutate(label, control) {
+        model.purpose = model.purpose + label + " before;";
+        control.started();
+        await control.gate;
+        const actor = $("#${actorId}").first();
+        actor.name = actor.name + " " + label;
+        model.name = app.model.current().info.name + " " + label;
+      }
+      app.commands.register("local.async-scope.mutate", {
+        title: "Async mutate",
+        async run(_context, args) { await mutate(args.label, args); }
+      });
+      app.events.on("view.contextMenu", async function(payload) {
+        await mutate(payload.label, payload);
+      });
+    `,
+    createdAt: 1,
+    updatedAt: 1,
+  }, registry);
+}
+
 describe('multi-model extension integration', () => {
   it('emits identified model lifecycle events', async () => {
     const registry = createExtensionRegistry();
@@ -193,6 +253,656 @@ describe('multi-model extension integration', () => {
     expect(surviving.getState().model!.elements[actorId].name).toBe('Surviving actor closed');
     expect(surviving.getState().undoStack).toHaveLength(1);
     expect(registry.getSnapshot().errors).toEqual([]);
+  });
+
+  it('keeps an async command bound and batched to its captured invocation model', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first, secondId, second, actorId } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(installAsyncScopeExtension(registry, actorId)).toEqual({});
+    const gate = deferred();
+    let started = false;
+
+    const pending = registry.runCommand('local.async-scope.mutate', {
+      label: 'command',
+      gate: gate.promise,
+      started() { started = true; },
+    });
+    expect(started).toBe(true);
+    activateModelSession(secondId);
+    gate.resolve();
+    await pending;
+
+    expect(first.getState().model!.info.documentation).toBe('command before;');
+    expect(first.getState().model!.info.name).toBe('Async A command');
+    expect(first.getState().model!.elements[actorId].name).toBe('Actor A command');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: Async mutate',
+    ]);
+    expect(second.getState().model!.info.name).toBe('Async B');
+    expect(second.getState().model!.elements[actorId].name).toBe('Actor B');
+    expect(second.getState().undoStack).toHaveLength(0);
+    undo(first);
+    expect(first.getState().model!.info.documentation).toBe('');
+    expect(first.getState().model!.info.name).toBe('Async A');
+    expect(first.getState().model!.elements[actorId].name).toBe('Actor A');
+  });
+
+  it('keeps an async event bound and batched to its captured invocation model', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first, secondId, second, actorId } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(installAsyncScopeExtension(registry, actorId)).toEqual({});
+    const gate = deferred();
+    let started = false;
+
+    const pending = registry.emitEvent('view.contextMenu', {
+      label: 'event',
+      gate: gate.promise,
+      started() { started = true; },
+    });
+    expect(started).toBe(true);
+    activateModelSession(secondId);
+    gate.resolve();
+    await pending;
+
+    expect(first.getState().model!.info.documentation).toBe('event before;');
+    expect(first.getState().model!.info.name).toBe('Async A event');
+    expect(first.getState().model!.elements[actorId].name).toBe('Actor A event');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension event: view.contextMenu',
+    ]);
+    expect(second.getState().model!.info.name).toBe('Async B');
+    expect(second.getState().model!.elements[actorId].name).toBe('Actor B');
+    expect(second.getState().undoStack).toHaveLength(0);
+  });
+
+  it('keeps rejected invocations scoped until pre-yield async children settle', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first, secondId, second } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(runExtensionRecord({
+      id: 'local.async-child-scope',
+      name: 'Async child scope',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.async-child-scope.child", {
+          title: "Child mutate",
+          async run(_context, args) {
+            args.childStarted();
+            await args.gate;
+            model.name = model.name + " child";
+          }
+        });
+        app.commands.register("local.async-child-scope.parent", {
+          title: "Parent mutate",
+          async run(_context, args) {
+            void app.commands.run("local.async-child-scope.child", args);
+            await Promise.resolve();
+            args.parentRejected();
+            throw new Error("parent failed");
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    const gate = deferred();
+    let childStarted = false;
+    let parentRejected = false;
+    let invocationSettled = false;
+
+    const pending = registry.runCommand('local.async-child-scope.parent', {
+      gate: gate.promise,
+      childStarted() { childStarted = true; },
+      parentRejected() { parentRejected = true; },
+    });
+    void pending.then(() => { invocationSettled = true; });
+    expect(childStarted).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(parentRejected).toBe(true);
+    expect(invocationSettled).toBe(false);
+    activateModelSession(secondId);
+    gate.resolve();
+    await pending;
+
+    expect(first.getState().model!.info.name).toBe('Async A child');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: Parent mutate',
+    ]);
+    expect(second.getState().model!.info.name).toBe('Async B');
+    expect(second.getState().undoStack).toHaveLength(0);
+    expect(registry.getSnapshot().errors.map((error) => error.message)).toEqual([
+      'Error: parent failed',
+    ]);
+  });
+
+  it('waits for every pre-yield child after one child rejects', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first, secondId, second } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(runExtensionRecord({
+      id: 'local.multiple-children',
+      name: 'Multiple children',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.multiple-children.fail", {
+          title: "Failing child",
+          async run() {
+            await Promise.resolve();
+            throw new Error("child failed");
+          }
+        });
+        app.commands.register("local.multiple-children.pending", {
+          title: "Pending child",
+          async run(_context, args) {
+            args.pendingStarted();
+            await args.gate;
+            model.name = model.name + " pending";
+            args.pendingDone();
+          }
+        });
+        app.commands.register("local.multiple-children.parent", {
+          title: "Multiple-child parent",
+          run(_context, args) {
+            void app.commands.run("local.multiple-children.fail");
+            void app.commands.run("local.multiple-children.pending", args);
+            return "parent result";
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    const gate = deferred();
+    const childDone = deferred();
+    let pendingStarted = false;
+    let invocationSettled = false;
+
+    const pending = registry.runCommand('local.multiple-children.parent', {
+      gate: gate.promise,
+      pendingStarted() { pendingStarted = true; },
+      pendingDone() { childDone.resolve(); },
+    });
+    void pending.then(() => { invocationSettled = true; });
+    expect(pendingStarted).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const settledBeforeGate = invocationSettled;
+    activateModelSession(secondId);
+    gate.resolve();
+    const [result] = await Promise.all([pending, childDone.promise]);
+
+    expect(settledBeforeGate).toBe(false);
+    expect(result).toBe('parent result');
+    expect(first.getState().model!.info.name).toBe('Async A pending');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: Multiple-child parent',
+    ]);
+    expect(second.getState().model!.info.name).toBe('Async B');
+    expect(second.getState().undoStack).toHaveLength(0);
+    expect(registry.getSnapshot().errors.map((error) => error.message)).toEqual([
+      'Error: child failed',
+    ]);
+  });
+
+  it('serializes overlapping async invocations across different model stores', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first, secondId, second, actorId } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(installAsyncScopeExtension(registry, actorId)).toEqual({});
+    const firstGate = deferred();
+    const secondGate = deferred();
+    let firstStarted = false;
+    let secondStarted = false;
+
+    const firstPending = registry.runCommand('local.async-scope.mutate', {
+      label: 'first',
+      gate: firstGate.promise,
+      started() { firstStarted = true; },
+    });
+    expect(firstStarted).toBe(true);
+    activateModelSession(secondId);
+    const secondPending = registry.runCommand('local.async-scope.mutate', {
+      label: 'second',
+      gate: secondGate.promise,
+      started() { secondStarted = true; },
+    });
+    expect(secondStarted).toBe(false);
+
+    firstGate.resolve();
+    await firstPending;
+    expect(secondStarted).toBe(true);
+    secondGate.resolve();
+    await secondPending;
+
+    expect(first.getState().model!.info.name).toBe('Async A first');
+    expect(first.getState().model!.elements[actorId].name).toBe('Actor A first');
+    expect(first.getState().undoStack).toHaveLength(1);
+    expect(second.getState().model!.info.name).toBe('Async B second');
+    expect(second.getState().model!.elements[actorId].name).toBe('Actor B second');
+    expect(second.getState().undoStack).toHaveLength(1);
+  });
+
+  it('serializes overlapping async invocations on one store into separate undo entries', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first, actorId } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(installAsyncScopeExtension(registry, actorId)).toEqual({});
+    const firstGate = deferred();
+    const secondGate = deferred();
+    let secondStarted = false;
+
+    const firstPending = registry.runCommand('local.async-scope.mutate', {
+      label: 'first',
+      gate: firstGate.promise,
+      started() {},
+    });
+    const secondPending = registry.runCommand('local.async-scope.mutate', {
+      label: 'second',
+      gate: secondGate.promise,
+      started() { secondStarted = true; },
+    });
+    expect(secondStarted).toBe(false);
+
+    firstGate.resolve();
+    await firstPending;
+    expect(secondStarted).toBe(true);
+    secondGate.resolve();
+    await secondPending;
+
+    expect(first.getState().model!.info.name).toBe('Async A first second');
+    expect(first.getState().model!.elements[actorId].name).toBe('Actor A first second');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: Async mutate',
+      'Extension: Async mutate',
+    ]);
+    undo(first);
+    expect(first.getState().model!.info.name).toBe('Async A first');
+    expect(first.getState().model!.elements[actorId].name).toBe('Actor A first');
+    undo(first);
+    expect(first.getState().model!.info.name).toBe('Async A');
+    expect(first.getState().model!.elements[actorId].name).toBe('Actor A');
+  });
+
+  it('serializes overlapping async invocations from different extensions on one store', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    for (const extension of [
+      { id: 'local.async-first', title: 'First mutate' },
+      { id: 'local.async-second', title: 'Second mutate' },
+    ]) {
+      expect(runExtensionRecord({
+        id: extension.id,
+        name: extension.title,
+        version: '0.1.0',
+        enabled: true,
+        source: `
+          app.commands.register("${extension.id}.mutate", {
+            title: "${extension.title}",
+            async run(_context, args) {
+              args.started();
+              model.purpose = model.purpose + args.label + " before;";
+              await args.gate;
+              model.name = model.name + " " + args.label;
+            }
+          });
+        `,
+        createdAt: 1,
+        updatedAt: 1,
+      }, registry)).toEqual({});
+    }
+    const firstGate = deferred();
+    const secondGate = deferred();
+    let firstStarted = false;
+    let secondStarted = false;
+
+    const firstPending = registry.runCommand('local.async-first.mutate', {
+      label: 'first',
+      gate: firstGate.promise,
+      started() { firstStarted = true; },
+    });
+    expect(firstStarted).toBe(true);
+    const secondPending = registry.runCommand('local.async-second.mutate', {
+      label: 'second',
+      gate: secondGate.promise,
+      started() { secondStarted = true; },
+    });
+    expect(secondStarted).toBe(false);
+
+    firstGate.resolve();
+    await firstPending;
+    expect(secondStarted).toBe(true);
+    secondGate.resolve();
+    await secondPending;
+
+    expect(first.getState().model!.info.documentation).toBe('first before;second before;');
+    expect(first.getState().model!.info.name).toBe('Async A first second');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: First mutate',
+      'Extension: Second mutate',
+    ]);
+    undo(first);
+    expect(first.getState().model!.info.name).toBe('Async A first');
+    undo(first);
+    expect(first.getState().model!.info.name).toBe('Async A');
+    expect(first.getState().model!.info.documentation).toBe('');
+  });
+
+  it('inlines cross-extension same-store calls only during synchronous reentrancy', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(runExtensionRecord({
+      id: 'local.nested-child',
+      name: 'Nested child',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.nested-child.mutate", {
+          title: "Nested child mutate",
+          async run(_context, args) {
+            args.childStarted();
+            await args.gate;
+            model.name = model.name + " child";
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    expect(runExtensionRecord({
+      id: 'local.nested-parent',
+      name: 'Nested parent',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.nested-parent.mutate", {
+          title: "Nested parent mutate",
+          async run(_context, args) {
+            await app.commands.run("local.nested-child.mutate", args);
+            model.name = model.name + " parent";
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    const gate = deferred();
+    let childStarted = false;
+
+    const pending = registry.runCommand('local.nested-parent.mutate', {
+      gate: gate.promise,
+      childStarted() { childStarted = true; },
+    });
+    expect(childStarted).toBe(true);
+    gate.resolve();
+    await pending;
+
+    expect(first.getState().model!.info.name).toBe('Async A child parent');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: Nested parent mutate',
+    ]);
+    undo(first);
+    expect(first.getState().model!.info.name).toBe('Async A');
+  });
+
+  it('preserves a parent result and records only the nested command error', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(runExtensionRecord({
+      id: 'local.failed-child',
+      name: 'Failed child',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.failed-child.run", {
+          title: "Failed child",
+          async run() {
+            await Promise.resolve();
+            throw new Error("nested child failed");
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    expect(runExtensionRecord({
+      id: 'local.successful-parent',
+      name: 'Successful parent',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.successful-parent.run", {
+          title: "Successful parent",
+          async run() {
+            await app.commands.run("local.failed-child.run");
+            model.name = model.name + " parent";
+            return "parent result";
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+
+    const result = await registry.runCommand('local.successful-parent.run');
+
+    expect(result).toBe('parent result');
+    expect(first.getState().model!.info.name).toBe('Async A parent');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: Successful parent',
+    ]);
+    expect(registry.getSnapshot().errors).toHaveLength(1);
+    expect(registry.getSnapshot().errors[0]).toMatchObject({
+      extensionId: 'local.failed-child',
+      message: 'Error: nested child failed',
+    });
+  });
+
+  it('routes an awaited cross-extension command through its parent lease after yield', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(runExtensionRecord({
+      id: 'local.post-yield-child',
+      name: 'Post-yield child',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.post-yield-child.run", {
+          title: "Post-yield child",
+          async run(_context, args) {
+            args.childStarted();
+            await Promise.resolve();
+            model.name = model.name + " child";
+            return "child result";
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    expect(runExtensionRecord({
+      id: 'local.post-yield-parent',
+      name: 'Post-yield parent',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.post-yield-parent.run", {
+          title: "Post-yield parent",
+          async run(_context, args) {
+            await Promise.resolve();
+            const winner = await Promise.race([
+              app.commands.run("local.post-yield-child.run", args).then(() => "child"),
+              args.escape.then(() => "escape")
+            ]);
+            args.finished(winner);
+            model.name = model.name + " parent";
+            return winner;
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    const escape = deferred();
+    let childStarted = false;
+    let winner = '';
+
+    const pending = registry.runCommand('local.post-yield-parent.run', {
+      escape: escape.promise,
+      childStarted() { childStarted = true; },
+      finished(value: string) { winner = value; },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const childStartedBeforeEscape = childStarted;
+    escape.resolve();
+    const result = await pending;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(childStartedBeforeEscape).toBe(true);
+    expect(winner).toBe('child');
+    expect(result).toBe('child');
+    expect(first.getState().model!.info.name).toBe('Async A child parent');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: Post-yield parent',
+    ]);
+    expect(registry.getSnapshot().errors).toEqual([]);
+  });
+
+  it('rejects a cross-extension runtime cycle instead of deadlocking', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(runExtensionRecord({
+      id: 'local.cycle-a',
+      name: 'Cycle A',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.cycle-a.leaf", {
+          title: "Cycle leaf",
+          run(_context, args) { args.leafStarted(); }
+        });
+        app.commands.register("local.cycle-a.parent", {
+          title: "Cycle parent",
+          async run(_context, args) {
+            await app.commands.run("local.cycle-b.child", args);
+            model.name = model.name + " a";
+            return "parent result";
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    expect(runExtensionRecord({
+      id: 'local.cycle-b',
+      name: 'Cycle B',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.cycle-b.child", {
+          title: "Cycle child",
+          async run(_context, args) {
+            await app.commands.run("local.cycle-a.leaf", args);
+            model.name = model.name + " b";
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    let leafStarted = false;
+
+    const result = await registry.runCommand('local.cycle-a.parent', {
+      leafStarted() { leafStarted = true; },
+    });
+
+    expect(result).toBe('parent result');
+    expect(leafStarted).toBe(false);
+    expect(first.getState().model!.info.name).toBe('Async A b a');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: Cycle parent',
+    ]);
+    expect(registry.getSnapshot().errors).toHaveLength(1);
+    expect(registry.getSnapshot().errors[0]).toMatchObject({
+      extensionId: 'local.cycle-a',
+      message: 'Error: Extension invocation cycle detected on the current model.',
+    });
+  });
+
+  it('holds a parent lease for a post-yield fire-and-forget child', async () => {
+    const registry = createExtensionRegistry();
+    const { firstId, first, secondId, second } = asyncExtensionSessions();
+    activateModelSession(firstId);
+    expect(runExtensionRecord({
+      id: 'local.fire-child',
+      name: 'Fire child',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.fire-child.run", {
+          title: "Fire child",
+          async run(_context, args) {
+            args.childStarted();
+            await args.childGate;
+            model.name = model.name + " child";
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    expect(runExtensionRecord({
+      id: 'local.fire-parent',
+      name: 'Fire parent',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.fire-parent.run", {
+          title: "Fire parent",
+          async run(_context, args) {
+            await Promise.resolve();
+            void app.commands.run("local.fire-child.run", args);
+            model.purpose = model.purpose + "parent;";
+            return "parent result";
+          }
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+    const childGate = deferred();
+    let childStarted = false;
+    let parentSettled = false;
+
+    const pending = registry.runCommand('local.fire-parent.run', {
+      childGate: childGate.promise,
+      childStarted() { childStarted = true; },
+    });
+    void pending.then(() => { parentSettled = true; });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const childStartedBeforeGate = childStarted;
+    const parentSettledBeforeGate = parentSettled;
+    activateModelSession(secondId);
+    childGate.resolve();
+    const result = await pending;
+
+    expect(childStartedBeforeGate).toBe(true);
+    expect(parentSettledBeforeGate).toBe(false);
+    expect(result).toBe('parent result');
+    expect(first.getState().model!.info.documentation).toBe('parent;');
+    expect(first.getState().model!.info.name).toBe('Async A child');
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'Extension: Fire parent',
+    ]);
+    expect(second.getState().model!.info.name).toBe('Async B');
+    expect(second.getState().undoStack).toHaveLength(0);
   });
 });
 

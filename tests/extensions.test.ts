@@ -556,6 +556,39 @@ describe('extension app API and runtime', () => {
       message: 'Error: command failed',
     });
   });
+
+  it('records rejected runtime command and event callbacks after await', async () => {
+    const registry = createExtensionRegistry();
+    expect(runExtensionRecord({
+      id: 'local.async-errors',
+      name: 'Async errors',
+      version: '0.1.0',
+      enabled: true,
+      source: `
+        app.commands.register("local.async-errors.fail", {
+          title: "Fail later",
+          async run() {
+            await Promise.resolve();
+            throw new Error("async command failed");
+          }
+        });
+        app.events.on("app.ready", async function() {
+          await Promise.resolve();
+          throw new Error("async event failed");
+        });
+      `,
+      createdAt: 1,
+      updatedAt: 1,
+    }, registry)).toEqual({});
+
+    await expect(registry.runCommand('local.async-errors.fail')).resolves.toBeUndefined();
+    await expect(registry.emitEvent('app.ready')).resolves.toBeUndefined();
+
+    expect(registry.getSnapshot().errors.map((error) => error.message)).toEqual([
+      'Error: async command failed',
+      'Error: async event failed',
+    ]);
+  });
 });
 
 describe('extension events', () => {

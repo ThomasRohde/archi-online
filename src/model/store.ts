@@ -90,6 +90,13 @@ export interface ModelStore extends StoreApi<AppState> {
 
 const MAX_UNDO = 200;
 
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    (typeof value === 'object' && value !== null)
+    || typeof value === 'function'
+  ) && typeof (value as PromiseLike<unknown>).then === 'function';
+}
+
 function initialState(overrides: Partial<AppState> = {}): AppState {
   return {
     model: null,
@@ -171,9 +178,7 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
       batchSelectionAfter = undefined;
     }
     batchDepth++;
-    try {
-      return fn();
-    } finally {
+    const finish = () => {
       batchDepth--;
       if (batchDepth === 0 && batchPatches.length > 0) {
         const tx: Transaction = {
@@ -196,6 +201,17 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
         batchSelectionBefore = undefined;
         batchSelectionAfter = undefined;
       }
+    };
+    try {
+      const result = fn();
+      if (isPromiseLike(result)) {
+        return Promise.resolve(result).finally(finish) as unknown as typeof result;
+      }
+      finish();
+      return result;
+    } catch (error) {
+      finish();
+      throw error;
     }
   };
 

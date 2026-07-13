@@ -125,6 +125,33 @@ describe('model ops + undo/redo', () => {
     expect(Object.keys(model().elements)).toHaveLength(0);
   });
 
+  it('keeps an asynchronous batch open through promise settlement', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const pending = runBatch('async script', async () => {
+      addElement('BusinessActor', 'Before await');
+      await gate;
+      addElement('BusinessRole', 'After await');
+    });
+
+    expect(Object.values(model().elements).map((element) => element.name))
+      .toEqual(['Before await']);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    release();
+    await pending;
+
+    expect(Object.values(model().elements).map((element) => element.name))
+      .toEqual(['Before await', 'After await']);
+    expect(useStore.getState().undoStack.map((entry) => entry.label)).toEqual([
+      'async script',
+    ]);
+    undo();
+    expect(Object.keys(model().elements)).toHaveLength(0);
+  });
+
   it('applies connection appearance through one undoable style operation', () => {
     const actor = addElement('BusinessActor');
     const role = addElement('BusinessRole');

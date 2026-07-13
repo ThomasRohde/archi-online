@@ -5,6 +5,13 @@ import { JModel, JObject } from './wrappers';
 
 type Dollar = ((selector: string | JObject | JCollection) => JCollection) & { model: JModel };
 
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    (typeof value === 'object' && value !== null)
+    || typeof value === 'function'
+  ) && typeof (value as PromiseLike<unknown>).then === 'function';
+}
+
 export function createJArchiGlobals(
   modelStore: ModelStore = getActiveModelStore(),
 ) {
@@ -16,10 +23,103 @@ export function createJArchiGlobals(
   return { $, model };
 }
 
+interface ExtensionInvocationRuntime {
+  running: boolean;
+  store: ModelStore | null;
+  children: Set<Promise<void>>;
+}
+
+interface QueuedExtensionInvocation {
+  runtime: ExtensionInvocationRuntime;
+  store: ModelStore;
+  start: () => unknown;
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
+}
+
+interface SynchronousExtensionInvocation {
+  runtime: ExtensionInvocationRuntime;
+  store: ModelStore;
+}
+
+interface ExtensionInvocationOptions {
+  caller?: object;
+}
+
+const activeExtensionInvocationStores = new WeakSet<ModelStore>();
+const extensionInvocationQueue: QueuedExtensionInvocation[] = [];
+const synchronousExtensionInvocations: SynchronousExtensionInvocation[] = [];
+const extensionInvokerRuntimes = new WeakMap<object, ExtensionInvocationRuntime>();
+let drainingExtensionInvocations = false;
+
+function drainExtensionInvocations(): void {
+  if (drainingExtensionInvocations) return;
+  drainingExtensionInvocations = true;
+  try {
+    const blockedRuntimes = new Set<ExtensionInvocationRuntime>();
+    const blockedStores = new Set<ModelStore>();
+    let index = 0;
+    while (index < extensionInvocationQueue.length) {
+      const next = extensionInvocationQueue[index];
+      if (
+        next.runtime.running
+        || activeExtensionInvocationStores.has(next.store)
+        || blockedRuntimes.has(next.runtime)
+        || blockedStores.has(next.store)
+      ) {
+        blockedRuntimes.add(next.runtime);
+        blockedStores.add(next.store);
+        index += 1;
+        continue;
+      }
+      extensionInvocationQueue.splice(index, 1);
+      try {
+        const result = next.start();
+        void Promise.resolve(result).then(next.resolve, next.reject);
+      } catch (error) {
+        next.reject(error);
+      }
+    }
+  } finally {
+    drainingExtensionInvocations = false;
+  }
+}
+
+function hasQueuedInvocationConflict(
+  runtime: ExtensionInvocationRuntime,
+  store: ModelStore,
+): boolean {
+  return extensionInvocationQueue.some(
+    (queued) => queued.runtime === runtime || queued.store === store,
+  );
+}
+
+function trackInvocationChild(
+  runtime: ExtensionInvocationRuntime,
+  promise: Promise<unknown>,
+): void {
+  const children = runtime.children;
+  const settlement = promise
+    .then(() => undefined, () => undefined)
+    .finally(() => children.delete(settlement));
+  children.add(settlement);
+}
+
+async function waitForInvocationChildren(runtime: ExtensionInvocationRuntime): Promise<void> {
+  while (runtime.children.size > 0) {
+    await Promise.all([...runtime.children]);
+  }
+}
+
 /** Dynamic globals used only by long-lived extensions. Ordinary scripts stay store-captured. */
 export function createExtensionJArchiGlobals() {
-  let invocationStore: ModelStore | null = null;
-  const resolveStore = () => invocationStore ?? getActiveModelStore();
+  const runtime: ExtensionInvocationRuntime = {
+    running: false,
+    store: null,
+    children: new Set(),
+  };
+  let synchronousDepth = 0;
+  const resolveStore = () => runtime.store ?? getActiveModelStore();
   const model = new Proxy({} as JModel, {
     get(_target, property) {
       const receiver = new JModel('model', resolveStore());
@@ -37,16 +137,140 @@ export function createExtensionJArchiGlobals() {
   }) as Dollar;
   $.model = model;
 
-  const invoke = <T>(store: ModelStore, callback: () => T): T => {
-    const previous = invocationStore;
-    invocationStore = store;
+  const runCallback = <T>(store: ModelStore, callback: () => T): T => {
+    synchronousDepth += 1;
+    synchronousExtensionInvocations.push({
+      runtime,
+      store,
+    });
     try {
       return callback();
     } finally {
-      // Deliberately restore when an async callback yields so concurrent invocations cannot cross-talk.
-      invocationStore = previous;
+      synchronousExtensionInvocations.pop();
+      synchronousDepth -= 1;
     }
   };
+
+  const finish = (store: ModelStore, ownsStoreLease: boolean) => {
+    runtime.store = null;
+    runtime.running = false;
+    runtime.children = new Set();
+    if (ownsStoreLease) activeExtensionInvocationStores.delete(store);
+    drainExtensionInvocations();
+  };
+
+  const start = <T>(
+    store: ModelStore,
+    callback: () => T,
+    ownsStoreLease = true,
+  ): T | Promise<Awaited<T>> => {
+    runtime.running = true;
+    if (ownsStoreLease) activeExtensionInvocationStores.add(store);
+    runtime.store = store;
+    runtime.children = new Set();
+    let result: T;
+    try {
+      result = runCallback(store, callback);
+    } catch (error) {
+      if (runtime.children.size === 0) {
+        finish(store, ownsStoreLease);
+        throw error;
+      }
+      return waitForInvocationChildren(runtime)
+        .then(() => { throw error; })
+        .finally(() => finish(store, ownsStoreLease)) as Promise<Awaited<T>>;
+    }
+    if (isPromiseLike(result) || runtime.children.size > 0) {
+      return Promise.resolve(result)
+        .then(
+          async (value) => {
+            await waitForInvocationChildren(runtime);
+            return value;
+          },
+          async (error) => {
+            await waitForInvocationChildren(runtime);
+            throw error;
+          },
+        )
+        .finally(() => finish(store, ownsStoreLease)) as Promise<Awaited<T>>;
+    }
+    finish(store, ownsStoreLease);
+    return result;
+  };
+
+  const enqueue = <T>(
+    store: ModelStore,
+    callback: () => T,
+  ): Promise<Awaited<T>> => new Promise((resolve, reject) => {
+    extensionInvocationQueue.push({
+      runtime,
+      store,
+      start: () => start(store, callback),
+      resolve: (value) => resolve(value as Awaited<T>),
+      reject,
+    });
+    drainExtensionInvocations();
+  });
+
+  const invoke = <T>(
+    store: ModelStore,
+    callback: () => T,
+    options?: ExtensionInvocationOptions,
+  ): T | Promise<Awaited<T>> => {
+    const callerRuntime = options?.caller
+      ? extensionInvokerRuntimes.get(options.caller)
+      : undefined;
+    if (
+      runtime.running
+      && synchronousDepth > 0
+      && store === runtime.store
+      && (!callerRuntime || callerRuntime === runtime)
+    ) {
+      const result = runCallback(store, callback);
+      if (isPromiseLike(result)) trackInvocationChild(runtime, Promise.resolve(result));
+      return result;
+    }
+    const synchronousParent = synchronousExtensionInvocations.at(-1);
+    if (
+      !runtime.running
+      && synchronousParent?.store === store
+      && activeExtensionInvocationStores.has(store)
+    ) {
+      const result = start(store, callback, false);
+      if (isPromiseLike(result)) {
+        trackInvocationChild(synchronousParent.runtime, Promise.resolve(result));
+      }
+      return result;
+    }
+    if (callerRuntime?.running && callerRuntime.store === store) {
+      if (runtime === callerRuntime) {
+        const result = runCallback(store, callback);
+        if (isPromiseLike(result)) trackInvocationChild(runtime, Promise.resolve(result));
+        return result;
+      }
+      if (!runtime.running) {
+        const result = start(store, callback, false);
+        if (isPromiseLike(result)) {
+          trackInvocationChild(callerRuntime, Promise.resolve(result));
+        }
+        return result;
+      }
+      const reason = runtime.store === store
+        ? 'Extension invocation cycle detected on the current model.'
+        : 'Extension runtime is already active on another model.';
+      return Promise.reject(new Error(reason));
+    }
+    if (
+      !runtime.running
+      && !activeExtensionInvocationStores.has(store)
+      && !hasQueuedInvocationConflict(runtime, store)
+    ) {
+      return start(store, callback);
+    }
+    return enqueue(store, callback);
+  };
+
+  extensionInvokerRuntimes.set(invoke, runtime);
 
   return { $, model, invoke, resolveStore };
 }

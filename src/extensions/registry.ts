@@ -26,7 +26,15 @@ interface Owned<T> {
   invoke?: ExtensionModelStoreInvoker;
 }
 
-export type ExtensionModelStoreInvoker = <T>(store: ModelStore, callback: () => T) => T;
+export interface ExtensionModelStoreInvocationOptions {
+  caller?: ExtensionModelStoreInvoker;
+}
+
+export type ExtensionModelStoreInvoker = <T>(
+  store: ModelStore,
+  callback: () => T,
+  options?: ExtensionModelStoreInvocationOptions,
+) => T | Promise<Awaited<T>>;
 
 type Listener = () => void;
 
@@ -165,13 +173,12 @@ export class ExtensionRegistry {
     const handlers = this.eventHandlers.get(name) ?? [];
     for (const handler of handlers) {
       try {
-        await runBatch(
+        const run = () => runBatch(
           `Extension event: ${name}`,
-          () => handler.invoke
-            ? handler.invoke(modelStore, () => handler.value(payload))
-            : handler.value(payload),
+          () => handler.value(payload),
           modelStore,
         );
+        await (handler.invoke ? handler.invoke(modelStore, run) : run());
       } catch (error) {
         this.recordError(handler.extensionId, error);
       }
@@ -183,19 +190,19 @@ export class ExtensionRegistry {
     args?: unknown,
     trigger?: unknown,
     modelStore: ModelStore = getActiveModelStore(),
+    caller?: ExtensionModelStoreInvoker,
   ): Promise<unknown> {
     const owned = this.commands.get(id);
     if (!owned) throw new Error(`Unknown extension command: ${id}`);
     try {
       const session = getModelSessionForStore(modelStore);
       const context = this.createContext(owned.extensionId, modelStore, trigger);
-      return await runBatch(
+      const run = () => runBatch(
         `Extension: ${owned.value.title}`,
-        () => owned.invoke
-          ? owned.invoke(modelStore, () => owned.value.run(context, args))
-          : owned.value.run(context, args),
+        () => owned.value.run(context, args),
         session?.store ?? modelStore,
       );
+      return await (owned.invoke ? owned.invoke(modelStore, run, { caller }) : run());
     } catch (error) {
       this.recordError(owned.extensionId, error);
       return undefined;
