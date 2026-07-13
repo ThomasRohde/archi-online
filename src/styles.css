@@ -2735,6 +2735,7 @@ body {
 }
 
 .property-manager-keys {
+  min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -2856,6 +2857,7 @@ body {
 }
 
 .property-manager-details {
+  min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -2971,6 +2973,11 @@ body {
   white-space: pre-wrap;
 }
 
+.property-manager-value:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .property-manager-navigate {
   color: #355f8b;
   font-weight: 500;
@@ -2981,6 +2988,43 @@ body {
   color: var(--text-dim);
   font-size: 11px;
   text-align: center;
+}
+
+.property-manager-pagination {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--border);
+  background: #f7f9fb;
+  color: var(--text-mid);
+  font: 10px 'Cascadia Mono', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.property-manager-pagination button {
+  width: 25px;
+  height: 23px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fff;
+  color: #355f8b;
+  cursor: pointer;
+  font: 18px/1 'Segoe UI', system-ui, sans-serif;
+}
+
+.property-manager-pagination button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.property-manager-pagination span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .property-manager-actions {

@@ -9,6 +9,7 @@ import {
 } from '../src/model/workspace';
 import { JModel } from '../src/scripting/jarchi';
 import { JARCHI_SCRIPT_DTS } from '../src/scripting/jarchi-dts';
+import { runScript, type ConsoleEntry } from '../src/scripting/runner';
 
 interface ScriptPropertyOccurrence {
   readonly id: string;
@@ -123,6 +124,47 @@ describe('jArchi global property manager wrappers', () => {
     expect(getModelSession(firstId)!.store.getState().model!.info.properties).toHaveLength(2);
     expect(getModelSession(secondId)!.store.getState().model!.info.properties).toHaveLength(2);
     activateModelSession(firstId);
+  });
+
+  it('batches real runScript property mutations into one captured Script undo step', () => {
+    const firstId = addModelSession({
+      id: 'run-script-first',
+      model: modelWithProperties('Run script first'),
+      fileName: null,
+    });
+    const secondId = addModelSession({
+      id: 'run-script-second',
+      model: modelWithProperties('Run script second'),
+      fileName: null,
+    });
+    activateModelSession(firstId);
+    const logs: string[] = [];
+
+    const result = runScript(`
+      const rename = model.previewRenamePropertyKey('owner', 'steward');
+      model.renamePropertyKey(rename);
+      const deletion = model.previewDeletePropertyKey('existing');
+      model.deletePropertyKey(deletion);
+      console.log(model.propertyUsage().map((entry) => entry.key).join(','));
+    `, (entry: ConsoleEntry) => logs.push(`${entry.level}:${entry.text}`));
+
+    const first = getModelSession(firstId)!.store;
+    const second = getModelSession(secondId)!.store;
+    expect(result).toEqual({});
+    expect(logs).toEqual(['log:steward']);
+    expect(first.getState().model!.info.properties).toEqual([
+      { key: 'steward', value: 'Architecture' },
+    ]);
+    expect(first.getState().undoStack.map((entry) => entry.label)).toEqual(['Script']);
+    expect(second.getState().model!.info.properties).toEqual([
+      { key: 'owner', value: 'Architecture' },
+      { key: 'existing', value: 'keep' },
+    ]);
+    undo(first);
+    expect(first.getState().model!.info.properties).toEqual([
+      { key: 'owner', value: 'Architecture' },
+      { key: 'existing', value: 'keep' },
+    ]);
   });
 
   it('declares property usage, preview, rename, and delete contracts', () => {

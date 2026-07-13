@@ -1,4 +1,5 @@
 import { isLegendNote } from './legend';
+import { createConnectionOrderIndex, orderedViewConnectionIds } from './connection-order';
 import { elementLabel, relationshipLabel } from './metamodel';
 import { getActiveModelStore, type ModelStore } from './store';
 import type {
@@ -71,12 +72,14 @@ export interface PropertyMutationPreview {
 
 interface CaptureSource {
   readonly sourceModel: ModelState | null;
+  readonly sourceModelEpoch: number;
   readonly activationOrder: readonly ModelSessionId[] | null;
 }
 
 interface PreviewSource {
   readonly capture: PropertyManagerSessionCapture;
   readonly sourceModel: ModelState | null;
+  readonly sourceModelEpoch: number;
   readonly activationOrder: readonly ModelSessionId[] | null;
 }
 
@@ -89,7 +92,14 @@ interface PropertyOwner {
   readonly navigation: PropertyNavigation;
 }
 
+interface PropertyLedgerSnapshot {
+  readonly occurrences: readonly PropertyOccurrence[];
+  readonly usage: readonly PropertyKeyUsage[];
+  readonly occurrenceById: ReadonlyMap<string, PropertyOccurrence>;
+}
+
 const captureSources = new WeakMap<PropertyManagerSessionCapture, CaptureSource>();
+const captureLedgers = new WeakMap<PropertyManagerSessionCapture, PropertyLedgerSnapshot>();
 const previewSources = new WeakMap<PropertyMutationPreview, PreviewSource>();
 
 /** Capture the exact model store and activation generation used by one manager session. */
@@ -97,12 +107,14 @@ export function capturePropertyManagerSession(
   store: ModelStore = getActiveModelStore(),
 ): PropertyManagerSessionCapture {
   const session = getModelSessionForStore(store) ?? null;
+  const state = store.getState();
   const capture = Object.freeze({
     store,
     sessionId: session?.id ?? null,
   });
   captureSources.set(capture, Object.freeze({
-    sourceModel: store.getState().model,
+    sourceModel: state.model,
+    sourceModelEpoch: state.modelEpoch,
     activationOrder: session ? workspaceStore.getState().activationOrder : null,
   }));
   return capture;
@@ -110,7 +122,9 @@ export function capturePropertyManagerSession(
 
 /** Desktop-style presentation label without changing exact key identity. */
 export function displayPropertyKey(key: string): string {
-  return key === '' ? '(blank)' : key;
+  if (key === '') return '(blank)';
+  if (key === '(blank)' || /^\s+$/u.test(key)) return JSON.stringify(key);
+  return key;
 }
 
 /** Inspect all property keys and ordered occurrences without mutating the captured model. */
@@ -120,30 +134,12 @@ export function inspectPropertyUsage(
 ): readonly PropertyKeyUsage[] {
   const source = requireCurrentCapture(capture);
   if (!source.sourceModel) return Object.freeze([]);
-  const occurrences = collectPropertyOccurrences(source.sourceModel);
-  const byKey = new Map<string, PropertyOccurrence[]>();
-  for (const occurrence of occurrences) {
-    const existing = byKey.get(occurrence.key);
-    if (existing) existing.push(occurrence);
-    else byKey.set(occurrence.key, [occurrence]);
-  }
+  const usage = propertyLedger(capture, source).usage;
   const query = search.toLocaleLowerCase();
-  const usage: PropertyKeyUsage[] = [];
-  for (const [key, keyOccurrences] of byKey) {
-    const displayKey = displayPropertyKey(key);
-    if (query && !displayKey.toLocaleLowerCase().includes(query)) continue;
-    const owners = new Set(
-      keyOccurrences.map((entry) => `${entry.ownerKind}\u0000${entry.ownerId}`),
-    );
-    usage.push(Object.freeze({
-      key,
-      displayKey,
-      occurrenceCount: keyOccurrences.length,
-      ownerCount: owners.size,
-      occurrences: Object.freeze([...keyOccurrences]),
-    }));
-  }
-  return Object.freeze(usage);
+  if (!query) return usage;
+  return Object.freeze(
+    usage.filter((entry) => entry.displayKey.toLocaleLowerCase().includes(query)),
+  );
 }
 
 /** Create the mandatory immutable preview for an exact property-key rename. */
@@ -180,7 +176,7 @@ export function previewPropertyRename(
       occurrences: [],
     });
   }
-  const all = source.sourceModel ? collectPropertyOccurrences(source.sourceModel) : [];
+  const all = source.sourceModel ? propertyLedger(capture, source).occurrences : [];
   const occurrences = all.filter((entry) => entry.key === key);
   if (occurrences.length === 0) {
     return createPreview(source, capture, {
@@ -218,7 +214,7 @@ export function previewPropertyDelete(
 ): PropertyMutationPreview {
   const source = requireCurrentCapture(capture);
   const occurrences = source.sourceModel
-    ? collectPropertyOccurrences(source.sourceModel).filter((entry) => entry.key === key)
+    ? propertyLedger(capture, source).occurrences.filter((entry) => entry.key === key)
     : [];
   return createPreview(source, capture, {
     valid: occurrences.length > 0,
@@ -242,23 +238,24 @@ export function preparePropertyNavigation(
   sessionId: ModelSessionId | null;
   occurrence: PropertyOccurrence;
 }> | undefined {
-  let usage: readonly PropertyKeyUsage[];
+  let source: CaptureSource;
   try {
-    usage = inspectPropertyUsage(capture);
+    source = requireCurrentCapture(capture);
   } catch {
     return undefined;
   }
-  for (const entry of usage) {
-    const occurrence = entry.occurrences.find((candidate) => candidate.id === occurrenceId);
-    if (occurrence) {
-      return Object.freeze({
-        store: capture.store,
-        sessionId: capture.sessionId,
-        occurrence,
-      });
-    }
+  if (!source.sourceModel) return undefined;
+  const occurrence = propertyLedger(capture, source).occurrenceById.get(occurrenceId);
+  if (!occurrence) return undefined;
+  const property = propertyAt(source.sourceModel, occurrence);
+  if (!property || property.key !== occurrence.key || property.value !== occurrence.value) {
+    return undefined;
   }
-  return undefined;
+  return Object.freeze({
+    store: capture.store,
+    sessionId: capture.sessionId,
+    occurrence,
+  });
 }
 
 /** Validate an opaque preview and every coordinate before an operation starts a transaction. */
@@ -282,7 +279,9 @@ export function preparePropertyMutation(
   const state = source.capture.store.getState();
   if (
     state.model !== source.sourceModel
+    || state.modelEpoch !== source.sourceModelEpoch
     || captureSource.sourceModel !== source.sourceModel
+    || captureSource.sourceModelEpoch !== source.sourceModelEpoch
     || captureSource.activationOrder !== source.activationOrder
   ) {
     throw new Error('Preview is stale. Preview again.');
@@ -361,6 +360,7 @@ function createPreview(
   previewSources.set(preview, Object.freeze({
     capture,
     sourceModel: source.sourceModel,
+    sourceModelEpoch: source.sourceModelEpoch,
     activationOrder: source.activationOrder,
   }));
   return preview;
@@ -375,18 +375,59 @@ function requireCurrentCapture(capture: PropertyManagerSessionCapture): CaptureS
   return source;
 }
 
+function propertyLedger(
+  capture: PropertyManagerSessionCapture,
+  source: CaptureSource,
+): PropertyLedgerSnapshot {
+  const existing = captureLedgers.get(capture);
+  if (existing) return existing;
+  const occurrences = source.sourceModel
+    ? collectPropertyOccurrences(source.sourceModel)
+    : Object.freeze([]);
+  const byKey = new Map<string, PropertyOccurrence[]>();
+  const occurrenceById = new Map<string, PropertyOccurrence>();
+  for (const occurrence of occurrences) {
+    occurrenceById.set(occurrence.id, occurrence);
+    const keyOccurrences = byKey.get(occurrence.key);
+    if (keyOccurrences) keyOccurrences.push(occurrence);
+    else byKey.set(occurrence.key, [occurrence]);
+  }
+  const usage: PropertyKeyUsage[] = [];
+  for (const [key, keyOccurrences] of byKey) {
+    const owners = new Set(
+      keyOccurrences.map((entry) => `${entry.ownerKind}\u0000${entry.ownerId}`),
+    );
+    usage.push(Object.freeze({
+      key,
+      displayKey: displayPropertyKey(key),
+      occurrenceCount: keyOccurrences.length,
+      ownerCount: owners.size,
+      occurrences: Object.freeze([...keyOccurrences]),
+    }));
+  }
+  const ledger = Object.freeze({
+    occurrences,
+    usage: Object.freeze(usage),
+    occurrenceById,
+  });
+  captureLedgers.set(capture, ledger);
+  return ledger;
+}
+
 function captureIsCurrent(
   capture: PropertyManagerSessionCapture,
   source: CaptureSource,
 ): boolean {
+  const state = capture.store.getState();
   if (capture.sessionId === null) {
-    return capture.store.getState().model === source.sourceModel;
+    return state.model === source.sourceModel && state.modelEpoch === source.sourceModelEpoch;
   }
   const workspace = workspaceStore.getState();
   return getModelSession(capture.sessionId)?.store === capture.store
     && workspace.activeSessionId === capture.sessionId
     && workspace.activationOrder === source.activationOrder
-    && capture.store.getState().model === source.sourceModel;
+    && state.model === source.sourceModel
+    && state.modelEpoch === source.sourceModelEpoch;
 }
 
 function collectPropertyOccurrences(model: ModelState): readonly PropertyOccurrence[] {
@@ -427,18 +468,8 @@ function collectPropertyOccurrences(model: ModelState): readonly PropertyOccurre
   Object.keys(model.relationships).forEach((id) => addTreeOwner(model, id, add));
   Object.keys(model.views).forEach((id) => addTreeOwner(model, id, add));
 
-  const plainConnectionsByView = new Map<string, DiagramConnection[]>();
-  const orphanPlainConnections: DiagramConnection[] = [];
-  for (const connection of Object.values(model.connections)) {
-    if (connection.connType !== 'plain') continue;
-    if (!model.views[connection.viewId]) {
-      orphanPlainConnections.push(connection);
-      continue;
-    }
-    const connections = plainConnectionsByView.get(connection.viewId) ?? [];
-    connections.push(connection);
-    plainConnectionsByView.set(connection.viewId, connections);
-  }
+  const connectionOrderIndex = createConnectionOrderIndex(model);
+  const visitedPlainConnections = new Set<string>();
   const visitedNodes = new Set<string>();
   for (const view of orderedViews) {
     const visitNode = (nodeId: string) => {
@@ -452,7 +483,10 @@ function collectPropertyOccurrences(model: ModelState): readonly PropertyOccurre
       node.childIds.forEach(visitNode);
     };
     view.childIds.forEach(visitNode);
-    for (const connection of plainConnectionsByView.get(view.id) ?? []) {
+    for (const connectionId of orderedViewConnectionIds(model, view.id, connectionOrderIndex)) {
+      const connection = model.connections[connectionId];
+      if (connection?.connType !== 'plain') continue;
+      visitedPlainConnections.add(connection.id);
       add(plainConnectionOwner(model, connection));
     }
   }
@@ -461,7 +495,11 @@ function collectPropertyOccurrences(model: ModelState): readonly PropertyOccurre
       add(annotationOwner(model, node));
     }
   });
-  orphanPlainConnections.forEach((connection) => add(plainConnectionOwner(model, connection)));
+  Object.values(model.connections).forEach((connection) => {
+    if (connection.connType === 'plain' && !visitedPlainConnections.has(connection.id)) {
+      add(plainConnectionOwner(model, connection));
+    }
+  });
 
   const occurrences: PropertyOccurrence[] = [];
   for (const owner of owners) {

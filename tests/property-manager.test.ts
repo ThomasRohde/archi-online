@@ -16,10 +16,11 @@ import {
   createModelStore,
   openView,
   redo,
+  replaceModel,
   setSelection,
   undo,
 } from '../src/model/store';
-import type { ModelState } from '../src/model/types';
+import type { DiagramConnection, ModelState, Property } from '../src/model/types';
 import {
   activateModelSession,
   addModelSession,
@@ -202,6 +203,26 @@ function fixture(): ModelState {
   };
 }
 
+function orderedPlainConnection(
+  id: string,
+  sourceId: string,
+  targetId: string,
+): DiagramConnection {
+  return {
+    id,
+    connType: 'plain',
+    viewId: 'view',
+    name: id,
+    documentation: '',
+    properties: [{ key: 'connection-order', value: id }],
+    sourceId,
+    targetId,
+    sourceConnectionIds: [],
+    targetConnectionIds: [],
+    bendpoints: [],
+  };
+}
+
 beforeEach(() => resetWorkspaceForTests());
 
 describe('global property inspection', () => {
@@ -277,7 +298,9 @@ describe('global property inspection', () => {
     });
     expect(usage.some((entry) => entry.key === 'must-not-appear')).toBe(false);
     expect(displayPropertyKey('')).toBe('(blank)');
-    expect(displayPropertyKey(' ')).toBe(' ');
+    expect(displayPropertyKey('(blank)')).toBe('"(blank)"');
+    expect(displayPropertyKey(' ')).toBe('" "');
+    expect(displayPropertyKey('\t')).toBe('"\\t"');
     expect(Object.isFrozen(usage)).toBe(true);
     expect(Object.isFrozen(shared.occurrences)).toBe(true);
     expect(Object.isFrozen(shared.occurrences[0])).toBe(true);
@@ -289,6 +312,32 @@ describe('global property inspection', () => {
     expect(inspectPropertyUsage(capture, 'case').map((entry) => entry.key)).toEqual(['Case', 'case']);
     expect(inspectPropertyUsage(capture, 'BLANK').map((entry) => entry.key)).toEqual(['']);
     expect(inspectPropertyUsage(capture, 'shared').map((entry) => entry.key)).toEqual(['shared']);
+  });
+
+  it('orders plain connections by native adjacency topology before deterministic orphans', () => {
+    const model = fixture();
+    const orphan = orderedPlainConnection('orphan', 'missing-source', 'missing-target');
+    const nested = orderedPlainConnection('nested', 'dependent', 'legend');
+    const second = orderedPlainConnection('second', 'note', 'legend');
+    const dependent = orderedPlainConnection('dependent', 'first', 'legend');
+    const first = orderedPlainConnection('first', 'note', 'legend');
+    first.sourceConnectionIds = ['dependent'];
+    dependent.sourceConnectionIds = ['nested'];
+    model.connections = { orphan, nested, second, dependent, first };
+    model.nodes.note.sourceConnectionIds = ['first', 'second'];
+    model.nodes.legend.targetConnectionIds = ['second', 'nested', 'dependent', 'first'];
+
+    const usage = inspectPropertyUsage(
+      capturePropertyManagerSession(createModelStore({ model })),
+    ).find((entry) => entry.key === 'connection-order')!;
+
+    expect(usage.occurrences.map((entry) => entry.ownerId)).toEqual([
+      'first',
+      'dependent',
+      'nested',
+      'second',
+      'orphan',
+    ]);
   });
 });
 
@@ -425,6 +474,76 @@ describe('global property mutations', () => {
 });
 
 describe('property manager session and navigation isolation', () => {
+  it('reuses the captured occurrence index for O(1) navigation with coordinate validation', () => {
+    const model = fixture();
+    let propertyReads = 0;
+    const owners: Array<{ properties: Property[] }> = [
+      model.info,
+      ...Object.values(model.folders),
+      ...Object.values(model.elements),
+      ...Object.values(model.relationships),
+      ...Object.values(model.views),
+      ...Object.values(model.nodes).filter(
+        (node): node is Extract<typeof node, { nodeType: 'group' | 'note' }> =>
+          node.nodeType === 'group' || node.nodeType === 'note',
+      ),
+      ...Object.values(model.connections),
+    ];
+    for (const owner of owners) {
+      let properties = owner.properties;
+      Object.defineProperty(owner, 'properties', {
+        configurable: true,
+        get: () => {
+          propertyReads++;
+          return properties;
+        },
+        set: (next: Property[]) => {
+          properties = next;
+        },
+      });
+    }
+    const capture = capturePropertyManagerSession(createModelStore({ model }));
+    const occurrence = inspectPropertyUsage(capture)[0].occurrences[0];
+    propertyReads = 0;
+
+    const target = preparePropertyNavigation(capture, occurrence.id);
+
+    expect(target?.occurrence).toBe(occurrence);
+    expect(propertyReads).toBe(1);
+    model.info.properties[0].value = 'changed outside the store';
+    expect(preparePropertyNavigation(capture, occurrence.id)).toBeUndefined();
+  });
+
+  it('invalidates capture inspection and navigation when replaceModel reuses the model object', () => {
+    const model = fixture();
+    const store = createModelStore({ model });
+    const capture = capturePropertyManagerSession(store);
+    const occurrenceId = inspectPropertyUsage(capture)[0].occurrences[0].id;
+
+    replaceModel(model, null, false, {}, store);
+
+    expect(() => inspectPropertyUsage(capture)).toThrow(
+      'Property manager session is stale. Open it again.',
+    );
+    expect(preparePropertyNavigation(capture, occurrenceId)).toBeUndefined();
+  });
+
+  it('rejects a preview atomically when replaceModel reuses the model object', () => {
+    const model = fixture();
+    const store = createModelStore({ model });
+    const preview = previewPropertyRename(
+      capturePropertyManagerSession(store),
+      'shared',
+      'renamed',
+    );
+
+    replaceModel(model, null, false, {}, store);
+
+    expect(() => renamePropertyKey(preview)).toThrow('Preview is stale. Preview again.');
+    expect(model.info.properties[0].key).toBe('shared');
+    expect(store.getState().undoStack).toEqual([]);
+  });
+
   it('survives same-model navigation and file metadata replacement', () => {
     const sessionId = addModelSession({ id: 'saved', model: fixture(), fileName: null });
     const session = getModelSession(sessionId)!;

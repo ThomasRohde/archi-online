@@ -5,6 +5,10 @@ import {
   type DiagramConnection,
   type ModelState,
 } from '../../types';
+import {
+  createConnectionOrderIndex,
+  orderedConnectableConnectionIds,
+} from '../../connection-order';
 import { serializeLegendFeature } from '../../legend';
 import { ARCHIMATE_NS, docTag, featureTags, propertyTags, serializeFontStyle, tag, textTag, type Attr } from './xml';
 
@@ -14,16 +18,7 @@ export function serializeArchimate(state: ModelState): string {
   if (graphError) throw new Error(graphError);
   const writingConnections = new Set<string>();
   const writtenConnections = new Set<string>();
-  const connectionsBySource = new Map<string, string[]>();
-  const connectionsByTarget = new Map<string, string[]>();
-  for (const connection of Object.values(state.connections)) {
-    const sourceIds = connectionsBySource.get(connection.sourceId) ?? [];
-    sourceIds.push(connection.id);
-    connectionsBySource.set(connection.sourceId, sourceIds);
-    const targetIds = connectionsByTarget.get(connection.targetId) ?? [];
-    targetIds.push(connection.id);
-    connectionsByTarget.set(connection.targetId, targetIds);
-  }
+  const connectionOrderIndex = createConnectionOrderIndex(state);
 
   function writeBounds(indent: string, b: Bounds): string {
     return tag(indent, 'bounds', [
@@ -38,19 +33,7 @@ export function serializeArchimate(state: ModelState): string {
     connectable: ConnectableRefs & { id: string },
     direction: 'source' | 'target',
   ): string[] {
-    const preferred = direction === 'source'
-      ? connectable.sourceConnectionIds
-      : connectable.targetConnectionIds;
-    const candidates = (direction === 'source' ? connectionsBySource : connectionsByTarget)
-      .get(connectable.id) ?? [];
-    const valid = new Set(candidates);
-    const ordered = preferred.filter(
-      (connectionId, index) => valid.has(connectionId) && preferred.indexOf(connectionId) === index,
-    );
-    for (const connectionId of candidates) {
-      if (!ordered.includes(connectionId)) ordered.push(connectionId);
-    }
-    return ordered;
+    return orderedConnectableConnectionIds(connectable, direction, connectionOrderIndex);
   }
 
   function writeConnection(indent: string, conn: DiagramConnection): string {

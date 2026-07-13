@@ -31,6 +31,7 @@ const FOCUSABLE_SELECTOR = [
   'textarea:not([disabled])',
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
+const LEDGER_PAGE_SIZE = 50;
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -59,12 +60,61 @@ function occurrenceContext(
   return `property ${displayPropertyKey(key)} occurrence ${index + 1}: ${occurrence.ownerType} at ${occurrence.location}, ${value}`;
 }
 
-function initialUsage(capture: PropertyManagerSessionCapture): readonly PropertyKeyUsage[] {
+function accessiblePropertyKey(key: string): string {
+  if (key === '') return '(blank) — empty string';
+  if (key === '(blank)') return '"(blank)" — literal text';
+  if (/^\s+$/u.test(key)) return `${JSON.stringify(key)} — whitespace-only key`;
+  return key;
+}
+
+function initialLedger(capture: PropertyManagerSessionCapture): Readonly<{
+  valid: boolean;
+  usage: readonly PropertyKeyUsage[];
+}> {
   try {
-    return inspectPropertyUsage(capture);
+    return Object.freeze({ valid: true, usage: inspectPropertyUsage(capture) });
   } catch {
-    return Object.freeze([]);
+    return Object.freeze({ valid: false, usage: Object.freeze([]) });
   }
+}
+
+function LedgerPagination({
+  label,
+  itemLabel,
+  page,
+  total,
+  onPageChange,
+}: {
+  label: string;
+  itemLabel: string;
+  page: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  const pageCount = Math.max(1, Math.ceil(total / LEDGER_PAGE_SIZE));
+  return (
+    <nav className="property-manager-pagination" aria-label={`${label} pagination`}>
+      <button
+        type="button"
+        aria-label={`Previous ${itemLabel} page`}
+        disabled={page === 0}
+        onClick={() => onPageChange(page - 1)}
+      >
+        ‹
+      </button>
+      <span aria-live="polite">
+        Page {page + 1} of {pageCount} · {total} {itemLabel}
+      </span>
+      <button
+        type="button"
+        aria-label={`Next ${itemLabel} page`}
+        disabled={page >= pageCount - 1}
+        onClick={() => onPageChange(page + 1)}
+      >
+        ›
+      </button>
+    </nav>
+  );
 }
 
 export function PropertiesManagerDialog({
@@ -81,8 +131,11 @@ export function PropertiesManagerDialog({
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
   const closingRef = useRef(false);
-  const [usage] = useState(() => initialUsage(capture));
+  const [initial] = useState(() => initialLedger(capture));
+  const usage = initial.usage;
   const [search, setSearch] = useState('');
+  const [keyPage, setKeyPage] = useState(0);
+  const [occurrencePage, setOccurrencePage] = useState(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(usage[0]?.key ?? null);
   const [operation, setOperation] = useState<PropertyMutationOperation | null>(null);
   const [newKey, setNewKey] = useState('');
@@ -103,17 +156,22 @@ export function PropertiesManagerDialog({
     () => capture.store.getState().readOnly,
     () => capture.store.getState().readOnly,
   );
+  const modelEpoch = useSyncExternalStore(
+    capture.store.subscribe,
+    () => capture.store.getState().modelEpoch,
+    () => capture.store.getState().modelEpoch,
+  );
   const activationOrder = useSyncExternalStore(
     workspaceStore.subscribe,
     () => workspaceStore.getState().activationOrder,
     () => workspaceStore.getState().activationOrder,
   );
-  const sourceRef = useRef({ model, activationOrder });
+  const sourceRef = useRef({ model, modelEpoch, activationOrder });
   const previousCaptureRef = useRef(capture);
   if (previousCaptureRef.current !== capture) {
     previousCaptureRef.current = capture;
     closingRef.current = false;
-    sourceRef.current = { model, activationOrder };
+    sourceRef.current = { model, modelEpoch, activationOrder };
   }
   const requestClose = useCallback(() => {
     if (closingRef.current) return;
@@ -126,8 +184,24 @@ export function PropertiesManagerDialog({
     if (!query) return usage;
     return usage.filter((entry) => entry.displayKey.toLocaleLowerCase().includes(query));
   }, [search, usage]);
+  const keyPageCount = Math.max(1, Math.ceil(filteredUsage.length / LEDGER_PAGE_SIZE));
+  const currentKeyPage = Math.min(keyPage, keyPageCount - 1);
+  const pagedUsage = filteredUsage.slice(
+    currentKeyPage * LEDGER_PAGE_SIZE,
+    (currentKeyPage + 1) * LEDGER_PAGE_SIZE,
+  );
   const selectedUsage = usage.find((entry) => entry.key === selectedKey) ?? null;
-  const visibleOccurrences = preview?.occurrences ?? selectedUsage?.occurrences ?? [];
+  const occurrenceSource = preview?.occurrences ?? selectedUsage?.occurrences ?? [];
+  const occurrencePageCount = Math.max(
+    1,
+    Math.ceil(occurrenceSource.length / LEDGER_PAGE_SIZE),
+  );
+  const currentOccurrencePage = Math.min(occurrencePage, occurrencePageCount - 1);
+  const occurrenceStart = currentOccurrencePage * LEDGER_PAGE_SIZE;
+  const pagedOccurrences = occurrenceSource.slice(
+    occurrenceStart,
+    occurrenceStart + LEDGER_PAGE_SIZE,
+  );
 
   const invalidatePreview = (nextStatus = 'Options changed. Preview again.') => {
     setPreview(null);
@@ -136,6 +210,7 @@ export function PropertiesManagerDialog({
   };
 
   const resetStage = (nextOperation: PropertyMutationOperation | null) => {
+    setOccurrencePage(0);
     setOperation(nextOperation);
     setNewKey('');
     setCollisionDetected(false);
@@ -156,12 +231,17 @@ export function PropertiesManagerDialog({
   }, [filteredUsage, selectedKey]);
 
   useEffect(() => {
+    if (!initial.valid) requestClose();
+  }, [initial.valid, requestClose]);
+
+  useEffect(() => {
     const source = sourceRef.current;
     if (source.model !== model
+      || source.modelEpoch !== modelEpoch
       || (capture.sessionId !== null && source.activationOrder !== activationOrder)) {
       requestClose();
     }
-  }, [activationOrder, capture.sessionId, model, requestClose]);
+  }, [activationOrder, capture.sessionId, model, modelEpoch, requestClose]);
 
   useEffect(() => {
     const restoreFocus = restoreFocusRef.current;
@@ -232,6 +312,7 @@ export function PropertiesManagerDialog({
         ? previewPropertyRename(capture, selectedKey, newKey, collisionAcknowledged)
         : previewPropertyDelete(capture, selectedKey);
       setPreview(next.valid ? next : null);
+      setOccurrencePage(0);
       setCollisionDetected(next.collision);
       setError(next.error);
       const result = next.occurrences.length === 0
@@ -268,6 +349,8 @@ export function PropertiesManagerDialog({
   const applyLabel = operation === 'delete' ? 'Apply delete' : 'Apply rename';
   const feedbackError = error ?? preview?.warning ?? null;
 
+  if (!initial.valid) return null;
+
   return createPortal(
     <div
       className="modal-backdrop property-manager-backdrop"
@@ -301,7 +384,10 @@ export function PropertiesManagerDialog({
                 id={`${titleId}-search`}
                 name="propertyKeySearch"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setKeyPage(0);
+                }}
               />
             </label>
             <div className="property-manager-table-wrap">
@@ -310,12 +396,12 @@ export function PropertiesManagerDialog({
                   <tr><th>Key</th><th>Uses</th><th>Owners</th></tr>
                 </thead>
                 <tbody>
-                  {filteredUsage.map((entry) => (
+                  {pagedUsage.map((entry) => (
                     <tr key={entry.key} className={entry.key === selectedKey ? 'selected' : ''}>
                       <td>
                         <button
                           type="button"
-                          aria-label={`Inspect property key ${entry.displayKey}, ${entry.occurrenceCount} occurrences, ${entry.ownerCount} owners`}
+                          aria-label={`Inspect property key ${accessiblePropertyKey(entry.key)}, ${entry.occurrenceCount} occurrences, ${entry.ownerCount} owners`}
                           onClick={() => {
                             setSelectedKey(entry.key);
                             resetStage(null);
@@ -334,6 +420,13 @@ export function PropertiesManagerDialog({
                 <div className="property-manager-empty">No property keys match this search.</div>
               )}
             </div>
+            <LedgerPagination
+              label="Property keys"
+              itemLabel="property keys"
+              page={currentKeyPage}
+              total={filteredUsage.length}
+              onPageChange={setKeyPage}
+            />
           </aside>
 
           <main className="property-manager-details">
@@ -413,15 +506,26 @@ export function PropertiesManagerDialog({
                   <tr><th>Value</th><th>Owner</th><th>Location</th></tr>
                 </thead>
                 <tbody>
-                  {visibleOccurrences.map((occurrence, index) => (
+                  {pagedOccurrences.map((occurrence, index) => (
                     <tr key={occurrence.id} data-property-coordinate={occurrence.id}>
-                      <td><code>{occurrence.value || '∅'}</code></td>
+                      <td>
+                        <code
+                          className="property-manager-value"
+                          tabIndex={0}
+                          title={occurrence.value === '' ? 'Empty property value' : occurrence.value}
+                          aria-label={occurrence.value === ''
+                            ? 'Empty property value'
+                            : `Property value: ${occurrence.value}`}
+                        >
+                          {occurrence.value === '' ? '(empty)' : occurrence.value}
+                        </code>
+                      </td>
                       <td>{occurrence.ownerType}</td>
                       <td>
                         <button
                           type="button"
                           className="property-manager-navigate"
-                          aria-label={`Go to ${occurrenceContext(occurrence, index, selectedKey ?? occurrence.key)}`}
+                          aria-label={`Go to ${occurrenceContext(occurrence, occurrenceStart + index, selectedKey ?? occurrence.key)}`}
                           onClick={() => {
                             if (!navigateToPropertyOccurrence(capture, occurrence.id)) {
                               setError('This property occurrence is no longer available. Open the manager again.');
@@ -435,10 +539,17 @@ export function PropertiesManagerDialog({
                   ))}
                 </tbody>
               </table>
-              {visibleOccurrences.length === 0 && (
+              {occurrenceSource.length === 0 && (
                 <div className="property-manager-empty">Select a property key to inspect its uses.</div>
               )}
             </div>
+            <LedgerPagination
+              label="Property occurrences"
+              itemLabel="property occurrences"
+              page={currentOccurrencePage}
+              total={occurrenceSource.length}
+              onPageChange={setOccurrencePage}
+            />
           </main>
         </div>
 

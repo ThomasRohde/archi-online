@@ -6,7 +6,7 @@ import {
   inspectPropertyUsage,
 } from '../src/model/property-manager';
 import { createEmptyModel } from '../src/model/ops';
-import { createModelStore, type ModelStore } from '../src/model/store';
+import { createModelStore, replaceModel, type ModelStore } from '../src/model/store';
 import type { ModelState } from '../src/model/types';
 import {
   activateModelSession,
@@ -72,6 +72,21 @@ function fixture(modelName = 'Property model'): ModelState {
     sourceConnectionIds: [],
     targetConnectionIds: [],
   };
+  return model;
+}
+
+function largeFixture(): ModelState {
+  const model = fixture('Large property model');
+  model.info.properties = [
+    ...Array.from({ length: 135 }, (_, index) => ({
+      key: 'bulk-key',
+      value: `bulk value ${index + 1}`,
+    })),
+    ...Array.from({ length: 125 }, (_, index) => ({
+      key: `unique-${String(index).padStart(3, '0')}`,
+      value: `unique value ${index}`,
+    })),
+  ];
   return model;
 }
 
@@ -169,6 +184,66 @@ describe('global properties manager dialog', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].textContent).toContain('(blank)');
     expect(selectKey('')).not.toBeNull();
+  });
+
+  it('distinguishes empty, literal sentinel, and whitespace keys through exact deletion', async () => {
+    const model = fixture();
+    model.info.properties = [
+      { key: '', value: 'empty-key value' },
+      { key: '(blank)', value: 'literal-key value' },
+      { key: ' ', value: 'space-key value' },
+    ];
+    const store = createModelStore({ model });
+    await renderDialog(store);
+    const keyButtons = [...document.querySelectorAll<HTMLButtonElement>(
+      'table[aria-label="Property key summary"] tbody button',
+    )];
+
+    expect(keyButtons.map((control) => control.textContent)).toEqual([
+      '(blank)',
+      '"(blank)"',
+      '" "',
+      'shared',
+    ]);
+    expect(new Set(keyButtons.slice(0, 3).map((control) => control.getAttribute('aria-label'))).size)
+      .toBe(3);
+
+    await act(async () => keyButtons[1].click());
+    const details = document.querySelector('table[aria-label="Property occurrence details"]')!;
+    expect(details.textContent).toContain('literal-key value');
+    expect(details.textContent).not.toContain('empty-key value');
+    expect(details.textContent).not.toContain('space-key value');
+    await act(async () => button('Stage delete').click());
+    await act(async () => button('Preview').click());
+    expect(document.querySelectorAll(
+      'table[aria-label="Property mutation preview"] tbody tr',
+    )).toHaveLength(1);
+    await act(async () => button('Apply delete').click());
+
+    expect(store.getState().model!.info.properties).toEqual([
+      { key: '', value: 'empty-key value' },
+      { key: ' ', value: 'space-key value' },
+    ]);
+  });
+
+  it('distinguishes empty and literal value sentinels and exposes unclipped values', async () => {
+    const model = fixture();
+    const longValue = 'Full property value '.repeat(24);
+    model.info.properties = [
+      { key: 'values', value: '' },
+      { key: 'values', value: '∅' },
+      { key: 'values', value: longValue },
+    ];
+    await renderDialog(createModelStore({ model }));
+
+    const values = [...document.querySelectorAll<HTMLElement>(
+      'table[aria-label="Property occurrence details"] .property-manager-value',
+    )];
+    expect(values.map((value) => value.textContent)).toEqual(['(empty)', '∅', longValue]);
+    expect(values[0].getAttribute('aria-label')).toBe('Empty property value');
+    expect(values[1].getAttribute('aria-label')).toBe('Property value: ∅');
+    expect(values[2].title).toBe(longValue);
+    expect(values[2].tabIndex).toBe(0);
   });
 
   it('stages only one operation and requires collision acknowledgement plus a fresh preview', async () => {
@@ -272,6 +347,63 @@ describe('global properties manager dialog', () => {
     }
   });
 
+  it('bounds both ledger panes with accessible pagination while search remains global', async () => {
+    await renderDialog(createModelStore({ model: largeFixture() }));
+    const summaryRows = () => document.querySelectorAll(
+      'table[aria-label="Property key summary"] tbody tr',
+    );
+    const detailRows = () => document.querySelectorAll(
+      'table[aria-label="Property occurrence details"] tbody tr',
+    );
+
+    expect(summaryRows().length).toBeGreaterThan(1);
+    expect(summaryRows().length).toBeLessThanOrEqual(50);
+    expect(detailRows().length).toBe(50);
+    expect(document.querySelector('[aria-label="Property keys pagination"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Property occurrences pagination"]')).not.toBeNull();
+    expect(document.body.textContent).toContain('135');
+
+    await act(async () => document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Next property keys page"]',
+    )!.click());
+    expect(summaryRows().length).toBeLessThanOrEqual(50);
+    expect(document.querySelector('[aria-label="Property keys pagination"]')?.textContent)
+      .toContain('Page 2');
+    await act(async () => document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Next property occurrences page"]',
+    )!.click());
+    expect(detailRows().length).toBeLessThanOrEqual(50);
+    expect(document.querySelector('[aria-label="Property occurrences pagination"]')?.textContent)
+      .toContain('Page 2');
+
+    await setInput('propertyKeySearch', 'unique-124');
+    expect(summaryRows()).toHaveLength(1);
+    expect(summaryRows()[0].textContent).toContain('unique-124');
+    expect(document.querySelector('[aria-label="Property keys pagination"]')?.textContent)
+      .toContain('Page 1 of 1');
+  });
+
+  it('previews a bounded detail page but applies every occurrence globally', async () => {
+    const store = createModelStore({ model: largeFixture() });
+    await renderDialog(store);
+    await act(async () => button('Stage rename').click());
+    await setInput('newPropertyKey', 'renamed-bulk-key');
+    await act(async () => button('Preview').click());
+
+    expect(document.querySelectorAll(
+      'table[aria-label="Property mutation preview"] tbody tr',
+    )).toHaveLength(50);
+    expect(document.querySelector('[role="status"]')?.textContent).toContain(
+      '135 affected occurrences previewed.',
+    );
+    await act(async () => button('Apply rename').click());
+
+    expect(store.getState().model!.info.properties.filter(
+      (property) => property.key === 'renamed-bulk-key',
+    )).toHaveLength(135);
+    expect(store.getState().undoStack.at(-1)?.label).toBe('Rename Property Key');
+  });
+
   it('invalidates the manager on model or activation changes but not navigation or file metadata', async () => {
     const firstId = addModelSession({ id: 'first', model: fixture(), fileName: null });
     const first = getModelSession(firstId)!;
@@ -299,6 +431,55 @@ describe('global properties manager dialog', () => {
       addModelSession({ id: 'second', model: fixture('Second'), fileName: null });
     });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('closes when replaceModel reuses the mounted manager model object', async () => {
+    const model = fixture();
+    const store = createModelStore({ model });
+    const onClose = await renderDialog(store);
+
+    await act(async () => replaceModel(model, null, false, {}, store));
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(store.getState().undoStack).toEqual([]);
+  });
+
+  it('closes without rendering a ledger when activation changes before mount', async () => {
+    const firstId = addModelSession({ id: 'stale-before-activation', model: fixture(), fileName: null });
+    const capture = capturePropertyManagerSession(getModelSession(firstId)!.store);
+    addModelSession({ id: 'stale-before-activation-other', model: fixture('Other'), fileName: null });
+    const onClose = vi.fn();
+
+    await act(async () => root.render(createElement(PropertiesManagerDialog, { capture, onClose })));
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('closes without rendering a ledger when the model changes before mount', async () => {
+    const store = createModelStore({ model: fixture() });
+    const capture = capturePropertyManagerSession(store);
+    replaceModel(fixture('Replacement'), null, false, {}, store);
+    const onClose = vi.fn();
+
+    await act(async () => root.render(createElement(PropertiesManagerDialog, { capture, onClose })));
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('closes without rendering a ledger after same-reference replacement before mount', async () => {
+    const model = fixture();
+    const store = createModelStore({ model });
+    const capture = capturePropertyManagerSession(store);
+    replaceModel(model, null, false, {}, store);
+    const onClose = vi.fn();
+
+    await act(async () => root.render(createElement(PropertiesManagerDialog, { capture, onClose })));
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(store.getState().undoStack).toEqual([]);
   });
 });
 
