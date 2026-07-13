@@ -181,6 +181,8 @@
         <xs:sequence>
             <xs:group ref="LabelGroup" minOccurs="0" maxOccurs="unbounded" />
             <xs:group ref="DocumentationGroup" minOccurs="0" maxOccurs="unbounded" />
+            <!-- Compatibility correction: the 3.1 schema omitted properties despite ViewConceptType's documented contract. -->
+            <xs:group ref="PropertiesGroup" />
             <xs:element name="style" type="StyleType" minOccurs="0" maxOccurs="1" />
 
             <xs:element name="viewRef" type="ReferenceType" minOccurs="0" maxOccurs="unbounded">
@@ -403,6 +405,7 @@
                 <xs:sequence>
                     <xs:group ref="LabelGroup" minOccurs="0" maxOccurs="unbounded" />
                     <xs:group ref="DocumentationGroup" minOccurs="0" maxOccurs="unbounded" />
+                    <xs:group ref="PropertiesGroup" />
 
                     <xs:element name="style" type="StyleType" minOccurs="0" maxOccurs="1" />
                     <xs:element name="viewRef" type="ReferenceType" minOccurs="0" maxOccurs="unbounded" />

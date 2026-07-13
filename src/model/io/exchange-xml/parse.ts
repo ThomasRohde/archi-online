@@ -5,10 +5,14 @@
 import { newId } from '../../id';
 import { ELEMENT_TYPE_MAP } from '../../metamodel';
 import { createEmptyModel } from '../../ops/concepts';
+import {
+  createConnectionRouteResolver,
+  toRelativeBendpoint,
+  type Point,
+} from '../../../canvas/geometry';
 import type {
   ArchimateElement,
   ArchimateRelationship,
-  Bendpoint,
   Bounds,
   DiagramConnection,
   DiagramNode,
@@ -188,6 +192,7 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
   // Views.
   const pendingViewRefs: { node: DiagramNode & { nodeType: 'ref' }; refId: string }[] = [];
   const absBoundsByNode = new Map<string, Bounds>();
+  const seenDiagramObjectIds = new Set<string>();
   const viewsEl = child(root, 'views');
   const diagramsEl = viewsEl ? child(viewsEl, 'diagrams') : null;
   if (diagramsEl) {
@@ -259,6 +264,7 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
     for (const nodeEl of children(parentEl, 'node')) {
       const abs = nodeBounds(nodeEl);
       const id = nodeEl.getAttribute('identifier') ?? newId();
+      registerDiagramObjectId(id);
       const base = {
         id,
         viewId: view.id,
@@ -350,16 +356,14 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
   }
 
   function parseConnections(viewEl: Element, view: DiagramView): void {
-    const pending: DiagramConnection[] = [];
+    const pending: Array<{ connection: DiagramConnection; absoluteBendpoints: Point[] }> = [];
     for (const connEl of children(viewEl, 'connection')) {
+      const id = connEl.getAttribute('identifier') ?? newId();
+      registerDiagramObjectId(id);
       const relationshipRef = connEl.getAttribute('relationshipRef');
       const isRelationship = relationshipRef !== null && relationshipRef !== '';
       if (isRelationship && !state.relationships[relationshipRef]) {
         throw new ExchangeParseError(`Connection references missing relationship: ${relationshipRef}`);
-      }
-      const id = connEl.getAttribute('identifier') ?? newId();
-      if (state.connections[id] || state.nodes[id]) {
-        throw new ExchangeParseError(`Duplicate diagram object id: ${id}`);
       }
       const sourceId = connEl.getAttribute('source') ?? '';
       const targetId = connEl.getAttribute('target') ?? '';
@@ -376,7 +380,7 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
         sourceId,
         targetId,
         connectionType: isRelationship ? undefined : 0,
-        bendpoints: readBendpoints(connEl, sourceId, targetId),
+        bendpoints: [],
       };
       const styleEl = child(connEl, 'style');
       if (styleEl) {
@@ -389,10 +393,10 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
         applyFont(styleEl, conn);
       }
       state.connections[id] = conn;
-      pending.push(conn);
+      pending.push({ connection: conn, absoluteBendpoints: readAbsoluteBendpoints(connEl) });
     }
 
-    for (const connection of pending) {
+    for (const { connection } of pending) {
       const source = getConnectable(state, connection.sourceId);
       const target = getConnectable(state, connection.targetId);
       if (!source) {
@@ -428,30 +432,19 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
     }
     const graphError = connectionGraphError(state);
     if (graphError) throw new ExchangeParseError(graphError);
+    applyConnectionBendpoints(pending);
     rebuildConnectionAdjacency(state);
   }
 
-  function readBendpoints(connEl: Element, sourceId: string, targetId: string): Bendpoint[] {
-    const src = absBoundsByNode.get(sourceId);
-    const tgt = absBoundsByNode.get(targetId);
-    if (!src || !tgt) return [];
-    const srcCenter = { x: src.x + src.width / 2, y: src.y + src.height / 2 };
-    const tgtCenter = { x: tgt.x + tgt.width / 2, y: tgt.y + tgt.height / 2 };
-    const toRelative = (x: number, y: number): Bendpoint => ({
-      startX: Math.round(x - srcCenter.x),
-      startY: Math.round(y - srcCenter.y),
-      endX: Math.round(x - tgtCenter.x),
-      endY: Math.round(y - tgtCenter.y),
-    });
-
+  function readAbsoluteBendpoints(connEl: Element): Point[] {
     const bendpointEls = children(connEl, 'bendpoint');
     const srcAttach = child(connEl, 'sourceAttachment');
     const tgtAttach = child(connEl, 'targetAttachment');
-    const points: Bendpoint[] = [];
-    const attachMidpoint = (a: Element, b: Element): Bendpoint => {
+    const points: Point[] = [];
+    const attachMidpoint = (a: Element, b: Element): Point => {
       const pa = pointOf(a);
       const pb = pointOf(b);
-      return toRelative(pa.x + (pb.x - pa.x) / 2, pa.y + (pb.y - pa.y) / 2);
+      return { x: pa.x + (pb.x - pa.x) / 2, y: pa.y + (pb.y - pa.y) / 2 };
     };
 
     // Attachment points are approximated as bendpoints, per Archi.
@@ -462,13 +455,54 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
       points.push(attachMidpoint(srcAttach, bendpointEls[0]));
     }
     for (const bpEl of bendpointEls) {
-      const p = pointOf(bpEl);
-      points.push(toRelative(p.x, p.y));
+      points.push(pointOf(bpEl));
     }
     if (tgtAttach && bendpointEls.length > 0) {
       points.push(attachMidpoint(tgtAttach, bendpointEls[bendpointEls.length - 1]));
     }
     return points;
+  }
+
+  function applyConnectionBendpoints(
+    pending: Array<{ connection: DiagramConnection; absoluteBendpoints: Point[] }>,
+  ): void {
+    const pointsById = new Map(
+      pending.map(({ connection, absoluteBendpoints }) => [connection.id, absoluteBendpoints]),
+    );
+    const applied = new Set<string>();
+    const apply = (connectionId: string): void => {
+      if (applied.has(connectionId)) return;
+      const connection = state.connections[connectionId];
+      if (!connection) {
+        applied.add(connectionId);
+        return;
+      }
+      for (const endpointId of [connection.sourceId, connection.targetId]) {
+        if (state.connections[endpointId]) apply(endpointId);
+      }
+      const points = pointsById.get(connectionId) ?? [];
+      if (points.length > 0) {
+        const endpoints = createConnectionRouteResolver(
+          state,
+          absBoundsByNode,
+        ).endpointPoints(connectionId);
+        if (!endpoints) {
+          throw new ExchangeParseError(`Connection route cannot be resolved: ${connectionId}`);
+        }
+        connection.bendpoints = points.map((point) =>
+          toRelativeBendpoint(point, endpoints.source, endpoints.target),
+        );
+      }
+      applied.add(connectionId);
+    };
+    for (const { connection } of pending) apply(connection.id);
+  }
+
+  function registerDiagramObjectId(id: string): void {
+    if (seenDiagramObjectIds.has(id)) {
+      throw new ExchangeParseError(`Duplicate diagram object id: ${id}`);
+    }
+    seenDiagramObjectIds.add(id);
   }
 
   // ---- organizations ------------------------------------------------------
@@ -607,7 +641,18 @@ export function parseExchangeDocument(xml: string, options: ExchangeImportOption
       + Object.values(model.elements).reduce((total, item) => total + item.properties.length, 0)
       + Object.values(model.relationships).reduce((total, item) => total + item.properties.length, 0)
       + Object.values(model.views).reduce((total, item) => total + item.properties.length, 0)
-      + Object.values(model.folders).reduce((total, item) => total + item.properties.length, 0);
+      + Object.values(model.folders).reduce((total, item) => total + item.properties.length, 0)
+      + Object.values(model.nodes).reduce(
+        (total, item) =>
+          total + (item.nodeType === 'group' || item.nodeType === 'note'
+            ? item.properties.length
+            : 0),
+        0,
+      )
+      + Object.values(model.connections).reduce(
+        (total, item) => total + item.properties.length,
+        0,
+      );
     return {
       model,
       language,

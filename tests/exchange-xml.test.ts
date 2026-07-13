@@ -1,9 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { computeAbsBounds } from '../src/canvas/view-editor/bounds';
+import { createConnectionRouteResolver } from '../src/canvas/geometry';
 import { parseArchimate } from '../src/model/io/archimate-xml';
-import { isExchangeXml, parseExchange, serializeExchange } from '../src/model/io/exchange-xml';
+import {
+  isExchangeXml,
+  parseExchange,
+  parseExchangeDocument,
+  serializeExchange,
+  validateExchangeXml,
+} from '../src/model/io/exchange-xml';
 import { createEmptyModel } from '../src/model/ops/concepts';
+import { attachConnection } from '../src/model/ops/draft';
 import type { ModelState } from '../src/model/types';
 
 const fixture = (name: string) => readFileSync(join(__dirname, 'fixtures', name), 'utf8');
@@ -14,6 +23,161 @@ const archisurance = fixture('Archisurance.archimate');
 
 function folderOfType(m: ModelState, type: string) {
   return m.rootFolderIds.map((id) => m.folders[id]).find((f) => f.folderType === type)!;
+}
+
+function connectionPropertyModel(): ModelState {
+  const m = createEmptyModel('Connection properties');
+  m.info.id = 'connection-property-model';
+  const business = folderOfType(m, 'business');
+  for (const [id, type] of [
+    ['actor', 'BusinessActor'],
+    ['role', 'BusinessRole'],
+    ['object', 'BusinessObject'],
+  ] as const) {
+    m.elements[id] = {
+      id,
+      kind: 'element',
+      type,
+      name: id,
+      documentation: '',
+      properties: [],
+      profileIds: [],
+      folderId: business.id,
+    };
+    business.itemIds.push(id);
+  }
+
+  const relations = folderOfType(m, 'relations');
+  m.relationships['base-rel'] = {
+    id: 'base-rel',
+    kind: 'relationship',
+    type: 'AssignmentRelationship',
+    name: 'Base',
+    documentation: '',
+    properties: [],
+    profileIds: [],
+    folderId: relations.id,
+    sourceId: 'actor',
+    targetId: 'role',
+  };
+  m.relationships['dependent-rel'] = {
+    id: 'dependent-rel',
+    kind: 'relationship',
+    type: 'AssociationRelationship',
+    name: 'Dependent',
+    documentation: '',
+    properties: [],
+    profileIds: [],
+    folderId: relations.id,
+    sourceId: 'base-rel',
+    targetId: 'object',
+  };
+  relations.itemIds.push('base-rel', 'dependent-rel');
+
+  const diagrams = folderOfType(m, 'diagrams');
+  m.views.view = {
+    id: 'view',
+    kind: 'view',
+    name: 'Connection properties',
+    documentation: '',
+    properties: [],
+    folderId: diagrams.id,
+    childIds: ['actor-node', 'role-node', 'object-node', 'note-node'],
+  };
+  diagrams.itemIds.push('view');
+  for (const [id, elementId, x, y] of [
+    ['actor-node', 'actor', 0, 0],
+    ['role-node', 'role', 240, 0],
+    ['object-node', 'object', 240, 180],
+  ] as const) {
+    m.nodes[id] = {
+      id,
+      viewId: 'view',
+      parentId: 'view',
+      bounds: { x, y, width: 100, height: 40 },
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'element',
+      elementId,
+    };
+  }
+  m.nodes['note-node'] = {
+    id: 'note-node',
+    viewId: 'view',
+    parentId: 'view',
+    bounds: { x: 0, y: 180, width: 140, height: 70 },
+    childIds: [],
+    sourceConnectionIds: [],
+    targetConnectionIds: [],
+    nodeType: 'note',
+    content: 'Note',
+    properties: [],
+  };
+
+  attachConnection(m, {
+    id: 'base-connection',
+    viewId: 'view',
+    connType: 'relationship',
+    relationshipId: 'base-rel',
+    name: 'Base occurrence',
+    documentation: '',
+    properties: [
+      { key: 'shared-key', value: 'semantic first' },
+      { key: 'semantic-only', value: 'semantic middle' },
+      { key: 'shared-key', value: 'semantic last' },
+    ],
+    sourceConnectionIds: [],
+    targetConnectionIds: [],
+    sourceId: 'actor-node',
+    targetId: 'role-node',
+    bendpoints: [],
+  });
+  attachConnection(m, {
+    id: 'dependent-connection',
+    viewId: 'view',
+    connType: 'relationship',
+    relationshipId: 'dependent-rel',
+    name: 'Dependent occurrence',
+    documentation: '',
+    properties: [],
+    sourceConnectionIds: [],
+    targetConnectionIds: [],
+    sourceId: 'base-connection',
+    targetId: 'object-node',
+    bendpoints: [{ startX: 30, startY: 60, endX: -90, endY: -40 }],
+  });
+  attachConnection(m, {
+    id: 'plain-connection',
+    viewId: 'view',
+    connType: 'plain',
+    name: 'Plain note connection',
+    documentation: '',
+    properties: [
+      { key: 'plain-only', value: 'plain first' },
+      { key: 'shared-key', value: 'plain last' },
+    ],
+    sourceConnectionIds: [],
+    targetConnectionIds: [],
+    sourceId: 'note-node',
+    targetId: 'actor-node',
+    bendpoints: [],
+  });
+  return m;
+}
+
+function viewsOnlyExchange(diagrams: string, propertyDefinitions = ''): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" identifier="model-malformed">
+  <name xml:lang="en">Malformed views</name>
+  <elements><element identifier="fixture-element" xsi:type="BusinessActor"><name xml:lang="en">Fixture</name></element></elements>
+  ${propertyDefinitions}
+  <views><diagrams>${diagrams}</diagrams></views>
+</model>`;
+}
+
+function labelNode(id: string, x: number): string {
+  return `<node identifier="${id}" xsi:type="Label" x="${x}" y="0" w="100" h="40"><label xml:lang="en">${id}</label></node>`;
 }
 
 describe('isExchangeXml', () => {
@@ -275,6 +439,115 @@ describe('Open Exchange round-trip of editable non-concept properties', () => {
     expect(back.nodes['note-props']).toMatchObject({
       properties: [{ key: 'note-key', value: 'note-value' }],
     });
+  });
+});
+
+describe('Open Exchange view-connection fidelity', () => {
+  it('round-trips ordered properties on plain and relationship connections with shared definitions', async () => {
+    const model = connectionPropertyModel();
+    const xml = serializeExchange(model);
+    const back = parseExchange(xml);
+
+    expect(back.connections['plain-connection'].properties).toEqual(
+      model.connections['plain-connection'].properties,
+    );
+    expect(back.connections['base-connection'].properties).toEqual(
+      model.connections['base-connection'].properties,
+    );
+
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const definitions = Array.from(doc.getElementsByTagNameNS('*', 'propertyDefinition'));
+    const sharedDefinition = definitions.find(
+      (definition) =>
+        definition.getElementsByTagNameNS('*', 'name')[0]?.textContent === 'shared-key',
+    );
+    expect(sharedDefinition).toBeDefined();
+    const sharedId = sharedDefinition!.getAttribute('identifier');
+    const sharedReferences = Array.from(doc.getElementsByTagNameNS('*', 'property')).filter(
+      (property) => property.getAttribute('propertyDefinitionRef') === sharedId,
+    );
+    expect(sharedReferences).toHaveLength(3);
+    const diagnostics = await validateExchangeXml(xml);
+    expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+  });
+
+  it('round-trips a manual route whose relationship endpoint is another connection', () => {
+    const model = connectionPropertyModel();
+    const beforeRoute = createConnectionRouteResolver(
+      model,
+      computeAbsBounds(model, 'view'),
+    )('dependent-connection');
+
+    const back = parseExchange(serializeExchange(model));
+    const afterRoute = createConnectionRouteResolver(
+      back,
+      computeAbsBounds(back, 'view'),
+    )('dependent-connection');
+
+    expect(model.connections['dependent-connection'].bendpoints).not.toHaveLength(0);
+    expect(back.connections['dependent-connection'].bendpoints).not.toHaveLength(0);
+    expect(afterRoute).toEqual(beforeRoute);
+  });
+
+  it('counts annotation and connection properties in import diagnostics', () => {
+    const propertyDefinitions = `<propertyDefinitions>
+      <propertyDefinition identifier="annotation-property" type="string"><name xml:lang="en">annotation</name></propertyDefinition>
+      <propertyDefinition identifier="connection-property" type="string"><name xml:lang="en">connection</name></propertyDefinition>
+    </propertyDefinitions>`;
+    const xml = viewsOnlyExchange(
+      `<view identifier="view" xsi:type="Diagram"><name xml:lang="en">Properties</name>
+        <node identifier="source" xsi:type="Label" x="0" y="0" w="100" h="40">
+          <label xml:lang="en">Source</label>
+          <properties><property propertyDefinitionRef="annotation-property"><value xml:lang="en">node value</value></property></properties>
+        </node>
+        ${labelNode('target', 200)}
+        <connection identifier="line" xsi:type="Line" source="source" target="target">
+          <properties><property propertyDefinitionRef="connection-property"><value xml:lang="en">connection value</value></property></properties>
+        </connection>
+      </view>`,
+      propertyDefinitions,
+    );
+
+    const result = parseExchangeDocument(xml);
+
+    expect(result.errors).toEqual([]);
+    expect(result.model?.nodes.source).toMatchObject({
+      properties: [{ key: 'annotation', value: 'node value' }],
+    });
+    expect(result.model?.connections.line).toMatchObject({
+      properties: [{ key: 'connection', value: 'connection value' }],
+    });
+    expect(result.counts.properties).toBe(2);
+  });
+});
+
+describe('Open Exchange diagram object identifiers', () => {
+  it.each([
+    [
+      'duplicate nodes in one view',
+      viewsOnlyExchange(
+        `<view identifier="view" xsi:type="Diagram"><name xml:lang="en">View</name>${labelNode('duplicate', 0)}${labelNode('duplicate', 200)}</view>`,
+      ),
+    ],
+    [
+      'duplicate nodes across views',
+      viewsOnlyExchange(
+        `<view identifier="view-a" xsi:type="Diagram"><name xml:lang="en">A</name>${labelNode('duplicate', 0)}</view>
+         <view identifier="view-b" xsi:type="Diagram"><name xml:lang="en">B</name>${labelNode('duplicate', 0)}</view>`,
+      ),
+    ],
+    [
+      'a node colliding with an earlier connection in another view',
+      viewsOnlyExchange(
+        `<view identifier="view-a" xsi:type="Diagram"><name xml:lang="en">A</name>
+           ${labelNode('source', 0)}${labelNode('target', 200)}
+           <connection identifier="duplicate" xsi:type="Line" source="source" target="target"/>
+         </view>
+         <view identifier="view-b" xsi:type="Diagram"><name xml:lang="en">B</name>${labelNode('duplicate', 0)}</view>`,
+      ),
+    ],
+  ])('rejects %s', (_label, xml) => {
+    expect(() => parseExchange(xml)).toThrow('Duplicate diagram object id: duplicate');
   });
 });
 

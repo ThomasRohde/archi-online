@@ -10,6 +10,11 @@ import type {
   ModelState,
   Property,
 } from '../../types';
+import {
+  bendpointPositions,
+  createConnectionRouteResolver,
+  type ConnectionRouteResolver,
+} from '../../../canvas/geometry';
 import { tag, textTag, type Attr } from '../archimate-xml/xml';
 import type { ExchangeExportOptions } from './contracts';
 import {
@@ -231,7 +236,8 @@ function writeViews(state: ModelState, out: string[], propertyDefs: Map<string, 
   for (const viewId of viewIds) {
     const view = state.views[viewId];
     const absBounds = absoluteBounds(state, viewId);
-    const offset = negativeOffset(state, viewId, absBounds);
+    const routes = createConnectionRouteResolver(state, absBounds);
+    const offset = negativeOffset(state, viewId, routes);
 
     const attrs: Attr[] = [
       ['identifier', exchangeId(view.id)],
@@ -248,7 +254,7 @@ function writeViews(state: ModelState, out: string[], propertyDefs: Map<string, 
     for (const nodeId of view.childIds) {
       children.push(nodeTag(state, nodeId, absBounds, offset, propertyDefs, '        '));
     }
-    children.push(...connectionTags(state, viewId, absBounds, offset));
+    children.push(...connectionTags(state, viewId, offset, propertyDefs, routes));
     out.push(tag('      ', 'view', attrs, children));
   }
   out.push('    </diagrams>\n  </views>\n');
@@ -372,8 +378,9 @@ function fontTag(indent: string, font: string | undefined, fontColor: string | u
 function connectionTags(
   state: ModelState,
   viewId: string,
-  absBounds: Map<string, Bounds>,
   offset: Point,
+  propertyDefs: Map<string, string>,
+  routes: ConnectionRouteResolver,
 ): string[] {
   const rows: string[] = [];
   for (const conn of Object.values(state.connections)) {
@@ -394,18 +401,15 @@ function connectionTags(
     if (conn.documentation !== '') {
       children.push(textTag('          ', 'documentation', conn.documentation));
     }
+    children.push(...propertiesTags('          ', conn.properties, propertyDefs));
     children.push(connectionStyleTag(conn, '          '));
-    const src = absBounds.get(conn.sourceId);
-    const tgt = absBounds.get(conn.targetId);
-    if (src && tgt) {
-      for (const pt of absoluteBendpoints(conn, src, tgt)) {
-        children.push(
-          tag('          ', 'bendpoint', [
-            ['x', Math.round(pt.x) - offset.x],
-            ['y', Math.round(pt.y) - offset.y],
-          ]),
-        );
-      }
+    for (const pt of absoluteBendpoints(conn, routes)) {
+      children.push(
+        tag('          ', 'bendpoint', [
+          ['x', Math.round(pt.x) - offset.x],
+          ['y', Math.round(pt.y) - offset.y],
+        ]),
+      );
     }
     rows.push(tag('        ', 'connection', attrs, children));
   }
@@ -462,19 +466,16 @@ function absoluteBounds(state: ModelState, viewId: string): Map<string, Bounds> 
   return map;
 }
 
-/** Absolute bendpoint positions with GEF's weighted blend, matching
- * DiagramModelUtils.getAbsoluteBendpointPositions. */
-function absoluteBendpoints(conn: DiagramConnection, src: Bounds, tgt: Bounds): Point[] {
-  const srcCenter = { x: src.x + src.width / 2, y: src.y + src.height / 2 };
-  const tgtCenter = { x: tgt.x + tgt.width / 2, y: tgt.y + tgt.height / 2 };
-  const n = conn.bendpoints.length;
-  return conn.bendpoints.map((bp, i) => {
-    const w = (i + 1) / (n + 1);
-    return {
-      x: (1 - w) * (srcCenter.x + bp.startX) + w * (tgtCenter.x + bp.endX),
-      y: (1 - w) * (srcCenter.y + bp.startY) + w * (tgtCenter.y + bp.endY),
-    };
-  });
+/** Absolute bendpoint positions using the same recursive endpoint projection
+ * as the canvas, including connections attached to other connections. */
+function absoluteBendpoints(
+  conn: DiagramConnection,
+  routes: ConnectionRouteResolver,
+): Point[] {
+  const endpoints = routes.endpointPoints(conn.id);
+  return endpoints
+    ? bendpointPositions(conn.bendpoints, endpoints.source, endpoints.target)
+    : [];
 }
 
 /**
@@ -482,7 +483,11 @@ function absoluteBendpoints(conn: DiagramConnection, src: Bounds, tgt: Bounds): 
  * subtract, per XMLExchangeUtils.getNegativeOffsetForDiagram (top-level node
  * bounds plus all absolute bendpoint positions).
  */
-function negativeOffset(state: ModelState, viewId: string, absBounds: Map<string, Bounds>): Point {
+function negativeOffset(
+  state: ModelState,
+  viewId: string,
+  routes: ConnectionRouteResolver,
+): Point {
   const extreme = { x: 0, y: 0 };
   const view = state.views[viewId];
   if (!view) return extreme;
@@ -494,10 +499,7 @@ function negativeOffset(state: ModelState, viewId: string, absBounds: Map<string
   }
   for (const conn of Object.values(state.connections)) {
     if (conn.viewId !== viewId) continue;
-    const src = absBounds.get(conn.sourceId);
-    const tgt = absBounds.get(conn.targetId);
-    if (!src || !tgt) continue;
-    for (const pt of absoluteBendpoints(conn, src, tgt)) {
+    for (const pt of absoluteBendpoints(conn, routes)) {
       extreme.x = Math.min(extreme.x, Math.round(pt.x));
       extreme.y = Math.min(extreme.y, Math.round(pt.y));
     }
@@ -542,6 +544,7 @@ function collectPropertyDefinitions(state: ModelState): Map<string, string> {
   for (const n of Object.values(state.nodes)) {
     if (n.nodeType === 'group' || n.nodeType === 'note') collect(n.properties);
   }
+  for (const connection of Object.values(state.connections)) collect(connection.properties);
   const map = new Map<string, string>();
   let count = 1;
   for (const key of [...keys].sort()) map.set(key, `propid-${count++}`);

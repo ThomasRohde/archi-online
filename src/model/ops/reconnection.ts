@@ -1,12 +1,12 @@
-import { isAllowedRelationship } from '../rules';
 import { getActiveModelStore, transact, type ModelStore } from '../store';
 import {
   connectableConceptId,
   getConnectable,
-  getConcept,
   type ModelState,
 } from '../types';
+import { isRelationshipLegalInModel } from './concept-transform';
 import { attachConnection, deleteConnectionFromDraft } from './draft';
+import { canCreatePlainConnection } from './plain-connection';
 
 export type ConnectionReconnectionEnd = 'source' | 'target';
 
@@ -78,6 +78,11 @@ export function analyzeConnectionReconnection(
   }
 
   if (connection.connType === 'plain') {
+    const sourceId = input.end === 'source' ? input.endpointId : connection.sourceId;
+    const targetId = input.end === 'target' ? input.endpointId : connection.targetId;
+    if (!canCreatePlainConnection(model, connection.viewId, sourceId, targetId)) {
+      return invalid('A plain connection requires at least one Note endpoint');
+    }
     const changes = [{
       connectionId: connection.id,
       viewId: connection.viewId,
@@ -98,13 +103,19 @@ export function analyzeConnectionReconnection(
     : relationship.targetId;
   const sourceConceptId = input.end === 'source' ? nextConceptId : relationship.sourceId;
   const targetConceptId = input.end === 'target' ? nextConceptId : relationship.targetId;
-  const sourceConcept = getConcept(model, sourceConceptId);
-  const targetConcept = getConcept(model, targetConceptId);
-  if (
-    !sourceConcept ||
-    !targetConcept ||
-    !isAllowedRelationship(relationship.type, sourceConcept.type, targetConcept.type)
-  ) {
+  const stagedRelationship = {
+    ...relationship,
+    sourceId: sourceConceptId,
+    targetId: targetConceptId,
+  };
+  const stagedModel = {
+    ...model,
+    relationships: {
+      ...model.relationships,
+      [relationship.id]: stagedRelationship,
+    },
+  };
+  if (!isRelationshipLegalInModel(stagedModel, stagedRelationship)) {
     return invalid('The relationship is not valid for the proposed semantic endpoints');
   }
 

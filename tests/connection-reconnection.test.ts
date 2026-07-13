@@ -60,7 +60,7 @@ function folder(model: ModelState, folderType: 'business' | 'relations' | 'diagr
 function putElement(
   model: ModelState,
   id: string,
-  type: 'BusinessActor' | 'BusinessRole',
+  type: 'BusinessActor' | 'BusinessRole' | 'Junction' | 'Resource',
 ): void {
   const folderId = folder(model, 'business');
   model.elements[id] = {
@@ -74,6 +74,23 @@ function putElement(
     folderId,
   };
   model.folders[folderId].itemIds.push(id);
+}
+
+function putNote(model: ModelState, id: string, viewId: string, x: number): void {
+  const node: DiagramNode = {
+    id,
+    viewId,
+    parentId: viewId,
+    bounds: { x, y: 100, width: 160, height: 70 },
+    childIds: [],
+    sourceConnectionIds: [],
+    targetConnectionIds: [],
+    nodeType: 'note',
+    content: id.toUpperCase(),
+    properties: [],
+  };
+  model.nodes[id] = node;
+  model.views[viewId].childIds.push(id);
 }
 
 function putView(model: ModelState, id: string, name: string): void {
@@ -177,6 +194,52 @@ function reconnectionModel(): ModelState {
   return model;
 }
 
+function junctionReconnectionModel(
+  relationshipType: 'AssignmentRelationship' | 'AssociationRelationship',
+): ModelState {
+  const model = ops.createEmptyModel('Junction reconnection');
+  putElement(model, 'resource', 'Resource');
+  putElement(model, 'junction', 'Junction');
+  putElement(model, 'actor', 'BusinessActor');
+  putElement(model, 'role', 'BusinessRole');
+  putView(model, 'view', 'Junction view');
+  putNode(model, 'junction-node', 'view', 'junction', 0);
+  putNode(model, 'actor-node', 'view', 'actor', 200);
+  putNode(model, 'role-node', 'view', 'role', 400);
+
+  const folderId = folder(model, 'relations');
+  model.relationships.incident = {
+    id: 'incident',
+    kind: 'relationship',
+    type: relationshipType,
+    name: 'Incident relationship',
+    documentation: '',
+    properties: [],
+    profileIds: [],
+    folderId,
+    sourceId: 'resource',
+    targetId: 'junction',
+  };
+  model.relationships.selected = {
+    id: 'selected',
+    kind: 'relationship',
+    type: relationshipType,
+    name: 'Selected relationship',
+    documentation: '',
+    properties: [],
+    profileIds: [],
+    folderId,
+    sourceId: 'actor',
+    targetId: 'role',
+  };
+  model.folders[folderId].itemIds.push('incident', 'selected');
+  attachConnection(
+    model,
+    makeConnection('selected-connection', 'view', 'actor-node', 'role-node', 'selected'),
+  );
+  return model;
+}
+
 function storeFor(model: ModelState, readOnly = false): ModelStore {
   return createModelStore({ model, readOnly, fileName: null });
 }
@@ -274,22 +337,92 @@ describe('connection reconnection analysis and apply', () => {
     expect(store.getState().model).toEqual(before);
   });
 
-  it('supports plain connections and connection endpoints without semantic mutation', () => {
+  it('enforces note endpoint legality for plain reconnections atomically', () => {
     const api = reconnectApi();
     if (!api) return;
     const model = reconnectionModel();
-    attachConnection(model, makeConnection('plain', 'view-1', 'a-1', 'b-1'));
+    putNote(model, 'note', 'view-1', 100);
+    attachConnection(model, makeConnection('plain', 'view-1', 'note', 'b-1'));
     const store = storeFor(model);
-    const plan = api.analyze(model, {
+    const before = structuredClone(model);
+
+    const invalid = api.analyze(model, {
       connectionId: 'plain',
       end: 'source',
-      endpointId: 'selected',
+      endpointId: 'a-1',
+    });
+    expect(invalid).toMatchObject({ valid: false, scope: 'none' });
+    expect(invalid.reason).toMatch(/plain|note|valid/i);
+    expect(api.apply(invalid, store)).toBe(false);
+    expect(store.getState().model).toEqual(before);
+    expect(store.getState().undoStack).toHaveLength(0);
+
+    const valid = api.analyze(model, {
+      connectionId: 'plain',
+      end: 'target',
+      endpointId: 'c-1',
     });
 
-    expect(plan).toMatchObject({ valid: true, scope: 'occurrence', requiresConfirmation: false });
-    expect(api.apply(plan, store)).toBe(true);
-    expect(store.getState().model!.connections.plain.sourceId).toBe('selected');
+    expect(valid).toMatchObject({ valid: true, scope: 'occurrence', requiresConfirmation: false });
+    expect(api.apply(valid, store)).toBe(true);
+    expect(store.getState().model!.connections.plain).toMatchObject({
+      sourceId: 'note',
+      targetId: 'c-1',
+    });
     expect(store.getState().model!.relationships.rel).toEqual(model.relationships.rel);
+    expect(store.getState().undoStack).toHaveLength(1);
+    undo(store);
+    expect(store.getState().model).toEqual(before);
+  });
+
+  it('rejects a matrix-legal reconnection that violates Junction far-side legality', () => {
+    const api = reconnectApi();
+    if (!api) return;
+    const model = junctionReconnectionModel('AssignmentRelationship');
+    const store = storeFor(model);
+    const before = structuredClone(model);
+
+    const plan = api.analyze(model, {
+      connectionId: 'selected-connection',
+      end: 'source',
+      endpointId: 'junction-node',
+    });
+
+    expect(plan).toMatchObject({ valid: false, scope: 'none' });
+    expect(plan.reason).toMatch(/relationship.*valid/i);
+    expect(api.apply(plan, store)).toBe(false);
+    expect(store.getState().model).toEqual(before);
+    expect(store.getState().undoStack).toHaveLength(0);
+  });
+
+  it('allows the equivalent Junction reconnection when incident and far-side rules agree', () => {
+    const api = reconnectApi();
+    if (!api) return;
+    const model = junctionReconnectionModel('AssociationRelationship');
+    const store = storeFor(model);
+    const before = structuredClone(model);
+
+    const plan = api.analyze(model, {
+      connectionId: 'selected-connection',
+      end: 'source',
+      endpointId: 'junction-node',
+    });
+
+    expect(plan).toMatchObject({
+      valid: true,
+      scope: 'semantic',
+      relationshipId: 'selected',
+      previousConceptId: 'actor',
+      nextConceptId: 'junction',
+    });
+    expect(api.apply(plan, store)).toBe(true);
+    expect(store.getState().model!.relationships.selected.sourceId).toBe('junction');
+    expect(store.getState().model!.connections['selected-connection'].sourceId).toBe(
+      'junction-node',
+    );
+    expect(store.getState().undoStack).toHaveLength(1);
+    undo(store);
+    expect(store.getState().model).toEqual(before);
   });
 
   it('reconnects semantic relationship endpoints through relationship connections', () => {
