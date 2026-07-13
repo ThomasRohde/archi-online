@@ -1,5 +1,6 @@
 import { labelForModelTreeItem } from '../model/label-expression';
 import { isRelationshipType, type ConceptType } from '../model/metamodel';
+import { compileTextMatcher } from '../model/text-matcher';
 import type {
   ArchimateElement,
   ArchimateRelationship,
@@ -85,10 +86,6 @@ export const DEFAULT_TREE_SEARCH_CRITERIA: TreeSearchCriteria = {
   specializations: [],
 };
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 /** Compile once per criteria change, then reuse the same Unicode matcher for every open model. */
 export function compileTreeSearch(criteria: TreeSearchCriteria): CompiledTreeSearch {
   const hasQuery = criteria.query.length > 0;
@@ -102,14 +99,17 @@ export function compileTreeSearch(criteria: TreeSearchCriteria): CompiledTreeSea
   )) || criteria.propertyKeys.length > 0;
   let matcher: RegExp | null = null;
   let error: string | null = null;
+  const textMatcher = hasQuery
+    ? compileTextMatcher({
+        find: criteria.query,
+        matchCase: criteria.matchCase,
+        useRegex: criteria.useRegex,
+      })
+    : null;
 
-  if (hasQuery) {
-    try {
-      matcher = new RegExp(criteria.useRegex ? criteria.query : escapeRegex(criteria.query),
-        criteria.matchCase ? 'u' : 'iu');
-    } catch {
-      error = 'Invalid regular expression.';
-    }
+  if (textMatcher) {
+    matcher = textMatcher.regex;
+    error = textMatcher.error;
   }
 
   return {
@@ -123,7 +123,7 @@ export function compileTreeSearch(criteria: TreeSearchCriteria): CompiledTreeSea
     propertyKeys: new Set(criteria.propertyKeys),
     conceptTypes: new Set(criteria.conceptTypes),
     specializations: new Set(criteria.specializations.map(treeSearchProfileKey)),
-    matches: (value: string) => value.length > 0 && matcher !== null && matcher.test(value),
+    matches: (value: string) => value.length > 0 && textMatcher?.matches(value) === true,
   };
 }
 

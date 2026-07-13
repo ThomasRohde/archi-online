@@ -12,6 +12,7 @@ import {
   PanelsTopLeft,
   Presentation,
   Redo2,
+  ReplaceAll,
   Save,
   SaveAll,
   Share2,
@@ -65,6 +66,11 @@ import { layoutBus } from './layout-bus';
 import { createNewModelSession } from './model-session-actions';
 import { SpecializationsManager } from './SpecializationsManager';
 import { ImageGallery } from './ImageGallery';
+import {
+  captureFindReplaceSession,
+  type FindReplaceSessionCapture,
+} from '../model/find-replace';
+import { FindReplaceDialog } from './FindReplaceDialog';
 
 /** Published documentation site (GitHub Pages). */
 const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
@@ -293,6 +299,7 @@ type IconName =
   | 'c4'
   | 'profiles'
   | 'images'
+  | 'replace'
   | 'ext'
   | 'views'
   | 'docs'
@@ -311,6 +318,7 @@ const TB_ICONS: Record<IconName, LucideIcon> = {
   c4: PanelsTopLeft,
   profiles: Tags,
   images: Images,
+  replace: ReplaceAll,
   ext: Blocks,
   views: PanelTopOpen,
   docs: BookOpen,
@@ -340,6 +348,8 @@ export function Toolbar() {
   const [presenting, setPresenting] = useState(false);
   const [showSpecializations, setShowSpecializations] = useState(false);
   const [showImages, setShowImages] = useState(false);
+  const [findReplaceCapture, setFindReplaceCapture] =
+    useState<FindReplaceSessionCapture | null>(null);
   const extensionSnapshot = useSyncExternalStore(
     (listener) => extensionRegistry.subscribe(listener),
     () => extensionRegistry.getSnapshot(),
@@ -515,6 +525,14 @@ export function Toolbar() {
       >
         <TbIcon name="images" />
       </button>
+      <button
+        className="tb-icon"
+        {...tip('Find and replace')}
+        disabled={!hasModel}
+        onClick={() => setFindReplaceCapture(captureFindReplaceSession())}
+      >
+        <TbIcon name="replace" />
+      </button>
       <div className="toolbar-spacer" />
       {extensionSnapshot.toolbarButtons.map((button) => (
         <button
@@ -570,6 +588,12 @@ export function Toolbar() {
       {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}
       {showExportExchange && <ExportExchangeDialog onClose={() => setShowExportExchange(false)} />}
       {presenting && <PresentationMode onClose={() => setPresenting(false)} />}
+      {findReplaceCapture && (
+        <FindReplaceDialog
+          capture={findReplaceCapture}
+          onClose={() => setFindReplaceCapture(null)}
+        />
+      )}
       <SpecializationsManager
         open={showSpecializations}
         onClose={() => setShowSpecializations(false)}

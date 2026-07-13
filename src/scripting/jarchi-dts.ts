@@ -118,6 +118,38 @@ declare interface JFolder extends JObject {
   labelExpression: string | undefined;
 }
 
+declare interface JFindReplaceSearchOptions {
+  find: string;
+  scope?: 'model' | 'active-view';
+  name?: boolean;
+  documentation?: boolean;
+  propertyValues?: boolean;
+  matchCase?: boolean;
+  regex?: boolean;
+}
+
+declare interface JFindReplaceOptions extends JFindReplaceSearchOptions {
+  replace: string;
+}
+
+declare interface JFindReplaceRow {
+  readonly id: string;
+  readonly ownerId: string;
+  readonly ownerKind: 'model' | 'folder' | 'element' | 'relationship' | 'view' | 'group' | 'note' | 'plain-connection';
+  readonly ownerType: string;
+  readonly location: string;
+  readonly field: string;
+  readonly before: string;
+  readonly after: string;
+  readonly count: number;
+}
+
+declare interface JFindReplacePreview {
+  readonly valid: boolean;
+  readonly error: string | null;
+  readonly rows: readonly JFindReplaceRow[];
+}
+
 declare interface JCollection {
   size(): number;
   readonly length: number;
@@ -157,6 +189,9 @@ declare interface JModel {
   prop(key: string): string | undefined;
   prop(key: string, value: string, duplicate?: boolean): void;
   removeProp(key: string, value?: string): void;
+  search(options: JFindReplaceSearchOptions): JFindReplaceRow[];
+  previewReplace(options: JFindReplaceOptions): JFindReplacePreview;
+  applyReplace(preview: JFindReplacePreview, selectedRowIds?: readonly string[]): number;
   readonly specializations: JProfile[];
   createSpecialization(name: string, conceptType: string, image?: { path: string }): JProfile;
   findSpecialization(name: string, conceptType: string): JProfile | undefined;

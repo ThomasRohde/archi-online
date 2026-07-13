@@ -315,8 +315,8 @@ export function ModelTree() {
     }));
     setSetting('treeSearchViews', false);
   }, [setSetting]);
-  useEffect(() => onRevealRequest((id) => {
-    const sessionId = order.length > 0 ? activeSessionId : 'legacy';
+  useEffect(() => onRevealRequest((id, requestedSessionId) => {
+    const sessionId = order.length > 0 ? (requestedSessionId ?? activeSessionId) : 'legacy';
     if (!sessionId) return;
     const sessionModel = sessionId === 'legacy'
       ? model
@@ -325,7 +325,8 @@ export function ModelTree() {
     const item = sessionModel.elements[id]
       ?? sessionModel.relationships[id]
       ?? sessionModel.views[id];
-    if (!item && !sessionModel.folders[id]) return;
+    const isModelRoot = sessionModel.info.id === id;
+    if (!item && !sessionModel.folders[id] && !isModelRoot) return;
 
     const result = results[sessionId];
     if (result?.active && !result.visibleIds.has(id)) clearSearchForReveal();
@@ -333,7 +334,7 @@ export function ModelTree() {
     const ancestors = new Set<string>();
     let folderId: string | null | undefined = item
       ? item.folderId
-      : sessionModel.folders[id]?.parentId;
+      : (sessionModel.folders[id]?.parentId ?? null);
     while (folderId) {
       ancestors.add(folderId);
       folderId = sessionModel.folders[folderId]?.parentId;

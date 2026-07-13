@@ -16,6 +16,7 @@ const BUILT_IN_ACTIONS = [
   'Create and validate C4 views',
   'Manage specializations',
   'Import or place model images',
+  'Find and replace',
   'Run extension commands',
   'Show or reopen panels',
   'Documentation',

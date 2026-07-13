@@ -7,6 +7,7 @@ import {
 } from '../../model/metamodel';
 import {
   addConnectionToView,
+  applyFindReplace,
   addElement,
   addElementNodeToView,
   addGroupToView,
@@ -44,6 +45,13 @@ import {
 } from '../../model/ops';
 import { openView } from '../../model/store';
 import {
+  captureFindReplaceSession,
+  previewFindReplace,
+  type FindReplacePreview,
+  type FindReplaceRow,
+  type FindReplaceScope,
+} from '../../model/find-replace';
+import {
   absoluteBounds as modelAbsoluteBounds,
   type Bendpoint,
   type Bounds,
@@ -76,6 +84,39 @@ export interface JPoint {
 export type JBounds = Bounds;
 
 export type JBendpoint = Bendpoint;
+
+export interface JFindReplaceSearchOptions {
+  find: string;
+  scope?: FindReplaceScope;
+  name?: boolean;
+  documentation?: boolean;
+  propertyValues?: boolean;
+  matchCase?: boolean;
+  regex?: boolean;
+}
+
+export interface JFindReplaceOptions extends JFindReplaceSearchOptions {
+  replace: string;
+}
+
+export type JFindReplaceRow = FindReplaceRow;
+export type JFindReplacePreview = FindReplacePreview;
+
+function findReplaceOptions(
+  options: JFindReplaceSearchOptions,
+  replacement: string,
+) {
+  return {
+    find: options.find,
+    replace: replacement,
+    scope: options.scope ?? 'model',
+    searchName: options.name ?? true,
+    searchDocumentation: options.documentation ?? true,
+    searchPropertyValues: options.propertyValues ?? false,
+    matchCase: options.matchCase ?? false,
+    useRegex: options.regex ?? false,
+  };
+}
 
 export interface ViewLayoutInput {
   nodes?: Record<string, Partial<JBounds>>;
@@ -1238,6 +1279,32 @@ export class JModel extends JObject {
 
   removeProp(key: string, value?: string): void {
     propApi({ id: state().info.id }).removeProp(key, value);
+  }
+
+  /** Search the captured active model without changing it. */
+  search(options: JFindReplaceSearchOptions): JFindReplaceRow[] {
+    const preview = previewFindReplace(
+      captureFindReplaceSession(),
+      findReplaceOptions(options, ''),
+    );
+    if (!preview.valid) throw new Error(preview.error ?? 'Search failed.');
+    return preview.rows.map((row) => ({ ...row, after: row.before }));
+  }
+
+  /** Build the mandatory preview consumed by applyReplace(). */
+  previewReplace(options: JFindReplaceOptions): JFindReplacePreview {
+    return previewFindReplace(
+      captureFindReplaceSession(),
+      findReplaceOptions(options, options.replace),
+    );
+  }
+
+  /** Apply all or selected preview rows in one Find and Replace transaction. */
+  applyReplace(
+    preview: JFindReplacePreview,
+    selectedRowIds?: readonly string[],
+  ): number {
+    return applyFindReplace(preview, selectedRowIds);
   }
 
   get specializations(): JProfile[] {

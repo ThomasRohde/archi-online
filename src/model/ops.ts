@@ -21,3 +21,4 @@ export * from './ops/movement';
 export * from './ops/nesting';
 export * from './ops/style';
 export * from './ops/view';
+export * from './ops/find-replace';

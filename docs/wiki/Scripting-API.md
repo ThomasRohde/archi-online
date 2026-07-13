@@ -135,6 +135,10 @@ model.prop("key");               // get
 model.prop("key", "value");      // set (add duplicate key with third arg: true)
 model.removeProp("key");         // remove (or a specific value: removeProp(key, value))
 
+model.search(options);
+model.previewReplace(options);
+model.applyReplace(preview, selectedRowIds);
+
 model.createElement(type, name, folder);
 model.createRelationship(type, name, source, target, folder);
 model.createArchimateView(name, folder);
@@ -159,6 +163,68 @@ var actorNode = view.add(actor, 40, 20, 160, 60);
 view.add(rel, serviceNode, actorNode);
 view.openInUI();
 ```
+
+## Search and replace
+
+`JModel` exposes non-mutating search, mandatory replacement preview, and
+single-transaction apply methods:
+
+```js
+var hits = model.search({
+  find: "Customer",
+  scope: "model"
+});
+
+var preview = model.previewReplace({
+  find: "Customer (.+)",
+  replace: "Client $1",
+  scope: "active-view",
+  name: true,
+  documentation: true,
+  propertyValues: false,
+  matchCase: false,
+  regex: true
+});
+
+if (!preview.valid) {
+  throw new Error(preview.error);
+}
+
+// Apply only Name rows. Omit the second argument to apply every preview row.
+var selectedIds = preview.rows
+  .filter(function (row) { return row.field === "Name"; })
+  .map(function (row) { return row.id; });
+var changedFields = model.applyReplace(preview, selectedIds);
+```
+
+Options default to `scope: "model"`, Name and Documentation enabled, and
+property values, case matching, and regular expressions disabled. Model scope
+means only the active model session, never all open models. Active-view scope
+uses the same boundaries as the toolbar dialog: the view, recursive
+annotations and plain connections, referenced concepts, and referenced view
+objects without descending into their contents.
+
+Both modes find every occurrence in a field and use Unicode matching. Literal
+mode treats the find and replacement strings literally. With `regex: true`,
+the find text is a global Unicode JavaScript regular expression and replacement
+text supports native tokens such as `$1` and `$&`. Empty find text is invalid;
+an empty replacement is valid.
+
+Each result row has `id`, `ownerId`, `ownerKind`, `ownerType`, `location`,
+`field`, `before`, `after`, and `count`. `search()` returns matching rows
+without changing the model (`after` equals `before`) and throws for invalid
+criteria, including an empty find, invalid regular expression, or missing
+active view. A valid search with no matches returns an empty array. `previewReplace()`
+returns `{ valid, error, rows }` with the proposed after-values. Pass that
+exact preview object to `applyReplace()`; it returns the number of fields
+changed.
+
+A preview captures its model session and active view. Any intervening model or
+active-view change makes it stale, and a closed or replaced session cannot be
+retargeted. `applyReplace()` rejects invalid, stale, or read-only previews and
+routes an accepted preview through one **Find and Replace** operation. During a
+normal script run, that operation remains part of the run's single **Script**
+undo step.
 
 ## Common object members
 

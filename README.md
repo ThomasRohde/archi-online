@@ -27,6 +27,9 @@ the complete workspace autosaved to IndexedDB.
 - **Model tree** — multi-model Unicode search across names, documentation,
   properties, types, views, folders, and specializations; drag-drop, context
   menus, and inline rename
+- **Find and replace** — model or active-view scope, selective before/after
+  preview with navigation, Unicode literal/regular-expression matching, and a
+  single undoable apply
 - **View editor** — custom SVG canvas with:
   - drag/resize/nesting with grid snap, marquee selection, copy/paste
   - relationship tools with live validity feedback and a *magic connector*

@@ -43,6 +43,7 @@ Extensions can contribute additional dockable panels; they appear in the
 | **Import/Export ▾** | View image export (PNG/SVG/clipboard), ArchiMate Open Exchange import/export, and CSV import/export. See [[Import & Export|Import-and-Export]]. |
 | **Present** | Full-screen, chrome-free walkthrough of the model's views (arrow keys to step, `Esc` to exit). |
 | **Undo** / **Redo** | Step through model transactions; the tooltip names the operation. |
+| **Find and replace** | Preview and selectively replace text in the captured model or its active view. |
 | *status area* | Model name, file name (or *unsaved*), and a `•` dirty marker. |
 | *extension buttons* | Toolbar buttons contributed by extensions. |
 | **Extensions ▾** | Extension menu items, plus registered extension commands that don't already appear in an extension menu. |
@@ -105,6 +106,40 @@ asterisk after a root name means that model has unsaved changes.
   creates a view reference.
 
 Extensions can add items to the tree's context menu.
+
+## Find and replace
+
+Use **Find and replace** in the toolbar for reviewed bulk edits. The dialog is
+bound to the model session that was active when you opened it. **Model** means
+that one model, not every model shown in the Models panel; **Active view**
+limits the operation to the current view.
+
+- **Model scope** includes model information, folders, elements,
+  relationships, views, groups, note and legend text, and plain diagram
+  connections.
+- **Active view scope** includes the view itself, recursively nested groups,
+  notes and legends, plain connections, and the underlying concepts used on
+  that view. A view-reference object includes the referenced view itself, but
+  not the referenced view's contents. Repeated visual occurrences of the same
+  underlying object produce one result.
+- **Fields and matching** search Name and Documentation by default. Property
+  values are opt-in, as are **Match case** and **Regular expression**. Find
+  text cannot be empty; replacement text can be empty to delete matches.
+  Every occurrence in a field is replaced. Literal mode treats both the find
+  and replacement text literally. Regular-expression mode uses a global
+  Unicode JavaScript regular expression and supports native replacement
+  tokens such as `$1` and `$&`.
+- **Preview first** shows stable rows with type and location, field,
+  before/after text, and occurrence count. All rows start selected; clear any
+  rows you do not want to apply. Click a result's type to navigate to it.
+  **Apply** changes only the selected rows in one **Find and Replace** undo
+  step.
+
+Changing the criteria, model state, or active view invalidates the preview.
+Closing or replacing the captured model session also makes an old preview
+stale, so it is rejected rather than applied to a different target. Open a new
+preview before applying. In a read-only model, preview and navigation remain
+available, but **Apply** is disabled.
 
 ## Palette
 

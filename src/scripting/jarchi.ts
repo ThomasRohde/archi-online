@@ -14,5 +14,9 @@ export {
   JVisual,
   wrap,
   type JConnectable,
+  type JFindReplaceOptions,
+  type JFindReplacePreview,
+  type JFindReplaceRow,
+  type JFindReplaceSearchOptions,
   type JKind,
 } from './jarchi/wrappers';
