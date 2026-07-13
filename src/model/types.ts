@@ -336,6 +336,37 @@ export function connectableConceptId(state: ModelState, id: string): string | un
   return resolveSemanticEndpoint(state, id)?.id;
 }
 
+/**
+ * Validate that a relationship occurrence connects visuals representing the
+ * exact semantic source and target of its relationship. Connection endpoints
+ * remain first-class semantic endpoints when they represent relationships.
+ */
+export function relationshipConnectionEndpointError(
+  state: ModelState,
+  connection: DiagramConnection,
+): string | undefined {
+  if (connection.connType !== 'relationship') return undefined;
+  const relationship = connection.relationshipId
+    ? state.relationships[connection.relationshipId]
+    : undefined;
+  if (!relationship) {
+    return `Relationship connection has no semantic relationship: ${connection.id}`;
+  }
+  const sourceConceptId = connectableConceptId(state, connection.sourceId);
+  const targetConceptId = connectableConceptId(state, connection.targetId);
+  if (
+    sourceConceptId !== relationship.sourceId
+    || targetConceptId !== relationship.targetId
+  ) {
+    return (
+      `Relationship connection semantic endpoint mismatch: ${connection.id} `
+      + `expected ${relationship.sourceId} -> ${relationship.targetId}, `
+      + `received ${sourceConceptId ?? '(none)'} -> ${targetConceptId ?? '(none)'}`
+    );
+  }
+  return undefined;
+}
+
 /** Return a missing-endpoint or recursive connection-dependency error. */
 export function connectionGraphError(state: ModelState): string | undefined {
   for (const connection of Object.values(state.connections)) {
@@ -372,6 +403,10 @@ export function connectionGraphError(state: ModelState): string | undefined {
   for (const connectionId of Object.keys(state.connections)) {
     const error = visit(connectionId);
     if (error) return error;
+  }
+  for (const connection of Object.values(state.connections)) {
+    const semanticError = relationshipConnectionEndpointError(state, connection);
+    if (semanticError) return semanticError;
   }
   return undefined;
 }

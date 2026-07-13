@@ -15,6 +15,10 @@ const c4CustomerPortalModel = readFileSync(
   join(__dirname, '..', 'public', 'examples', 'c4-customer-portal.archimate'),
   'utf8',
 );
+const phase2Online = readFileSync(
+  join(__dirname, 'fixtures', 'phase2', 'phase2-online.archimate'),
+  'utf8',
+);
 
 describe('.archimate parsing', () => {
   const m = parseArchimate(archisurance);
@@ -70,6 +74,17 @@ describe('.archimate parsing', () => {
 
   it('every node/connection reference resolves', () => {
     expectReferencesResolve(m);
+  });
+});
+
+describe('.archimate relationship occurrence integrity', () => {
+  it('rejects a relationship occurrence whose visual source represents another semantic concept', () => {
+    const contradictory = phase2Online.replace(
+      'source="p2o-element-process" target="p2o-relationship-assignment"',
+      'source="p2o-element-actor" target="p2o-relationship-assignment"',
+    );
+
+    expect(() => parseArchimate(contradictory)).toThrow(/semantic endpoint mismatch/i);
   });
 });
 

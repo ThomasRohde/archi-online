@@ -2,13 +2,14 @@
 // Structure, element order, defaults, and coordinate handling follow that
 // implementation exactly (organizations are always written).
 
-import type {
-  Bounds,
-  DiagramConnection,
-  DiagramNode,
-  Folder,
-  ModelState,
-  Property,
+import {
+  connectionGraphError,
+  type Bounds,
+  type DiagramConnection,
+  type DiagramNode,
+  type Folder,
+  type ModelState,
+  type Property,
 } from '../../types';
 import {
   bendpointPositions,
@@ -49,6 +50,8 @@ interface Point {
 }
 
 export function serializeExchange(state: ModelState, options: ExchangeExportOptions = {}): string {
+  const graphError = connectionGraphError(state);
+  if (graphError) throw new Error(graphError);
   const language = normalizeLanguage(options.language ?? state.info.language ?? 'en');
   const metadata = options.metadata ?? state.info.metadata;
   const propertyDefs = collectPropertyDefinitions(state);

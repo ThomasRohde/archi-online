@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyModel, deleteViewObjects } from '../src/model/ops';
+import { addConnectionToView, createEmptyModel, deleteViewObjects } from '../src/model/ops';
 import {
   attachConnection,
   detachConnection,
@@ -141,6 +141,34 @@ describe('connectable topology', () => {
     expect(connectableConceptId(model, 'node-a')).toBe('a');
     expect(connectableConceptId(model, 'relationship-connection')).toBe('rel');
     expect(connectableConceptId(model, 'plain-connection')).toBeUndefined();
+  });
+
+  it('rejects an authored relationship occurrence whose represented endpoints contradict its relationship', () => {
+    const model = connectableModel();
+    attachConnection(model, connection('base', 'node-a', 'node-b', 'rel'));
+    const store = createModelStore({ model });
+
+    expect(() => addConnectionToView('view', 'rel', 'base', 'node-b', store))
+      .toThrow(/semantic endpoint mismatch/i);
+    expect(Object.keys(store.getState().model!.connections)).toEqual(['base']);
+  });
+
+  it('accepts an authored relationship occurrence whose endpoint is another represented relationship', () => {
+    const model = connectableModel();
+    model.relationships.meta = {
+      ...model.relationships.rel,
+      id: 'meta',
+      type: 'AssociationRelationship',
+      sourceId: 'rel',
+    };
+    model.folders[model.relationships.meta.folderId].itemIds.push('meta');
+    attachConnection(model, connection('base', 'node-a', 'node-b', 'rel'));
+    const store = createModelStore({ model });
+
+    expect(() => addConnectionToView('view', 'meta', 'base', 'node-b', store))
+      .not.toThrow();
+    expect(Object.values(store.getState().model!.connections))
+      .toContainEqual(expect.objectContaining({ relationshipId: 'meta', sourceId: 'base' }));
   });
 
   it('attaches, detaches, and rebuilds ordered adjacency for every connectable', () => {

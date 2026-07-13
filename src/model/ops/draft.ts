@@ -1,5 +1,11 @@
 import { newId } from '../id';
-import { getConnectable, type DiagramConnection, type DiagramNode, type ModelState } from '../types';
+import {
+  getConnectable,
+  relationshipConnectionEndpointError,
+  type DiagramConnection,
+  type DiagramNode,
+  type ModelState,
+} from '../types';
 
 export function removeFromFolder(draft: ModelState, id: string): void {
   for (const folder of Object.values(draft.folders)) {
@@ -78,6 +84,8 @@ export function attachConnection(draft: ModelState, conn: DiagramConnection): vo
   if (src.viewId !== conn.viewId || tgt.viewId !== conn.viewId) {
     throw new Error(`Connection endpoint belongs to another view: ${conn.id}`);
   }
+  const semanticError = relationshipConnectionEndpointError(draft, conn);
+  if (semanticError) throw new Error(semanticError);
   for (const endpointId of [conn.sourceId, conn.targetId]) {
     if (
       draft.connections[endpointId] &&

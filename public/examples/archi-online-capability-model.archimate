@@ -685,10 +685,13 @@
         <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-script-runner" fillColor="#b5ffff" archimateElement="id-el-script-runner">
           <bounds x="255" y="45" width="190" height="65"/>
           <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-script-app" lineColor="#5f6f89" source="id-view-02-application-map-node-script-runner" target="id-view-02-application-map-node-app-shell" archimateRelationship="id-rel-script-serves-app-shell"/>
-          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-script-service" lineColor="#5f6f89" source="id-view-02-application-map-node-script-runner" target="id-view-02-application-map-node-monaco-editor" archimateRelationship="id-rel-script-realizes-script-service"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-view-02-application-map-conn-script-service" lineColor="#5f6f89" source="id-view-02-application-map-node-script-runner" target="id-view-02-application-map-node-scripting-service" archimateRelationship="id-rel-script-realizes-script-service"/>
         </child>
-        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-monaco-editor" targetConnections="id-view-02-application-map-conn-script-service" fillColor="#b5ffff" archimateElement="id-el-monaco-editor">
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-scripting-service" targetConnections="id-view-02-application-map-conn-script-service" fillColor="#c9e7b7" archimateElement="id-el-scripting-app-service">
           <bounds x="475" y="45" width="170" height="65"/>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-monaco-editor" fillColor="#b5ffff" archimateElement="id-el-monaco-editor">
+          <bounds x="385" y="150" width="170" height="65"/>
         </child>
         <child xsi:type="archimate:DiagramObject" id="id-view-02-application-map-node-extension-package" targetConnections="id-view-02-application-map-conn-extension-package" fillColor="#b5ffff" archimateElement="id-el-extension-package-data">
           <bounds x="145" y="150" width="220" height="65"/>
@@ -707,12 +710,15 @@
         <bounds x="30" y="80" width="170" height="70"/>
         <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-author-share" lineColor="#5f6f89" source="id-view-03-share-flow-node-author-process" target="id-view-03-share-flow-node-share-process" archimateRelationship="id-rel-author-triggers-share"/>
       </child>
-      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-share-process" targetConnections="id-view-03-share-flow-conn-author-share id-view-03-share-flow-conn-share-toolbar" fillColor="#ffffb5" archimateElement="id-el-share-process">
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-share-process" targetConnections="id-view-03-share-flow-conn-author-share" fillColor="#ffffb5" archimateElement="id-el-share-process">
         <bounds x="250" y="80" width="170" height="70"/>
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-toolbar" targetConnections="id-view-03-share-flow-conn-share-service" fillColor="#b5ffff" archimateElement="id-el-toolbar">
         <bounds x="470" y="80" width="180" height="70"/>
-        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-share-toolbar" lineColor="#5f6f89" source="id-view-03-share-flow-node-toolbar" target="id-view-03-share-flow-node-share-process" archimateRelationship="id-rel-toolbar-realizes-share-service"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-share-toolbar" lineColor="#5f6f89" source="id-view-03-share-flow-node-toolbar" target="id-view-03-share-flow-node-share-service" archimateRelationship="id-rel-toolbar-realizes-share-service"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-share-service" targetConnections="id-view-03-share-flow-conn-share-toolbar" fillColor="#c9e7b7" archimateElement="id-el-share-app-service">
+        <bounds x="470" y="230" width="180" height="70"/>
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-share-module" targetConnections="id-view-03-share-flow-conn-github-service" fillColor="#b5ffff" archimateElement="id-el-share-encoding">
         <bounds x="700" y="80" width="190" height="70"/>
@@ -731,24 +737,36 @@
       <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-xml-data" targetConnections="id-view-03-share-flow-conn-github-xml" fillColor="#b5ffff" archimateElement="id-el-archimate-xml">
         <bounds x="700" y="230" width="190" height="70"/>
       </child>
-      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-gist-link" targetConnections="id-view-03-share-flow-conn-share-gist-link id-view-03-share-flow-conn-review-link" fillColor="#b5ffff" archimateElement="id-el-gist-link-data">
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-gist-link" targetConnections="id-view-03-share-flow-conn-share-gist-link" fillColor="#b5ffff" archimateElement="id-el-gist-link-data">
         <bounds x="940" y="230" width="200" height="70"/>
       </child>
-      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-review-process" targetConnections="id-view-03-share-flow-conn-viewer-service" fillColor="#ffffb5" archimateElement="id-el-review-process">
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-review-process" fillColor="#ffffb5" archimateElement="id-el-review-process">
         <bounds x="1190" y="230" width="170" height="70"/>
-        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-review-link" lineColor="#5f6f89" source="id-view-03-share-flow-node-review-process" target="id-view-03-share-flow-node-gist-link" archimateRelationship="id-rel-review-reads-link"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-review-link" lineColor="#5f6f89" source="id-view-03-share-flow-node-review-process" target="id-view-03-share-flow-node-review-link" archimateRelationship="id-rel-review-reads-link"/>
         <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-review-copy" lineColor="#5f6f89" source="id-view-03-share-flow-node-review-process" target="id-view-03-share-flow-node-copy-process" archimateRelationship="id-rel-review-triggers-copy"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-review-link" targetConnections="id-view-03-share-flow-conn-review-link" fillColor="#fff2cc" archimateElement="id-el-review-link">
+        <bounds x="1190" y="350" width="170" height="70"/>
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-viewer-shell" fillColor="#b5ffff" archimateElement="id-el-viewer-shell">
         <bounds x="940" y="390" width="200" height="70"/>
-        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-viewer-service" lineColor="#5f6f89" source="id-view-03-share-flow-node-viewer-shell" target="id-view-03-share-flow-node-review-process" archimateRelationship="id-rel-viewer-realizes-viewer-service"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-viewer-service" lineColor="#5f6f89" source="id-view-03-share-flow-node-viewer-shell" target="id-view-03-share-flow-node-viewer-service" archimateRelationship="id-rel-viewer-realizes-viewer-service"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-viewer-service" targetConnections="id-view-03-share-flow-conn-viewer-service" fillColor="#c9e7b7" archimateElement="id-el-viewer-app-service">
+        <bounds x="1190" y="500" width="170" height="70"/>
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-copy-process" targetConnections="id-view-03-share-flow-conn-review-copy" fillColor="#ffffb5" archimateElement="id-el-copy-process">
         <bounds x="700" y="390" width="190" height="70"/>
-        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-copy-store" lineColor="#5f6f89" source="id-view-03-share-flow-node-copy-process" target="id-view-03-share-flow-node-store" archimateRelationship="id-rel-copy-realizes-readonly"/>
       </child>
-      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-store" targetConnections="id-view-03-share-flow-conn-copy-store" fillColor="#b5ffff" archimateElement="id-el-model-store">
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-store" fillColor="#b5ffff" archimateElement="id-el-model-store">
         <bounds x="470" y="390" width="180" height="70"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-copy-requirement" fillColor="#ccccff" archimateElement="id-el-copy-req">
+        <bounds x="470" y="520" width="180" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-03-share-flow-conn-copy-store" lineColor="#5f6f89" source="id-view-03-share-flow-node-copy-requirement" target="id-view-03-share-flow-node-readonly-goal" archimateRelationship="id-rel-copy-realizes-readonly"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-03-share-flow-node-readonly-goal" targetConnections="id-view-03-share-flow-conn-copy-store" fillColor="#ffffcc" archimateElement="id-el-readonly-goal">
+        <bounds x="700" y="520" width="190" height="70"/>
       </child>
       <child xsi:type="archimate:Note" id="id-view-03-share-flow-note-flow-note" lineColor="#c9ad4f" fillColor="#fff7d6">
         <bounds x="45" y="350" width="360" height="110"/>
@@ -773,8 +791,11 @@
         <bounds x="290" y="260" width="190" height="75"/>
         <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-assets-spa" lineColor="#5f6f89" source="id-view-04-runtime-context-node-assets" target="id-view-04-runtime-context-node-spa" archimateRelationship="id-rel-static-assets-realize-spa"/>
       </child>
-      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-spa" targetConnections="id-view-04-runtime-context-conn-assets-spa id-view-04-runtime-context-conn-browser-spa id-view-04-runtime-context-conn-clipboard-toolbar id-view-04-runtime-context-conn-idb-autosave" fillColor="#b5ffff" archimateElement="id-el-spa">
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-spa" targetConnections="id-view-04-runtime-context-conn-assets-spa id-view-04-runtime-context-conn-browser-spa" fillColor="#b5ffff" archimateElement="id-el-spa">
         <bounds x="540" y="80" width="190" height="75"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-toolbar" targetConnections="id-view-04-runtime-context-conn-clipboard-toolbar" fillColor="#b5ffff" archimateElement="id-el-toolbar">
+        <bounds x="790" y="80" width="190" height="75"/>
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-github-platform" fillColor="#c9e7b7" archimateElement="id-el-github-platform">
         <bounds x="1040" y="80" width="210" height="75"/>
@@ -789,7 +810,7 @@
         <bounds x="1040" y="360" width="210" height="75"/>
         <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-raw-module" lineColor="#5f6f89" source="id-view-04-runtime-context-node-raw-content" target="id-view-04-runtime-context-node-github-module" archimateRelationship="id-rel-raw-content-serves-github-module"/>
       </child>
-      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-github-module" targetConnections="id-view-04-runtime-context-conn-gist-api-module id-view-04-runtime-context-conn-raw-module id-view-04-runtime-context-conn-gist-file-xml" fillColor="#b5ffff" archimateElement="id-el-github-persistence">
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-github-module" targetConnections="id-view-04-runtime-context-conn-gist-api-module id-view-04-runtime-context-conn-raw-module" fillColor="#b5ffff" archimateElement="id-el-github-persistence">
         <bounds x="790" y="220" width="190" height="75"/>
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-file-module" targetConnections="id-view-04-runtime-context-conn-fileapi-file" fillColor="#b5ffff" archimateElement="id-el-file-persistence">
@@ -797,7 +818,10 @@
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-indexeddb" fillColor="#c9e7b7" archimateElement="id-el-indexeddb-api">
         <bounds x="290" y="440" width="190" height="75"/>
-        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-idb-autosave" lineColor="#5f6f89" source="id-view-04-runtime-context-node-indexeddb" target="id-view-04-runtime-context-node-spa" archimateRelationship="id-rel-indexeddb-serves-stores"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-idb-autosave" lineColor="#5f6f89" source="id-view-04-runtime-context-node-indexeddb" target="id-view-04-runtime-context-node-autosave" archimateRelationship="id-rel-indexeddb-serves-stores"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-autosave" targetConnections="id-view-04-runtime-context-conn-idb-autosave" fillColor="#b5ffff" archimateElement="id-el-autosave">
+        <bounds x="290" y="560" width="190" height="75"/>
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-file-api" fillColor="#c9e7b7" archimateElement="id-el-filesystem-api">
         <bounds x="40" y="440" width="190" height="75"/>
@@ -805,11 +829,14 @@
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-clipboard-api" fillColor="#c9e7b7" archimateElement="id-el-clipboard-api">
         <bounds x="540" y="260" width="190" height="75"/>
-        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-clipboard-toolbar" lineColor="#5f6f89" source="id-view-04-runtime-context-node-clipboard-api" target="id-view-04-runtime-context-node-spa" archimateRelationship="id-rel-clipboard-serves-toolbar"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-clipboard-toolbar" lineColor="#5f6f89" source="id-view-04-runtime-context-node-clipboard-api" target="id-view-04-runtime-context-node-toolbar" archimateRelationship="id-rel-clipboard-serves-toolbar"/>
       </child>
       <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-gist-file" fillColor="#c9e7b7" archimateElement="id-el-gist-file-artifact">
         <bounds x="790" y="360" width="190" height="75"/>
-        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-gist-file-xml" lineColor="#5f6f89" source="id-view-04-runtime-context-node-gist-file" target="id-view-04-runtime-context-node-github-module" archimateRelationship="id-rel-gist-file-realizes-xml"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-view-04-runtime-context-conn-gist-file-xml" lineColor="#5f6f89" source="id-view-04-runtime-context-node-gist-file" target="id-view-04-runtime-context-node-xml" archimateRelationship="id-rel-gist-file-realizes-xml"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-view-04-runtime-context-node-xml" targetConnections="id-view-04-runtime-context-conn-gist-file-xml" fillColor="#b5ffff" archimateElement="id-el-archimate-xml">
+        <bounds x="1040" y="500" width="210" height="75"/>
       </child>
       <documentation>Technology and external services used by the browser app.</documentation>
     </element>

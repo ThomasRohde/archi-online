@@ -153,7 +153,8 @@ describe('connection endpoint cloning', () => {
     const copied = Object.values(useStore.getState().model!.connections)
       .filter((item) => item.id !== 'base' && item.id !== 'dependent');
     expect(copied).toEqual([]);
-    expect(connectionGraphError(useStore.getState().model!)).toBeUndefined();
+    expect(connectionGraphError(useStore.getState().model!))
+      .toMatch(/relationship connection has no semantic relationship: base/i);
   });
 
   it('collects and pastes a cross-model view connection chain', () => {

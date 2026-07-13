@@ -616,4 +616,20 @@ describe('Open Exchange connectable connection endpoints', () => {
     expect(() => parseExchange(xml.replace('target="base-connection"', 'target="missing"')))
       .toThrow(/endpoint.*missing/i);
   });
+
+  it('rejects a relationship occurrence whose visual source represents another semantic concept', () => {
+    const contradictory = xml.replace(
+      'identifier="meta" source="base" target="b"',
+      'identifier="meta" source="a" target="b"',
+    );
+
+    expect(() => parseExchange(contradictory)).toThrow(/semantic endpoint mismatch/i);
+  });
+
+  it('rejects export of a relationship occurrence whose visual endpoints contradict its relationship', () => {
+    const model = parseExchange(xml);
+    model.connections['meta-connection'].sourceId = 'node-a';
+
+    expect(() => serializeExchange(model)).toThrow(/semantic endpoint mismatch/i);
+  });
 });
