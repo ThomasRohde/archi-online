@@ -240,6 +240,8 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
         onPointerDown={handlers.onPointerDown}
         onPointerMove={onCanvasPointerMove}
         onPointerUp={handlers.onPointerUp}
+        onPointerCancel={handlers.onPointerCancel}
+        onLostPointerCapture={handlers.onLostPointerCapture}
         onPointerLeave={onCanvasPointerLeave}
         onDoubleClick={handlers.onDoubleClick}
         onKeyDown={handlers.onKeyDown}

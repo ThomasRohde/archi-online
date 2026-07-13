@@ -42,9 +42,11 @@ the complete workspace autosaved to IndexedDB.
     zoom/pan, and direct-edit renaming
 - **Properties workflows** — per-object editing plus a model-wide property
   ledger with exact-key usage, reviewed rename/delete, and one-step undo
-- **File compatibility** — lossless `.archimate` round-trip (verified against the
-  Archisurance example and reciprocal Phase 1/2 Desktop fixtures), File System
-  Access API save/open with download fallback
+- **File compatibility** — lossless `.archimate` round-trip for the
+  [documented supported feature set](docs/wiki/Archi-Compatibility.md#same-file-format)
+  (verified against the Archisurance example and reciprocal Phase 1/2 Desktop
+  fixtures); see the [known compatibility limitations](docs/wiki/Archi-Compatibility.md#known-limitations).
+  File System Access API save/open includes a download fallback
 - **jArchi-style scripting** — `$()` selectors, `model.createElement(...)`,
   `view.add(...)`, properties, relationship traversal (`rels`, `sourceEnds`, …),
   Monaco editor with API IntelliSense, script library with `.ajs` import/export.

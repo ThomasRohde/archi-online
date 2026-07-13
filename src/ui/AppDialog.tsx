@@ -114,6 +114,26 @@ export interface NestingRelationshipDialogOptions {
 let nextDialogId = 1;
 let presenter: ((request: DialogRequest) => void) | null = null;
 const pendingDialogs: DialogRequest[] = [];
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function preventAppShortcutDefault(event: KeyboardEvent): void {
+  if (!event.ctrlKey && !event.metaKey) return;
+  const key = event.key.toLowerCase();
+  const editable =
+    event.target instanceof HTMLInputElement ||
+    event.target instanceof HTMLTextAreaElement ||
+    (event.target instanceof HTMLElement && event.target.isContentEditable);
+  if (key === 's' || key === 'o' || (!editable && ['d', 'z', 'y'].includes(key))) {
+    event.preventDefault();
+  }
+}
 
 function present(request: DialogRequest): void {
   if (presenter) presenter(request);
@@ -214,34 +234,51 @@ export function AppDialogHost() {
   const inputRef = useRef<HTMLInputElement>(null);
   const firstSelectRef = useRef<HTMLSelectElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const focusOwnerRef = useRef<{ element: HTMLElement | null } | null>(null);
+  const settledIdsRef = useRef(new Set<number>());
   const active = queue[0] ?? null;
 
-  const closeActive = useCallback(() => {
-    setQueue((current) => current.slice(1));
+  const restoreOwnedFocus = useCallback(() => {
+    const owner = focusOwnerRef.current;
+    if (!owner) return;
+    focusOwnerRef.current = null;
+    if (owner.element?.isConnected) owner.element.focus();
+  }, []);
+
+  const settleActive = useCallback((request: DialogRequest, resolve: () => void) => {
+    if (settledIdsRef.current.has(request.id)) return;
+    settledIdsRef.current.add(request.id);
+    resolve();
+    setQueue((current) =>
+      current[0]?.id === request.id ? current.slice(1) : current,
+    );
   }, []);
 
   const confirmActive = useCallback(() => {
     if (!active) return;
-    if (active.kind === 'alert') active.resolve();
-    else if (active.kind === 'confirm') active.resolve(true);
-    else if (active.kind === 'prompt') active.resolve(inputValue);
-    else if (active.kind === 'choice') {
-      active.resolve(
-        active.choices.find((choice) => choice.primary)?.value ??
-          active.choices[0]?.value ??
-          null,
-      );
-    } else active.resolve({ ...nestingSelections });
-    closeActive();
-  }, [active, closeActive, inputValue, nestingSelections]);
+    settleActive(active, () => {
+      if (active.kind === 'alert') active.resolve();
+      else if (active.kind === 'confirm') active.resolve(true);
+      else if (active.kind === 'prompt') active.resolve(inputValue);
+      else if (active.kind === 'choice') {
+        active.resolve(
+          active.choices.find((choice) => choice.primary)?.value ??
+            active.choices[0]?.value ??
+            null,
+        );
+      } else active.resolve({ ...nestingSelections });
+    });
+  }, [active, inputValue, nestingSelections, settleActive]);
 
   const cancelActive = useCallback(() => {
     if (!active) return;
-    if (active.kind === 'alert') active.resolve();
-    else if (active.kind === 'confirm') active.resolve(false);
-    else active.resolve(null);
-    closeActive();
-  }, [active, closeActive]);
+    settleActive(active, () => {
+      if (active.kind === 'alert') active.resolve();
+      else if (active.kind === 'confirm') active.resolve(false);
+      else active.resolve(null);
+    });
+  }, [active, settleActive]);
 
   useEffect(() => {
     const hostPresenter = (request: DialogRequest) => {
@@ -253,6 +290,22 @@ export function AppDialogHost() {
       if (presenter === hostPresenter) presenter = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (active) {
+      if (!focusOwnerRef.current) {
+        focusOwnerRef.current = {
+          element: document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null,
+        };
+      }
+      return;
+    }
+    restoreOwnedFocus();
+  }, [active, restoreOwnedFocus]);
+
+  useEffect(() => () => restoreOwnedFocus(), [restoreOwnedFocus]);
 
   useEffect(() => {
     if (!active) return;
@@ -274,19 +327,38 @@ export function AppDialogHost() {
         : active.kind === 'nesting-relationships'
           ? firstSelectRef.current
           : primaryRef.current;
-    focusTarget?.focus();
+    (focusTarget ?? dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR))?.focus();
   }, [active]);
 
   useEffect(() => {
     if (!active) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      preventAppShortcutDefault(event);
       if (event.key === 'Escape') {
         event.preventDefault();
         cancelActive();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      const focused = document.activeElement;
+      if (event.shiftKey && (focused === first || !dialog.contains(focused))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (focused === last || !dialog.contains(focused))) {
+        event.preventDefault();
+        first.focus();
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [active, cancelActive]);
 
   if (!active) return null;
@@ -304,6 +376,7 @@ export function AppDialogHost() {
       }}
     >
       <form
+        ref={dialogRef}
         className={`app-dialog intent-${active.intent ?? 'default'}`}
         role="dialog"
         aria-modal="true"
@@ -373,8 +446,7 @@ export function AppDialogHost() {
                 type="button"
                 className={`app-dialog-btn${choice.primary ? ' primary' : ''}${choice.danger ? ' danger' : ''}`}
                 onClick={() => {
-                  active.resolve(choice.value);
-                  closeActive();
+                  settleActive(active, () => active.resolve(choice.value));
                 }}
               >
                 {choice.label}

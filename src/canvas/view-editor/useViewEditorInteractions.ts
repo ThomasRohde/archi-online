@@ -122,6 +122,7 @@ export function useViewEditorInteractions({
   const [inter, setInter] = useState<Interaction>({ kind: 'none' });
   const [edit, setEdit] = useState<EditState | null>(null);
   const interRef = useRef(inter);
+  const activePointerIdRef = useRef<number | null>(null);
   interRef.current = inter;
   const isConnectionVisible = model
     ? createNestedConnectionVisibilityResolver(model, settings)
@@ -196,6 +197,44 @@ export function useViewEditorInteractions({
 
   const restoreCanvasFocus = () => {
     setTimeout(() => svgRef.current?.focus(), 0);
+  };
+
+  const ownsPointer = (pointerId: number) => activePointerIdRef.current === pointerId;
+
+  const capturePointer = (pointerId: number) => {
+    svgRef.current!.setPointerCapture(pointerId);
+    activePointerIdRef.current = pointerId;
+  };
+
+  const safelyReleasePointerCapture = (pointerId: number) => {
+    const svg = svgRef.current;
+    try {
+      if (
+        svg &&
+        typeof svg.hasPointerCapture === 'function' &&
+        svg.hasPointerCapture(pointerId)
+      ) {
+        svg.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Capture can disappear between the ownership check and release.
+    }
+  };
+
+  const releasePointer = (pointerId: number) => {
+    if (!ownsPointer(pointerId)) return false;
+    // Clear ownership before release: releasePointerCapture may synchronously
+    // dispatch lostpointercapture in browsers and test doubles.
+    activePointerIdRef.current = null;
+    safelyReleasePointerCapture(pointerId);
+    return true;
+  };
+
+  const cancelPointerInteraction = (pointerId: number) => {
+    if (!ownsPointer(pointerId)) return;
+    activePointerIdRef.current = null;
+    setInter({ kind: 'none' });
+    safelyReleasePointerCapture(pointerId);
   };
 
   const commitEditAndRestoreFocus = (text: string) => {
@@ -320,16 +359,17 @@ export function useViewEditorInteractions({
 
   const onPointerDown = (e: ReactPointerEvent) => {
     if (!model || !view) return;
+    if (activePointerIdRef.current !== null && !ownsPointer(e.pointerId)) return;
     svgRef.current?.focus();
     if (edit) commitEdit(null);
     if (e.button === 1 || (e.button === 0 && spaceRef.current)) {
       setInter({ kind: 'pan', startX: e.clientX, startY: e.clientY, vx: viewport.x, vy: viewport.y });
-      svgRef.current!.setPointerCapture(e.pointerId);
+      capturePointer(e.pointerId);
       e.preventDefault();
       return;
     }
     if (e.button !== 0) return;
-    svgRef.current!.setPointerCapture(e.pointerId);
+    capturePointer(e.pointerId);
     const p = toView(e.clientX, e.clientY);
     const hit = hitFromEvent(e);
     const tool = modelStore.getState().activeTool;
@@ -586,7 +626,7 @@ export function useViewEditorInteractions({
   };
 
   const onPointerMove = (e: ReactPointerEvent) => {
-    if (!model) return;
+    if (!model || !ownsPointer(e.pointerId)) return;
     const cur = interRef.current;
     if (cur.kind === 'none') return;
     const p = toView(e.clientX, e.clientY);
@@ -682,7 +722,12 @@ export function useViewEditorInteractions({
   };
 
   const onPointerUp = (e: ReactPointerEvent) => {
-    if (!model) return;
+    if (!ownsPointer(e.pointerId)) return;
+    releasePointer(e.pointerId);
+    if (!model) {
+      setInter({ kind: 'none' });
+      return;
+    }
     const cur = interRef.current;
     const p = toView(e.clientX, e.clientY);
     switch (cur.kind) {
@@ -839,6 +884,14 @@ export function useViewEditorInteractions({
       default:
         break;
     }
+  };
+
+  const onPointerCancel = (e: ReactPointerEvent) => {
+    cancelPointerInteraction(e.pointerId);
+  };
+
+  const onLostPointerCapture = (e: ReactPointerEvent) => {
+    cancelPointerInteraction(e.pointerId);
   };
 
   const onDoubleClick = (e: ReactMouseEvent) => {
@@ -1124,6 +1177,8 @@ export function useViewEditorInteractions({
       onPointerDown,
       onPointerMove,
       onPointerUp,
+      onPointerCancel,
+      onLostPointerCapture,
       onDoubleClick,
       onKeyDown,
       onContextMenu,
