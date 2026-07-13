@@ -63,7 +63,7 @@ declare interface JVisual extends JObject {
   imageSource: number;
   imagePosition: number;
   text: string;
-  legendOptions: JLegendOptions | undefined;
+  legendOptions: JLegendOptions;
   setLegendOptimalSize(): void;
   /** Add a nested element (coordinates relative to this container). */
   add(element: JConcept, x: number, y: number, width: number, height: number): JVisual;

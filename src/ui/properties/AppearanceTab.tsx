@@ -198,6 +198,7 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
   const conn = target.connection;
   const plainConnection = conn?.connType === 'plain' ? conn : undefined;
   const isConnection = !!conn && !node;
+  const isLegend = node?.nodeType === 'note' && node.legendOptions !== undefined;
   const currentFont = node?.font ?? conn?.font ?? FONT_OPTIONS[0].value;
   const currentFontStyle = node?.fontStyle ?? conn?.fontStyle ?? parseFontStyle(currentFont) ?? {
     family: 'Segoe UI', sizePt: 9, bold: false, italic: false,
@@ -305,18 +306,20 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
             onChange={(value) => apply({ lineAlpha: value })}
           />
         </AppearanceField>
-        <AppearanceField label="Text Alignment">
-          <SegmentedControl
-            value={node?.textAlignment ?? 2}
-            disabled={readOnly || !node}
-            onChange={(value) => apply({ textAlignment: value })}
-            options={[
-              { value: 1, label: 'Align left', icon: <AlignIcon align="left" /> },
-              { value: 2, label: 'Align center', icon: <AlignIcon align="center" /> },
-              { value: 4, label: 'Align right', icon: <AlignIcon align="right" /> },
-            ]}
-          />
-        </AppearanceField>
+        {!isLegend && (
+          <AppearanceField label="Text Alignment">
+            <SegmentedControl
+              value={node?.textAlignment ?? 2}
+              disabled={readOnly || !node}
+              onChange={(value) => apply({ textAlignment: value })}
+              options={[
+                { value: 1, label: 'Align left', icon: <AlignIcon align="left" /> },
+                { value: 2, label: 'Align center', icon: <AlignIcon align="center" /> },
+                { value: 4, label: 'Align right', icon: <AlignIcon align="right" /> },
+              ]}
+            />
+          </AppearanceField>
+        )}
         <AppearanceField label="Font">
           <div className="appearance-font-controls">
             <input list="local-font-families" value={currentFontStyle.family} disabled={readOnly || (!node && !conn)} onChange={(event) => updateFont({ family: event.target.value })} />
@@ -357,26 +360,28 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
             <option value={3}>Hidden</option>
           </select>
         </AppearanceField>
-        <AppearanceField label="Text Position">
-          <SegmentedControl
-            value={(node?.textPosition ?? conn?.textPosition) ?? 1}
-            disabled={readOnly || (!node && !conn)}
-            onChange={(value) => apply({ textPosition: value })}
-            options={[
-              {
-                value: 0,
-                label: isConnection ? 'Position source' : 'Position top',
-                icon: <PositionIcon position="top" />,
-              },
-              { value: 1, label: 'Position middle', icon: <PositionIcon position="middle" /> },
-              {
-                value: 2,
-                label: isConnection ? 'Position target' : 'Position bottom',
-                icon: <PositionIcon position="bottom" />,
-              },
-            ]}
-          />
-        </AppearanceField>
+        {!isLegend && (
+          <AppearanceField label="Text Position">
+            <SegmentedControl
+              value={(node?.textPosition ?? conn?.textPosition) ?? 1}
+              disabled={readOnly || (!node && !conn)}
+              onChange={(value) => apply({ textPosition: value })}
+              options={[
+                {
+                  value: 0,
+                  label: isConnection ? 'Position source' : 'Position top',
+                  icon: <PositionIcon position="top" />,
+                },
+                { value: 1, label: 'Position middle', icon: <PositionIcon position="middle" /> },
+                {
+                  value: 2,
+                  label: isConnection ? 'Position target' : 'Position bottom',
+                  icon: <PositionIcon position="bottom" />,
+                },
+              ]}
+            />
+          </AppearanceField>
+        )}
         <AppearanceField label="Font Colour">
           <ColourControl
             value={node?.fontColor ?? conn?.fontColor}

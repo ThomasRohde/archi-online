@@ -51,7 +51,27 @@ describe('native legend scripting wrappers', () => {
     expect(JARCHI_SCRIPT_DTS).toContain(
       'createLegend(x: number, y: number, options?: Partial<JLegendOptions>): JVisual;',
     );
-    expect(JARCHI_SCRIPT_DTS).toContain('legendOptions: JLegendOptions | undefined;');
+    expect(JARCHI_SCRIPT_DTS).toContain('legendOptions: JLegendOptions;');
+    expect(JARCHI_SCRIPT_DTS).not.toContain('legendOptions: JLegendOptions | undefined;');
     expect(JARCHI_SCRIPT_DTS).toContain('setLegendOptimalSize(): void;');
+  });
+
+  it('rejects undefined legend option assignment at runtime', () => {
+    const { error, logs } = run(`
+      var view = model.createArchimateView("Legend View");
+      var legend = view.createLegend(20, 20);
+      try {
+        legend.legendOptions = undefined;
+      } catch (error) {
+        console.log(error.message);
+      }
+      console.log(legend.legendOptions.rowsPerColumn);
+    `);
+
+    expect(error).toBeUndefined();
+    expect(logs).toEqual([
+      'log:legendOptions are only available on native legends',
+      'log:15',
+    ]);
   });
 });

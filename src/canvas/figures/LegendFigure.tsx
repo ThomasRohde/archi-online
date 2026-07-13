@@ -7,8 +7,7 @@ import {
 } from '../../model/legend';
 import { isElementType, type RelationshipType } from '../../model/metamodel';
 import type { ModelState, NoteNode } from '../../model/types';
-import { StandaloneIcon } from './icons';
-import { RelationshipIcon } from './RelationshipIcon';
+import { LegendElementGlyph, LegendRelationshipGlyph } from './LegendGlyph';
 
 export interface LegendFigureProps {
   model: ModelState;
@@ -53,29 +52,15 @@ export function LegendFigure({ model, node, preferences, font, color }: LegendFi
                 preserveAspectRatio="xMidYMid meet"
               />
             ) : isElementType(entry.type) ? (
-              <g transform={`translate(${entry.x + 3},${iconY})`} color="#000000">
-                <rect
-                  data-legend-color="true"
-                  x={0}
-                  y={0}
-                  width={18}
-                  height={16}
-                  rx={1}
-                  fill={entry.color ?? 'none'}
-                  stroke="#000000"
-                  strokeWidth={0.8}
+              <g transform={`translate(${entry.x + 3},${iconY - 1})`}>
+                <LegendElementGlyph
+                  type={entry.type}
+                  backgroundColor={entry.color}
                 />
-                <svg x={1.5} y={0.5} width={15} height={15} overflow="visible">
-                  <StandaloneIcon type={entry.type} size={15} />
-                </svg>
               </g>
             ) : (
-              <g
-                transform={`translate(${entry.x},${iconY - 1}) scale(0.8)`}
-                color="#000000"
-                data-legend-color={entry.color}
-              >
-                <RelationshipIcon type={entry.type as RelationshipType} />
+              <g transform={`translate(${entry.x + 3},${iconY - 1})`}>
+                <LegendRelationshipGlyph type={entry.type as RelationshipType} />
               </g>
             )}
             <text

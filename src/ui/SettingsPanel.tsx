@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ARM_RELATIONSHIP_BITS, ARM_RELATIONSHIP_ORDER } from '../model/automatic-relationships';
 import {
   ELEMENT_TYPES,
@@ -156,6 +156,69 @@ const LEGEND_PREFERENCE_ROWS = [
     .sort((a, b) => a.label.localeCompare(b.label)),
 ];
 
+type LegendPreferenceRow = (typeof LEGEND_PREFERENCE_ROWS)[number];
+
+function LegendCustomPreferenceRow({
+  row,
+  settings,
+  updateLabel,
+  updateColor,
+}: {
+  row: LegendPreferenceRow;
+  settings: AppSettings;
+  updateLabel: (type: ConceptType, value: string) => void;
+  updateColor: (type: ConceptType, value: string | undefined) => void;
+}) {
+  const committedLabel = settings.legendLabels[row.type] ?? '';
+  const [labelDraft, setLabelDraft] = useState(committedLabel);
+  useEffect(() => setLabelDraft(committedLabel), [committedLabel]);
+  const hasLabel = Boolean(committedLabel);
+  const hasColor = Boolean(settings.legendUserColors[row.type]);
+  const commitLabel = () => updateLabel(row.type, labelDraft);
+  return (
+    <div className="settings-legend-row">
+      <span className="settings-legend-name">{row.label}</span>
+      <input
+        className="prop-input"
+        aria-label={`${row.label} legend label`}
+        value={labelDraft}
+        placeholder={row.label}
+        onChange={(event) => setLabelDraft(event.target.value)}
+        onBlur={commitLabel}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commitLabel();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            setLabelDraft(committedLabel);
+          }
+        }}
+      />
+      {row.color ? (
+        <input
+          type="color"
+          aria-label={`${row.label} legend user color`}
+          value={settings.legendUserColors[row.type] ?? row.color}
+          onChange={(event) => updateColor(row.type, event.target.value)}
+        />
+      ) : <span className="settings-legend-na">—</span>}
+      <button
+        className="tb-btn small"
+        aria-label={`Reset ${row.label} legend preferences`}
+        disabled={!hasLabel && !hasColor && !labelDraft}
+        onClick={() => {
+          setLabelDraft('');
+          updateLabel(row.type, '');
+          updateColor(row.type, undefined);
+        }}
+      >
+        Reset
+      </button>
+    </div>
+  );
+}
+
 function LegendCustomPreferences({
   settings,
   setSetting,
@@ -182,41 +245,15 @@ function LegendCustomPreferences({
         <span>Concept</span><span>Legend label</span><span>User colour</span><span />
       </div>
       <div className="settings-legend-grid">
-        {LEGEND_PREFERENCE_ROWS.map((row) => {
-          const hasLabel = Boolean(settings.legendLabels[row.type]);
-          const hasColor = Boolean(settings.legendUserColors[row.type]);
-          return (
-            <div className="settings-legend-row" key={row.type}>
-              <span className="settings-legend-name">{row.label}</span>
-              <input
-                className="prop-input"
-                aria-label={`${row.label} legend label`}
-                value={settings.legendLabels[row.type] ?? ''}
-                placeholder={row.label}
-                onChange={(event) => updateLabel(row.type, event.target.value)}
-              />
-              {row.color ? (
-                <input
-                  type="color"
-                  aria-label={`${row.label} legend user color`}
-                  value={settings.legendUserColors[row.type] ?? row.color}
-                  onChange={(event) => updateColor(row.type, event.target.value)}
-                />
-              ) : <span className="settings-legend-na">—</span>}
-              <button
-                className="tb-btn small"
-                aria-label={`Reset ${row.label} legend preferences`}
-                disabled={!hasLabel && !hasColor}
-                onClick={() => {
-                  updateLabel(row.type, '');
-                  updateColor(row.type, undefined);
-                }}
-              >
-                Reset
-              </button>
-            </div>
-          );
-        })}
+        {LEGEND_PREFERENCE_ROWS.map((row) => (
+          <LegendCustomPreferenceRow
+            key={row.type}
+            row={row}
+            settings={settings}
+            updateLabel={updateLabel}
+            updateColor={updateColor}
+          />
+        ))}
       </div>
     </details>
   );

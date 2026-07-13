@@ -4,11 +4,16 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewEditor } from '../src/canvas/ViewEditor';
 import { StaticViewContent } from '../src/canvas/export/StaticViewSvg';
+import { LegendFigure } from '../src/canvas/figures/LegendFigure';
+import { LegendElementGlyph } from '../src/canvas/figures/LegendGlyph';
+import { isLegendNote, type LegendPreferences } from '../src/model/legend';
+import { ELEMENT_TYPES, type ElementType } from '../src/model/metamodel';
 import {
   addLegendToView,
   addView,
   createElementOnView,
   createEmptyModel,
+  createRelationshipOnView,
   setLegendOptions,
   setNodeStyle,
 } from '../src/model/ops';
@@ -46,6 +51,18 @@ async function change(select: HTMLSelectElement | HTMLInputElement, value: strin
   });
 }
 
+async function typeCharacters(input: HTMLInputElement, value: string): Promise<void> {
+  for (const character of value) {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        input,
+        input.value + character,
+      );
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+}
+
 function fixture() {
   const viewId = addView('Legend View');
   const legendId = addLegendToView(
@@ -53,14 +70,67 @@ function fixture() {
     viewId,
     { x: 20, y: 20, width: 210, height: 320 },
   )!;
-  createElementOnView(
+  const actor = createElementOnView(
     'BusinessActor',
     viewId,
     viewId,
     { x: 300, y: 20, width: 120, height: 55 },
     'Customer',
   );
+  return { viewId, legendId, actor };
+}
+
+function glyphFixture() {
+  const { viewId, legendId, actor } = fixture();
+  const role = createElementOnView(
+    'BusinessRole', viewId, viewId, { x: 450, y: 20, width: 120, height: 55 }, 'Role',
+  );
+  const process = createElementOnView(
+    'BusinessProcess', viewId, viewId, { x: 300, y: 120, width: 120, height: 55 }, 'Process',
+  );
+  const object = createElementOnView(
+    'BusinessObject', viewId, viewId, { x: 450, y: 120, width: 120, height: 55 }, 'Object',
+  );
+  createRelationshipOnView('AssignmentRelationship', viewId, actor.nodeId, role.nodeId);
+  createRelationshipOnView('AssociationRelationship', viewId, actor.nodeId, role.nodeId);
+  createRelationshipOnView('AccessRelationship', viewId, process.nodeId, object.nodeId);
   return { viewId, legendId };
+}
+
+function staticLegendDocument(viewId: string): Document {
+  const markup = renderToStaticMarkup(createElement(
+    'svg',
+    null,
+    createElement(StaticViewContent, { model: useStore.getState().model!, viewId }),
+  ));
+  return new DOMParser().parseFromString(markup, 'image/svg+xml');
+}
+
+function legendFigureDocument(legendId: string, preferences: LegendPreferences): Document {
+  const current = useStore.getState().model!;
+  const node = current.nodes[legendId];
+  if (!isLegendNote(node)) throw new Error('Expected native legend');
+  const markup = renderToStaticMarkup(createElement(
+    'svg',
+    null,
+    createElement(LegendFigure, {
+      model: current,
+      node,
+      preferences,
+      font: { family: 'Segoe UI', sizePx: 12, bold: false, italic: false },
+      color: '#000000',
+    }),
+  ));
+  return new DOMParser().parseFromString(markup, 'image/svg+xml');
+}
+
+function elementGlyphDocument(type: ElementType): Document {
+  const markup = renderToStaticMarkup(createElement(
+    'svg',
+    null,
+    createElement(LegendElementGlyph, { type, backgroundColor: '#123456' }),
+  ));
+  return new DOMParser().parseFromString(markup, 'image/svg+xml');
 }
 
 function pointer(x = 40, y = 40): PointerEvent {
@@ -233,6 +303,7 @@ describe('native legend palette and properties', () => {
     expect(color).not.toBeNull();
 
     await change(label, 'Person');
+    await act(async () => label.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
     await change(color, '#123456');
     expect(useSettingsStore.getState().settings.legendLabels).toEqual({ BusinessActor: 'Person' });
     expect(useSettingsStore.getState().settings.legendUserColors).toEqual({ BusinessActor: '#123456' });
@@ -243,9 +314,224 @@ describe('native legend palette and properties', () => {
     expect(host.querySelector('[aria-label="Assignment relation legend user color"]')).toBeNull();
     await act(async () => root.unmount());
   });
+
+  it('keeps spaces while typing a custom label and persists only on blur', async () => {
+    const { host, root } = await render(createElement(SettingsPanel));
+    const details = host.querySelector<HTMLDetailsElement>('.settings-legend-custom')!;
+    await act(async () => {
+      details.open = true;
+      details.dispatchEvent(new Event('toggle', { bubbles: true }));
+    });
+    const label = host.querySelector<HTMLInputElement>(
+      '[aria-label="Business Actor legend label"]',
+    )!;
+
+    await typeCharacters(label, 'External Party');
+
+    expect(label.value).toBe('External Party');
+    expect(useSettingsStore.getState().settings.legendLabels).toEqual({});
+
+    await act(async () => label.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(useSettingsStore.getState().settings.legendLabels).toEqual({
+      BusinessActor: 'External Party',
+    });
+    await act(async () => root.unmount());
+  });
+
+  it('commits custom labels with Enter and restores drafts with Escape or Reset', async () => {
+    const { host, root } = await render(createElement(SettingsPanel));
+    const details = host.querySelector<HTMLDetailsElement>('.settings-legend-custom')!;
+    await act(async () => {
+      details.open = true;
+      details.dispatchEvent(new Event('toggle', { bubbles: true }));
+    });
+    const label = host.querySelector<HTMLInputElement>(
+      '[aria-label="Business Actor legend label"]',
+    )!;
+    const reset = host.querySelector<HTMLButtonElement>(
+      '[aria-label="Reset Business Actor legend preferences"]',
+    )!;
+
+    await typeCharacters(label, 'External Party');
+    await act(async () => label.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+    })));
+    expect(useSettingsStore.getState().settings.legendLabels).toEqual({
+      BusinessActor: 'External Party',
+    });
+
+    await change(label, 'Discard me');
+    await act(async () => label.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+    })));
+    expect(label.value).toBe('External Party');
+    expect(useSettingsStore.getState().settings.legendLabels).toEqual({
+      BusinessActor: 'External Party',
+    });
+
+    await click(reset);
+    await typeCharacters(label, 'Uncommitted draft');
+    expect(reset.disabled).toBe(false);
+    await click(reset);
+    expect(label.value).toBe('');
+    expect(useSettingsStore.getState().settings.legendLabels).toEqual({});
+    await act(async () => root.unmount());
+  });
+
+  it('hides ignored text alignment and position controls for native legends', async () => {
+    const { legendId } = fixture();
+    setSelection('view', [legendId]);
+    const { host, root } = await render(createElement(PropertiesPanel));
+    await click(Array.from(host.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Appearance',
+    )!);
+    const labels = Array.from(host.querySelectorAll('.appearance-field > label'))
+      .map((label) => label.textContent);
+
+    expect(labels).not.toContain('Text Alignment');
+    expect(labels).not.toContain('Text Position');
+    expect(labels).toContain('Font');
+    expect(labels).toContain('Fill Colour');
+    await act(async () => root.unmount());
+  });
 });
 
 describe('shared native legend projections', () => {
+  it('declares an audited background-fill strategy for every element glyph', () => {
+    const strategies = ELEMENT_TYPES.map(({ type }) => {
+      const glyph = elementGlyphDocument(type).querySelector('[data-legend-element-glyph]')!;
+      return [type, glyph.getAttribute('data-legend-fill-strategy')] as const;
+    });
+
+    expect(strategies.filter(([, strategy]) => strategy === null)).toEqual([]);
+    expect(strategies.filter(([, strategy]) => strategy === 'custom').length).toBeGreaterThan(10);
+    expect(strategies.filter(([, strategy]) => strategy === 'none').map(([type]) => type))
+      .toEqual(['Path', 'WorkPackage', 'Plateau']);
+
+    for (const [type, strategy] of strategies) {
+      if (strategy === 'none' || strategy === 'foreground') continue;
+      expect(
+        elementGlyphDocument(type).querySelector('[data-legend-background-shape="true"]'),
+        `${type} should include its audited background artwork`,
+      ).not.toBeNull();
+    }
+  });
+
+  it('fills Desktop composite Event, Interaction, and Role regions explicitly', () => {
+    const event = elementGlyphDocument('BusinessEvent');
+    const interaction = elementGlyphDocument('BusinessInteraction');
+    const role = elementGlyphDocument('BusinessRole');
+    const stakeholder = elementGlyphDocument('Stakeholder');
+
+    expect(event.querySelector('[data-legend-background-part="event-body"]')).not.toBeNull();
+    expect(event.querySelectorAll('[data-legend-background-part="event-body"] > *'))
+      .toHaveLength(3);
+    expect(event.querySelectorAll('[data-legend-background-part="event-body"] > path')[0]
+      ?.getAttribute('d')).toBe('M12 9 A4 4.5 0 0 0 12 0');
+    expect(interaction.querySelectorAll('[data-legend-background-part^="interaction-"]'))
+      .toHaveLength(2);
+    expect(role.querySelector('[data-legend-background-part="role-body"]')).not.toBeNull();
+    expect(role.querySelector('[data-legend-background-part="role-end"]')).not.toBeNull();
+    expect(stakeholder.querySelector('[data-legend-background-part="stakeholder-arc"]')
+      ?.getAttribute('d')).toBe('M4 0 A4 3.5 0 0 0 4 7');
+    expect(stakeholder.querySelector('[data-legend-background-part="stakeholder-body"]')
+      ?.tagName).toBe('rect');
+    expect(stakeholder.querySelector('[data-legend-background-part="stakeholder-end"]'))
+      .not.toBeNull();
+  });
+
+  it('fills both faces of the Desktop Node glyph', () => {
+    const node = elementGlyphDocument('Node');
+
+    expect(node.querySelector('[data-legend-element-glyph]')
+      ?.getAttribute('data-legend-fill-strategy')).toBe('custom');
+    expect(node.querySelector('[data-legend-background-part="node-front"]')).not.toBeNull();
+    expect(node.querySelector('[data-legend-background-part="node-depth"]')
+      ?.getAttribute('d')).toBe('M-0.2 0 L3.2 -3 L14 -3 L14 8 L11 11.2 Z');
+  });
+
+  it('draws and colours the complete Desktop Junction glyph', () => {
+    const junction = elementGlyphDocument('Junction');
+    const artwork = junction.querySelector('[data-legend-junction-desktop="true"]')!;
+
+    expect(junction.querySelector('[data-legend-element-glyph]')
+      ?.getAttribute('data-legend-fill-strategy')).toBe('foreground');
+    expect(artwork.querySelectorAll('rect')).toHaveLength(3);
+    expect(artwork.querySelectorAll('line')).toHaveLength(3);
+    expect(artwork.querySelector('circle')?.getAttribute('fill')).toBe('#123456');
+    expect(artwork.querySelector('circle')?.getAttribute('r')).toBe('3');
+  });
+
+  it('draws Desktop-style element fill inside the type glyph without a generic swatch', () => {
+    const { viewId } = glyphFixture();
+    const document = staticLegendDocument(viewId);
+    const actor = document.querySelector('[data-legend-entry="BusinessActor"]')!;
+    const glyph = actor.querySelector('[data-legend-element-glyph="BusinessActor"]')!;
+
+    expect(glyph).not.toBeNull();
+    expect(glyph.getAttribute('data-legend-background')).toBe('#ffffb5');
+    expect(glyph.querySelector('[data-legend-background-shape="true"]')?.getAttribute('fill'))
+      .toBe('#ffffb5');
+    expect(actor.querySelector('rect[data-legend-color]')).toBeNull();
+  });
+
+  it('uses exact diagonal Desktop relationship glyph families', () => {
+    const { viewId } = glyphFixture();
+    const document = staticLegendDocument(viewId);
+    const assignment = document.querySelector(
+      '[data-legend-relationship-glyph="AssignmentRelationship"]',
+    )!;
+    const access = document.querySelector(
+      '[data-legend-relationship-glyph="AccessRelationship"]',
+    )!;
+    const association = document.querySelector(
+      '[data-legend-relationship-glyph="AssociationRelationship"]',
+    )!;
+
+    expect(assignment).not.toBeNull();
+    expect(access).not.toBeNull();
+    expect(association).not.toBeNull();
+    expect(assignment.querySelector('[data-legend-relationship-line]')?.getAttribute('d'))
+      .toBe('M0 13 L13 0');
+    expect(assignment.querySelector('circle')).not.toBeNull();
+    expect(access.querySelector('[data-legend-relationship-line]')?.getAttribute('stroke-dasharray'))
+      .toBe('1.5 1.5');
+    expect(association.querySelector('[data-legend-relationship-line]')?.getAttribute('d'))
+      .toBe('M0 13 L13 0');
+    expect(document.querySelector('[data-legend-relationship-glyph] line[y1="9"][y2="9"]'))
+      .toBeNull();
+  });
+
+  it('applies Core, User, and None schemes to the element glyph itself', () => {
+    const { legendId } = glyphFixture();
+    let document = legendFigureDocument(legendId, { labels: {}, userColors: {} });
+    expect(document.querySelector(
+      '[data-legend-element-glyph="BusinessActor"] [data-legend-background-shape="true"]',
+    )?.getAttribute('fill')).toBe('#ffffb5');
+
+    setLegendOptions(legendId, { colorScheme: 2 });
+    expect(useStore.getState().model!.nodes[legendId]).toMatchObject({
+      legendOptions: { colorScheme: 2 },
+    });
+    document = legendFigureDocument(legendId, {
+      labels: {},
+      userColors: { BusinessActor: '#123456' },
+    });
+    expect(document.querySelector(
+      '[data-legend-element-glyph="BusinessActor"] [data-legend-background-shape="true"]',
+    )?.getAttribute('fill')).toBe('#123456');
+
+    setLegendOptions(legendId, { colorScheme: 0 });
+    document = legendFigureDocument(legendId, { labels: {}, userColors: {} });
+    expect(document.querySelector(
+      '[data-legend-element-glyph="BusinessActor"] [data-legend-background-shape="true"]',
+    )).toBeNull();
+    expect(document.querySelector('[data-legend-element-glyph="BusinessActor"]'))
+      .not.toBeNull();
+  });
+
   it.each([
     ['editor', false],
     ['viewer', true],
@@ -296,7 +582,8 @@ describe('shared native legend projections', () => {
     const { host, root } = await render(createElement(ViewEditor, { viewId }));
     const entry = host.querySelector('[data-legend-entry="BusinessActor"]')!;
     expect(entry.textContent).toContain('Person');
-    expect(entry.querySelector('[data-legend-color]')?.getAttribute('fill')).toBe('#123456');
+    expect(entry.querySelector('[data-legend-background-shape]')?.getAttribute('fill'))
+      .toBe('#123456');
     await act(async () => root.unmount());
   });
 });
