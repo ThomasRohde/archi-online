@@ -74,9 +74,9 @@ export interface FindReplacePreview {
 }
 
 interface FindReplacePreviewSource {
-  capture: FindReplaceSessionCapture;
-  sourceModel: ModelState | null;
-  sourceActiveViewId: string | null;
+  readonly capture: FindReplaceSessionCapture;
+  readonly sourceModel: ModelState | null;
+  readonly sourceActiveViewId: string | null;
 }
 
 const previewSources = new WeakMap<FindReplacePreview, FindReplacePreviewSource>();
@@ -97,10 +97,10 @@ export function captureFindReplaceSession(
   store: ModelStore = getActiveModelStore(),
 ): FindReplaceSessionCapture {
   const session = getModelSessionForStore(store) ?? null;
-  return {
+  return Object.freeze({
     store,
     sessionId: session?.id ?? null,
-  };
+  });
 }
 
 /** Build a stable, non-mutating replacement preview for one captured model session. */
@@ -110,11 +110,14 @@ export function previewFindReplace(
 ): FindReplacePreview {
   const state = capture.store.getState();
   const model = state.model;
-  const source = {
-    capture,
+  const source = Object.freeze({
+    capture: Object.freeze({
+      store: capture.store,
+      sessionId: capture.sessionId,
+    }),
     sourceModel: model,
     sourceActiveViewId: state.activeViewId,
-  };
+  });
   const result = (
     valid: boolean,
     error: string | null,
@@ -134,6 +137,9 @@ export function previewFindReplace(
     return preview;
   };
   if (!model) return result(false, 'No model is open.', []);
+  if (options.scope !== 'model' && options.scope !== 'active-view') {
+    return result(false, 'Invalid find and replace scope.', []);
+  }
 
   const matcher = compileTextMatcher({
     find: options.find,
@@ -187,10 +193,7 @@ export function previewFindReplace(
   return result(true, null, rows);
 }
 
-/** @internal Retrieve opaque source identity for operation and UI adapters. */
-export function findReplacePreviewSource(
-  preview: FindReplacePreview,
-): FindReplacePreviewSource | undefined {
+function previewSource(preview: FindReplacePreview): FindReplacePreviewSource | undefined {
   return previewSources.get(preview);
 }
 
@@ -200,7 +203,7 @@ export function prepareFindReplaceApply(
   selectedRowIds?: readonly string[],
 ): { store: ModelStore; rows: readonly FindReplaceRow[] } {
   if (!preview) throw new Error('Preview is required.');
-  const source = findReplacePreviewSource(preview);
+  const source = previewSource(preview);
   if (!preview.valid || !source?.sourceModel) throw new Error('Preview is invalid. Preview again.');
 
   const { capture, sourceModel, sourceActiveViewId } = source;
@@ -226,6 +229,27 @@ export function prepareFindReplaceApply(
     }
   }
   return { store, rows };
+}
+
+/** Resolve one row for read-only navigation without exposing preview source identity. */
+export function prepareFindReplaceNavigation(
+  preview: FindReplacePreview,
+  rowId: string,
+): Readonly<{
+  store: ModelStore;
+  sessionId: ModelSessionId | null;
+  row: FindReplaceRow;
+}> | undefined {
+  const source = previewSource(preview);
+  if (!preview.valid || !source?.sourceModel) return undefined;
+  const row = preview.rows.find((candidate) => candidate.id === rowId);
+  if (!row) return undefined;
+  const { capture, sourceModel, sourceActiveViewId } = source;
+  const { store, sessionId } = capture;
+  if (sessionId !== null && getModelSession(sessionId)?.store !== store) return undefined;
+  const state = store.getState();
+  if (state.model !== sourceModel || state.activeViewId !== sourceActiveViewId) return undefined;
+  return Object.freeze({ store, sessionId, row });
 }
 
 /** Apply already validated rows to an Immer draft. Called only by the operation layer. */
@@ -312,17 +336,34 @@ function collectModelOwners(model: ModelState): SearchOwner[] {
   Object.keys(model.relationships).forEach((id) => addTreeOwner(model, id, add));
   Object.keys(model.views).forEach((id) => addTreeOwner(model, id, add));
 
-  for (const view of Object.values(model.views)) {
+  const views = Object.values(model.views);
+  const viewIds = new Set(views.map((view) => view.id));
+  const connectionsByView = new Map<string, DiagramConnection[]>();
+  const orphanPlainConnections: DiagramConnection[] = [];
+  for (const connection of Object.values(model.connections)) {
+    if (!viewIds.has(connection.viewId)) {
+      if (connection.connType === 'plain') orphanPlainConnections.push(connection);
+      continue;
+    }
+    const connections = connectionsByView.get(connection.viewId) ?? [];
+    connections.push(connection);
+    connectionsByView.set(connection.viewId, connections);
+  }
+  const visitedNodes = new Set<string>();
+  for (const view of views) {
     collectVisualOwners(model, view, add, {
       includeSemantic: false,
       includeReferencedViews: false,
+      connections: connectionsByView.get(view.id) ?? [],
+      visitedNodes,
     });
   }
   for (const node of Object.values(model.nodes)) {
+    if (visitedNodes.has(node.id)) continue;
     if (node.nodeType === 'group' || node.nodeType === 'note') add(annotationOwner(model, node));
   }
-  for (const connection of Object.values(model.connections)) {
-    if (connection.connType === 'plain') add(plainConnectionOwner(model, connection));
+  for (const connection of orphanPlainConnections) {
+    add(plainConnectionOwner(model, connection));
   }
   return owners;
 }
@@ -341,6 +382,9 @@ function collectActiveViewOwners(model: ModelState, viewId: string): SearchOwner
   collectVisualOwners(model, view, add, {
     includeSemantic: true,
     includeReferencedViews: true,
+    connections: Object.values(model.connections)
+      .filter((connection) => connection.viewId === view.id),
+    visitedNodes: new Set(),
   });
   return owners;
 }
@@ -349,14 +393,18 @@ function collectVisualOwners(
   model: ModelState,
   view: DiagramView,
   add: (owner: SearchOwner) => void,
-  options: { includeSemantic: boolean; includeReferencedViews: boolean },
+  options: {
+    includeSemantic: boolean;
+    includeReferencedViews: boolean;
+    connections: readonly DiagramConnection[];
+    visitedNodes: Set<string>;
+  },
 ): void {
-  const visitedNodes = new Set<string>();
   const visitNode = (nodeId: string) => {
-    if (visitedNodes.has(nodeId)) return;
-    visitedNodes.add(nodeId);
+    if (options.visitedNodes.has(nodeId)) return;
     const node = model.nodes[nodeId];
     if (!node || node.viewId !== view.id) return;
+    options.visitedNodes.add(nodeId);
     if (node.nodeType === 'group' || node.nodeType === 'note') {
       add(annotationOwner(model, node));
     } else if (options.includeSemantic && node.nodeType === 'element') {
@@ -378,8 +426,7 @@ function collectVisualOwners(
   };
   view.childIds.forEach(visitNode);
 
-  for (const connection of Object.values(model.connections)) {
-    if (connection.viewId !== view.id) continue;
+  for (const connection of options.connections) {
     if (connection.connType === 'plain') {
       add(plainConnectionOwner(model, connection));
     } else if (options.includeSemantic && connection.relationshipId) {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import * as findReplaceModule from '../src/model/find-replace';
 import {
   captureFindReplaceSession,
   previewFindReplace,
@@ -347,9 +348,59 @@ describe('find and replace preview scopes', () => {
       rows: [],
     });
   });
+
+  it('rejects unsupported runtime scopes deliberately', () => {
+    const store = createModelStore({ model: fixture(), activeViewId: 'view-a' });
+    const result = previewFindReplace(captureFindReplaceSession(store), options({
+      scope: 'workspace' as FindReplaceOptions['scope'],
+    }));
+
+    expect(result).toMatchObject({
+      valid: false,
+      error: 'Invalid find and replace scope.',
+      rows: [],
+    });
+  });
+
+  it('enumerates model connections a constant number of times across many views', () => {
+    const model = fixture();
+    const viewsFolder = model.folders['views-folder'];
+    for (let index = 0; index < 40; index++) {
+      const id = `extra-view-${index}`;
+      model.views[id] = view(id, `Extra view ${index}`);
+      viewsFolder.itemIds.push(id);
+    }
+    let connectionEnumerations = 0;
+    model.connections = new Proxy(model.connections, {
+      ownKeys(target) {
+        connectionEnumerations++;
+        return Reflect.ownKeys(target);
+      },
+    });
+
+    const result = preview(createModelStore({ model, activeViewId: 'view-a' }));
+
+    expect(result.valid).toBe(true);
+    expect(connectionEnumerations).toBeLessThanOrEqual(2);
+  });
 });
 
 describe('find and replace apply safety', () => {
+  it('keeps preview source private and snapshots a mutable capture', () => {
+    expect('findReplacePreviewSource' in findReplaceModule).toBe(false);
+    const sourceStore = createModelStore({ model: fixture(), activeViewId: 'view-a' });
+    const otherStore = createModelStore({ model: fixture(), activeViewId: 'view-a' });
+    const capture = { store: sourceStore, sessionId: null };
+    const result = previewFindReplace(capture, options({ searchDocumentation: false }));
+    const actor = result.rows.find((row) => row.ownerId === 'shared-object' && row.field === 'Name')!;
+
+    capture.store = otherStore;
+
+    expect(applyFindReplace(result, [actor.id])).toBe(1);
+    expect(sourceStore.getState().model!.elements['shared-object'].name).toBe('Omega actor Omega');
+    expect(otherStore.getState().model!.elements['shared-object'].name).toBe('Alpha actor Alpha');
+  });
+
   it('applies selected rows only in one undoable transaction and supports redo', () => {
     const store = createModelStore({ model: fixture(), activeViewId: 'view-a' });
     const result = preview(store, { replace: '' });

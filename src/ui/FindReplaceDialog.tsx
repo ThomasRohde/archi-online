@@ -39,6 +39,12 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function previewRowContext(row: FindReplacePreview['rows'][number], index: number): string {
+  const before = row.before || 'empty';
+  const after = row.after || 'empty';
+  return `match ${index + 1}: ${row.ownerType} at ${row.location}, ${row.field}, ${before} to ${after}`;
+}
+
 export function FindReplaceDialog({
   capture,
   onClose,
@@ -107,13 +113,15 @@ export function FindReplaceDialog({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const dialog = dialogRef.current;
+      if (dialog && event.target instanceof Node && dialog.contains(event.target)) return;
+      event.stopImmediatePropagation();
       if (event.key === 'Escape') {
         event.preventDefault();
         onClose();
         return;
       }
       if (event.key !== 'Tab') return;
-      const dialog = dialogRef.current;
       if (!dialog) return;
       const focusable = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
       const first = focusable[0];
@@ -128,9 +136,33 @@ export function FindReplaceDialog({
         first.focus();
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [onClose]);
+
+  const onDialogKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    event.stopPropagation();
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const focusable = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || !dialog.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const runPreview = () => {
     const next = previewFindReplace(capture, options);
@@ -176,6 +208,7 @@ export function FindReplaceDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         onMouseDown={(event) => event.stopPropagation()}
+        onKeyDown={onDialogKeyDown}
       >
         <header className="find-replace-header">
           <div>
@@ -315,12 +348,12 @@ export function FindReplaceDialog({
                 </tr>
               </thead>
               <tbody>
-                {preview.rows.map((row) => (
+                {preview.rows.map((row, index) => (
                   <tr key={row.id} data-match-id={row.id}>
                     <td className="find-replace-check">
                       <input
                         type="checkbox"
-                        aria-label={`Select ${row.ownerType} ${row.field}`}
+                        aria-label={`Select ${previewRowContext(row, index)}`}
                         checked={selected.has(row.id)}
                         onChange={(event) => setSelected((current) => {
                           const next = new Set(current);
@@ -334,6 +367,7 @@ export function FindReplaceDialog({
                       <button
                         type="button"
                         className="find-replace-navigate"
+                        aria-label={`Go to ${previewRowContext(row, index)}`}
                         disabled={false}
                         onClick={() => {
                           if (!navigateToFindReplaceRow(preview, row.id)) {

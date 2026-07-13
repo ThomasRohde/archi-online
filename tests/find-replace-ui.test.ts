@@ -189,6 +189,71 @@ describe('find and replace dialog', () => {
     expect(document.activeElement).toBe(find);
   });
 
+  it('isolates background shortcuts from dialog action controls', async () => {
+    const store = createModelStore({ model: fixture(), activeViewId: 'view-a' });
+    const backgroundOperation = vi.fn();
+    window.addEventListener('keydown', backgroundOperation);
+    try {
+      await renderDialog(store);
+      await setInput('find', 'Alpha');
+      await act(async () => button('Preview').click());
+      const navigate = document.querySelector<HTMLButtonElement>('.find-replace-navigate')!;
+      const shortcuts = [
+        { target: button('Preview'), key: 'Delete' },
+        { target: button('Cancel'), key: 'd', ctrlKey: true },
+        { target: navigate, key: 'z', ctrlKey: true },
+        { target: button('Preview'), key: 'o', ctrlKey: true },
+        { target: button('Cancel'), key: 's', ctrlKey: true },
+      ];
+
+      for (const shortcut of shortcuts) {
+        shortcut.target.focus();
+        await act(async () => shortcut.target.dispatchEvent(new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          key: shortcut.key,
+          ctrlKey: shortcut.ctrlKey,
+        })));
+      }
+
+      expect(backgroundOperation).not.toHaveBeenCalled();
+      expect(store.getState().undoStack).toEqual([]);
+    } finally {
+      window.removeEventListener('keydown', backgroundOperation);
+    }
+  });
+
+  it('gives duplicate property rows unique contextual control names', async () => {
+    const model = fixture();
+    model.elements['shared-object'].properties = [
+      { key: 'tag', value: 'Alpha' },
+      { key: 'tag', value: 'Alpha' },
+    ];
+    await renderDialog(createModelStore({ model, activeViewId: 'view-a' }));
+    await setInput('find', 'Alpha');
+    await act(async () => document.querySelector<HTMLInputElement>(
+      'input[name="searchPropertyValues"]',
+    )!.click());
+    await act(async () => button('Preview').click());
+
+    const propertyRows = [...document.querySelectorAll<HTMLTableRowElement>('tbody tr')]
+      .filter((row) => row.textContent?.includes('Property: tag'));
+    const checkboxLabels = propertyRows.map((row) => row.querySelector<HTMLInputElement>(
+      'input[type="checkbox"]',
+    )!.getAttribute('aria-label'));
+    const navigationLabels = propertyRows.map((row) => row.querySelector<HTMLButtonElement>(
+      '.find-replace-navigate',
+    )!.getAttribute('aria-label'));
+
+    expect(propertyRows).toHaveLength(2);
+    expect(new Set(checkboxLabels).size).toBe(2);
+    expect(new Set(navigationLabels).size).toBe(2);
+    expect(checkboxLabels.every((label) => label?.includes('Property: tag')
+      && label.includes('Alpha'))).toBe(true);
+    expect(navigationLabels.every((label) => label?.includes('Property: tag')
+      && label.includes('Alpha'))).toBe(true);
+  });
+
   it('restores focus to the toolbar action after closing', async () => {
     addModelSession({ id: 'focus-session', model: fixture(), fileName: null });
     await act(async () => root.render(createElement(Toolbar)));
