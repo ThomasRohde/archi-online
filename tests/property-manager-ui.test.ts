@@ -253,22 +253,47 @@ describe('global properties manager dialog', () => {
     const toggles = [...document.querySelectorAll<HTMLButtonElement>(
       'button.property-manager-value-toggle',
     )];
-    expect(toggles).toHaveLength(1);
-    expect(toggles[0].textContent).toBe('Show full value');
-    expect(toggles[0].getAttribute('aria-expanded')).toBe('false');
-    expect(toggles[0].getAttribute('aria-controls')).toBe(values[2].id);
+    expect(toggles).toHaveLength(2);
+    expect(toggles.some((toggle) => toggle.getAttribute('aria-controls') === values[0].id))
+      .toBe(false);
+    expect(toggles.some((toggle) => toggle.getAttribute('aria-controls') === values[1].id))
+      .toBe(true);
+    const longValueToggle = toggles.find(
+      (toggle) => toggle.getAttribute('aria-controls') === values[2].id,
+    )!;
+    expect(longValueToggle.textContent).toBe('Show full value');
+    expect(longValueToggle.getAttribute('aria-expanded')).toBe('false');
 
-    toggles[0].focus();
-    expect(document.activeElement).toBe(toggles[0]);
-    await act(async () => toggles[0].click());
-    expect(toggles[0].getAttribute('aria-expanded')).toBe('true');
-    expect(toggles[0].textContent).toBe('Collapse value');
+    longValueToggle.focus();
+    expect(document.activeElement).toBe(longValueToggle);
+    await act(async () => longValueToggle.click());
+    expect(longValueToggle.getAttribute('aria-expanded')).toBe('true');
+    expect(longValueToggle.textContent).toBe('Collapse value');
     expect(values[2].classList.contains('expanded')).toBe(true);
     expect(values[2].textContent).toBe(longValue);
 
-    await act(async () => toggles[0].click());
-    expect(toggles[0].getAttribute('aria-expanded')).toBe('false');
+    await act(async () => longValueToggle.click());
+    expect(longValueToggle.getAttribute('aria-expanded')).toBe('false');
     expect(values[2].classList.contains('expanded')).toBe(false);
+  });
+
+  it('offers a complete-value control for short values that can wrap past three lines', async () => {
+    const model = fixture();
+    const wrapProneValue = [
+      'First short line that can wrap',
+      'Second line may also wrap',
+      'Third line',
+    ].join('\n');
+    expect(wrapProneValue.length).toBeLessThan(97);
+    model.info.properties = [{ key: 'wrapped', value: wrapProneValue }];
+    await renderDialog(createModelStore({ model }));
+
+    const value = document.querySelector<HTMLElement>('.property-manager-value')!;
+    const toggle = document.querySelector<HTMLButtonElement>('.property-manager-value-toggle');
+    expect(value.textContent).toBe(wrapProneValue);
+    expect(toggle).not.toBeNull();
+    expect(toggle!.getAttribute('aria-controls')).toBe(value.id);
+    expect(toggle!.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('stages only one operation and requires collision acknowledgement plus a fresh preview', async () => {

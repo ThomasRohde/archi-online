@@ -32,8 +32,6 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 const LEDGER_PAGE_SIZE = 50;
-const COLLAPSED_VALUE_CHARACTER_LIMIT = 96;
-const COLLAPSED_VALUE_LINE_LIMIT = 3;
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -67,11 +65,6 @@ function accessiblePropertyKey(key: string): string {
   if (key === '(blank)') return '"(blank)" — literal text';
   if (/^\s+$/u.test(key)) return `${JSON.stringify(key)} — whitespace-only key`;
   return key;
-}
-
-function propertyValueNeedsExpansion(value: string): boolean {
-  return value.length > COLLAPSED_VALUE_CHARACTER_LIMIT
-    || value.split(/\r\n?|\n/u).length > COLLAPSED_VALUE_LINE_LIMIT;
 }
 
 function initialLedger(capture: PropertyManagerSessionCapture): Readonly<{
@@ -520,7 +513,7 @@ export function PropertiesManagerDialog({
                     const occurrenceIndex = occurrenceStart + index;
                     const valueId = `${titleId}-property-value-${occurrenceIndex}`;
                     const expanded = expandedValueIds.has(occurrence.id);
-                    const expandable = propertyValueNeedsExpansion(occurrence.value);
+                    const expandable = occurrence.value !== '';
                     return (
                       <tr key={occurrence.id} data-property-coordinate={occurrence.id}>
                         <td>
