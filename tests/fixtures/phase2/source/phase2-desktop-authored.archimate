@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="Desktop-Authored Phase 2 Daily Modeling Parity" id="p2d-model" version="5.0.0">
+  <folder name="Strategy" id="p2d-folder-strategy" type="strategy"/>
+  <folder name="Business" id="p2d-folder-business" type="business">
+    <folder name="Independent Desktop Probes" id="p2d-folder-business-nested">
+      <documentation>Searchable nested folder authored independently for Desktop</documentation>
+      <property key="probe" value="desktop:nested-folder"/>
+      <element xsi:type="archimate:BusinessProcess" name="Desktop Authored Process" id="p2d-element-process">
+        <documentation>Nested ARM child and transform probe</documentation>
+        <property key="probe" value="desktop:process"/>
+      </element>
+      <element xsi:type="archimate:BusinessRole" name="Desktop Authored Role" id="p2d-element-role">
+        <documentation>Magic Connector reuse target</documentation>
+        <property key="probe" value="desktop:role"/>
+        <property key="duplicate" value="two"/>
+      </element>
+      <element xsi:type="archimate:BusinessActor" name="Desktop Authored Actor" id="p2d-element-actor">
+        <documentation>Search replace actor documentation</documentation>
+        <property key="duplicate" value="one"/>
+        <property key="probe" value="desktop:element"/>
+      </element>
+    </folder>
+    <documentation>Phase 2 folder documentation probe</documentation>
+    <property value="blank-key"/>
+    <property key="probe" value="desktop:folder"/>
+  </folder>
+  <folder name="Application" id="p2d-folder-application" type="application"/>
+  <folder name="Technology &amp; Physical" id="p2d-folder-technology" type="technology"/>
+  <folder name="Motivation" id="p2d-folder-motivation" type="motivation"/>
+  <folder name="Implementation &amp; Migration" id="p2d-folder-implementation_migration" type="implementation_migration"/>
+  <folder name="Other" id="p2d-folder-other" type="other"/>
+  <folder name="Relations" id="p2d-folder-relations" type="relations">
+    <element xsi:type="archimate:AssociationRelationship" name="Independent recursive chain" id="p2d-relationship-chain" source="p2d-relationship-node-to-relationship" target="p2d-element-role">
+      <documentation>Phase 2 Recursive chain documentation</documentation>
+      <property key="probe" value="desktop:relationship:chain"/>
+    </element>
+    <element xsi:type="archimate:AssignmentRelationship" name="Desktop Assignment" id="p2d-relationship-assignment" source="p2d-element-actor" target="p2d-element-role">
+      <documentation>Phase 2 Assignment documentation</documentation>
+      <property key="probe" value="desktop:relationship:assignment"/>
+    </element>
+    <element xsi:type="archimate:AssociationRelationship" name="Desktop relationship to node" id="p2d-relationship-relationship-to-node" source="p2d-relationship-assignment" target="p2d-element-process">
+      <documentation>Phase 2 Relationship to node documentation</documentation>
+      <property key="probe" value="desktop:relationship:relationship-to-node"/>
+    </element>
+    <element xsi:type="archimate:AssociationRelationship" name="Desktop node to relationship" id="p2d-relationship-node-to-relationship" source="p2d-element-process" target="p2d-relationship-assignment">
+      <documentation>Phase 2 Node to relationship documentation</documentation>
+      <property key="probe" value="desktop:relationship:node-to-relationship"/>
+    </element>
+  </folder>
+  <folder name="Views" id="p2d-folder-diagrams" type="diagrams">
+    <element xsi:type="archimate:ArchimateDiagramModel" name="Desktop Authored Manhattan" id="p2d-view-manhattan" connectionRouterType="2">
+      <child xsi:type="archimate:DiagramObject" id="p2d-node-manhattan-actor" archimateElement="p2d-element-actor">
+        <bounds x="110" y="130" width="150" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="p2d-connection-manhattan" source="p2d-node-manhattan-actor" target="p2d-node-manhattan-role" archimateRelationship="p2d-relationship-assignment">
+          <bendpoint startX="95" startY="55" endX="-310" endY="-155"/>
+          <bendpoint startX="285" startY="175" endX="-120" endY="-35"/>
+        </sourceConnection>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="p2d-node-manhattan-role" targetConnections="p2d-connection-manhattan" archimateElement="p2d-element-role">
+        <bounds x="590" y="310" width="150" height="70"/>
+      </child>
+      <documentation>Independently authored Manhattan route with dormant manual bendpoints</documentation>
+      <property key="probe" value="desktop:view:manhattan"/>
+    </element>
+    <element xsi:type="archimate:ArchimateDiagramModel" name="Desktop Authored Manual" id="p2d-view-manual" viewpoint="business_process_cooperation">
+      <child xsi:type="archimate:Note" id="p2d-node-note" name="Desktop Authored Note">
+        <bounds x="700" y="250" width="205" height="95"/>
+        <sourceConnection id="p2d-connection-plain-note" name="Desktop Authored Plain Note Connection" fontColor="#223344" lineWidth="2" lineColor="#556677" textPosition="2" source="p2d-node-note" target="p2d-connection-assignment" type="82">
+          <feature name="labelExpression" value="${name} ${property:probe}"/>
+          <feature name="lineStyle" value="3"/>
+          <sourceConnection id="p2d-connection-plain-chain" name="Independent plain recursive child" source="p2d-connection-plain-note" target="p2d-node-actor" type="128">
+            <property key="probe" value="desktop:plain-chain"/>
+            <documentation>Phase 2 recursive plain dependency</documentation>
+          </sourceConnection>
+          <property key="ordered" value="first"/>
+          <property key="probe" value="desktop:plain-connection"/>
+          <documentation>Phase 2 named documented plain connection</documentation>
+          <bendpoint startX="-25" startY="20" endX="35" endY="-30"/>
+        </sourceConnection>
+        <content>desktop-authored searchable note</content>
+        <property key="probe" value="desktop:note"/>
+      </child>
+      <child xsi:type="archimate:Group" id="p2d-node-group" name="Desktop Authored Probe Group" borderType="1">
+        <bounds x="40" y="30" width="560" height="280"/>
+        <child xsi:type="archimate:DiagramObject" id="p2d-node-process" targetConnections="p2d-connection-relationship-to-node" archimateElement="p2d-element-process">
+          <bounds x="330" y="85" width="150" height="70"/>
+          <sourceConnection xsi:type="archimate:Connection" id="p2d-connection-node-to-relationship" source="p2d-node-process" target="p2d-connection-assignment" archimateRelationship="p2d-relationship-node-to-relationship">
+            <sourceConnection xsi:type="archimate:Connection" id="p2d-connection-chain" source="p2d-connection-node-to-relationship" target="p2d-node-role" archimateRelationship="p2d-relationship-chain"/>
+          </sourceConnection>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="p2d-node-actor" targetConnections="p2d-connection-plain-chain" archimateElement="p2d-element-actor">
+          <bounds x="35" y="65" width="150" height="70"/>
+          <sourceConnection xsi:type="archimate:Connection" id="p2d-connection-assignment" targetConnections="p2d-connection-node-to-relationship p2d-connection-plain-note" source="p2d-node-actor" target="p2d-node-role" archimateRelationship="p2d-relationship-assignment">
+            <sourceConnection xsi:type="archimate:Connection" id="p2d-connection-relationship-to-node" source="p2d-connection-assignment" target="p2d-node-process" archimateRelationship="p2d-relationship-relationship-to-node"/>
+            <bendpoint startX="45" startY="-10" endX="-35" endY="25"/>
+            <bendpoint startX="180" startY="35" endX="-170" endY="-15"/>
+          </sourceConnection>
+        </child>
+        <documentation>Search replace group documentation</documentation>
+        <property key="probe" value="desktop:group"/>
+      </child>
+      <child xsi:type="archimate:Note" id="p2d-node-legend" name="Desktop Independent Legend">
+        <bounds x="930" y="30" width="250" height="320"/>
+        <feature name="legend" value="display=7,rows=6,offset=18,color=1,sort=1"/>
+        <property key="probe" value="desktop:legend"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="p2d-node-role" targetConnections="p2d-connection-assignment p2d-connection-chain" archimateElement="p2d-element-role">
+        <bounds x="690" y="110" width="150" height="70"/>
+      </child>
+      <documentation>Independent manual topology, annotation, legend, and productivity probes</documentation>
+      <property key="probe" value="desktop:view:manual"/>
+    </element>
+  </folder>
+  <feature name="exchangeLanguage" value="en"/>
+  <property key="rename-me" value="manager-preview"/>
+  <property key="probe" value="desktop:model"/>
+  <purpose>Independently Desktop-authored Phase 2 model purpose and search replace probe</purpose>
+</archimate:model>

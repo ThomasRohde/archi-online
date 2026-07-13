@@ -7,10 +7,10 @@ is represented here, including lower-priority items and optional plug-in parity.
 
 ## Baseline and scope
 
-- **Archi Online baseline:** Phase 1 release candidate, version 1.3.0.
+- **Archi Online baseline:** Phase 2 release candidate, version 1.4.0.
 - **Desktop reference:** Archi 5.9.0, released April 14, 2026.
 - **ArchiMate reference:** ArchiMate 3.2.
-- **Audit date:** July 12, 2026.
+- **Audit date:** July 13, 2026.
 - **Primary Desktop sources:** the
   [Archi 5.9 User Guide](https://www.archimatetool.com/downloads/archi/Archi%20User%20Guide.pdf),
   [version history](https://www.archimatetool.com/version-history/), and
@@ -39,6 +39,18 @@ The implementation deliberately does not add legacy autosave migration, opaque
 future-version preservation, or preservation-only substitutes for unsupported
 features. Remaining entries in this document are implementation gaps for later
 phases; Phase 1 entries are retained as the completed parity contract.
+
+## Phase 2 implementation status
+
+Phase 2 daily modeling parity is implemented in version 1.4.0 against the same
+pinned Desktop Archi build. The completed scope is `VIEW-01` through `VIEW-05`,
+`TREE-01`, `TREE-02`, and `PROP-01`. Independent Online-authored and
+hand-authored Desktop-native fixtures, a frozen Desktop load/save golden, exact
+source-semantic contracts, headed Chrome/Edge smoke evidence, and
+`verify:phase2` / `verify:phase2:desktop` provide the certification evidence.
+
+This is a Phase 2 feature-area claim, not a declaration of full project parity;
+all unmarked entries remain implementation gaps for later phases.
 
 The parity target has three distinct scopes:
 
@@ -93,12 +105,12 @@ The largest remaining gaps are not the basic metamodel. They are:
 
 | Feature area | Current Archi Online status | Main Desktop parity gaps | Improvement IDs |
 | --- | --- | --- | --- |
-| ArchiMate 3.2 metamodel and rules | **Strong** | Visible relationship matrix and connection-to-connection diagram endpoints. Specializations and specialization interchange are complete. | `MODEL-06` |
-| Workspace and model tree | **Strong/partial** | Cut, drill-down, hidden folders, richer sorting and unused markers, advanced search, find/replace, and some Desktop tree preferences. | `TREE-01`–`TREE-06`, `UX-03`, `UX-04` |
-| Everyday view editing | **Strong/partial** | ARM, full Magic Connector behavior, relationship reuse, Manhattan routing, transformation commands, note connections, legends, and several manipulation commands. | `VIEW-01`–`VIEW-07` |
-| Properties and appearance | **Strong/partial** | Format Painter and global property management. Phase 1 completed images, label expressions, gradients, line styles and widths, icons, opacity, and fonts. | `VIEW-07`, `PROP-01`–`PROP-03` |
+| ArchiMate 3.2 metamodel and rules | **Strong** | The visible relationship matrix remains. Specializations, interchange, and connection-to-connection diagram endpoints are complete. | `MODEL-06` |
+| Workspace and model tree | **Strong/partial** | Cut, drill-down, hidden folders, richer sorting and unused markers, and some Desktop tree preferences. Phase 2 completed advanced search and find/replace. | `TREE-03`–`TREE-06`, `UX-03`, `UX-04` |
+| Everyday view editing | **Strong/partial** | Remaining manipulation commands and Format Painter. Phase 2 completed ARM, Magic Connector reuse/creation, connection endpoints and routers, transformations, note connections, and legends. | `VIEW-06`, `VIEW-07` |
+| Properties and appearance | **Strong/partial** | Format Painter, richer property reuse/bulk editing, and hyperlinks. Phase 1 completed the appearance schema; Phase 2 completed global property management. | `VIEW-07`, `PROP-02`, `PROP-03` |
 | Navigation, analysis, and quality | **Mostly strong** | Visualiser, Hints, generated views, Navigator drag-to-view, parent-folder paths, and the latest validator integrity/configuration behavior. | `ANALYSIS-01`–`ANALYSIS-06` |
-| Native `.archimate` fidelity | **Strong/partial** | Legends, connection endpoints/routes, Sketch, and Canvas remain. ZIP assets, specializations, images, label expressions, and complete Phase 1 appearance I/O are implemented. | `FILE-02`, `VIEW-03`, `VIEW-05`, `NONSTD-01`–`NONSTD-03` |
+| Native `.archimate` fidelity | **Strong/partial** | Sketch and Canvas remain. ZIP assets, specializations, images, appearance, recursive connection endpoints/routes, note connections, and legends are implemented. | `FILE-02`, `NONSTD-01`–`NONSTD-03` |
 | Open Exchange and CSV | **Strong** | Phase 1 completed metadata, language, organization, XSD validation/copy, specializations, atomic import, and Archi 5.9 CSV edge behavior. | — |
 | Output and reporting | **Partial** | Printing, PDF/JPG/BMP output, HTML reports, report search/zoom/masking/SQL, Jasper templates, Excel export, and gallery output. | `OUTPUT-01`–`OUTPUT-06` |
 | Model reuse and lifecycle | **Partial** | Full model import/merge, reusable model templates, recent-file workflows, backup files, and richer open/save preferences. | `REUSE-01`, `REUSE-02`, `UX-04` |
@@ -247,6 +259,7 @@ opaque preservation does not count as feature support.
 
 #### TREE-01 — Advanced model-tree search
 
+- **Status:** Completed in 1.4.0
 - **Priority:** P1
 - **Effort:** M
 - **Current gap:** Search matches displayed names/relationship labels and a type
@@ -258,6 +271,7 @@ opaque preservation does not count as feature support.
 
 #### TREE-02 — Find and replace
 
+- **Status:** Completed in 1.4.0
 - **Priority:** P1/P2
 - **Effort:** M
 - **Dependencies:** `TREE-01`
@@ -315,6 +329,7 @@ opaque preservation does not count as feature support.
 
 #### PROP-01 — Global Properties Manager
 
+- **Status:** Completed in 1.4.0
 - **Priority:** P1
 - **Effort:** M
 - **Current gap:** Properties are edited per target, but users cannot inspect
@@ -350,6 +365,7 @@ opaque preservation does not count as feature support.
 
 #### VIEW-01 — Automatic Relationship Management
 
+- **Status:** Completed in 1.4.0
 - **Priority:** P1
 - **Effort:** XL
 - **Current gap:** Visual reparenting changes containment geometry but does not
@@ -363,6 +379,7 @@ opaque preservation does not count as feature support.
 
 #### VIEW-02 — Full Magic Connector behavior
 
+- **Status:** Completed in 1.4.0
 - **Priority:** P1
 - **Effort:** L
 - **Current gap:** The current Magic Connector offers forward relationships
@@ -375,6 +392,7 @@ opaque preservation does not count as feature support.
 
 #### VIEW-03 — Complete connection endpoints and routing
 
+- **Status:** Completed in 1.4.0
 - **Priority:** P1
 - **Effort:** L/XL
 - **Current gap:** Diagram connections terminate on nodes only; Desktop also
@@ -388,6 +406,7 @@ opaque preservation does not count as feature support.
 
 #### VIEW-04 — Concept and relationship transformation commands
 
+- **Status:** Completed in 1.4.0
 - **Priority:** P1
 - **Effort:** M/L
 - **Current gap:** Users cannot change selected elements/relationships to another
@@ -400,6 +419,7 @@ opaque preservation does not count as feature support.
 
 #### VIEW-05 — Note connections and legends
 
+- **Status:** Completed in 1.4.0
 - **Priority:** P1/P2
 - **Effort:** M/L
 - **Dependencies:** `MODEL-01` for specialization-aware legends

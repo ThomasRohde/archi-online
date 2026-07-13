@@ -12,6 +12,7 @@
 *.yaml text eol=lf
 *.xml text eol=lf
 *.archimate text eol=lf
+tests/fixtures/phase2/phase2-desktop.archimate binary
 
 *.png binary
 *.jpg binary

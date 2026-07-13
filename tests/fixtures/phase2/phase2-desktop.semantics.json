@@ -1,0 +1,748 @@
+{
+  "info": {
+    "id": "p2d-model",
+    "name": "Desktop-Authored Phase 2 Daily Modeling Parity",
+    "documentation": "Independently Desktop-authored Phase 2 model purpose and search replace probe",
+    "properties": [
+      {
+        "key": "rename-me",
+        "value": "manager-preview"
+      },
+      {
+        "key": "probe",
+        "value": "desktop:model"
+      }
+    ],
+    "metadata": [],
+    "language": "en",
+    "version": "5.0.0"
+  },
+  "rootFolderIds": [
+    "p2d-folder-strategy",
+    "p2d-folder-business",
+    "p2d-folder-application",
+    "p2d-folder-technology",
+    "p2d-folder-motivation",
+    "p2d-folder-implementation_migration",
+    "p2d-folder-other",
+    "p2d-folder-relations",
+    "p2d-folder-diagrams"
+  ],
+  "folders": [
+    {
+      "id": "p2d-folder-application",
+      "kind": "folder",
+      "name": "Application",
+      "folderType": "application",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2d-folder-business",
+      "kind": "folder",
+      "name": "Business",
+      "folderType": "business",
+      "documentation": "Phase 2 folder documentation probe",
+      "properties": [
+        {
+          "key": "",
+          "value": "blank-key"
+        },
+        {
+          "key": "probe",
+          "value": "desktop:folder"
+        }
+      ],
+      "parentId": null,
+      "folderIds": [
+        "p2d-folder-business-nested"
+      ],
+      "itemIds": []
+    },
+    {
+      "id": "p2d-folder-business-nested",
+      "kind": "folder",
+      "name": "Independent Desktop Probes",
+      "documentation": "Searchable nested folder authored independently for Desktop",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:nested-folder"
+        }
+      ],
+      "parentId": "p2d-folder-business",
+      "folderIds": [],
+      "itemIds": [
+        "p2d-element-process",
+        "p2d-element-role",
+        "p2d-element-actor"
+      ]
+    },
+    {
+      "id": "p2d-folder-diagrams",
+      "kind": "folder",
+      "name": "Views",
+      "folderType": "diagrams",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": [
+        "p2d-view-manhattan",
+        "p2d-view-manual"
+      ]
+    },
+    {
+      "id": "p2d-folder-implementation_migration",
+      "kind": "folder",
+      "name": "Implementation & Migration",
+      "folderType": "implementation_migration",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2d-folder-motivation",
+      "kind": "folder",
+      "name": "Motivation",
+      "folderType": "motivation",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2d-folder-other",
+      "kind": "folder",
+      "name": "Other",
+      "folderType": "other",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2d-folder-relations",
+      "kind": "folder",
+      "name": "Relations",
+      "folderType": "relations",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": [
+        "p2d-relationship-chain",
+        "p2d-relationship-assignment",
+        "p2d-relationship-relationship-to-node",
+        "p2d-relationship-node-to-relationship"
+      ]
+    },
+    {
+      "id": "p2d-folder-strategy",
+      "kind": "folder",
+      "name": "Strategy",
+      "folderType": "strategy",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2d-folder-technology",
+      "kind": "folder",
+      "name": "Technology & Physical",
+      "folderType": "technology",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    }
+  ],
+  "profiles": [],
+  "elements": [
+    {
+      "id": "p2d-element-actor",
+      "kind": "element",
+      "type": "BusinessActor",
+      "name": "Desktop Authored Actor",
+      "documentation": "Search replace actor documentation",
+      "properties": [
+        {
+          "key": "duplicate",
+          "value": "one"
+        },
+        {
+          "key": "probe",
+          "value": "desktop:element"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-business-nested"
+    },
+    {
+      "id": "p2d-element-process",
+      "kind": "element",
+      "type": "BusinessProcess",
+      "name": "Desktop Authored Process",
+      "documentation": "Nested ARM child and transform probe",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:process"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-business-nested"
+    },
+    {
+      "id": "p2d-element-role",
+      "kind": "element",
+      "type": "BusinessRole",
+      "name": "Desktop Authored Role",
+      "documentation": "Magic Connector reuse target",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:role"
+        },
+        {
+          "key": "duplicate",
+          "value": "two"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-business-nested"
+    }
+  ],
+  "relationships": [
+    {
+      "id": "p2d-relationship-assignment",
+      "kind": "relationship",
+      "type": "AssignmentRelationship",
+      "name": "Desktop Assignment",
+      "documentation": "Phase 2 Assignment documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:relationship:assignment"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-relations",
+      "sourceId": "p2d-element-actor",
+      "targetId": "p2d-element-role"
+    },
+    {
+      "id": "p2d-relationship-chain",
+      "kind": "relationship",
+      "type": "AssociationRelationship",
+      "name": "Independent recursive chain",
+      "documentation": "Phase 2 Recursive chain documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:relationship:chain"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-relations",
+      "sourceId": "p2d-relationship-node-to-relationship",
+      "targetId": "p2d-element-role"
+    },
+    {
+      "id": "p2d-relationship-node-to-relationship",
+      "kind": "relationship",
+      "type": "AssociationRelationship",
+      "name": "Desktop node to relationship",
+      "documentation": "Phase 2 Node to relationship documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:relationship:node-to-relationship"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-relations",
+      "sourceId": "p2d-element-process",
+      "targetId": "p2d-relationship-assignment"
+    },
+    {
+      "id": "p2d-relationship-relationship-to-node",
+      "kind": "relationship",
+      "type": "AssociationRelationship",
+      "name": "Desktop relationship to node",
+      "documentation": "Phase 2 Relationship to node documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:relationship:relationship-to-node"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2d-folder-relations",
+      "sourceId": "p2d-relationship-assignment",
+      "targetId": "p2d-element-process"
+    }
+  ],
+  "views": [
+    {
+      "id": "p2d-view-manhattan",
+      "kind": "view",
+      "name": "Desktop Authored Manhattan",
+      "documentation": "Independently authored Manhattan route with dormant manual bendpoints",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:view:manhattan"
+        }
+      ],
+      "folderId": "p2d-folder-diagrams",
+      "childIds": [
+        "p2d-node-manhattan-actor",
+        "p2d-node-manhattan-role"
+      ],
+      "connectionRouterType": 2
+    },
+    {
+      "id": "p2d-view-manual",
+      "kind": "view",
+      "name": "Desktop Authored Manual",
+      "documentation": "Independent manual topology, annotation, legend, and productivity probes",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:view:manual"
+        }
+      ],
+      "folderId": "p2d-folder-diagrams",
+      "viewpoint": "business_process_cooperation",
+      "childIds": [
+        "p2d-node-note",
+        "p2d-node-group",
+        "p2d-node-legend",
+        "p2d-node-role"
+      ],
+      "connectionRouterType": 0
+    }
+  ],
+  "nodes": [
+    {
+      "id": "p2d-node-actor",
+      "nodeType": "element",
+      "elementId": "p2d-element-actor",
+      "viewId": "p2d-view-manual",
+      "parentId": "p2d-node-group",
+      "bounds": {
+        "x": 35,
+        "y": 65,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "p2d-connection-assignment"
+      ],
+      "targetConnectionIds": [
+        "p2d-connection-plain-chain"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2d-node-group",
+      "nodeType": "group",
+      "name": "Desktop Authored Probe Group",
+      "documentation": "Search replace group documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:group"
+        }
+      ],
+      "viewId": "p2d-view-manual",
+      "parentId": "p2d-view-manual",
+      "bounds": {
+        "x": 40,
+        "y": 30,
+        "width": 560,
+        "height": 280
+      },
+      "childIds": [
+        "p2d-node-process",
+        "p2d-node-actor"
+      ],
+      "borderType": 1,
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2d-node-legend",
+      "nodeType": "note",
+      "name": "Desktop Independent Legend",
+      "content": "",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:legend"
+        }
+      ],
+      "legendOptions": {
+        "displayElements": true,
+        "displayRelations": true,
+        "displaySpecializationElements": true,
+        "displaySpecializationRelations": false,
+        "rowsPerColumn": 6,
+        "widthOffset": 18,
+        "colorScheme": 1,
+        "sortMethod": 1
+      },
+      "viewId": "p2d-view-manual",
+      "parentId": "p2d-view-manual",
+      "bounds": {
+        "x": 930,
+        "y": 30,
+        "width": 250,
+        "height": 320
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2d-node-manhattan-actor",
+      "nodeType": "element",
+      "elementId": "p2d-element-actor",
+      "viewId": "p2d-view-manhattan",
+      "parentId": "p2d-view-manhattan",
+      "bounds": {
+        "x": 110,
+        "y": 130,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "p2d-connection-manhattan"
+      ],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2d-node-manhattan-role",
+      "nodeType": "element",
+      "elementId": "p2d-element-role",
+      "viewId": "p2d-view-manhattan",
+      "parentId": "p2d-view-manhattan",
+      "bounds": {
+        "x": 590,
+        "y": 310,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [
+        "p2d-connection-manhattan"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2d-node-note",
+      "nodeType": "note",
+      "name": "Desktop Authored Note",
+      "content": "desktop-authored searchable note",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:note"
+        }
+      ],
+      "viewId": "p2d-view-manual",
+      "parentId": "p2d-view-manual",
+      "bounds": {
+        "x": 700,
+        "y": 250,
+        "width": 205,
+        "height": 95
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "p2d-connection-plain-note"
+      ],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2d-node-process",
+      "nodeType": "element",
+      "elementId": "p2d-element-process",
+      "viewId": "p2d-view-manual",
+      "parentId": "p2d-node-group",
+      "bounds": {
+        "x": 330,
+        "y": 85,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "p2d-connection-node-to-relationship"
+      ],
+      "targetConnectionIds": [
+        "p2d-connection-relationship-to-node"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2d-node-role",
+      "nodeType": "element",
+      "elementId": "p2d-element-role",
+      "viewId": "p2d-view-manual",
+      "parentId": "p2d-view-manual",
+      "bounds": {
+        "x": 690,
+        "y": 110,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [
+        "p2d-connection-assignment",
+        "p2d-connection-chain"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    }
+  ],
+  "connections": [
+    {
+      "id": "p2d-connection-assignment",
+      "viewId": "p2d-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [
+        {
+          "startX": 45,
+          "startY": -10,
+          "endX": -35,
+          "endY": 25
+        },
+        {
+          "startX": 180,
+          "startY": 35,
+          "endX": -170,
+          "endY": -15
+        }
+      ],
+      "connType": "relationship",
+      "relationshipId": "p2d-relationship-assignment",
+      "sourceId": "p2d-node-actor",
+      "targetId": "p2d-node-role",
+      "sourceConnectionIds": [
+        "p2d-connection-relationship-to-node"
+      ],
+      "targetConnectionIds": [
+        "p2d-connection-node-to-relationship",
+        "p2d-connection-plain-note"
+      ],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2d-connection-chain",
+      "viewId": "p2d-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "relationship",
+      "relationshipId": "p2d-relationship-chain",
+      "sourceId": "p2d-connection-node-to-relationship",
+      "targetId": "p2d-node-role",
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2d-connection-manhattan",
+      "viewId": "p2d-view-manhattan",
+      "connType": "relationship",
+      "relationshipId": "p2d-relationship-assignment",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "sourceId": "p2d-node-manhattan-actor",
+      "targetId": "p2d-node-manhattan-role",
+      "nameVisible": true,
+      "bendpoints": [
+        {
+          "startX": 95,
+          "startY": 55,
+          "endX": -310,
+          "endY": -155
+        },
+        {
+          "startX": 285,
+          "startY": 175,
+          "endX": -120,
+          "endY": -35
+        }
+      ],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2d-connection-node-to-relationship",
+      "viewId": "p2d-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "relationship",
+      "relationshipId": "p2d-relationship-node-to-relationship",
+      "sourceId": "p2d-node-process",
+      "targetId": "p2d-connection-assignment",
+      "sourceConnectionIds": [
+        "p2d-connection-chain"
+      ],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2d-connection-plain-chain",
+      "viewId": "p2d-view-manual",
+      "name": "Independent plain recursive child",
+      "documentation": "Phase 2 recursive plain dependency",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "desktop:plain-chain"
+        }
+      ],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "plain",
+      "sourceId": "p2d-connection-plain-note",
+      "targetId": "p2d-node-actor",
+      "connectionType": 128,
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2d-connection-plain-note",
+      "viewId": "p2d-view-manual",
+      "name": "Desktop Authored Plain Note Connection",
+      "documentation": "Phase 2 named documented plain connection",
+      "properties": [
+        {
+          "key": "ordered",
+          "value": "first"
+        },
+        {
+          "key": "probe",
+          "value": "desktop:plain-connection"
+        }
+      ],
+      "nameVisible": true,
+      "bendpoints": [
+        {
+          "startX": -25,
+          "startY": 20,
+          "endX": 35,
+          "endY": -30
+        }
+      ],
+      "connType": "plain",
+      "sourceId": "p2d-node-note",
+      "targetId": "p2d-connection-assignment",
+      "connectionType": 82,
+      "lineStyle": 3,
+      "lineWidth": 2,
+      "lineColor": "#556677",
+      "fontColor": "#223344",
+      "labelExpression": "${name} ${property:probe}",
+      "textPosition": 2,
+      "sourceConnectionIds": [
+        "p2d-connection-plain-chain"
+      ],
+      "targetConnectionIds": [],
+      "fontAlpha": 255
+    },
+    {
+      "id": "p2d-connection-relationship-to-node",
+      "viewId": "p2d-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "relationship",
+      "relationshipId": "p2d-relationship-relationship-to-node",
+      "sourceId": "p2d-connection-assignment",
+      "targetId": "p2d-node-process",
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    }
+  ],
+  "assets": []
+}

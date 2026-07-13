@@ -138,6 +138,11 @@ model.removeProp("key");         // remove (or a specific value: removeProp(key,
 model.search(options);
 model.previewReplace(options);
 model.applyReplace(preview, selectedRowIds);
+model.propertyUsage();
+model.previewRenamePropertyKey("old", "new", false);
+model.renamePropertyKey(preview);
+model.previewDeletePropertyKey("obsolete");
+model.deletePropertyKey(preview);
 
 model.createElement(type, name, folder);
 model.createRelationship(type, name, source, target, folder);
@@ -226,6 +231,33 @@ routes an accepted preview through one **Find and Replace** operation. During a
 normal script run, that operation remains part of the run's single **Script**
 undo step.
 
+## Global property keys
+
+The model-wide property ledger is exposed through the same mandatory-preview
+contract as the UI:
+
+```js
+var usage = model.propertyUsage("status");
+usage.forEach(function (entry) {
+  console.log(entry.displayKey, entry.occurrenceCount, entry.ownerCount);
+});
+
+var rename = model.previewRenamePropertyKey("status", "lifecycle", false);
+if (rename.collision) {
+  rename = model.previewRenamePropertyKey("status", "lifecycle", true);
+}
+if (!rename.valid) throw new Error(rename.error);
+model.renamePropertyKey(rename);
+
+var removal = model.previewDeletePropertyKey("obsolete");
+if (removal.valid) model.deletePropertyKey(removal);
+```
+
+Usage records preserve model order and include exact key/value, owner kind and
+type, property index, and stable location. Rename and delete previews capture
+the active model session and become stale after model/session changes. A rename
+collision requires explicit acknowledgement and never merges duplicate rows.
+
 ## Common object members
 
 Every wrapper (`JConcept`, `JView`, `JVisual`, `JConnection`, `JFolder`) has:
@@ -289,6 +321,7 @@ positions.
 view.name;
 view.documentation;
 view.viewpoint;
+view.routerType;                    // "manual" or "manhattan"; writable
 view.openInUI();                  // open/focus the view tab
 
 view.add(element, x, y, width, height);        // returns JVisual
@@ -377,8 +410,8 @@ returns view coordinates, which is usually what layout code wants.
 
 ```js
 connection.view;
-connection.source;        // JVisual
-connection.target;        // JVisual
+connection.source;        // JVisual or JConnection
+connection.target;        // JVisual or JConnection
 connection.concept;       // underlying relationship
 connection.lineColor;
 connection.fontColor;
@@ -392,6 +425,8 @@ connection.lineWidth;
 connection.bendpoints;    // raw Archi/GEF format
 connection.absoluteRoute();
 connection.setAbsoluteRoute(points);
+connection.routedPoints(); // rendered route; Manhattan derives orthogonal points
+connection.reconnect("target", anotherConnection); // node or connection endpoint
 ```
 
 `bendpoints` uses Archi's relative offset representation
@@ -408,6 +443,13 @@ console.log(connection.absoluteRoute());
 
 `absoluteRoute()` returns only the intermediate points — the source and
 target anchors are not included.
+
+`source` and `target` are `JConnectable` values: either a `JVisual` or another
+`JConnection`. `reconnect()` validates same-view ownership, semantic endpoint
+rules, and recursive-cycle safety, then applies one **Reconnect Connection**
+operation. `routedPoints()` returns the actual rendered intermediate points;
+for a Manhattan view it derives the orthogonal route without overwriting the
+connection's stored dormant bendpoints.
 
 `connectionType` and `nameVisible` are writable only for plain connections.
 The remaining appearance fields above apply to semantic and plain

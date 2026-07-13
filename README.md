@@ -30,15 +30,21 @@ the complete workspace autosaved to IndexedDB.
 - **Find and replace** — model or active-view scope, selective before/after
   preview with navigation, Unicode literal/regular-expression matching, and a
   single undoable apply
+- **Daily modeling parity** — Desktop-compatible automatic nesting
+  relationships, full Magic Connector polarity/reuse/target creation,
+  connection endpoints and reconnection, manual/Manhattan routing, and
+  transactional concept transformation and relationship inversion
 - **View editor** — custom SVG canvas with:
   - drag/resize/nesting with grid snap, marquee selection, copy/paste
   - relationship tools with live validity feedback and a *magic connector*
-  - manual bendpoints (drag a connection; double-click a bendpoint to remove)
-  - notes, groups, view references, zoom/pan, direct-edit renaming
-- **Properties panel** — name/documentation, key-value properties, appearance
-  (colors, opacity, text alignment)
+  - manual bendpoints plus per-view manual/Manhattan routers
+  - native note connections and live legends, groups, view references,
+    zoom/pan, and direct-edit renaming
+- **Properties workflows** — per-object editing plus a model-wide property
+  ledger with exact-key usage, reviewed rename/delete, and one-step undo
 - **File compatibility** — lossless `.archimate` round-trip (verified against the
-  Archisurance example), File System Access API save/open with download fallback
+  Archisurance example and reciprocal Phase 1/2 Desktop fixtures), File System
+  Access API save/open with download fallback
 - **jArchi-style scripting** — `$()` selectors, `model.createElement(...)`,
   `view.add(...)`, properties, relationship traversal (`rels`, `sourceEnds`, …),
   Monaco editor with API IntelliSense, script library with `.ajs` import/export.

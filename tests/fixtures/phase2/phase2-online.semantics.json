@@ -1,0 +1,742 @@
+{
+  "info": {
+    "id": "p2o-model",
+    "name": "Online Phase 2 Daily Modeling Parity",
+    "documentation": "Phase 2 model purpose and search replace probe",
+    "properties": [
+      {
+        "key": "probe",
+        "value": "online:model"
+      },
+      {
+        "key": "rename-me",
+        "value": "manager-preview"
+      }
+    ],
+    "metadata": [],
+    "language": "en",
+    "version": "5.0.0"
+  },
+  "rootFolderIds": [
+    "p2o-folder-strategy",
+    "p2o-folder-business",
+    "p2o-folder-application",
+    "p2o-folder-technology",
+    "p2o-folder-motivation",
+    "p2o-folder-implementation_migration",
+    "p2o-folder-other",
+    "p2o-folder-relations",
+    "p2o-folder-diagrams"
+  ],
+  "folders": [
+    {
+      "id": "p2o-folder-application",
+      "kind": "folder",
+      "name": "Application",
+      "folderType": "application",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2o-folder-business",
+      "kind": "folder",
+      "name": "Business",
+      "folderType": "business",
+      "documentation": "Phase 2 folder documentation probe",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:folder"
+        },
+        {
+          "key": "",
+          "value": "blank-key"
+        }
+      ],
+      "parentId": null,
+      "folderIds": [
+        "p2o-folder-business-nested"
+      ],
+      "itemIds": []
+    },
+    {
+      "id": "p2o-folder-business-nested",
+      "kind": "folder",
+      "name": "Nested Modeling Probes",
+      "documentation": "Searchable nested folder",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:nested-folder"
+        }
+      ],
+      "parentId": "p2o-folder-business",
+      "folderIds": [],
+      "itemIds": [
+        "p2o-element-actor",
+        "p2o-element-role",
+        "p2o-element-process"
+      ]
+    },
+    {
+      "id": "p2o-folder-diagrams",
+      "kind": "folder",
+      "name": "Views",
+      "folderType": "diagrams",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": [
+        "p2o-view-manual",
+        "p2o-view-manhattan"
+      ]
+    },
+    {
+      "id": "p2o-folder-implementation_migration",
+      "kind": "folder",
+      "name": "Implementation & Migration",
+      "folderType": "implementation_migration",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2o-folder-motivation",
+      "kind": "folder",
+      "name": "Motivation",
+      "folderType": "motivation",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2o-folder-other",
+      "kind": "folder",
+      "name": "Other",
+      "folderType": "other",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2o-folder-relations",
+      "kind": "folder",
+      "name": "Relations",
+      "folderType": "relations",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": [
+        "p2o-relationship-assignment",
+        "p2o-relationship-node-to-relationship",
+        "p2o-relationship-relationship-to-node",
+        "p2o-relationship-chain"
+      ]
+    },
+    {
+      "id": "p2o-folder-strategy",
+      "kind": "folder",
+      "name": "Strategy",
+      "folderType": "strategy",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    },
+    {
+      "id": "p2o-folder-technology",
+      "kind": "folder",
+      "name": "Technology & Physical",
+      "folderType": "technology",
+      "documentation": "",
+      "properties": [],
+      "parentId": null,
+      "folderIds": [],
+      "itemIds": []
+    }
+  ],
+  "profiles": [],
+  "elements": [
+    {
+      "id": "p2o-element-actor",
+      "kind": "element",
+      "type": "BusinessActor",
+      "name": "online Phase 2 Actor",
+      "documentation": "Search replace actor documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:element"
+        },
+        {
+          "key": "duplicate",
+          "value": "one"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-business-nested"
+    },
+    {
+      "id": "p2o-element-process",
+      "kind": "element",
+      "type": "BusinessProcess",
+      "name": "online Phase 2 Process",
+      "documentation": "Nested ARM child and transform probe",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:process"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-business-nested"
+    },
+    {
+      "id": "p2o-element-role",
+      "kind": "element",
+      "type": "BusinessRole",
+      "name": "online Phase 2 Role",
+      "documentation": "Magic Connector reuse target",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:role"
+        },
+        {
+          "key": "duplicate",
+          "value": "two"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-business-nested"
+    }
+  ],
+  "relationships": [
+    {
+      "id": "p2o-relationship-assignment",
+      "kind": "relationship",
+      "type": "AssignmentRelationship",
+      "name": "Assignment",
+      "documentation": "Phase 2 Assignment documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:relationship:assignment"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-relations",
+      "sourceId": "p2o-element-actor",
+      "targetId": "p2o-element-role"
+    },
+    {
+      "id": "p2o-relationship-chain",
+      "kind": "relationship",
+      "type": "AssociationRelationship",
+      "name": "Recursive chain",
+      "documentation": "Phase 2 Recursive chain documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:relationship:chain"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-relations",
+      "sourceId": "p2o-relationship-relationship-to-node",
+      "targetId": "p2o-element-actor"
+    },
+    {
+      "id": "p2o-relationship-node-to-relationship",
+      "kind": "relationship",
+      "type": "AssociationRelationship",
+      "name": "Node to relationship",
+      "documentation": "Phase 2 Node to relationship documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:relationship:node-to-relationship"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-relations",
+      "sourceId": "p2o-element-process",
+      "targetId": "p2o-relationship-assignment"
+    },
+    {
+      "id": "p2o-relationship-relationship-to-node",
+      "kind": "relationship",
+      "type": "AssociationRelationship",
+      "name": "Relationship to node",
+      "documentation": "Phase 2 Relationship to node documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:relationship:relationship-to-node"
+        }
+      ],
+      "profileIds": [],
+      "folderId": "p2o-folder-relations",
+      "sourceId": "p2o-relationship-assignment",
+      "targetId": "p2o-element-process"
+    }
+  ],
+  "views": [
+    {
+      "id": "p2o-view-manhattan",
+      "kind": "view",
+      "name": "online Phase 2 Manhattan",
+      "documentation": "Manhattan routing with preserved dormant manual bendpoints",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:view:manhattan"
+        }
+      ],
+      "folderId": "p2o-folder-diagrams",
+      "childIds": [
+        "p2o-node-manhattan-actor",
+        "p2o-node-manhattan-role"
+      ],
+      "connectionRouterType": 2
+    },
+    {
+      "id": "p2o-view-manual",
+      "kind": "view",
+      "name": "online Phase 2 Manual",
+      "documentation": "Manual router, topology, annotation, legend, and productivity probes",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:view:manual"
+        }
+      ],
+      "folderId": "p2o-folder-diagrams",
+      "viewpoint": "business_process_cooperation",
+      "childIds": [
+        "p2o-node-group",
+        "p2o-node-role",
+        "p2o-node-note",
+        "p2o-node-legend"
+      ],
+      "connectionRouterType": 0
+    }
+  ],
+  "nodes": [
+    {
+      "id": "p2o-node-actor",
+      "nodeType": "element",
+      "elementId": "p2o-element-actor",
+      "viewId": "p2o-view-manual",
+      "parentId": "p2o-node-group",
+      "bounds": {
+        "x": 25,
+        "y": 50,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "p2o-connection-assignment"
+      ],
+      "targetConnectionIds": [
+        "p2o-connection-chain"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2o-node-group",
+      "nodeType": "group",
+      "name": "online Probe Group",
+      "documentation": "Search replace group documentation",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:group"
+        }
+      ],
+      "viewId": "p2o-view-manual",
+      "parentId": "p2o-view-manual",
+      "bounds": {
+        "x": 20,
+        "y": 20,
+        "width": 520,
+        "height": 240
+      },
+      "childIds": [
+        "p2o-node-actor",
+        "p2o-node-process"
+      ],
+      "borderType": 1,
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2o-node-legend",
+      "nodeType": "note",
+      "name": "Legend",
+      "content": "",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:legend"
+        }
+      ],
+      "legendOptions": {
+        "displayElements": true,
+        "displayRelations": true,
+        "displaySpecializationElements": false,
+        "displaySpecializationRelations": true,
+        "rowsPerColumn": 4,
+        "widthOffset": 12,
+        "colorScheme": 2,
+        "sortMethod": 0
+      },
+      "viewId": "p2o-view-manual",
+      "parentId": "p2o-view-manual",
+      "bounds": {
+        "x": 875,
+        "y": 20,
+        "width": 240,
+        "height": 300
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2o-node-manhattan-actor",
+      "nodeType": "element",
+      "elementId": "p2o-element-actor",
+      "viewId": "p2o-view-manhattan",
+      "parentId": "p2o-view-manhattan",
+      "bounds": {
+        "x": 80,
+        "y": 100,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "p2o-connection-manhattan"
+      ],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2o-node-manhattan-role",
+      "nodeType": "element",
+      "elementId": "p2o-element-role",
+      "viewId": "p2o-view-manhattan",
+      "parentId": "p2o-view-manhattan",
+      "bounds": {
+        "x": 520,
+        "y": 280,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [
+        "p2o-connection-manhattan"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2o-node-note",
+      "nodeType": "note",
+      "name": "Phase 2 Note",
+      "content": "online searchable note",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:note"
+        }
+      ],
+      "viewId": "p2o-view-manual",
+      "parentId": "p2o-view-manual",
+      "bounds": {
+        "x": 650,
+        "y": 210,
+        "width": 190,
+        "height": 90
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "p2o-connection-plain-note"
+      ],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2o-node-process",
+      "nodeType": "element",
+      "elementId": "p2o-element-process",
+      "viewId": "p2o-view-manual",
+      "parentId": "p2o-node-group",
+      "bounds": {
+        "x": 300,
+        "y": 50,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [
+        "p2o-connection-node-to-relationship"
+      ],
+      "targetConnectionIds": [
+        "p2o-connection-relationship-to-node"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    },
+    {
+      "id": "p2o-node-role",
+      "nodeType": "element",
+      "elementId": "p2o-element-role",
+      "viewId": "p2o-view-manual",
+      "parentId": "p2o-view-manual",
+      "bounds": {
+        "x": 650,
+        "y": 75,
+        "width": 150,
+        "height": 70
+      },
+      "childIds": [],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [
+        "p2o-connection-assignment",
+        "p2o-connection-plain-chain"
+      ],
+      "lineWidth": 1,
+      "alpha": 255,
+      "lineAlpha": 255,
+      "fontAlpha": 255,
+      "imagePosition": 2
+    }
+  ],
+  "connections": [
+    {
+      "id": "p2o-connection-assignment",
+      "viewId": "p2o-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [
+        {
+          "startX": 30,
+          "startY": 20,
+          "endX": -20,
+          "endY": -15
+        }
+      ],
+      "connType": "relationship",
+      "relationshipId": "p2o-relationship-assignment",
+      "sourceId": "p2o-node-actor",
+      "targetId": "p2o-node-role",
+      "sourceConnectionIds": [
+        "p2o-connection-relationship-to-node"
+      ],
+      "targetConnectionIds": [
+        "p2o-connection-node-to-relationship",
+        "p2o-connection-plain-note"
+      ],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2o-connection-chain",
+      "viewId": "p2o-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "relationship",
+      "relationshipId": "p2o-relationship-chain",
+      "sourceId": "p2o-connection-relationship-to-node",
+      "targetId": "p2o-node-actor",
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2o-connection-manhattan",
+      "viewId": "p2o-view-manhattan",
+      "connType": "relationship",
+      "relationshipId": "p2o-relationship-assignment",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "sourceId": "p2o-node-manhattan-actor",
+      "targetId": "p2o-node-manhattan-role",
+      "nameVisible": true,
+      "bendpoints": [
+        {
+          "startX": 120,
+          "startY": 40,
+          "endX": -280,
+          "endY": -140
+        },
+        {
+          "startX": 260,
+          "startY": 160,
+          "endX": -140,
+          "endY": -20
+        }
+      ],
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2o-connection-node-to-relationship",
+      "viewId": "p2o-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "relationship",
+      "relationshipId": "p2o-relationship-node-to-relationship",
+      "sourceId": "p2o-node-process",
+      "targetId": "p2o-connection-assignment",
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2o-connection-plain-chain",
+      "viewId": "p2o-view-manual",
+      "name": "Plain recursive child",
+      "documentation": "Phase 2 recursive plain dependency",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:plain-chain"
+        }
+      ],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "plain",
+      "sourceId": "p2o-connection-plain-note",
+      "targetId": "p2o-node-role",
+      "connectionType": 128,
+      "sourceConnectionIds": [],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    },
+    {
+      "id": "p2o-connection-plain-note",
+      "viewId": "p2o-view-manual",
+      "name": "online Plain Note Connection",
+      "documentation": "Phase 2 named documented plain connection",
+      "properties": [
+        {
+          "key": "probe",
+          "value": "online:plain-connection"
+        },
+        {
+          "key": "ordered",
+          "value": "first"
+        }
+      ],
+      "nameVisible": true,
+      "bendpoints": [
+        {
+          "startX": -10,
+          "startY": 15,
+          "endX": 20,
+          "endY": -25
+        }
+      ],
+      "connType": "plain",
+      "sourceId": "p2o-node-note",
+      "targetId": "p2o-connection-assignment",
+      "connectionType": 82,
+      "lineStyle": 3,
+      "lineWidth": 2,
+      "lineColor": "#445566",
+      "fontColor": "#112233",
+      "labelExpression": "${name} ${property:probe}",
+      "textPosition": 2,
+      "sourceConnectionIds": [
+        "p2o-connection-plain-chain"
+      ],
+      "targetConnectionIds": [],
+      "fontAlpha": 255
+    },
+    {
+      "id": "p2o-connection-relationship-to-node",
+      "viewId": "p2o-view-manual",
+      "name": "",
+      "documentation": "",
+      "properties": [],
+      "nameVisible": true,
+      "bendpoints": [],
+      "connType": "relationship",
+      "relationshipId": "p2o-relationship-relationship-to-node",
+      "sourceId": "p2o-connection-assignment",
+      "targetId": "p2o-node-process",
+      "sourceConnectionIds": [
+        "p2o-connection-chain"
+      ],
+      "targetConnectionIds": [],
+      "lineWidth": 1,
+      "fontAlpha": 255,
+      "textPosition": 1
+    }
+  ],
+  "assets": []
+}

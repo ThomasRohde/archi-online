@@ -12,18 +12,31 @@ models are plain XML; image-bearing models are Desktop-compatible ZIP archives
 with `model.xml` and referenced `images/*` entries. A model saved in Archi
 Online opens in Desktop Archi and vice versa — element ids, folders, view
 layouts, specializations, images, label expressions, complete Phase 1
-appearance, Dublin Core metadata, and key-value properties are preserved.
+appearance, Dublin Core metadata, key-value properties, recursive connection
+endpoints, router modes and dormant bendpoints, note connections, and native
+legend configuration are preserved.
 
 Round-trip fidelity is verified against Archi's official *Archisurance* model
-and reciprocal Phase 1 fixtures. `npm run verify:phase1:desktop` asks the
-installed Archi 5.9 command-line application to load and save the Online
-fixture, then compares normalized source semantics and archive asset hashes.
+plus reciprocal Phase 1 and Phase 2 fixtures. The Phase 2 pair consists of an
+Online-authored source contract and a separately hand-authored Desktop-native
+source, semantic contract, and frozen Desktop 5.9 load/save golden.
+`npm run verify:phase2` checks both contracts on every platform.
+`npm run verify:phase2:desktop` requires exact Desktop Archi
+`5.9.0.202604140726`, rebuilds the frozen Desktop golden from its hand-authored
+source in a temporary path, requires exact Desktop output bytes and independent
+source semantics, round-trips both fixtures, and proves committed evidence did
+not change.
 
 Two details worth knowing:
 
 - **Bendpoints** are stored in Archi's relative offset format
   (`startX`/`startY`/`endX`/`endY`), exactly as desktop Archi writes them, so
   manually routed connections survive the round trip.
+- **Connection endpoints** retain node-to-connection, connection-to-node, and
+  recursive connection chains. Endpoint cycles and missing targets are rejected
+  atomically instead of being repaired silently.
+- **Routers** use Desktop's native manual (`0`) and Manhattan (`2`) values.
+  Switching to Manhattan does not delete stored manual bendpoints.
 - **Images** retain their original PNG, JPEG, GIF, TIFF, BMP, or ICO bytes.
   Browser-incompatible sources use a derived PNG only for rendering. Assets are
   deduplicated and are included in autosave, sharing, viewer, and export flows.
@@ -63,6 +76,13 @@ and atomic failure. See [[Import & Export|Import-and-Export]] for the workflows.
   supports forward/reverse choices, semantic relationship reuse, atomic target
   creation on canvas or in Groups, desktop menu polarity, and sticky palette
   tools.
+- **Automatic Relationship Management** uses Desktop-compatible normal,
+  reverse, and hidden-while-nested relationship masks. The preferences are
+  browser-local; the relationships, containment, and occurrences they create
+  are ordinary native model data.
+- **Set Concept Type**, relationship inversion, advanced tree search,
+  previewed find/replace, and global property-key operations use one reviewed,
+  undoable transaction and stay isolated to the captured model session.
 - **Default sizes and fill colors** for new elements follow Archi's defaults.
 - Native Archi 5.8/5.9 **legends** round-trip as Note figures with the exact
   `legend` feature encoding. Their contents are derived live from recursively
@@ -99,6 +119,11 @@ Element figures are ported from Archi's Java source rather than redrawn:
   evaluation, and visible diagnostics without preventing a view from loading.
 
 ## Known limitations
+
+- A deeply nested create-target menu can overlap an earlier menu column near
+  the right edge of a narrow browser viewport. Keyboard arrows and `Enter`
+  remain fully supported, and placing the target farther left avoids the
+  overlap. This does not affect the created model data.
 
 - **Sketch and Canvas views** (desktop Archi extras outside the ArchiMate
   standard) are not supported. They are skipped when a file is opened —

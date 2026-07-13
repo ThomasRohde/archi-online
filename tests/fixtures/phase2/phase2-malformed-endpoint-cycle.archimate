@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="Online Phase 2 Daily Modeling Parity" id="p2o-model" version="5.0.0">
+  <folder name="Strategy" id="p2o-folder-strategy" type="strategy"/>
+  <folder name="Business" id="p2o-folder-business" type="business">
+    <folder name="Nested Modeling Probes" id="p2o-folder-business-nested">
+      <element xsi:type="archimate:BusinessActor" name="online Phase 2 Actor" id="p2o-element-actor">
+        <documentation>Search replace actor documentation</documentation>
+        <property key="probe" value="online:element"/>
+        <property key="duplicate" value="one"/>
+      </element>
+      <element xsi:type="archimate:BusinessRole" name="online Phase 2 Role" id="p2o-element-role">
+        <documentation>Magic Connector reuse target</documentation>
+        <property key="probe" value="online:role"/>
+        <property key="duplicate" value="two"/>
+      </element>
+      <element xsi:type="archimate:BusinessProcess" name="online Phase 2 Process" id="p2o-element-process">
+        <documentation>Nested ARM child and transform probe</documentation>
+        <property key="probe" value="online:process"/>
+      </element>
+      <documentation>Searchable nested folder</documentation>
+      <property key="probe" value="online:nested-folder"/>
+    </folder>
+    <documentation>Phase 2 folder documentation probe</documentation>
+    <property key="probe" value="online:folder"/>
+    <property value="blank-key"/>
+  </folder>
+  <folder name="Application" id="p2o-folder-application" type="application"/>
+  <folder name="Technology &amp; Physical" id="p2o-folder-technology" type="technology"/>
+  <folder name="Motivation" id="p2o-folder-motivation" type="motivation"/>
+  <folder name="Implementation &amp; Migration" id="p2o-folder-implementation_migration" type="implementation_migration"/>
+  <folder name="Other" id="p2o-folder-other" type="other"/>
+  <folder name="Relations" id="p2o-folder-relations" type="relations">
+    <element xsi:type="archimate:AssignmentRelationship" name="Assignment" id="p2o-relationship-assignment" source="p2o-element-actor" target="p2o-element-role">
+      <documentation>Phase 2 Assignment documentation</documentation>
+      <property key="probe" value="online:relationship:assignment"/>
+    </element>
+    <element xsi:type="archimate:AssociationRelationship" name="Node to relationship" id="p2o-relationship-node-to-relationship" source="p2o-element-process" target="p2o-relationship-assignment">
+      <documentation>Phase 2 Node to relationship documentation</documentation>
+      <property key="probe" value="online:relationship:node-to-relationship"/>
+    </element>
+    <element xsi:type="archimate:AssociationRelationship" name="Relationship to node" id="p2o-relationship-relationship-to-node" source="p2o-relationship-assignment" target="p2o-element-process">
+      <documentation>Phase 2 Relationship to node documentation</documentation>
+      <property key="probe" value="online:relationship:relationship-to-node"/>
+    </element>
+    <element xsi:type="archimate:AssociationRelationship" name="Recursive chain" id="p2o-relationship-chain" source="p2o-relationship-relationship-to-node" target="p2o-element-actor">
+      <documentation>Phase 2 Recursive chain documentation</documentation>
+      <property key="probe" value="online:relationship:chain"/>
+    </element>
+  </folder>
+  <folder name="Views" id="p2o-folder-diagrams" type="diagrams">
+    <element xsi:type="archimate:ArchimateDiagramModel" name="online Phase 2 Manual" id="p2o-view-manual" connectionRouterType="0" viewpoint="business_process_cooperation">
+      <child xsi:type="archimate:Group" id="p2o-node-group" name="online Probe Group" borderType="1">
+        <bounds x="20" y="20" width="520" height="240"/>
+        <child xsi:type="archimate:DiagramObject" id="p2o-node-actor" targetConnections="p2o-connection-chain" archimateElement="p2o-element-actor">
+          <bounds x="25" y="50" width="150" height="70"/>
+          <sourceConnection xsi:type="archimate:Connection" id="p2o-connection-assignment" targetConnections="p2o-connection-node-to-relationship p2o-connection-plain-note" source="p2o-connection-chain" target="p2o-node-role" archimateRelationship="p2o-relationship-assignment">
+            <sourceConnection xsi:type="archimate:Connection" id="p2o-connection-relationship-to-node" source="p2o-connection-assignment" target="p2o-node-process" archimateRelationship="p2o-relationship-relationship-to-node">
+              <sourceConnection xsi:type="archimate:Connection" id="p2o-connection-chain" source="p2o-connection-relationship-to-node" target="p2o-node-actor" archimateRelationship="p2o-relationship-chain"/>
+            </sourceConnection>
+            <bendpoint startX="30" startY="20" endX="-20" endY="-15"/>
+          </sourceConnection>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="p2o-node-process" targetConnections="p2o-connection-relationship-to-node" archimateElement="p2o-element-process">
+          <bounds x="300" y="50" width="150" height="70"/>
+          <sourceConnection xsi:type="archimate:Connection" id="p2o-connection-node-to-relationship" source="p2o-node-process" target="p2o-connection-assignment" archimateRelationship="p2o-relationship-node-to-relationship"/>
+        </child>
+        <documentation>Search replace group documentation</documentation>
+        <property key="probe" value="online:group"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="p2o-node-role" targetConnections="p2o-connection-assignment p2o-connection-plain-chain" archimateElement="p2o-element-role">
+        <bounds x="650" y="75" width="150" height="70"/>
+      </child>
+      <child xsi:type="archimate:Note" id="p2o-node-note" name="Phase 2 Note">
+        <bounds x="650" y="210" width="190" height="90"/>
+        <sourceConnection id="p2o-connection-plain-note" name="online Plain Note Connection" fontColor="#112233" lineColor="#445566" lineWidth="2" textPosition="2" source="p2o-node-note" target="p2o-connection-assignment" type="82">
+          <sourceConnection id="p2o-connection-plain-chain" name="Plain recursive child" source="p2o-connection-plain-note" target="p2o-node-role" type="128">
+            <documentation>Phase 2 recursive plain dependency</documentation>
+            <property key="probe" value="online:plain-chain"/>
+          </sourceConnection>
+          <feature name="labelExpression" value="${name} ${property:probe}"/>
+          <feature name="lineStyle" value="3"/>
+          <bendpoint startX="-10" startY="15" endX="20" endY="-25"/>
+          <documentation>Phase 2 named documented plain connection</documentation>
+          <property key="probe" value="online:plain-connection"/>
+          <property key="ordered" value="first"/>
+        </sourceConnection>
+        <content>online searchable note</content>
+        <property key="probe" value="online:note"/>
+      </child>
+      <child xsi:type="archimate:Note" id="p2o-node-legend" name="Legend">
+        <bounds x="875" y="20" width="240" height="300"/>
+        <feature name="legend" value="display=11,rows=4,offset=12,color=2,sort=0"/>
+        <property key="probe" value="online:legend"/>
+      </child>
+      <documentation>Manual router, topology, annotation, legend, and productivity probes</documentation>
+      <property key="probe" value="online:view:manual"/>
+    </element>
+    <element xsi:type="archimate:ArchimateDiagramModel" name="online Phase 2 Manhattan" id="p2o-view-manhattan" connectionRouterType="2">
+      <child xsi:type="archimate:DiagramObject" id="p2o-node-manhattan-actor" archimateElement="p2o-element-actor">
+        <bounds x="80" y="100" width="150" height="70"/>
+        <sourceConnection xsi:type="archimate:Connection" id="p2o-connection-manhattan" source="p2o-node-manhattan-actor" target="p2o-node-manhattan-role" archimateRelationship="p2o-relationship-assignment">
+          <bendpoint startX="120" startY="40" endX="-280" endY="-140"/>
+          <bendpoint startX="260" startY="160" endX="-140" endY="-20"/>
+        </sourceConnection>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="p2o-node-manhattan-role" targetConnections="p2o-connection-manhattan" archimateElement="p2o-element-role">
+        <bounds x="520" y="280" width="150" height="70"/>
+      </child>
+      <documentation>Manhattan routing with preserved dormant manual bendpoints</documentation>
+      <property key="probe" value="online:view:manhattan"/>
+    </element>
+  </folder>
+  <purpose>Phase 2 model purpose and search replace probe</purpose>
+  <property key="probe" value="online:model"/>
+  <property key="rename-me" value="manager-preview"/>
+  <feature name="exchangeLanguage" value="en"/>
+</archimate:model>

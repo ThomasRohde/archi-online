@@ -4,6 +4,26 @@ Archi Online reads and writes the same interchange formats as desktop Archi,
 and can render any view to an image. Everything is client-side — no files
 leave the browser except the ones you deliberately save.
 
+## Native `.archimate` documents
+
+Use native `.archimate` files when Desktop fidelity matters. Asset-free models
+are XML; image-bearing models are compatible ZIP documents. Native I/O retains
+the complete normalized model, including nested folders and property order,
+recursive node/connection endpoints, manual and Manhattan router state,
+dormant bendpoints, named property-bearing note connections, and configured
+live legends. Missing endpoints and endpoint cycles are rejected atomically.
+
+The reciprocal certification commands are:
+
+```text
+npm run verify:phase2
+npm run verify:phase2:desktop
+```
+
+The first command is cross-platform and runs in CI. The second requires the
+exact pinned Desktop Archi 5.9 installation, uses temporary round-trip paths,
+and never rewrites the committed goldens.
+
 ## View images
 
 Open the **Import/Export ▾** menu on the toolbar (or use it while a view is
@@ -53,6 +73,12 @@ absolute diagram coordinates, styles, bendpoints, access/influence/association
 attributes, ISO-639 language, Dublin Core metadata, and Archi 5.9
 specialization definitions and assignments. Import returns structured warnings
 and errors and never applies a partial model.
+
+Open Exchange and CSV cover their standards' applicable scope; they are not a
+substitute for the native file when a workflow depends on recursive
+connection endpoints, native note connections, live legends, or dormant
+manual routes. Automatic-relationship and legend-label preferences are
+browser-local settings and therefore are never exported as model data.
 
 ## CSV
 

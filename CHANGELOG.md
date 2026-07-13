@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-07-13
+
+### Added
+
+- Desktop-compatible Automatic Relationship Management for palette creation,
+  model-tree drops, and canvas nesting, including normal/reverse candidates,
+  hidden nested occurrences, reveal-on-unnest, and browser-local preferences
+- Full Magic Connector workflows for forward/reverse relationships, semantic
+  reuse, new target creation, direct naming, and sticky palette tools
+- Recursive connection endpoints, safe reconnection, manual and Manhattan
+  routers with dormant bendpoint preservation, and routed-point scripting APIs
+- Transactional Set Concept Type and Invert Connection Direction commands
+  across the tree, canvas, scripting, and extensions
+- Native property-bearing note connections and configurable, auto-updating
+  Desktop 5.9 legends
+- Advanced model-tree search, reviewed model/view find-and-replace, and the
+  model-wide Properties Manager with previewed exact-key rename/delete
+- Reciprocal Online-authored and independently hand-authored Desktop-native
+  Phase 2 fixtures, malformed endpoint/cycle probes, cross-platform semantic
+  verification, and an exact-version Desktop CLI gate
+
+### Changed
+
+- Expanded the jArchi-compatible wrappers with connection reconnection,
+  rendered routes, per-view router selection, and property-ledger operations
+- Added Phase 2 fixture verification to the local and hosted CI gates
+
 ## [1.3.2] - 2026-07-12
 
 ### Changed

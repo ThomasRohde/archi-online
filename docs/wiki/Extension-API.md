@@ -264,6 +264,21 @@ var opened = app.views.open("view-id"); // opens the tab, returns JView | null
 Returned values are `JView` wrappers — see [[Scripting API|Scripting-API]]
 for `nodes()`, `connections()`, `layout()`, and the rest.
 
+## Daily modeling wrappers
+
+Extensions receive the same typed Phase 2 wrappers as Scripting-panel code.
+That includes `model.search()` and reviewed replacement, the model-wide
+property ledger and previewed exact-key mutations, `concept.setType()`,
+`relationship.invert()`, `view.routerType`, recursive connection endpoints,
+`connection.routedPoints()`, `connection.reconnect()`, native plain
+connections, and live legends. The exact signatures and failure rules are in
+the [[Scripting API|Scripting-API]].
+
+Perform mutations synchronously inside one registered command when they must
+share a single extension undo step. Do not mutate `app.model.current()` to
+reach endpoint or legend fields; use the wrappers so validation, session
+isolation, undo/redo, autosave, sharing, and read-only enforcement stay intact.
+
 ## Selection
 
 ```js

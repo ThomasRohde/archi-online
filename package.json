@@ -1,7 +1,7 @@
 {
   "name": "archi-online",
   "private": true,
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Web-based ArchiMate modeler inspired by Archi, scriptable with a jArchi-compatible JavaScript API",
   "license": "MIT",
   "type": "module",
@@ -26,8 +26,11 @@
     "fixtures:phase1": "node tools/generate-phase1-fixtures.mjs",
     "verify:phase1": "node tools/verify-phase1-parity.mjs --skip-desktop",
     "verify:phase1:desktop": "node tools/verify-phase1-parity.mjs",
+    "fixtures:phase2": "node tools/generate-phase2-fixtures.mjs",
+    "verify:phase2": "node tools/verify-phase2-parity.mjs",
+    "verify:phase2:desktop": "node tools/verify-phase2-desktop.mjs",
     "security:audit": "npm audit --omit=dev",
-    "ci:check": "node tools/sync-versions.mjs --check && npm run docs:check && npm run lint && npm run typecheck && npm test && npm run security:audit && npm run build"
+    "ci:check": "node tools/sync-versions.mjs --check && npm run docs:check && npm run lint && npm run typecheck && npm test && npm run verify:phase2 && npm run security:audit && npm run build"
   },
   "dependencies": {
     "dockview": "^7.0.2",

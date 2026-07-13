@@ -44,6 +44,7 @@ Extensions can contribute additional dockable panels; they appear in the
 | **Present** | Full-screen, chrome-free walkthrough of the model's views (arrow keys to step, `Esc` to exit). |
 | **Undo** / **Redo** | Step through model transactions; the tooltip names the operation. |
 | **Find and replace** | Preview and selectively replace text in the captured model or its active view. |
+| **Properties manager** | Inspect exact property-key usage and preview a model-wide rename or delete. |
 | *status area* | Model name, file name (or *unsaved*), and a `•` dirty marker. |
 | *extension buttons* | Toolbar buttons contributed by extensions. |
 | **Extensions ▾** | Extension menu items, plus registered extension commands that don't already appear in an extension menu. |
@@ -156,6 +157,9 @@ From top to bottom:
   element, relationship, and specialization that occurs in the view and
   updates automatically as the view changes. This is separate from the C4
   command that inserts a textual C4 legend.
+- **Plain connection** — a native non-semantic connection for annotations. At
+  least one endpoint must be a Note; nodes and other connections can be the
+  other endpoint.
 - **Element types** — grouped by layer: Strategy, Business, Application,
   Technology, Physical, Motivation, Implementation & Migration, and Other
   (including Junction).
@@ -171,6 +175,10 @@ The created target is selected and ready to rename in place. Palette creation
 tools are one-shot by default; Shift-click or double-click a tool to keep it
 selected for repeated use. A later single click clears the lock, and `Escape`
 always returns to **Select / move**.
+
+Magic Connector menus support arrow-key navigation at every level. On a narrow
+viewport, place an empty-canvas target farther left or use arrows and `Enter`
+if a three-level relationship/category/type menu overlaps an earlier column.
 
 ![The magic connector offering only the relationships ArchiMate allows between two elements](https://raw.githubusercontent.com/ThomasRohde/archi-online/main/docs/public/screenshots/palette-validity.png)
 
@@ -194,8 +202,12 @@ The view editor is a custom SVG canvas. It supports:
 - **Move and resize** — drag objects or their resize handles. Grid snapping
   applies by default; hold `Alt` to bypass it for one drag. Arrow keys nudge
   the selection by 1 px, `Shift`+arrows by one grid step.
-- **Nesting** — drop an element inside a group or another element to nest it;
-  child bounds stay relative to the parent.
+- **Nesting and automatic relationships** — drop an element inside a group or
+  another element to nest it; child bounds stay relative to the parent. When
+  Automatic Relationships are enabled, an element container offers the valid
+  normal/reverse semantic relationships configured in Settings. Accepting one
+  creates the relationship and nesting in one undo step, hides configured
+  relationship occurrences while nested, and reveals them when un-nested.
 - **Copy / paste** — `Ctrl+C` / `Ctrl+V`, or the diagram context menus. Pasting
   a copied tree element creates a visual element; pasting a copied tree view
   creates a view-reference object. Pasting diagram objects into another model
@@ -225,8 +237,14 @@ The view editor is a custom SVG canvas. It supports:
   including its route and source/target label position.
 - **Notes, groups, view references** — notes and groups come from the
   palette; view references are created by dragging a view from the tree.
-- **Bendpoints** — drag anywhere on a connection to add a manual bendpoint;
-  double-click a bendpoint to remove it.
+- **Connection endpoints** — semantic and plain connections can terminate on
+  nodes or other connections. Select a connection and drag its source/target
+  handle to reconnect it; invalid, cross-view, or cyclic results are rejected.
+- **Routers and bendpoints** — choose **Manual** or **Manhattan** on the view's
+  Properties. Manual mode renders and edits bendpoints; Manhattan mode derives
+  an orthogonal route while preserving dormant manual bendpoints for a later
+  switch back. Drag a manual connection to add a bendpoint and double-click a
+  bendpoint to remove it.
 - **Zoom** — `Ctrl+wheel`, `Ctrl+=` / `Ctrl+-`, `Ctrl+0` for 100%, `Home` to
   fit the diagram to the window. Zoom is per view.
 - **Pan / scroll** — middle-drag or `Space`+drag to pan; wheel and
@@ -311,6 +329,15 @@ All of these are model data: edits create normal undo steps and mark the
 model dirty. Selecting multiple objects shows the selection count; appearance
 edits apply to the whole selection where they make sense.
 
+The toolbar **Properties manager** is the model-wide companion to the
+per-object tab. It lists exact keys, occurrence/owner counts, values, owner
+types, and stable model/view locations, including blank and duplicate keys.
+Rename and delete are staged operations: review the affected occurrences,
+acknowledge a collision before renaming to an existing key, then apply one
+operation as one undo step. Renaming changes keys in place, so property values,
+duplicates, and relative order are preserved. Read-only sessions can inspect
+and navigate the ledger but cannot apply changes.
+
 For a single selected element or relationship an **Analysis** tab appears —
 the same read-only queries as desktop Archi's Analysis tab:
 
@@ -357,6 +384,8 @@ style. Each row has a reset button, and **Reset all** restores the defaults.
 | Section | Settings (defaults) |
 | --- | --- |
 | General | Add a note to a Relation's documentation field when changing type (off). When enabled, an automatically converted Association is prefixed with `(Changed from <type>)`. |
+| Model tree search | Name (on); Documentation, Property Value, Views, Show All Folders, Match Case, and Regular Expression (off). Query text and selected keys/types are intentionally not persisted. |
+| Automatic relationships | Use nested connections and prompt for palette creation, tree drop, and canvas movement (on); normal relationship candidates use Desktop defaults; reverse candidates default off; every relationship type is hidden while represented by nesting. |
 | Legends | New legends use 15 rows per column, Core colours, and Category sort. Custom labels and User colours are browser-local and never enter `.archimate` files. |
 | Canvas snapping | Snap to grid (on); grid size (12 px) — also the `Shift`+arrow nudge step. |
 | New object defaults | Text align (center) and text position (center) for new objects; default sizes for elements (120×55), junctions (15), notes (185×80), groups (400×140), and view references (200×140). |

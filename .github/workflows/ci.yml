@@ -39,6 +39,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Verify Phase 2 native-file semantics
+        run: npm run verify:phase2
+
       - name: Audit dependencies
         run: npm run security:audit
 
