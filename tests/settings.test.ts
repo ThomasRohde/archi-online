@@ -44,6 +44,50 @@ describe('app settings', () => {
     });
   });
 
+  it('persists only the seven Desktop model-tree search booleans with exact defaults', async () => {
+    expect({
+      name: DEFAULT_SETTINGS.treeSearchName,
+      documentation: DEFAULT_SETTINGS.treeSearchDocumentation,
+      propertyValue: DEFAULT_SETTINGS.treeSearchPropertyValue,
+      views: DEFAULT_SETTINGS.treeSearchViews,
+      showAllFolders: DEFAULT_SETTINGS.treeSearchShowAllFolders,
+      matchCase: DEFAULT_SETTINGS.treeSearchMatchCase,
+      regex: DEFAULT_SETTINGS.treeSearchRegex,
+    }).toEqual({
+      name: true,
+      documentation: false,
+      propertyValue: false,
+      views: false,
+      showAllFolders: false,
+      matchCase: false,
+      regex: false,
+    });
+
+    const loaded = await loadSettings(memoryKeyValueStore([[
+      SETTINGS_STORAGE_KEY,
+      {
+        treeSearchName: false,
+        treeSearchDocumentation: true,
+        treeSearchPropertyValue: true,
+        treeSearchViews: true,
+        treeSearchShowAllFolders: true,
+        treeSearchMatchCase: true,
+        treeSearchRegex: true,
+        treeSearchQuery: 'must not persist',
+        treeSearchTypes: ['BusinessActor'],
+        treeSearchPropertyKeys: ['Owner'],
+        treeSearchProfiles: ['profile-id'],
+      },
+    ]]));
+
+    expect(loaded.treeSearchName).toBe(false);
+    expect(loaded.treeSearchRegex).toBe(true);
+    expect('treeSearchQuery' in loaded).toBe(false);
+    expect('treeSearchTypes' in loaded).toBe(false);
+    expect('treeSearchPropertyKeys' in loaded).toBe(false);
+    expect('treeSearchProfiles' in loaded).toBe(false);
+  });
+
   it('loads valid persisted settings', async () => {
     const saved = {
       ...DEFAULT_SETTINGS,

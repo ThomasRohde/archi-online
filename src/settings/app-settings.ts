@@ -21,6 +21,13 @@ export const SETTINGS_STORAGE_KEY = 'archi-online.settings.v1';
 
 export interface AppSettings {
   addDocumentationNoteOnRelationChange: boolean;
+  treeSearchName: boolean;
+  treeSearchDocumentation: boolean;
+  treeSearchPropertyValue: boolean;
+  treeSearchViews: boolean;
+  treeSearchShowAllFolders: boolean;
+  treeSearchMatchCase: boolean;
+  treeSearchRegex: boolean;
   snapToGrid: boolean;
   gridSize: number;
   defaultTextAlignment: TextAlignment;
@@ -109,6 +116,13 @@ export interface SettingSection {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   addDocumentationNoteOnRelationChange: false,
+  treeSearchName: true,
+  treeSearchDocumentation: false,
+  treeSearchPropertyValue: false,
+  treeSearchViews: false,
+  treeSearchShowAllFolders: false,
+  treeSearchMatchCase: false,
+  treeSearchRegex: false,
   snapToGrid: true,
   gridSize: 12,
   defaultTextAlignment: 2,
@@ -160,6 +174,55 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
         label: "Add a note to a Relation's documentation field when changing type",
         description:
           "If a connected relation type is changed as a result of changing an Element's type, a note will be added to the Relation's documentation field.",
+      },
+    ],
+  },
+  {
+    id: 'model-tree-search',
+    title: 'Model tree search',
+    description: 'Desktop-compatible defaults retained between browser sessions.',
+    rows: [
+      {
+        key: 'treeSearchName',
+        kind: 'boolean',
+        label: 'Name',
+        description: 'Search raw stored model-tree names.',
+      },
+      {
+        key: 'treeSearchDocumentation',
+        kind: 'boolean',
+        label: 'Documentation',
+        description: 'Search model-tree documentation fields.',
+      },
+      {
+        key: 'treeSearchPropertyValue',
+        kind: 'boolean',
+        label: 'Property Value',
+        description: 'Search property values, constrained by selected keys when present.',
+      },
+      {
+        key: 'treeSearchViews',
+        kind: 'boolean',
+        label: 'Views',
+        description: 'Include views in the type and specialization filter group.',
+      },
+      {
+        key: 'treeSearchShowAllFolders',
+        kind: 'boolean',
+        label: 'Show All Folders',
+        description: 'Keep every folder visible while search filtering is active.',
+      },
+      {
+        key: 'treeSearchMatchCase',
+        kind: 'boolean',
+        label: 'Match Case',
+        description: 'Use case-sensitive text matching.',
+      },
+      {
+        key: 'treeSearchRegex',
+        kind: 'boolean',
+        label: 'Regular Expression',
+        description: 'Interpret the query as a Unicode regular expression.',
       },
     ],
   },

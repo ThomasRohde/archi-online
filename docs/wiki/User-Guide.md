@@ -55,11 +55,18 @@ The **Models** panel shows every open model as a collapsible root. Clicking a
 root or item, or focusing one of its view tabs, makes that model active. An
 asterisk after a root name means that model has unsaved changes.
 
-- **Search / filter** — the box at the top of the panel filters the tree by
-  name as you type; the dropdown narrows to a category (elements,
-  relationships, views, folders) or a specific concept type. Matches are
-  shown with their ancestor folders. `Ctrl+F` focuses the box (from inside
-  the tree); `Esc` clears it.
+- **Search / filter** — the box at the top applies one search across every open
+  model. **Search options** can combine multiple exact concept types,
+  cross-model specializations, and Views with raw Name, Documentation, selected
+  property keys, or Property Value text. The type/specialization/View choices
+  form one OR group; the text/property choices form another, and both groups
+  must match when active. Options also include **Show All Folders**, **Match
+  Case**, Unicode **Regular Expression** matching, **Reset**, and **Refresh**.
+  Invalid expressions are reported without changing the model. Only the seven
+  boolean options persist in browser settings; query text and selected
+  keys/types/specializations do not. `Ctrl+F` focuses the box; `Esc` clears its
+  text. Clearing all active criteria restores the previous expansion and
+  selection state.
 - **Open a view** — double-click it, or right-click → **Open View**.
 - **Create content** — right-click a folder: **New Element** offers the
   element types belonging to that folder's layer, **New ArchiMate View**
@@ -381,7 +388,7 @@ Open this table anytime with the **?** toolbar button.
 | `Escape` | Cancel tool / clear selection |
 | `Ctrl+Enter` (script editor) | Run script |
 | Double-click bendpoint | Remove bendpoint |
-| `Ctrl+F` (model tree) | Focus the model-tree filter |
+| `Ctrl+F` (model tree) | Focus the all-model tree search |
 | `←` / `→`, `PgUp` / `PgDn`, `Space` (presentation) | Previous / next view |
 | `Home` / `End` (presentation) | First / last view |
 

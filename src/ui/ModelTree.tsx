@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -13,7 +14,6 @@ import { C4_VIEW_TYPE_LABELS, C4_VIEW_TYPES } from '../model/c4';
 import {
   ELEMENT_TYPES,
   ELEMENT_TYPE_MAP,
-  RELATIONSHIP_TYPES,
   type ElementType,
   type Layer,
 } from '../model/metamodel';
@@ -44,7 +44,17 @@ import {
   type MenuItem,
 } from './ContextMenu';
 import { onRevealRequest } from './tree-bus';
-import { computeVisibleTreeItems, treeItemLabel, type TreeTypeFilter } from './tree-filter';
+import {
+  DEFAULT_TREE_SEARCH_CRITERIA,
+  collectTreeSearchCatalog,
+  compileTreeSearch,
+  resetTreeSearchCriteria,
+  searchModelTree,
+  treeItemLabel,
+  treeSearchCatalogSignature,
+  type TreeSearchCriteria,
+  type TreeSearchResult,
+} from './tree-filter';
 import {
   closeModelSession,
   closeModelSessions,
@@ -52,6 +62,7 @@ import {
 } from './model-session-actions';
 import { useSettingsStore } from '../settings/app-settings';
 import { conceptTransformationMenuItems } from './concept-transform-menu';
+import { TreeSearchBar } from './TreeSearchBar';
 
 const FOLDER_LAYERS: Record<string, Layer[]> = {
   strategy: ['strategy'],
@@ -188,19 +199,183 @@ export function ModelTree() {
   const order = useWorkspaceStore((s) => s.order);
   const sessions = useWorkspaceStore((s) => s.sessions);
   const activeSessionId = useWorkspaceStore((s) => s.activeSessionId);
+  const modelRevision = useWorkspaceStore((s) => s.modelRevision);
+  const settings = useSettingsStore((s) => s.settings);
+  const setSetting = useSettingsStore((s) => s.setSetting);
+  const treeContainerRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [legacyRenamingId, setLegacyRenamingId] = useState<string | null>(null);
-  const [filterText, setFilterText] = useState('');
-  const [filterType, setFilterType] = useState<TreeTypeFilter>('all');
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [criteria, setCriteria] = useState<TreeSearchCriteria>(() => ({
+    ...DEFAULT_TREE_SEARCH_CRITERIA,
+    searchName: settings.treeSearchName,
+    searchDocumentation: settings.treeSearchDocumentation,
+    searchPropertyValues: settings.treeSearchPropertyValue,
+    includeViews: settings.treeSearchViews,
+    showAllFolders: settings.treeSearchShowAllFolders,
+    matchCase: settings.treeSearchMatchCase,
+    useRegex: settings.treeSearchRegex,
+  }));
+  const searchableModels = useMemo(() => {
+    void modelRevision;
+    return order.length > 0
+      ? order.flatMap((sessionId) => {
+          const sessionModel = sessions[sessionId]?.store.getState().model;
+          return sessionModel ? [sessionModel] : [];
+        })
+      : model ? [model] : [];
+  }, [model, modelRevision, order, sessions]);
+  const catalog = useMemo(() => collectTreeSearchCatalog(searchableModels), [searchableModels]);
+  const catalogSignature = treeSearchCatalogSignature(catalog);
+  const previousCatalogSignature = useRef<string | null>(null);
+  const compiled = useMemo(() => compileTreeSearch(criteria), [criteria]);
+  const results = useMemo(() => {
+    void modelRevision;
+    void refreshToken;
+    const next: Record<string, TreeSearchResult> = {};
+    if (order.length > 0) {
+      for (const sessionId of order) {
+        const sessionModel = sessions[sessionId]?.store.getState().model;
+        if (sessionModel) next[sessionId] = searchModelTree(sessionModel, compiled);
+      }
+    } else if (model) {
+      next.legacy = searchModelTree(model, compiled);
+    }
+    return next;
+  }, [compiled, model, modelRevision, order, refreshToken, sessions]);
+  const allFolderKeys = order.length > 0
+    ? order.flatMap((sessionId) =>
+        Object.keys(sessions[sessionId]?.store.getState().model?.folders ?? {}).map(
+          (folderId) => `${sessionId}:${folderId}`,
+        ))
+    : Object.keys(model?.folders ?? {}).map((id) => `legacy:${id}`);
+  const matchCount = Object.values(results).reduce((sum, result) => sum + result.matchedIds.size, 0);
+
+  useEffect(() => {
+    setCriteria((current) => ({
+      ...current,
+      searchName: settings.treeSearchName,
+      searchDocumentation: settings.treeSearchDocumentation,
+      searchPropertyValues: settings.treeSearchPropertyValue,
+      includeViews: settings.treeSearchViews,
+      showAllFolders: settings.treeSearchShowAllFolders,
+      matchCase: settings.treeSearchMatchCase,
+      useRegex: settings.treeSearchRegex,
+    }));
+  }, [
+    settings.treeSearchDocumentation,
+    settings.treeSearchMatchCase,
+    settings.treeSearchName,
+    settings.treeSearchPropertyValue,
+    settings.treeSearchRegex,
+    settings.treeSearchShowAllFolders,
+    settings.treeSearchViews,
+  ]);
+
+  useEffect(() => {
+    const previous = previousCatalogSignature.current;
+    previousCatalogSignature.current = catalogSignature;
+    if (previous !== null && previous !== catalogSignature) {
+      setCriteria((current) => ({ ...current, propertyKeys: [], specializations: [] }));
+    }
+  }, [catalogSignature]);
+
+  const setSearchPreference = (
+    key: 'searchName' | 'searchDocumentation' | 'searchPropertyValues' | 'includeViews'
+      | 'showAllFolders' | 'matchCase' | 'useRegex',
+    value: boolean,
+  ) => {
+    const settingKey = {
+      searchName: 'treeSearchName',
+      searchDocumentation: 'treeSearchDocumentation',
+      searchPropertyValues: 'treeSearchPropertyValue',
+      includeViews: 'treeSearchViews',
+      showAllFolders: 'treeSearchShowAllFolders',
+      matchCase: 'treeSearchMatchCase',
+      useRegex: 'treeSearchRegex',
+    } as const;
+    setCriteria((current) => ({ ...current, [key]: value }));
+    setSetting(settingKey[key], value);
+  };
+  const resetSearch = () => {
+    setCriteria((current) => resetTreeSearchCriteria(current));
+    setSetting('treeSearchName', true);
+    setSetting('treeSearchDocumentation', false);
+    setSetting('treeSearchPropertyValue', false);
+    setSetting('treeSearchViews', false);
+  };
+  const clearSearchForReveal = useCallback(() => {
+    setCriteria((current) => ({
+      ...current,
+      query: '',
+      propertyKeys: [],
+      conceptTypes: [],
+      specializations: [],
+      includeViews: false,
+    }));
+    setSetting('treeSearchViews', false);
+  }, [setSetting]);
+  useEffect(() => onRevealRequest((id) => {
+    const sessionId = order.length > 0 ? activeSessionId : 'legacy';
+    if (!sessionId) return;
+    const sessionModel = sessionId === 'legacy'
+      ? model
+      : sessions[sessionId]?.store.getState().model;
+    if (!sessionModel) return;
+    const item = sessionModel.elements[id]
+      ?? sessionModel.relationships[id]
+      ?? sessionModel.views[id];
+    if (!item && !sessionModel.folders[id]) return;
+
+    const result = results[sessionId];
+    if (result?.active && !result.visibleIds.has(id)) clearSearchForReveal();
+
+    const ancestors = new Set<string>();
+    let folderId: string | null | undefined = item
+      ? item.folderId
+      : sessionModel.folders[id]?.parentId;
+    while (folderId) {
+      ancestors.add(folderId);
+      folderId = sessionModel.folders[folderId]?.parentId;
+    }
+    const ancestorKeys = new Set([...ancestors].map((ancestorId) =>
+      `${sessionId}:${ancestorId}`));
+    ancestorKeys.add(`${sessionId}:${sessionModel.info.id}`);
+    setCollapsed((current) => new Set([...current].filter((key) => !ancestorKeys.has(key))));
+
+    const scroll = (attempt: number) => {
+      const container = treeContainerRef.current;
+      const owner = sessionId === 'legacy'
+        ? container
+        : [...(container?.querySelectorAll<HTMLElement>('[data-model-session-id]') ?? [])]
+            .find((candidate) => candidate.dataset.modelSessionId === sessionId);
+      const row = [...(owner?.querySelectorAll<HTMLElement>('[data-tree-id]') ?? [])]
+        .find((candidate) => candidate.dataset.treeId === id);
+      if (row) row.scrollIntoView?.({ block: 'center' });
+      else if (attempt < 3) requestAnimationFrame(() => scroll(attempt + 1));
+    };
+    requestAnimationFrame(() => scroll(0));
+  }), [activeSessionId, clearSearchForReveal, model, order, results, sessions]);
+  const searchBar = searchableModels.length > 0 ? (
+    <TreeSearchBar
+      criteria={criteria}
+      setCriteria={setCriteria}
+      compiled={compiled}
+      catalog={catalog}
+      matchCount={matchCount}
+      setPreference={setSearchPreference}
+      onReset={resetSearch}
+      onRefresh={() => setRefreshToken((value) => value + 1)}
+      filtering={compiled.active}
+      onExpandAll={() => setCollapsed(new Set())}
+      onCollapseAll={() => setCollapsed(new Set(allFolderKeys))}
+    />
+  ) : null;
 
   if (order.length > 0) {
-    const allFolderKeys = order.flatMap((sessionId) =>
-      Object.keys(sessions[sessionId]?.store.getState().model?.folders ?? {}).map(
-        (folderId) => `${sessionId}:${folderId}`,
-      ),
-    );
     return (
       <div
+        ref={treeContainerRef}
         className="model-tree workspace-model-tree"
         tabIndex={0}
         onKeyDownCapture={(event) => {
@@ -210,24 +385,24 @@ export function ModelTree() {
           }
         }}
       >
-        {order.map((sessionId, index) => {
+        {searchBar}
+        {order.map((sessionId) => {
           const session = sessions[sessionId];
-          return session ? (
+          const result = results[sessionId];
+          return session && result && (!result.active || result.visibleIds.has(
+            session.store.getState().model!.info.id,
+          )) ? (
             <ScopedModelTree
               key={sessionId}
               session={session}
               active={sessionId === activeSessionId}
               collapsed={collapsed}
               setCollapsed={setCollapsed}
-              filterText={filterText}
-              setFilterText={setFilterText}
-              filterType={filterType}
-              setFilterType={setFilterType}
-              showFilter={index === 0}
-              allFolderKeys={allFolderKeys}
+              searchResult={result}
             />
           ) : null;
         })}
+        {compiled.active && matchCount === 0 && <div className="tree-filter-empty">No matches.</div>}
       </div>
     );
   }
@@ -236,23 +411,23 @@ export function ModelTree() {
     return <div className="model-tree empty-hint">No model open.<br />Use File → New to create one.</div>;
   }
   return (
-    <ModelTreeInner
-      model={model}
-      collapsed={collapsed}
-      setCollapsed={setCollapsed}
-      renamingId={legacyRenamingId}
-      setRenamingId={setLegacyRenamingId}
-      filterText={filterText}
-      setFilterText={setFilterText}
-      filterType={filterType}
-      setFilterType={setFilterType}
-      collapsePrefix="legacy"
-      active
-      dirty={useStore.getState().dirty}
-      embedded={false}
-      showFilter
-      allFolderKeys={Object.keys(model.folders).map((id) => `legacy:${id}`)}
-    />
+    <div ref={treeContainerRef} className="model-tree" tabIndex={0}>
+      {searchBar}
+      {(!results.legacy.active || results.legacy.visibleIds.has(model.info.id)) && (
+        <ModelTreeInner
+          model={model}
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          renamingId={legacyRenamingId}
+          setRenamingId={setLegacyRenamingId}
+          searchResult={results.legacy}
+          collapsePrefix="legacy"
+          dirty={useStore.getState().dirty}
+          embedded={false}
+        />
+      )}
+      {compiled.active && matchCount === 0 && <div className="tree-filter-empty">No matches.</div>}
+    </div>
   );
 }
 
@@ -261,23 +436,13 @@ function ScopedModelTree({
   active,
   collapsed,
   setCollapsed,
-  filterText,
-  setFilterText,
-  filterType,
-  setFilterType,
-  showFilter,
-  allFolderKeys,
+  searchResult,
 }: {
   session: ModelSession;
   active: boolean;
   collapsed: Set<string>;
   setCollapsed: (value: Set<string>) => void;
-  filterText: string;
-  setFilterText: (value: string) => void;
-  filterType: TreeTypeFilter;
-  setFilterType: (value: TreeTypeFilter) => void;
-  showFilter: boolean;
-  allFolderKeys: string[];
+  searchResult: TreeSearchResult;
 }) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   return (
@@ -285,17 +450,11 @@ function ScopedModelTree({
       <ModelTreeActiveContext.Provider value={active}>
         <ScopedModelTreeContent
           sessionId={session.id}
-          active={active}
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           renamingId={renamingId}
           setRenamingId={setRenamingId}
-          filterText={filterText}
-          setFilterText={setFilterText}
-          filterType={filterType}
-          setFilterType={setFilterType}
-          showFilter={showFilter}
-          allFolderKeys={allFolderKeys}
+          searchResult={searchResult}
         />
       </ModelTreeActiveContext.Provider>
     </ModelStoreProvider>
@@ -304,30 +463,18 @@ function ScopedModelTree({
 
 function ScopedModelTreeContent({
   sessionId,
-  active,
   collapsed,
   setCollapsed,
   renamingId,
   setRenamingId,
-  filterText,
-  setFilterText,
-  filterType,
-  setFilterType,
-  showFilter,
-  allFolderKeys,
+  searchResult,
 }: {
   sessionId: string;
-  active: boolean;
   collapsed: Set<string>;
   setCollapsed: (value: Set<string>) => void;
   renamingId: string | null;
   setRenamingId: (value: string | null) => void;
-  filterText: string;
-  setFilterText: (value: string) => void;
-  filterType: TreeTypeFilter;
-  setFilterType: (value: TreeTypeFilter) => void;
-  showFilter: boolean;
-  allFolderKeys: string[];
+  searchResult: TreeSearchResult;
 }) {
   const model = useStore((state) => state.model);
   const dirty = useStore((state) => state.dirty);
@@ -339,16 +486,10 @@ function ScopedModelTreeContent({
       setCollapsed={setCollapsed}
       renamingId={renamingId}
       setRenamingId={setRenamingId}
-      filterText={filterText}
-      setFilterText={setFilterText}
-      filterType={filterType}
-      setFilterType={setFilterType}
+      searchResult={searchResult}
       collapsePrefix={sessionId}
-      active={active}
       dirty={dirty}
       embedded
-      showFilter={showFilter}
-      allFolderKeys={allFolderKeys}
     />
   );
 }
@@ -359,78 +500,30 @@ function ModelTreeInner({
   setCollapsed,
   renamingId,
   setRenamingId,
-  filterText,
-  setFilterText,
-  filterType,
-  setFilterType,
+  searchResult,
   collapsePrefix,
-  active,
   dirty,
   embedded,
-  showFilter,
-  allFolderKeys,
 }: {
   model: ModelState;
   collapsed: Set<string>;
   setCollapsed: (s: Set<string>) => void;
   renamingId: string | null;
   setRenamingId: (id: string | null) => void;
-  filterText: string;
-  setFilterText: (text: string) => void;
-  filterType: TreeTypeFilter;
-  setFilterType: (type: TreeTypeFilter) => void;
+  searchResult: TreeSearchResult;
   collapsePrefix: string;
-  active: boolean;
   dirty: boolean;
   embedded: boolean;
-  showFilter: boolean;
-  allFolderKeys: string[];
 }) {
   const modelStore = useModelStoreApi();
-  const filterInputRef = useRef<HTMLInputElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const readOnly = useStore((s) => s.readOnly);
   const settings = useSettingsStore((s) => s.settings);
-  const visible = useMemo(
-    () => computeVisibleTreeItems(model, filterText, filterType),
-    [model, filterText, filterType],
-  );
-  const filtering = visible !== null;
-  const clearFilter = () => {
-    setFilterText('');
-    setFilterType('all');
-  };
+  const visible = searchResult.visibleIds;
+  const filtering = searchResult.active;
 
-  // Reveal requests (e.g. clicking a Validator finding): expand the item's
-  // ancestor folders and scroll its row into view. Re-subscribed every render
-  // so the handler always sees current filter/collapse state.
-  useEffect(() =>
-    onRevealRequest((id) => {
-      if (!active) return;
-      const m = modelStore.getState().model;
-      if (!m) return;
-      const item = m.elements[id] ?? m.relationships[id] ?? m.views[id];
-      const ancestors = new Set<string>();
-      let f: string | null | undefined = item ? item.folderId : m.folders[id]?.parentId;
-      while (f) {
-        ancestors.add(f);
-        f = m.folders[f]?.parentId;
-      }
-      if (visible !== null && !visible.has(id)) clearFilter();
-      const ancestorKeys = new Set([...ancestors].map((id) => `${collapsePrefix}:${id}`));
-      if ([...ancestorKeys].some((key) => collapsed.has(key))) {
-        setCollapsed(new Set([...collapsed].filter((key) => !ancestorKeys.has(key))));
-      }
-      // The expanded row appears on a later render; retry a few frames.
-      const scroll = (attempt: number) => {
-        const row = treeRef.current?.querySelector(`[data-tree-id="${CSS.escape(id)}"]`);
-        if (row) row.scrollIntoView({ block: 'center' });
-        else if (attempt < 3) requestAnimationFrame(() => scroll(attempt + 1));
-      };
-      requestAnimationFrame(() => scroll(0));
-    }),
-  );
   const toggle = (id: string) => {
+    if (filtering) return;
     const key = `${collapsePrefix}:${id}`;
     const next = new Set(collapsed);
     if (next.has(key)) next.delete(key);
@@ -742,7 +835,7 @@ function ModelTreeInner({
   return (
     <div
       ref={treeRef}
-      className={embedded ? 'model-tree-session' : 'model-tree'}
+      className={embedded ? 'model-tree-session' : 'model-tree-session legacy-model-tree-session'}
       data-model-session-id={embedded ? collapsePrefix : undefined}
       tabIndex={0}
       onPointerDownCapture={() => {
@@ -757,7 +850,10 @@ function ModelTreeInner({
       onKeyDown={(e) => {
         if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
           e.preventDefault();
-          filterInputRef.current?.focus();
+          treeRef.current
+            ?.closest('.model-tree, .workspace-model-tree')
+            ?.querySelector<HTMLInputElement>('.tree-filter-input')
+            ?.focus();
           return;
         }
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
@@ -782,84 +878,6 @@ function ModelTreeInner({
         }
       }}
     >
-      {showFilter && <div className="tree-filter">
-        <input
-          ref={filterInputRef}
-          className="tree-filter-input"
-          type="search"
-          placeholder="Filter (Ctrl+F)"
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              e.stopPropagation();
-              clearFilter();
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-        />
-        <select
-          className="tree-filter-type"
-          title="Filter by type"
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value as TreeTypeFilter)}
-        >
-          <option value="all">All</option>
-          <option value="elements">Elements</option>
-          <option value="relationships">Relationships</option>
-          <option value="views">Views</option>
-          <option value="folders">Folders</option>
-          <optgroup label="Element types">
-            {ELEMENT_TYPES.map((d) => (
-              <option key={d.type} value={d.type}>
-                {d.label}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="Relationship types">
-            {RELATIONSHIP_TYPES.map((d) => (
-              <option key={d.type} value={d.type}>
-                {d.label}
-              </option>
-            ))}
-          </optgroup>
-        </select>
-        <button
-          className="tree-filter-btn"
-          title={filtering ? 'Expand All (unavailable while filtering)' : 'Expand All'}
-          disabled={filtering}
-          onClick={() => setCollapsed(new Set())}
-        >
-          <svg viewBox="0 0 16 16" width="12" height="12">
-            <path
-              d="M4 3.5 L8 7.5 L12 3.5 M4 8.5 L8 12.5 L12 8.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.3"
-            />
-          </svg>
-        </button>
-        <button
-          className="tree-filter-btn"
-          title={filtering ? 'Collapse All (unavailable while filtering)' : 'Collapse All'}
-          disabled={filtering}
-          onClick={() => setCollapsed(new Set(allFolderKeys))}
-        >
-          <svg viewBox="0 0 16 16" width="12" height="12">
-            <path
-              d="M4 7.5 L8 3.5 L12 7.5 M4 12.5 L8 8.5 L12 12.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.3"
-            />
-          </svg>
-        </button>
-        {(filterText !== '' || filterType !== 'all') && (
-          <button className="tree-filter-clear" title="Clear filter" onClick={clearFilter}>
-            ✕
-          </button>
-        )}
-      </div>}
       <div onDoubleClick={() => toggle(model.info.id)}>
         <TreeRow
           id={model.info.id}
@@ -872,9 +890,6 @@ function ModelTreeInner({
         />
       </div>
       {!rootCollapsed && model.rootFolderIds.map((fid) => renderFolder(fid, 1))}
-      {filtering && visible.size === 0 && (
-        <div className="tree-filter-empty">No matches.</div>
-      )}
     </div>
   );
 }

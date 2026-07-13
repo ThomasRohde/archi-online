@@ -24,7 +24,9 @@ the complete workspace autosaved to IndexedDB.
   panels and resets the layout
 - **Multi-model workspace** — multiple independent model roots, per-model undo/save state,
   cross-model view tabs, tree↔view copy/paste with context-menu actions, and full workspace restore
-- **Model tree** — folders, drag-drop, context menus, inline rename
+- **Model tree** — multi-model Unicode search across names, documentation,
+  properties, types, views, folders, and specializations; drag-drop, context
+  menus, and inline rename
 - **View editor** — custom SVG canvas with:
   - drag/resize/nesting with grid snap, marquee selection, copy/paste
   - relationship tools with live validity feedback and a *magic connector*

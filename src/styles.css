@@ -679,6 +679,7 @@ body {
 .model-tree {
   flex: 1;
   overflow: auto;
+  container-type: inline-size;
 }
 
 .model-tree-session + .model-tree-session {
@@ -712,40 +713,184 @@ body {
 .tree-filter {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 4;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 22px 22px 22px;
-  align-items: stretch;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) 24px 24px 24px 24px;
+  align-items: center;
+  gap: 2px;
   padding: 4px 6px;
-  background: var(--panel-bg, #f6f6f6);
+  background: var(--panel-bg, #fff);
   border-bottom: 1px solid var(--border, #ddd);
 }
 
 .tree-filter-input {
-  grid-column: 1 / -1;
-  flex: 1;
   min-width: 0;
   width: 100%;
+  height: 24px;
   font-size: 12px;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border: 1px solid var(--border, #ccc);
   border-radius: 3px;
   box-sizing: border-box;
 }
 
-.tree-filter-type {
-  width: 100%;
-  max-width: none;
-  font-size: 12px;
-  border: 1px solid var(--border, #ccc);
+.tree-filter-input[aria-invalid='true'] {
+  border-color: #c52f2f;
+  color: #a81f1f;
+}
+
+.tree-filter :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tree-search-options {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+.tree-search-options > summary {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  list-style: none;
   border-radius: 3px;
-  background: #fff;
+}
+
+.tree-search-options > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tree-search-options[open] > summary {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.tree-search-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: -94px;
+  left: auto;
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  width: min(252px, calc(100cqw - 12px));
+  max-height: min(520px, 72vh);
+  overflow: auto;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel-bg);
+  box-shadow: 0 8px 24px rgba(20, 30, 45, 0.2);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.tree-search-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 5px 7px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+}
+
+.tree-search-modifiers {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tree-search-fields legend,
+.tree-search-select-label > span {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tree-search-fields label,
+.tree-search-type-list label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
 }
 
+.tree-search-fields input,
+.tree-search-type-list input {
+  margin: 0;
+}
+
+.tree-search-select-label {
+  display: grid;
+  gap: 3px;
+}
+
+.tree-search-select-label select {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.tree-search-types {
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+}
+
+.tree-search-types > summary {
+  padding: 5px 7px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tree-search-type-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 8px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 3px 7px 7px;
+}
+
+.tree-search-type-list span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-search-menu-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.tree-search-error {
+  grid-column: 1 / -1;
+  padding: 1px 2px 0;
+  color: #a81f1f;
+  font-size: 11px;
+}
+
+.tree-search-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .tree-filter-clear {
-  width: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
   background: none;
   cursor: pointer;
@@ -759,7 +904,8 @@ body {
 }
 
 .tree-filter-btn {
-  width: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
   background: none;
   cursor: pointer;
@@ -780,6 +926,34 @@ body {
   padding: 10px;
   font-size: 12px;
   color: #888;
+}
+
+@container (max-width: 220px) {
+  .tree-search-modifiers,
+  .tree-search-type-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tree-search-menu {
+    gap: 6px;
+    padding: 7px;
+  }
+}
+
+@media (max-width: 520px) {
+  .tree-filter {
+    grid-template-columns: minmax(0, 1fr) repeat(4, 22px);
+    padding-inline: 4px;
+  }
+
+  .tree-search-menu {
+    position: fixed;
+    top: 42px;
+    right: 6px;
+    left: 6px;
+    width: auto;
+    max-height: calc(100vh - 54px);
+  }
 }
 
 .tree-row {

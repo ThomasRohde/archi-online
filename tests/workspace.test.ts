@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
-import { getActiveModelStore, transact } from '../src/model/store';
+import { getActiveModelStore, setSelection, transact } from '../src/model/store';
 import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
   activateModelSession,
@@ -73,6 +73,20 @@ describe('multi-model workspace', () => {
     expect(getModelSession(secondId)?.store.getState().model?.info.id).toBe(shared.info.id);
     expect(getModelSession(firstId)?.store.getState().model?.info.name).toBe('First copy');
     expect(getModelSession(secondId)?.store.getState().model?.info.name).toBe('Shared ids');
+  });
+
+  it('tracks model-content revisions separately from transient selection updates', () => {
+    const id = addModelSession({ model: createEmptyModel('Model'), fileName: null });
+    const session = getModelSession(id)!;
+
+    expect(useWorkspaceStore.getState().modelRevision).toBe(0);
+    setSelection('tree', ['transient'], session.store);
+    expect(useWorkspaceStore.getState().modelRevision).toBe(0);
+
+    transact('Rename model', (draft) => {
+      draft.info.name = 'Changed';
+    }, session.store);
+    expect(useWorkspaceStore.getState().modelRevision).toBe(1);
   });
 
   it('fully resets the shared empty store when the workspace is cleared', () => {

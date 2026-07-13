@@ -35,6 +35,8 @@ export interface WorkspaceState {
   activationOrder: ModelSessionId[];
   booted: boolean;
   revision: number;
+  /** Changes only when persistent model content changes, not for transient UI state. */
+  modelRevision: number;
 }
 
 const EMPTY_WORKSPACE: WorkspaceState = {
@@ -44,6 +46,7 @@ const EMPTY_WORKSPACE: WorkspaceState = {
   activationOrder: [],
   booted: false,
   revision: 0,
+  modelRevision: 0,
 };
 
 export const workspaceStore = createStore<WorkspaceState>()(() => ({ ...EMPTY_WORKSPACE }));
@@ -64,8 +67,11 @@ export function addModelSession(options: AddModelSessionOptions): ModelSessionId
     fileHandle: options.fileHandle ?? null,
     unsubscribe: () => undefined,
   };
-  session.unsubscribe = store.subscribe(() => {
-    workspaceStore.setState((state) => ({ revision: state.revision + 1 }));
+  session.unsubscribe = store.subscribe((next, previous) => {
+    workspaceStore.setState((state) => ({
+      revision: state.revision + 1,
+      modelRevision: state.modelRevision + (next.model === previous.model ? 0 : 1),
+    }));
   });
   workspaceStore.setState((state) => ({
     sessions: { ...state.sessions, [id]: session },
