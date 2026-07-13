@@ -1,3 +1,4 @@
+import { getActiveModelStore, type ModelStore } from '../../model/store';
 import { state } from './state';
 import { allObjects, matchesSelector } from './selectors';
 import {
@@ -13,8 +14,13 @@ import {
 
 export class JCollection {
   private items: JObject[];
+  readonly modelStore: ModelStore;
 
-  constructor(items: JObject[] = []) {
+  constructor(items: JObject[] = [], modelStore?: ModelStore) {
+    this.modelStore = modelStore ?? items[0]?.modelStore ?? getActiveModelStore();
+    if (items.some((item) => item.modelStore !== this.modelStore)) {
+      throw new Error('Cannot mix jArchi wrappers from different model sessions');
+    }
     // Dedupe by id, keep order.
     const seen = new Set<string>();
     this.items = items.filter((o) => {
@@ -62,12 +68,20 @@ export class JCollection {
   }
 
   filter(arg: string | ((obj: JObject) => boolean)): JCollection {
-    if (typeof arg === 'function') return new JCollection(this.items.filter((o) => arg(o)));
-    return new JCollection(this.items.filter((o) => matchesSelector(o, arg)));
+    if (typeof arg === 'function') {
+      return new JCollection(this.items.filter((o) => arg(o)), this.modelStore);
+    }
+    return new JCollection(
+      this.items.filter((o) => matchesSelector(o, arg)),
+      this.modelStore,
+    );
   }
 
   not(selector: string): JCollection {
-    return new JCollection(this.items.filter((o) => !matchesSelector(o, selector)));
+    return new JCollection(
+      this.items.filter((o) => !matchesSelector(o, selector)),
+      this.modelStore,
+    );
   }
 
   is(selector: string): boolean {
@@ -76,33 +90,47 @@ export class JCollection {
 
   add(other: JCollection | JObject | string): JCollection {
     if (typeof other === 'string') {
-      return new JCollection([...this.items, ...allObjects().filter((o) => matchesSelector(o, other))]);
+      return new JCollection(
+        [
+          ...this.items,
+          ...allObjects(this.modelStore).filter((o) => matchesSelector(o, other)),
+        ],
+        this.modelStore,
+      );
     }
-    if (other instanceof JCollection) return new JCollection([...this.items, ...other.items]);
-    return new JCollection([...this.items, other]);
+    if (other instanceof JCollection) {
+      this.assertSameModelStore(other);
+      return new JCollection([...this.items, ...other.items], this.modelStore);
+    }
+    this.assertSameModelStore(other);
+    return new JCollection([...this.items, other], this.modelStore);
   }
 
   /** Children of views/visual containers/folders. */
   children(selector?: string): JCollection {
-    const m = state();
+    const m = state(this.modelStore);
     const out: JObject[] = [];
     for (const o of this.items) {
       if (o instanceof JView) {
-        for (const cid of m.views[o.id]?.childIds ?? []) out.push(new JVisual(cid));
+        for (const cid of m.views[o.id]?.childIds ?? []) {
+          out.push(new JVisual(cid, this.modelStore));
+        }
       } else if (o instanceof JVisual) {
-        for (const cid of m.nodes[o.id]?.childIds ?? []) out.push(new JVisual(cid));
+        for (const cid of m.nodes[o.id]?.childIds ?? []) {
+          out.push(new JVisual(cid, this.modelStore));
+        }
       } else if (o instanceof JFolder) {
         const f = m.folders[o.id];
-        for (const fid of f?.folderIds ?? []) out.push(new JFolder(fid));
+        for (const fid of f?.folderIds ?? []) out.push(new JFolder(fid, this.modelStore));
         for (const iid of f?.itemIds ?? []) {
-          const w = wrap(iid);
+          const w = wrap(iid, this.modelStore);
           if (w) out.push(w);
         }
       } else if (o instanceof JModel) {
-        for (const fid of m.rootFolderIds) out.push(new JFolder(fid));
+        for (const fid of m.rootFolderIds) out.push(new JFolder(fid, this.modelStore));
       }
     }
-    const coll = new JCollection(out);
+    const coll = new JCollection(out, this.modelStore);
     return selector ? coll.filter(selector) : coll;
   }
 
@@ -112,33 +140,35 @@ export class JCollection {
     const walk = (coll: JCollection) => {
       for (const o of coll.toArray()) {
         out.push(o);
-        walk(new JCollection([o]).children());
+        walk(new JCollection([o], this.modelStore).children());
       }
     };
     walk(this.children());
-    const coll = new JCollection(out);
+    const coll = new JCollection(out, this.modelStore);
     return selector ? coll.filter(selector) : coll;
   }
 
   parent(selector?: string): JCollection {
-    const m = state();
+    const m = state(this.modelStore);
     const out: JObject[] = [];
     for (const o of this.items) {
       if (o instanceof JVisual) {
         const n = m.nodes[o.id];
         if (n) {
-          const p = n.parentId === n.viewId ? new JView(n.viewId) : new JVisual(n.parentId);
+          const p = n.parentId === n.viewId
+            ? new JView(n.viewId, this.modelStore)
+            : new JVisual(n.parentId, this.modelStore);
           out.push(p);
         }
       } else if (o instanceof JFolder) {
         const f = m.folders[o.id];
-        if (f?.parentId) out.push(new JFolder(f.parentId));
+        if (f?.parentId) out.push(new JFolder(f.parentId, this.modelStore));
       } else if (o instanceof JConcept || o instanceof JView) {
         const item = m.elements[o.id] ?? m.relationships[o.id] ?? m.views[o.id];
-        if (item) out.push(new JFolder(item.folderId));
+        if (item) out.push(new JFolder(item.folderId, this.modelStore));
       }
     }
-    const coll = new JCollection(out);
+    const coll = new JCollection(out, this.modelStore);
     return selector ? coll.filter(selector) : coll;
   }
 
@@ -149,7 +179,7 @@ export class JCollection {
       out.push(...cur.toArray());
       cur = cur.parent();
     }
-    const coll = new JCollection(out);
+    const coll = new JCollection(out, this.modelStore);
     return selector ? coll.filter(selector) : coll;
   }
 
@@ -178,34 +208,34 @@ export class JCollection {
     pred: (r: { sourceId: string; targetId: string }) => boolean,
     selector?: string,
   ): JCollection {
-    const m = state();
+    const m = state(this.modelStore);
     const ids = new Set(this.conceptIds());
     const out: JObject[] = [];
     for (const rel of Object.values(m.relationships)) {
       if ((ids.has(rel.sourceId) || ids.has(rel.targetId)) && pred(rel)) {
-        out.push(new JConcept(rel.id));
+        out.push(new JConcept(rel.id, this.modelStore));
       }
     }
-    const coll = new JCollection(out);
+    const coll = new JCollection(out, this.modelStore);
     return selector ? coll.filter(selector) : coll;
   }
 
   /** Source/target concepts of relationships in this collection. */
   sourceEnds(selector?: string): JCollection {
-    const m = state();
+    const m = state(this.modelStore);
     const out = this.items
       .filter((o): o is JConcept => o instanceof JConcept && !!m.relationships[o.id])
-      .map((o) => new JConcept(m.relationships[o.id].sourceId));
-    const coll = new JCollection(out);
+      .map((o) => new JConcept(m.relationships[o.id].sourceId, this.modelStore));
+    const coll = new JCollection(out, this.modelStore);
     return selector ? coll.filter(selector) : coll;
   }
 
   targetEnds(selector?: string): JCollection {
-    const m = state();
+    const m = state(this.modelStore);
     const out = this.items
       .filter((o): o is JConcept => o instanceof JConcept && !!m.relationships[o.id])
-      .map((o) => new JConcept(m.relationships[o.id].targetId));
-    const coll = new JCollection(out);
+      .map((o) => new JConcept(m.relationships[o.id].targetId, this.modelStore));
+    const coll = new JCollection(out, this.modelStore);
     return selector ? coll.filter(selector) : coll;
   }
 
@@ -215,16 +245,20 @@ export class JCollection {
 
   /** Visual objects referencing concepts in this collection. */
   objectRefs(selector?: string): JCollection {
-    const m = state();
+    const m = state(this.modelStore);
     const ids = new Set(this.conceptIds());
     const out: JObject[] = [];
     for (const node of Object.values(m.nodes)) {
-      if (node.nodeType === 'element' && ids.has(node.elementId)) out.push(new JVisual(node.id));
+      if (node.nodeType === 'element' && ids.has(node.elementId)) {
+        out.push(new JVisual(node.id, this.modelStore));
+      }
     }
     for (const conn of Object.values(m.connections)) {
-      if (conn.relationshipId && ids.has(conn.relationshipId)) out.push(new JConnection(conn.id));
+      if (conn.relationshipId && ids.has(conn.relationshipId)) {
+        out.push(new JConnection(conn.id, this.modelStore));
+      }
     }
-    const coll = new JCollection(out);
+    const coll = new JCollection(out, this.modelStore);
     return selector ? coll.filter(selector) : coll;
   }
 
@@ -233,7 +267,7 @@ export class JCollection {
     const out = this.objectRefs()
       .toArray()
       .map((o) => (o as JVisual | JConnection).view);
-    const coll = new JCollection(out);
+    const coll = new JCollection(out, this.modelStore);
     return selector ? coll.filter(selector) : coll;
   }
 
@@ -271,6 +305,12 @@ export class JCollection {
   }
 
   clone(): JCollection {
-    return new JCollection(this.items);
+    return new JCollection(this.items, this.modelStore);
+  }
+
+  private assertSameModelStore(other: { modelStore: ModelStore }): void {
+    if (other.modelStore !== this.modelStore) {
+      throw new Error('Cannot mix jArchi wrappers from different model sessions');
+    }
   }
 }

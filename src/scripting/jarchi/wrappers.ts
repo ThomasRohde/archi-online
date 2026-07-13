@@ -45,7 +45,7 @@ import {
   setConceptProfiles,
   updateProfile,
 } from '../../model/ops';
-import { openView } from '../../model/store';
+import { getActiveModelStore, openView, type ModelStore } from '../../model/store';
 import {
   captureFindReplaceSession,
   previewFindReplace,
@@ -138,7 +138,10 @@ export interface ViewLayoutInput {
 }
 
 export abstract class JObject {
-  constructor(readonly id: string) {}
+  constructor(
+    readonly id: string,
+    readonly modelStore: ModelStore = getActiveModelStore(),
+  ) {}
   abstract get kind(): JKind;
   abstract get type(): string;
 
@@ -155,12 +158,27 @@ export abstract class JObject {
   }
 
   equals(other: unknown): boolean {
-    return other instanceof JObject && other.id === this.id;
+    return other instanceof JObject &&
+      other.id === this.id &&
+      other.modelStore === this.modelStore;
   }
 }
 
-function propsOf(id: string): Property[] {
-  const m = state();
+interface ModelStoreBound {
+  readonly modelStore: ModelStore;
+}
+
+function assertSameModelStore(
+  owner: ModelStoreBound,
+  ...others: (ModelStoreBound | undefined)[]
+): void {
+  if (others.some((other) => other && other.modelStore !== owner.modelStore)) {
+    throw new Error('Cannot mix jArchi wrappers from different model sessions');
+  }
+}
+
+function propsOf(id: string, store: ModelStore): Property[] {
+  const m = state(store);
   return (
     m.elements[id]?.properties ??
     m.relationships[id]?.properties ??
@@ -173,27 +191,29 @@ function propsOf(id: string): Property[] {
 }
 
 /** Shared prop()/removeProp() implementation (concepts, views, folders, model). */
-function propApi(target: { id: string }) {
+function propApi(target: { id: string; modelStore: ModelStore }) {
   return {
     prop(key?: string, value?: string, duplicate?: boolean): unknown {
-      const props = propsOf(target.id);
+      const props = propsOf(target.id, target.modelStore);
       if (key === undefined) return [...new Set(props.map((p) => p.key))];
       if (value === undefined) return props.find((p) => p.key === key)?.value;
       if (duplicate || !props.some((p) => p.key === key)) {
-        setProperties(target.id, [...props, { key, value }]);
+        setProperties(target.id, [...props, { key, value }], target.modelStore);
       } else {
         setProperties(
           target.id,
           props.map((p) => (p.key === key ? { ...p, value } : p)),
+          target.modelStore,
         );
       }
       return undefined;
     },
     removeProp(key: string, value?: string): void {
-      const props = propsOf(target.id);
+      const props = propsOf(target.id, target.modelStore);
       setProperties(
         target.id,
         props.filter((p) => p.key !== key || (value !== undefined && p.value !== value)),
+        target.modelStore,
       );
     },
   };
@@ -319,12 +339,12 @@ function routeToBendpoints(
 
 export class JConcept extends JObject {
   get kind(): JKind {
-    const m = state();
+    const m = state(this.modelStore);
     return m.relationships[this.id] ? 'relationship' : 'element';
   }
 
   private concept(): Concept {
-    const m = state();
+    const m = state(this.modelStore);
     const c: Concept | undefined = m.elements[this.id] ?? m.relationships[this.id];
     if (!c) throw new Error(`Concept ${this.id} no longer exists`);
     return c;
@@ -339,7 +359,7 @@ export class JConcept extends JObject {
   }
 
   override set name(v: string) {
-    renameItem(this.id, v);
+    renameItem(this.id, v, this.modelStore);
   }
 
   get documentation(): string {
@@ -347,17 +367,17 @@ export class JConcept extends JObject {
   }
 
   set documentation(v: string) {
-    setDocumentation(this.id, v);
+    setDocumentation(this.id, v, this.modelStore);
   }
 
   get source(): JConcept | undefined {
     const c = this.concept();
-    return c.kind === 'relationship' ? new JConcept(c.sourceId) : undefined;
+    return c.kind === 'relationship' ? new JConcept(c.sourceId, this.modelStore) : undefined;
   }
 
   get target(): JConcept | undefined {
     const c = this.concept();
-    return c.kind === 'relationship' ? new JConcept(c.targetId) : undefined;
+    return c.kind === 'relationship' ? new JConcept(c.targetId, this.modelStore) : undefined;
   }
 
   setType(type: string): JConcept {
@@ -366,20 +386,24 @@ export class JConcept extends JObject {
       throw new Error(`Unknown concept type: ${type}`);
     }
     const concept = this.concept();
-    if (concept.type === targetType) return new JConcept(this.id);
-    const plan = analyzeConceptTypeChange(state(), {
+    if (concept.type === targetType) return new JConcept(this.id, this.modelStore);
+    const plan = analyzeConceptTypeChange(state(this.modelStore), {
       conceptIds: [this.id],
       targetType,
     });
     if (!plan.valid) throw new Error(plan.reason ?? 'Concept type change is not legal');
-    const result = applyConceptTypeChange(plan, {
-      convertInvalidRelationshipsToAssociation: plan.requiresConfirmation,
-      addDocumentationNote:
-        useSettingsStore.getState().settings.addDocumentationNoteOnRelationChange,
-    });
+    const result = applyConceptTypeChange(
+      plan,
+      {
+        convertInvalidRelationshipsToAssociation: plan.requiresConfirmation,
+        addDocumentationNote:
+          useSettingsStore.getState().settings.addDocumentationNoteOnRelationChange,
+      },
+      this.modelStore,
+    );
     const replacementId = result?.idMap[this.id];
     if (!replacementId) throw new Error('Concept type change could not be applied');
-    return new JConcept(replacementId);
+    return new JConcept(replacementId, this.modelStore);
   }
 
   invert(): JConcept {
@@ -387,12 +411,12 @@ export class JConcept extends JObject {
     if (concept.kind !== 'relationship') {
       throw new Error('invert() is supported for relationships only');
     }
-    const plan = analyzeRelationshipInversion(state(), { ids: [this.id] });
+    const plan = analyzeRelationshipInversion(state(this.modelStore), { ids: [this.id] });
     if (!plan.valid) throw new Error(plan.reason ?? 'Relationship cannot be inverted');
-    if (!applyRelationshipInversion(plan)) {
+    if (!applyRelationshipInversion(plan, this.modelStore)) {
       throw new Error('Relationship inversion could not be applied');
     }
-    return new JConcept(this.id);
+    return new JConcept(this.id, this.modelStore);
   }
 
   get accessType(): string | undefined {
@@ -403,7 +427,7 @@ export class JConcept extends JObject {
 
   set accessType(v: string | undefined) {
     const i = ['write', 'read', 'access', 'readwrite'].indexOf(v ?? 'write');
-    setRelationshipAttrs(this.id, { accessType: i < 0 ? 0 : i });
+    setRelationshipAttrs(this.id, { accessType: i < 0 ? 0 : i }, this.modelStore);
   }
 
   get influenceStrength(): string | undefined {
@@ -412,7 +436,7 @@ export class JConcept extends JObject {
   }
 
   set influenceStrength(v: string | undefined) {
-    setRelationshipAttrs(this.id, { strength: v ?? '' });
+    setRelationshipAttrs(this.id, { strength: v ?? '' }, this.modelStore);
   }
 
   get associationDirected(): boolean {
@@ -421,12 +445,12 @@ export class JConcept extends JObject {
   }
 
   set associationDirected(v: boolean) {
-    setRelationshipAttrs(this.id, { directed: v });
+    setRelationshipAttrs(this.id, { directed: v }, this.modelStore);
   }
 
   get specialization(): string | undefined {
     const concept = this.concept();
-    return state().profiles[concept.profileIds[0]]?.name;
+    return state(this.modelStore).profiles[concept.profileIds[0]]?.name;
   }
 
   set specialization(name: string | undefined) {
@@ -435,23 +459,27 @@ export class JConcept extends JObject {
       throw new Error('Specialization name must not be empty');
     }
     if (name === undefined || name === null) {
-      setConceptProfiles(this.id, concept.profileIds.slice(1));
+      setConceptProfiles(this.id, concept.profileIds.slice(1), this.modelStore);
       return;
     }
-    const profile = Object.values(state().profiles).find(
+    const profile = Object.values(state(this.modelStore).profiles).find(
       (candidate) =>
         candidate.conceptType === concept.type &&
         candidate.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0,
     );
     if (!profile) throw new Error(`Specialization not found: ${name} (${concept.type})`);
-    setConceptProfiles(this.id, [profile.id, ...concept.profileIds.filter((id) => id !== profile.id)]);
+    setConceptProfiles(
+      this.id,
+      [profile.id, ...concept.profileIds.filter((id) => id !== profile.id)],
+      this.modelStore,
+    );
   }
 
   prop = propApi(this).prop;
   removeProp = propApi(this).removeProp;
 
   delete(): void {
-    deleteItems([this.id]);
+    deleteItems([this.id], this.modelStore);
   }
 }
 
@@ -465,7 +493,7 @@ export class JFolder extends JObject {
   }
 
   private folder() {
-    const f = state().folders[this.id];
+    const f = state(this.modelStore).folders[this.id];
     if (!f) throw new Error(`Folder ${this.id} no longer exists`);
     return f;
   }
@@ -475,7 +503,7 @@ export class JFolder extends JObject {
   }
 
   override set name(v: string) {
-    renameItem(this.id, v);
+    renameItem(this.id, v, this.modelStore);
   }
 
   get documentation(): string {
@@ -483,25 +511,30 @@ export class JFolder extends JObject {
   }
 
   set documentation(v: string) {
-    setDocumentation(this.id, v);
+    setDocumentation(this.id, v, this.modelStore);
   }
 
   prop = propApi(this).prop;
   removeProp = propApi(this).removeProp;
 
   get labelExpression(): string | undefined { return this.folder().labelExpression; }
-  set labelExpression(value: string | undefined) { setLabelExpression(this.id, value); }
+  set labelExpression(value: string | undefined) {
+    setLabelExpression(this.id, value, this.modelStore);
+  }
 
   delete(): void {
-    deleteItems([this.id]);
+    deleteItems([this.id], this.modelStore);
   }
 }
 
 export class JProfile {
-  constructor(readonly id: string) {}
+  constructor(
+    readonly id: string,
+    readonly modelStore: ModelStore = getActiveModelStore(),
+  ) {}
 
   private profile(): ProfileDefinition {
-    const profile = state().profiles[this.id];
+    const profile = state(this.modelStore).profiles[this.id];
     if (!profile) throw new Error(`Specialization ${this.id} no longer exists`);
     return profile;
   }
@@ -511,7 +544,7 @@ export class JProfile {
   }
 
   set name(value: string) {
-    updateProfile(this.id, { name: value });
+    updateProfile(this.id, { name: value }, this.modelStore);
   }
 
   get type(): string {
@@ -523,7 +556,7 @@ export class JProfile {
     if (!conceptType || (!isElementType(conceptType) && !isRelationshipType(conceptType))) {
       throw new Error(`Unknown profile concept type: ${value}`);
     }
-    updateProfile(this.id, { conceptType });
+    updateProfile(this.id, { conceptType }, this.modelStore);
   }
 
   get image(): { path: string } | undefined {
@@ -532,11 +565,11 @@ export class JProfile {
   }
 
   set image(value: { path: string } | undefined) {
-    updateProfile(this.id, { imagePath: value?.path });
+    updateProfile(this.id, { imagePath: value?.path }, this.modelStore);
   }
 
   delete(): void {
-    deleteProfile(this.id);
+    deleteProfile(this.id, this.modelStore);
   }
 
   toString(): string {
@@ -554,7 +587,7 @@ export class JView extends JObject {
   }
 
   private view() {
-    const v = state().views[this.id];
+    const v = state(this.modelStore).views[this.id];
     if (!v) throw new Error(`View ${this.id} no longer exists`);
     return v;
   }
@@ -564,7 +597,7 @@ export class JView extends JObject {
   }
 
   override set name(v: string) {
-    renameItem(this.id, v);
+    renameItem(this.id, v, this.modelStore);
   }
 
   get documentation(): string {
@@ -572,7 +605,7 @@ export class JView extends JObject {
   }
 
   set documentation(v: string) {
-    setDocumentation(this.id, v);
+    setDocumentation(this.id, v, this.modelStore);
   }
 
   get viewpoint(): string | undefined {
@@ -587,7 +620,11 @@ export class JView extends JObject {
     if (value !== 'manual' && value !== 'manhattan') {
       throw new Error(`Unknown connection router: ${String(value)}`);
     }
-    setViewConnectionRouterType(this.id, value === 'manhattan' ? 2 : 0);
+    setViewConnectionRouterType(
+      this.id,
+      value === 'manhattan' ? 2 : 0,
+      this.modelStore,
+    );
   }
 
   prop = propApi(this).prop;
@@ -604,13 +641,15 @@ export class JView extends JObject {
     w?: number,
     h?: number,
   ): JVisual | JConnection {
-    const m = state();
+    assertSameModelStore(this, obj);
+    const m = state(this.modelStore);
     if (m.relationships[obj.id]) {
       if (!isJConnectable(a) || !isJConnectable(b)) {
         throw new Error('view.add(relationship, sourceConnectable, targetConnectable)');
       }
-      const connId = addConnectionToView(this.id, obj.id, a.id, b.id);
-      return new JConnection(connId);
+      assertSameModelStore(this, a, b);
+      const connId = addConnectionToView(this.id, obj.id, a.id, b.id, this.modelStore);
+      return new JConnection(connId, this.modelStore);
     }
     if (typeof a !== 'number' || typeof b !== 'number') {
       throw new Error('view.add(element, x, y, width, height)');
@@ -621,17 +660,39 @@ export class JView extends JObject {
       this.id,
       { x: a, y: b, width: w ?? 120, height: h ?? 55 },
       false,
+      {},
+      this.modelStore,
     );
-    return new JVisual(nodeId);
+    return new JVisual(nodeId, this.modelStore);
   }
 
   createObject(type: string, x: number, y: number, w: number, h: number): JVisual {
     const t = type.toLowerCase();
     if (t.includes('note')) {
-      return new JVisual(addNoteToView(this.id, this.id, { x, y, width: w, height: h }));
+      return new JVisual(
+        addNoteToView(
+          this.id,
+          this.id,
+          { x, y, width: w, height: h },
+          '',
+          {},
+          this.modelStore,
+        ),
+        this.modelStore,
+      );
     }
     if (t.includes('group')) {
-      return new JVisual(addGroupToView(this.id, this.id, { x, y, width: w, height: h }));
+      return new JVisual(
+        addGroupToView(
+          this.id,
+          this.id,
+          { x, y, width: w, height: h },
+          'Group',
+          {},
+          this.modelStore,
+        ),
+        this.modelStore,
+      );
     }
     throw new Error(`Unsupported view object type: ${type}`);
   }
@@ -653,9 +714,11 @@ export class JView extends JObject {
         sortMethod: settings.legendSortMethod as 0 | 1,
         ...options,
       },
+      {},
+      this.modelStore,
     );
     if (!legendId) throw new Error(`Could not create legend in view ${this.id}`);
-    return new JVisual(legendId);
+    return new JVisual(legendId, this.modelStore);
   }
 
   createPlainConnection(
@@ -666,21 +729,22 @@ export class JView extends JObject {
     if (!isJConnectable(source) || !isJConnectable(target)) {
       throw new Error('view.createPlainConnection(source, target, connectionType?)');
     }
+    assertSameModelStore(this, source, target);
     const connectionId = createPlainConnectionOnView(
       this.id,
       source.id,
       target.id,
-      undefined,
+      this.modelStore,
       connectionType,
     );
     if (!connectionId) {
       throw new Error('Plain connection requires a Note endpoint in this view');
     }
-    return new JConnection(connectionId);
+    return new JConnection(connectionId, this.modelStore);
   }
 
   nodes(options?: { recursive?: boolean }): JVisual[] {
-    const m = state();
+    const m = state(this.modelStore);
     const view = this.view();
     const recursive = options?.recursive ?? false;
     const ids: string[] = [];
@@ -693,17 +757,17 @@ export class JView extends JObject {
       }
     };
     collect(view.childIds);
-    return ids.map((id) => new JVisual(id));
+    return ids.map((id) => new JVisual(id, this.modelStore));
   }
 
   connections(): JConnection[] {
-    return Object.values(state().connections)
+    return Object.values(state(this.modelStore).connections)
       .filter((conn) => conn.viewId === this.id)
-      .map((conn) => new JConnection(conn.id));
+      .map((conn) => new JConnection(conn.id, this.modelStore));
   }
 
   bounds(options?: { recursive?: boolean }): JBounds | null {
-    const m = state();
+    const m = state(this.modelStore);
     const nodes = this.nodes({ recursive: options?.recursive ?? true });
     if (nodes.length === 0) return null;
     let union: Bounds | null = null;
@@ -724,7 +788,7 @@ export class JView extends JObject {
 
   layout(layout: ViewLayoutInput): void {
     if (!isRecord(layout)) throw new Error('view.layout(layout) expects an object');
-    const m = state();
+    const m = state(this.modelStore);
     this.view();
     const minNodeSize = useSettingsStore.getState().settings.minNodeSize;
     const nodeInputs = layout.nodes ?? {};
@@ -882,15 +946,15 @@ export class JView extends JObject {
       };
     });
 
-    layoutView(nodeUpdates, connectionUpdates);
+    layoutView(nodeUpdates, connectionUpdates, this.modelStore);
   }
 
   openInUI(): void {
-    openView(this.id);
+    openView(this.id, this.modelStore);
   }
 
   delete(): void {
-    deleteItems([this.id]);
+    deleteItems([this.id], this.modelStore);
   }
 }
 
@@ -900,7 +964,7 @@ export class JVisual extends JObject {
   }
 
   node() {
-    const n = state().nodes[this.id];
+    const n = state(this.modelStore).nodes[this.id];
     if (!n) throw new Error(`Diagram object ${this.id} no longer exists`);
     return n;
   }
@@ -909,7 +973,7 @@ export class JVisual extends JObject {
     const n = this.node();
     switch (n.nodeType) {
       case 'element':
-        return toKebab(state().elements[n.elementId]?.type ?? 'DiagramObject');
+        return toKebab(state(this.modelStore).elements[n.elementId]?.type ?? 'DiagramObject');
       case 'group':
         return 'diagram-model-group';
       case 'note':
@@ -923,18 +987,20 @@ export class JVisual extends JObject {
 
   override get name(): string {
     const n = this.node();
-    if (n.nodeType === 'element') return state().elements[n.elementId]?.name ?? '';
+    if (n.nodeType === 'element') {
+      return state(this.modelStore).elements[n.elementId]?.name ?? '';
+    }
     if (n.nodeType === 'group') return n.name;
     if (n.nodeType === 'note') return isLegendNote(n) ? n.name ?? 'Legend' : n.content;
     if (n.nodeType === 'image') return '';
-    return state().views[n.refViewId]?.name ?? '';
+    return state(this.modelStore).views[n.refViewId]?.name ?? '';
   }
 
   override set name(v: string) {
     const n = this.node();
-    if (n.nodeType === 'element') renameItem(n.elementId, v);
+    if (n.nodeType === 'element') renameItem(n.elementId, v, this.modelStore);
     else if (isLegendNote(n)) throw new Error('Legend name is fixed');
-    else renameItem(this.id, v);
+    else renameItem(this.id, v, this.modelStore);
   }
 
   get text(): string {
@@ -956,7 +1022,7 @@ export class JVisual extends JObject {
     if (!isLegendNote(n) || value === undefined || !isRecord(value)) {
       throw new Error('legendOptions are only available on native legends');
     }
-    setLegendOptions(this.id, value);
+    setLegendOptions(this.id, value, this.modelStore);
   }
 
   setLegendOptimalSize(): void {
@@ -966,16 +1032,18 @@ export class JVisual extends JObject {
     setLegendOptimalSize(this.id, {
       labels: settings.legendLabels,
       userColors: settings.legendUserColors,
-    });
+    }, undefined, this.modelStore);
   }
 
   get concept(): JConcept | undefined {
     const n = this.node();
-    return n.nodeType === 'element' ? new JConcept(n.elementId) : undefined;
+    return n.nodeType === 'element'
+      ? new JConcept(n.elementId, this.modelStore)
+      : undefined;
   }
 
   get view(): JView {
-    return new JView(this.node().viewId);
+    return new JView(this.node().viewId, this.modelStore);
   }
 
   get bounds(): { x: number; y: number; width: number; height: number } {
@@ -989,22 +1057,24 @@ export class JVisual extends JObject {
       y: b.y ?? cur.y,
       width: b.width ?? cur.width,
       height: b.height ?? cur.height,
-    });
+    }, this.modelStore);
   }
 
   parent(): JView | JVisual {
     const n = this.node();
-    return n.parentId === n.viewId ? new JView(n.viewId) : new JVisual(n.parentId);
+    return n.parentId === n.viewId
+      ? new JView(n.viewId, this.modelStore)
+      : new JVisual(n.parentId, this.modelStore);
   }
 
   children(): JVisual[] {
     return this.node().childIds
-      .filter((id) => !!state().nodes[id])
-      .map((id) => new JVisual(id));
+      .filter((id) => !!state(this.modelStore).nodes[id])
+      .map((id) => new JVisual(id, this.modelStore));
   }
 
   absoluteBounds(): JBounds {
-    return modelAbsoluteBounds(state(), this.id);
+    return modelAbsoluteBounds(state(this.modelStore), this.id);
   }
 
   connections(options?: { incoming?: boolean; outgoing?: boolean }): JConnection[] {
@@ -1019,9 +1089,9 @@ export class JVisual extends JObject {
       .filter((id) => {
         if (seen.has(id)) return false;
         seen.add(id);
-        return !!state().connections[id];
+        return !!state(this.modelStore).connections[id];
       })
-      .map((id) => new JConnection(id));
+      .map((id) => new JConnection(id, this.modelStore));
   }
 
   get fillColor(): string | undefined {
@@ -1029,7 +1099,7 @@ export class JVisual extends JObject {
   }
 
   set fillColor(v: string | undefined) {
-    setNodeStyle([this.id], { fillColor: v });
+    setNodeStyle([this.id], { fillColor: v }, this.modelStore);
   }
 
   get lineColor(): string | undefined {
@@ -1037,7 +1107,7 @@ export class JVisual extends JObject {
   }
 
   set lineColor(v: string | undefined) {
-    setNodeStyle([this.id], { lineColor: v });
+    setNodeStyle([this.id], { lineColor: v }, this.modelStore);
   }
 
   get fontColor(): string | undefined {
@@ -1045,7 +1115,7 @@ export class JVisual extends JObject {
   }
 
   set fontColor(v: string | undefined) {
-    setNodeStyle([this.id], { fontColor: v });
+    setNodeStyle([this.id], { fontColor: v }, this.modelStore);
   }
 
   get opacity(): number {
@@ -1053,29 +1123,58 @@ export class JVisual extends JObject {
   }
 
   set opacity(v: number) {
-    setNodeStyle([this.id], { alpha: Math.max(0, Math.min(255, v)) });
+    setNodeStyle([this.id], { alpha: Math.max(0, Math.min(255, v)) }, this.modelStore);
   }
 
   get labelExpression(): string | undefined { return this.node().labelExpression; }
-  set labelExpression(value: string | undefined) { setLabelExpression(this.id, value); }
+  set labelExpression(value: string | undefined) {
+    setLabelExpression(this.id, value, this.modelStore);
+  }
 
   get gradient(): number { return this.node().gradient ?? -1; }
-  set gradient(value: number) { setNodeStyle([this.id], { gradient: Math.max(-1, Math.min(3, value)) as -1 | 0 | 1 | 2 | 3 }); }
+  set gradient(value: number) {
+    setNodeStyle(
+      [this.id],
+      { gradient: Math.max(-1, Math.min(3, value)) as -1 | 0 | 1 | 2 | 3 },
+      this.modelStore,
+    );
+  }
 
   get lineStyle(): number { return this.node().lineStyle ?? -1; }
-  set lineStyle(value: number) { setNodeStyle([this.id], { lineStyle: Math.max(-1, Math.min(3, value)) as -1 | 0 | 1 | 2 | 3 }); }
+  set lineStyle(value: number) {
+    setNodeStyle(
+      [this.id],
+      { lineStyle: Math.max(-1, Math.min(3, value)) as -1 | 0 | 1 | 2 | 3 },
+      this.modelStore,
+    );
+  }
 
   get lineWidth(): number { return this.node().lineWidth ?? 1; }
-  set lineWidth(value: number) { setNodeStyle([this.id], { lineWidth: Math.max(1, Math.min(3, value)) as 1 | 2 | 3 }); }
+  set lineWidth(value: number) {
+    setNodeStyle(
+      [this.id],
+      { lineWidth: Math.max(1, Math.min(3, value)) as 1 | 2 | 3 },
+      this.modelStore,
+    );
+  }
 
   get imageSource(): number { return this.node().imageSource ?? 0; }
-  set imageSource(value: number) { setNodeStyle([this.id], { imageSource: value === 1 ? 1 : 0 }); }
+  set imageSource(value: number) {
+    setNodeStyle([this.id], { imageSource: value === 1 ? 1 : 0 }, this.modelStore);
+  }
 
   get imagePosition(): number { return this.node().imagePosition ?? 2; }
-  set imagePosition(value: number) { setNodeStyle([this.id], { imagePosition: Math.max(0, Math.min(9, value)) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 }); }
+  set imagePosition(value: number) {
+    setNodeStyle(
+      [this.id],
+      { imagePosition: Math.max(0, Math.min(9, value)) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 },
+      this.modelStore,
+    );
+  }
 
   /** Nested add (bounds relative to this container). */
   add(element: JConcept, x: number, y: number, w: number, h: number): JVisual {
+    assertSameModelStore(this, element);
     const n = this.node();
     const nodeId = addElementNodeToView(
       n.viewId,
@@ -1083,12 +1182,14 @@ export class JVisual extends JObject {
       this.id,
       { x, y, width: w, height: h },
       false,
+      {},
+      this.modelStore,
     );
-    return new JVisual(nodeId);
+    return new JVisual(nodeId, this.modelStore);
   }
 
   delete(): void {
-    deleteViewObjects([this.id]);
+    deleteViewObjects([this.id], this.modelStore);
   }
 }
 
@@ -1098,7 +1199,7 @@ export class JConnection extends JObject {
   }
 
   private conn() {
-    const c = state().connections[this.id];
+    const c = state(this.modelStore).connections[this.id];
     if (!c) throw new Error(`Connection ${this.id} no longer exists`);
     return c;
   }
@@ -1106,7 +1207,9 @@ export class JConnection extends JObject {
   get type(): string {
     const c = this.conn();
     if (c.relationshipId) {
-      return toKebab(state().relationships[c.relationshipId]?.type ?? 'Connection');
+      return toKebab(
+        state(this.modelStore).relationships[c.relationshipId]?.type ?? 'Connection',
+      );
     }
     return 'diagram-model-connection';
   }
@@ -1116,7 +1219,7 @@ export class JConnection extends JObject {
   }
 
   override set name(value: string) {
-    renameItem(this.id, value);
+    renameItem(this.id, value, this.modelStore);
   }
 
   get documentation(): string {
@@ -1124,7 +1227,7 @@ export class JConnection extends JObject {
   }
 
   set documentation(value: string) {
-    setDocumentation(this.id, value);
+    setDocumentation(this.id, value, this.modelStore);
   }
 
   prop = propApi(this).prop;
@@ -1132,19 +1235,19 @@ export class JConnection extends JObject {
 
   get concept(): JConcept | undefined {
     const c = this.conn();
-    return c.relationshipId ? new JConcept(c.relationshipId) : undefined;
+    return c.relationshipId ? new JConcept(c.relationshipId, this.modelStore) : undefined;
   }
 
   get view(): JView {
-    return new JView(this.conn().viewId);
+    return new JView(this.conn().viewId, this.modelStore);
   }
 
   get source(): JConnectable {
-    return wrapConnectable(this.conn().sourceId);
+    return wrapConnectable(this.conn().sourceId, this.modelStore);
   }
 
   get target(): JConnectable {
-    return wrapConnectable(this.conn().targetId);
+    return wrapConnectable(this.conn().targetId, this.modelStore);
   }
 
   get lineColor(): string | undefined {
@@ -1152,56 +1255,82 @@ export class JConnection extends JObject {
   }
 
   set lineColor(v: string | undefined) {
-    setNodeStyle([this.id], { lineColor: v });
+    setNodeStyle([this.id], { lineColor: v }, this.modelStore);
   }
 
   get fontColor(): string | undefined { return this.conn().fontColor; }
-  set fontColor(value: string | undefined) { setNodeStyle([this.id], { fontColor: value }); }
+  set fontColor(value: string | undefined) {
+    setNodeStyle([this.id], { fontColor: value }, this.modelStore);
+  }
 
   get font(): string | undefined { return this.conn().font; }
-  set font(value: string | undefined) { setNodeStyle([this.id], { font: value }); }
+  set font(value: string | undefined) {
+    setNodeStyle([this.id], { font: value }, this.modelStore);
+  }
 
   get textPosition(): number { return this.conn().textPosition ?? 1; }
   set textPosition(value: number) {
-    setNodeStyle([this.id], { textPosition: Math.max(0, Math.min(2, Math.trunc(value))) });
+    setNodeStyle(
+      [this.id],
+      { textPosition: Math.max(0, Math.min(2, Math.trunc(value))) },
+      this.modelStore,
+    );
   }
 
   get connectionType(): number { return this.conn().connectionType ?? 0; }
   set connectionType(value: number) {
     this.assertPlain();
-    setPlainConnectionAttributes(this.id, { connectionType: value });
+    setPlainConnectionAttributes(this.id, { connectionType: value }, this.modelStore);
   }
 
   get nameVisible(): boolean { return this.conn().nameVisible !== false; }
   set nameVisible(value: boolean) {
     this.assertPlain();
-    setPlainConnectionAttributes(this.id, { nameVisible: value });
+    setPlainConnectionAttributes(this.id, { nameVisible: value }, this.modelStore);
   }
 
   get labelExpression(): string | undefined { return this.conn().labelExpression; }
-  set labelExpression(value: string | undefined) { setLabelExpression(this.id, value); }
+  set labelExpression(value: string | undefined) {
+    setLabelExpression(this.id, value, this.modelStore);
+  }
 
   get lineStyle(): number { return this.conn().lineStyle ?? -1; }
-  set lineStyle(value: number) { setNodeStyle([this.id], { lineStyle: Math.max(-1, Math.min(3, value)) as -1 | 0 | 1 | 2 | 3 }); }
+  set lineStyle(value: number) {
+    setNodeStyle(
+      [this.id],
+      { lineStyle: Math.max(-1, Math.min(3, value)) as -1 | 0 | 1 | 2 | 3 },
+      this.modelStore,
+    );
+  }
 
   get lineWidth(): number { return this.conn().lineWidth ?? 1; }
-  set lineWidth(value: number) { setNodeStyle([this.id], { lineWidth: Math.max(1, Math.min(3, value)) as 1 | 2 | 3 }); }
+  set lineWidth(value: number) {
+    setNodeStyle(
+      [this.id],
+      { lineWidth: Math.max(1, Math.min(3, value)) as 1 | 2 | 3 },
+      this.modelStore,
+    );
+  }
 
   get bendpoints(): JBendpoint[] {
     return this.conn().bendpoints.map((bp) => ({ ...bp }));
   }
 
   set bendpoints(value: JBendpoint[]) {
-    setConnectionBendpoints(this.id, validateBendpointArray(value, `connection.${this.id}.bendpoints`));
+    setConnectionBendpoints(
+      this.id,
+      validateBendpointArray(value, `connection.${this.id}.bendpoints`),
+      this.modelStore,
+    );
   }
 
   absoluteRoute(): JPoint[] {
-    const m = state();
+    const m = state(this.modelStore);
     return absoluteRouteForConnection(m, this.conn());
   }
 
   setAbsoluteRoute(points: JPoint[]): void {
-    const m = state();
+    const m = state(this.modelStore);
     setConnectionBendpoints(
       this.id,
       routeToBendpoints(
@@ -1209,11 +1338,12 @@ export class JConnection extends JObject {
         this.conn(),
         validatePointArray(points, `connection.${this.id}.route`),
       ),
+      this.modelStore,
     );
   }
 
   routedPoints(): JPoint[] {
-    const m = state();
+    const m = state(this.modelStore);
     return renderedRouteForConnection(m, this.conn());
   }
 
@@ -1221,19 +1351,20 @@ export class JConnection extends JObject {
     if ((end !== 'source' && end !== 'target') || !isJConnectable(endpoint)) {
       throw new Error('connection.reconnect(end, endpoint)');
     }
-    const plan = analyzeConnectionReconnection(state(), {
+    assertSameModelStore(this, endpoint);
+    const plan = analyzeConnectionReconnection(state(this.modelStore), {
       connectionId: this.id,
       end,
       endpointId: endpoint.id,
     });
     if (!plan.valid) throw new Error(plan.reason ?? 'Connection cannot be reconnected');
-    if (!applyConnectionReconnection(plan)) {
+    if (!applyConnectionReconnection(plan, this.modelStore)) {
       throw new Error('Connection reconnection was not applied');
     }
   }
 
   delete(): void {
-    deleteViewObjects([this.id]);
+    deleteViewObjects([this.id], this.modelStore);
   }
 
   private assertPlain(): void {
@@ -1247,10 +1378,10 @@ function isJConnectable(value: unknown): value is JConnectable {
   return value instanceof JVisual || value instanceof JConnection;
 }
 
-function wrapConnectable(id: string): JConnectable {
-  const model = state();
-  if (model.nodes[id]) return new JVisual(id);
-  if (model.connections[id]) return new JConnection(id);
+function wrapConnectable(id: string, store: ModelStore): JConnectable {
+  const model = state(store);
+  if (model.nodes[id]) return new JVisual(id, store);
+  if (model.connections[id]) return new JConnection(id, store);
   throw new Error(`Diagram connectable ${id} no longer exists`);
 }
 
@@ -1264,19 +1395,19 @@ export class JModel extends JObject {
   }
 
   override get name(): string {
-    return state().info.name;
+    return state(this.modelStore).info.name;
   }
 
   override set name(v: string) {
-    renameItem(state().info.id, v);
+    renameItem(state(this.modelStore).info.id, v, this.modelStore);
   }
 
   get purpose(): string {
-    return state().info.documentation;
+    return state(this.modelStore).info.documentation;
   }
 
   set purpose(v: string) {
-    setDocumentation(state().info.id, v);
+    setDocumentation(state(this.modelStore).info.id, v, this.modelStore);
   }
 
   get documentation(): string {
@@ -1288,17 +1419,23 @@ export class JModel extends JObject {
   }
 
   prop(key?: string, value?: string, duplicate?: boolean): unknown {
-    return propApi({ id: state().info.id }).prop(key, value, duplicate);
+    return propApi({
+      id: state(this.modelStore).info.id,
+      modelStore: this.modelStore,
+    }).prop(key, value, duplicate);
   }
 
   removeProp(key: string, value?: string): void {
-    propApi({ id: state().info.id }).removeProp(key, value);
+    propApi({
+      id: state(this.modelStore).info.id,
+      modelStore: this.modelStore,
+    }).removeProp(key, value);
   }
 
   /** Search the captured active model without changing it. */
   search(options: JFindReplaceSearchOptions): JFindReplaceRow[] {
     const preview = previewFindReplace(
-      captureFindReplaceSession(),
+      captureFindReplaceSession(this.modelStore),
       findReplaceOptions(options, ''),
     );
     if (!preview.valid) throw new Error(preview.error ?? 'Search failed.');
@@ -1308,7 +1445,7 @@ export class JModel extends JObject {
   /** Build the mandatory preview consumed by applyReplace(). */
   previewReplace(options: JFindReplaceOptions): JFindReplacePreview {
     return previewFindReplace(
-      captureFindReplaceSession(),
+      captureFindReplaceSession(this.modelStore),
       findReplaceOptions(options, options.replace),
     );
   }
@@ -1323,7 +1460,7 @@ export class JModel extends JObject {
 
   /** Inspect ordered property-key usage across the captured active model. */
   propertyUsage(search = ''): readonly JPropertyKeyUsage[] {
-    return inspectPropertyUsage(capturePropertyManagerSession(), search);
+    return inspectPropertyUsage(capturePropertyManagerSession(this.modelStore), search);
   }
 
   /** Build the mandatory preview consumed by renamePropertyKey(). */
@@ -1333,7 +1470,7 @@ export class JModel extends JObject {
     collisionAcknowledged = false,
   ): JPropertyMutationPreview {
     return previewPropertyRename(
-      capturePropertyManagerSession(),
+      capturePropertyManagerSession(this.modelStore),
       key,
       newKey,
       collisionAcknowledged,
@@ -1347,7 +1484,7 @@ export class JModel extends JObject {
 
   /** Build the mandatory preview consumed by deletePropertyKey(). */
   previewDeletePropertyKey(key: string): JPropertyMutationPreview {
-    return previewPropertyDelete(capturePropertyManagerSession(), key);
+    return previewPropertyDelete(capturePropertyManagerSession(this.modelStore), key);
   }
 
   /** Delete every exact occurrence through its preview's captured store. */
@@ -1356,7 +1493,8 @@ export class JModel extends JObject {
   }
 
   get specializations(): JProfile[] {
-    return Object.values(state().profiles).map((profile) => new JProfile(profile.id));
+    return Object.values(state(this.modelStore).profiles)
+      .map((profile) => new JProfile(profile.id, this.modelStore));
   }
 
   createSpecialization(
@@ -1368,54 +1506,76 @@ export class JModel extends JObject {
     if (!resolved || (!isElementType(resolved) && !isRelationshipType(resolved))) {
       throw new Error(`Unknown profile concept type: ${conceptType}`);
     }
-    return new JProfile(createProfile({
-      name,
-      conceptType: resolved,
-      imagePath: image?.path,
-    }));
+    return new JProfile(
+      createProfile({
+        name,
+        conceptType: resolved,
+        imagePath: image?.path,
+      }, this.modelStore),
+      this.modelStore,
+    );
   }
 
   findSpecialization(name: string, conceptType: string): JProfile | undefined {
     const resolved = resolveType(conceptType);
     if (!resolved || (!isElementType(resolved) && !isRelationshipType(resolved))) return undefined;
-    const profile = Object.values(state().profiles).find(
+    const profile = Object.values(state(this.modelStore).profiles).find(
       (candidate) =>
         candidate.conceptType === resolved &&
         candidate.name.localeCompare(name, undefined, { sensitivity: 'accent' }) === 0,
     );
-    return profile ? new JProfile(profile.id) : undefined;
+    return profile ? new JProfile(profile.id, this.modelStore) : undefined;
   }
 
   createElement(type: string, name?: string, folder?: JFolder): JConcept {
     const t = resolveType(type);
     if (!t || !isElementType(t)) throw new Error(`Unknown element type: ${type}`);
-    return new JConcept(addElement(t as ElementType, name, folder?.id));
+    assertSameModelStore(this, folder);
+    return new JConcept(
+      addElement(t as ElementType, name, folder?.id, this.modelStore),
+      this.modelStore,
+    );
   }
 
   createRelationship(type: string, name: string, source: JConcept, target: JConcept, folder?: JFolder): JConcept {
     const t = resolveType(type);
     if (!t || !isRelationshipType(t)) throw new Error(`Unknown relationship type: ${type}`);
-    const id = addRelationship(t as RelationshipType, source.id, target.id, name ?? '', folder?.id);
+    assertSameModelStore(this, source, target, folder);
+    const id = addRelationship(
+      t as RelationshipType,
+      source.id,
+      target.id,
+      name ?? '',
+      folder?.id,
+      this.modelStore,
+    );
     if (!id) {
       throw new Error(
         `Relationship ${type} not allowed between ${source.type} and ${target.type}`,
       );
     }
-    return new JConcept(id);
+    return new JConcept(id, this.modelStore);
   }
 
   createArchimateView(name?: string, folder?: JFolder): JView {
-    return new JView(addView(name ?? 'New View', folder?.id));
+    assertSameModelStore(this, folder);
+    return new JView(
+      addView(name ?? 'New View', folder?.id, this.modelStore),
+      this.modelStore,
+    );
   }
 }
 
-export function wrap(id: string): JObject | undefined {
-  const m = state();
-  if (m.elements[id] || m.relationships[id]) return new JConcept(id);
-  if (m.views[id]) return new JView(id);
-  if (m.folders[id]) return new JFolder(id);
-  if (m.nodes[id]) return new JVisual(id);
-  if (m.connections[id]) return new JConnection(id);
-  if (m.info.id === id) return new JModel(id);
+export function wrap(
+  id: string,
+  store: ModelStore = getActiveModelStore(),
+): JObject | undefined {
+  const m = state(store);
+  if (m.elements[id] || m.relationships[id]) return new JConcept(id, store);
+  if (m.views[id]) return new JView(id, store);
+  if (m.folders[id]) return new JFolder(id, store);
+  if (m.nodes[id]) return new JVisual(id, store);
+  if (m.connections[id]) return new JConnection(id, store);
+  if (m.info.id === id) return new JModel(id, store);
   return undefined;
 }

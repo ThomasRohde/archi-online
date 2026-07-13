@@ -37,13 +37,14 @@ function fmt(arg: unknown): string {
 
 /** Run a user script with jArchi-style globals. One undo step per run. */
 export function runScript(code: string, onConsole: (e: ConsoleEntry) => void): { error?: string } {
-  if (!getActiveModelStore().getState().model) {
+  const modelStore = getActiveModelStore();
+  if (!modelStore.getState().model) {
     return { error: 'No model is open' };
   }
   const emit = (level: ConsoleEntry['level'], args: unknown[]) =>
     onConsole({ level, text: args.map(fmt).join(' '), time: Date.now() });
 
-  const { $, model } = createJArchiGlobals();
+  const { $, model } = createJArchiGlobals(modelStore);
   const scriptConsole = {
     log: (...args: unknown[]) => emit('log', args),
     error: (...args: unknown[]) => emit('error', args),
@@ -65,7 +66,7 @@ export function runScript(code: string, onConsole: (e: ConsoleEntry) => void): {
     const fn = new Function('$', 'model', 'console', 'window', 'exit', `"use strict";\n${code}`);
     runBatch('Script', () => {
       fn($, model, scriptConsole, scriptWindow, exit);
-    });
+    }, modelStore);
     return {};
   } catch (e) {
     if (e instanceof ExitSignal) return {};

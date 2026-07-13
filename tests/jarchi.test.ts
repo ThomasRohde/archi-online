@@ -12,10 +12,16 @@ import {
   createEmptyModel,
 } from '../src/model/ops';
 import { attachConnection } from '../src/model/ops/draft';
-import { replaceModel, undo } from '../src/model/store';
+import {
+  createModelStore,
+  getActiveModelStore,
+  replaceModel,
+  setActiveModelStore,
+  undo,
+} from '../src/model/store';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 import { useStore } from '../src/ui/store-hooks';
-import { JView } from '../src/scripting/jarchi';
+import { createJArchiGlobals, JConcept, JView } from '../src/scripting/jarchi';
 import { JARCHI_CAPABILITY_TEST_SCRIPT } from '../src/scripting/example-scripts';
 import { runScript, type ConsoleEntry } from '../src/scripting/runner';
 import { connectionEndpointModel, endpointConnection } from './helpers/connection-endpoints';
@@ -30,11 +36,200 @@ function run(code: string): { error?: string; logs: string[] } {
   return { ...res, logs };
 }
 
+function collidingJArchiStores() {
+  const first = createModelStore({ model: createEmptyModel('First model') });
+  const actorId = addElement('BusinessActor', 'First actor', undefined, first);
+  const roleId = addElement('BusinessRole', 'First role', undefined, first);
+  const relationshipId = addRelationship(
+    'AssignmentRelationship',
+    actorId,
+    roleId,
+    'First relationship',
+    undefined,
+    first,
+  )!;
+  const viewId = addView('First view', undefined, first);
+  const actorNodeId = addElementNodeToView(
+    viewId,
+    actorId,
+    viewId,
+    { x: 10, y: 10, width: 120, height: 55 },
+    false,
+    {},
+    first,
+  );
+  const roleNodeId = addElementNodeToView(
+    viewId,
+    roleId,
+    viewId,
+    { x: 300, y: 10, width: 120, height: 55 },
+    false,
+    {},
+    first,
+  );
+  const connectionId = addConnectionToView(
+    viewId,
+    relationshipId,
+    actorNodeId,
+    roleNodeId,
+    first,
+  );
+  const secondModel = structuredClone(first.getState().model!);
+  secondModel.info.name = 'Second model';
+  secondModel.elements[actorId].name = 'Second actor';
+  secondModel.elements[roleId].name = 'Second role';
+  secondModel.relationships[relationshipId].name = 'Second relationship';
+  secondModel.views[viewId].name = 'Second view';
+  const second = createModelStore({ model: secondModel });
+
+  return {
+    first,
+    second,
+    actorId,
+    roleId,
+    relationshipId,
+    viewId,
+    actorNodeId,
+    roleNodeId,
+    connectionId,
+  };
+}
+
 beforeEach(() => {
   replaceModel(createEmptyModel('Script Test'), null);
 });
 
 describe('jArchi scripting API', () => {
+  it('keeps retained wrappers bound to the model store where they were created', () => {
+    const previous = getActiveModelStore();
+    const { first, second, actorId, viewId } = collidingJArchiStores();
+    try {
+      setActiveModelStore(first);
+      const globals = createJArchiGlobals();
+      const actor = globals.$(`#${actorId}`).first()!;
+      const view = new JView(viewId);
+
+      setActiveModelStore(second);
+
+      expect(globals.$(`#${actorId}`).first()!.name).toBe('First actor');
+      expect(view.name).toBe('First view');
+      actor.name = 'Renamed in first';
+      expect(first.getState().model!.elements[actorId].name).toBe('Renamed in first');
+      expect(second.getState().model!.elements[actorId].name).toBe('Second actor');
+    } finally {
+      setActiveModelStore(previous);
+    }
+  });
+
+  it('keeps retained specialization wrappers bound to their originating store', () => {
+    const previous = getActiveModelStore();
+    const { first, second } = collidingJArchiStores();
+    try {
+      setActiveModelStore(first);
+      const profile = createJArchiGlobals().model.createSpecialization(
+        'First specialization',
+        'business-actor',
+      );
+
+      setActiveModelStore(second);
+
+      expect(profile.name).toBe('First specialization');
+      profile.name = 'Renamed specialization';
+      expect(Object.values(first.getState().model!.profiles)[0].name)
+        .toBe('Renamed specialization');
+      expect(Object.keys(second.getState().model!.profiles)).toHaveLength(0);
+    } finally {
+      setActiveModelStore(previous);
+    }
+  });
+
+  it('includes model-store identity in equality and preserves it through derived wrappers', () => {
+    const previous = getActiveModelStore();
+    const { first, second, actorId, relationshipId, viewId } = collidingJArchiStores();
+    try {
+      setActiveModelStore(first);
+      const firstGlobals = createJArchiGlobals();
+      const firstActor = firstGlobals.$(`#${actorId}`).first()!;
+      const firstRelationship = firstGlobals.$(`#${relationshipId}`);
+      const firstView = new JView(viewId);
+
+      setActiveModelStore(second);
+      const secondActor = createJArchiGlobals().$(`#${actorId}`).first()!;
+
+      expect(firstActor.equals(secondActor)).toBe(false);
+      expect(firstGlobals.$(`#${actorId}`).first()!.equals(firstActor)).toBe(true);
+      expect(firstRelationship.sourceEnds().first()!.equals(firstActor)).toBe(true);
+      expect(firstView.nodes()[0].concept!.equals(firstActor)).toBe(true);
+      expect(firstView.connections()[0].source.equals(firstView.nodes()[0])).toBe(true);
+      expect(firstGlobals.$('.Business').children(`#${actorId}`).first()!.name)
+        .toBe('First actor');
+    } finally {
+      setActiveModelStore(previous);
+    }
+  });
+
+  it('rejects create and reconnect calls that mix wrappers from different model stores', () => {
+    const previous = getActiveModelStore();
+    const { first, second, actorId, roleId, relationshipId, viewId } = collidingJArchiStores();
+    try {
+      setActiveModelStore(first);
+      const firstGlobals = createJArchiGlobals();
+      const firstActor = firstGlobals.$(`#${actorId}`).first() as JConcept;
+      const firstRelationship = firstGlobals.$(`#${relationshipId}`).first() as JConcept;
+      const firstView = new JView(viewId);
+      const firstNodes = firstView.nodes();
+      const firstConnection = firstView.connections()[0];
+
+      setActiveModelStore(second);
+      const secondGlobals = createJArchiGlobals();
+      const secondRole = secondGlobals.$(`#${roleId}`).first() as JConcept;
+      const secondRoleNode = new JView(viewId).nodes()[1];
+
+      expect(() => firstGlobals.model.createRelationship(
+        'assignment-relationship',
+        'mixed',
+        firstActor,
+        secondRole,
+      )).toThrow(/different model session/i);
+      expect(() => firstView.add(
+        firstRelationship,
+        firstNodes[0],
+        secondRoleNode,
+      )).toThrow(/different model session/i);
+      expect(() => firstConnection.reconnect('target', secondRoleNode))
+        .toThrow(/different model session/i);
+      expect(() => firstGlobals.$(`#${actorId}`).add(secondRole))
+        .toThrow(/different model session/i);
+    } finally {
+      setActiveModelStore(previous);
+    }
+  });
+
+  it('keeps one script execution and undo batch on its captured active store', () => {
+    const previous = getActiveModelStore();
+    const first = createModelStore({ model: createEmptyModel('First') });
+    const second = createModelStore({ model: createEmptyModel('Second') });
+    try {
+      setActiveModelStore(first);
+      const result = runScript(`
+        model.createElement("business-actor", "Before switch");
+        console.log("switch");
+        model.createElement("business-role", "After switch");
+      `, (entry) => {
+        if (entry.text === 'switch') setActiveModelStore(second);
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(Object.values(first.getState().model!.elements).map((element) => element.name))
+        .toEqual(['Before switch', 'After switch']);
+      expect(Object.keys(second.getState().model!.elements)).toHaveLength(0);
+      expect(first.getState().undoStack).toHaveLength(1);
+      expect(second.getState().undoStack).toHaveLength(0);
+    } finally {
+      setActiveModelStore(previous);
+    }
+  });
+
   it('matches the jArchi specialization API', () => {
     const { logs, error } = run(`
       var actor = model.createElement("business-actor", "Customer");

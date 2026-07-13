@@ -1,10 +1,30 @@
+import { getActiveModelStore, type ModelStore } from '../../model/store';
 import { JCollection } from './collection';
 import { allObjects, matchesSelector } from './selectors';
 import { JObject } from './wrappers';
 
-export function $$(selector: string | JObject | JCollection): JCollection {
-  if (selector instanceof JCollection) return selector.clone();
-  if (selector instanceof JObject) return new JCollection([selector]);
-  if (typeof selector !== 'string') return new JCollection();
-  return new JCollection(allObjects().filter((o) => matchesSelector(o, selector)));
+export function $$(
+  selector: string | JObject | JCollection,
+  modelStore?: ModelStore,
+): JCollection {
+  if (selector instanceof JCollection) {
+    assertRequestedStore(selector.modelStore, modelStore);
+    return selector.clone();
+  }
+  if (selector instanceof JObject) {
+    assertRequestedStore(selector.modelStore, modelStore);
+    return new JCollection([selector], modelStore ?? selector.modelStore);
+  }
+  const store = modelStore ?? getActiveModelStore();
+  if (typeof selector !== 'string') return new JCollection([], store);
+  return new JCollection(
+    allObjects(store).filter((o) => matchesSelector(o, selector)),
+    store,
+  );
+}
+
+function assertRequestedStore(actual: ModelStore, requested?: ModelStore): void {
+  if (requested && actual !== requested) {
+    throw new Error('Cannot mix jArchi wrappers from different model sessions');
+  }
 }

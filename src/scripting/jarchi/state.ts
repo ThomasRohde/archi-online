@@ -1,8 +1,8 @@
-import { getActiveModelStore } from '../../model/store';
+import { getActiveModelStore, type ModelStore } from '../../model/store';
 import type { ModelState } from '../../model/types';
 
-export function state(): ModelState {
-  const m = getActiveModelStore().getState().model;
+export function state(store: ModelStore = getActiveModelStore()): ModelState {
+  const m = store.getState().model;
   if (!m) throw new Error('No model is open');
   return m;
 }

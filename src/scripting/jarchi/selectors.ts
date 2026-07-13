@@ -1,3 +1,4 @@
+import { getActiveModelStore, type ModelStore } from '../../model/store';
 import { state } from './state';
 import { JConcept, JFolder, JModel, JObject, JView } from './wrappers';
 
@@ -33,16 +34,16 @@ export function matchesSelector(obj: JObject, selector: string): boolean {
   return typeOk && (namePart === undefined || obj.name === namePart);
 }
 
-export function allObjects(): JObject[] {
-  const m = state();
+export function allObjects(store: ModelStore = getActiveModelStore()): JObject[] {
+  const m = state(store);
   const out: JObject[] = [];
-  for (const id of Object.keys(m.folders)) out.push(new JFolder(id));
-  for (const id of Object.keys(m.elements)) out.push(new JConcept(id));
-  for (const id of Object.keys(m.relationships)) out.push(new JConcept(id));
-  for (const id of Object.keys(m.views)) out.push(new JView(id));
+  for (const id of Object.keys(m.folders)) out.push(new JFolder(id, store));
+  for (const id of Object.keys(m.elements)) out.push(new JConcept(id, store));
+  for (const id of Object.keys(m.relationships)) out.push(new JConcept(id, store));
+  for (const id of Object.keys(m.views)) out.push(new JView(id, store));
   return out;
 }
 
-export function modelObject(): JModel {
-  return new JModel('model');
+export function modelObject(store: ModelStore = getActiveModelStore()): JModel {
+  return new JModel('model', store);
 }
