@@ -1,4 +1,5 @@
 import { performance } from 'node:perf_hooks';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
@@ -11,8 +12,15 @@ import type {
 } from '../src/model/types';
 import {
   DEFAULT_TREE_SEARCH_CRITERIA,
+  JAVA21_CASE_FOLD_DATA_SHA256,
+  JAVA21_CASE_FOLD_SOURCE_SHA256,
+  JAVA21_CASE_FOLD_SOURCE_URL,
+  JAVA21_CASE_FOLD_UNICODE_VERSION,
+  JAVA21_SIMPLE_CASE_FOLD_DATA,
   collectTreeSearchCatalog,
   compileTreeSearch,
+  javaCaseInsensitiveCanonical,
+  javaStringEqualsIgnoreCase,
   reconcileTreeSearchCatalog,
   resetTreeSearchCriteria,
   searchModelTree,
@@ -315,6 +323,152 @@ describe('structured model-tree search', () => {
     }).matchedIds.size).toBe(0);
   });
 
+  it('canonicalizes profile names with Java equalsIgnoreCase semantics', () => {
+    for (const [left, right] of [
+      ['IDENTITY', 'identity'],
+      ['Ångström', 'ångström'],
+      ['İ', 'i'],
+      ['Σ', 'ς'],
+      ['ПРОФИЛЬ', 'профиль'],
+      ['東京', '東京'],
+      ['𐐀', '𐐨'],
+    ]) {
+      expect(javaStringEqualsIgnoreCase(left, right), `${left} should equal ${right}`).toBe(true);
+      expect(javaCaseInsensitiveCanonical(left)).toBe(javaCaseInsensitiveCanonical(right));
+    }
+
+    expect(javaStringEqualsIgnoreCase('Straße', 'STRASSE')).toBe(false);
+    expect(javaCaseInsensitiveCanonical('Straße')).not.toBe(
+      javaCaseInsensitiveCanonical('STRASSE'),
+    );
+    expect(treeSearchProfileKey({ name: 'İ', conceptType: 'BusinessActor' })).toBe(
+      treeSearchProfileKey({ name: 'i', conceptType: 'BusinessActor' }),
+    );
+    expect(treeSearchProfileKey({ name: 'Σ', conceptType: 'BusinessActor' })).toBe(
+      treeSearchProfileKey({ name: 'ς', conceptType: 'BusinessActor' }),
+    );
+    expect(treeSearchProfileKey({ name: 'Σ', conceptType: 'BusinessActor' })).not.toBe(
+      treeSearchProfileKey({ name: 'ς', conceptType: 'BusinessObject' }),
+    );
+    expect(javaStringEqualsIgnoreCase('\u1c89', '\u1c8a')).toBe(false);
+    expect(javaCaseInsensitiveCanonical('\u1c89')).not.toBe(
+      javaCaseInsensitiveCanonical('\u1c8a'),
+    );
+  });
+
+  it('pins the Java 21 Unicode 15 fold data version and deterministic hashes', () => {
+    expect(JAVA21_CASE_FOLD_UNICODE_VERSION).toBe('15.0.0');
+    expect(JAVA21_CASE_FOLD_SOURCE_URL).toBe(
+      'https://www.unicode.org/Public/15.0.0/ucd/UnicodeData.txt',
+    );
+    expect(JAVA21_CASE_FOLD_SOURCE_SHA256)
+      .toBe('806e9aed65037197f1ec85e12be6e8cd870fc5608b4de0fffd990f689f376a73');
+    expect(JAVA21_SIMPLE_CASE_FOLD_DATA).toHaveLength(2_912);
+    expect(createHash('sha256').update(JAVA21_SIMPLE_CASE_FOLD_DATA.join(',')).digest('hex'))
+      .toBe(JAVA21_CASE_FOLD_DATA_SHA256);
+    expect(JAVA21_CASE_FOLD_DATA_SHA256)
+      .toBe('b52509337e3f5ef5091d4aecae61e272600f62d6fc232025cc314af8f14b3805');
+  });
+
+  it('uses every pinned simple fold pair and covers reference edge mappings', () => {
+    let previous = -1;
+    for (let index = 0; index < JAVA21_SIMPLE_CASE_FOLD_DATA.length; index += 2) {
+      const source = JAVA21_SIMPLE_CASE_FOLD_DATA[index];
+      const target = JAVA21_SIMPLE_CASE_FOLD_DATA[index + 1];
+      expect(source).toBeGreaterThan(previous);
+      expect(target).not.toBe(source);
+      expect(javaCaseInsensitiveCanonical(String.fromCodePoint(source)))
+        .toBe(String.fromCodePoint(target));
+      previous = source;
+    }
+
+    for (const [source, target] of [
+      [0x0041, 0x0061],
+      [0x0130, 0x0069],
+      [0x03a3, 0x03c3],
+      [0x03c2, 0x03c3],
+      [0x212a, 0x006b],
+      [0x1e9e, 0x00df],
+      [0x10400, 0x10428],
+      [0x10428, 0x10428],
+      [0x1c89, 0x1c89],
+      [0x1c8a, 0x1c8a],
+    ]) {
+      expect(javaCaseInsensitiveCanonical(String.fromCodePoint(source)))
+        .toBe(String.fromCodePoint(target));
+    }
+  });
+
+  it('deduplicates Java-equivalent profile descriptors without merging different base types', () => {
+    const first = createEmptyModel('First');
+    const second = createEmptyModel('Second');
+    first.profiles.a = {
+      id: 'a', name: 'İ', conceptType: 'BusinessActor', specialization: true,
+    };
+    second.profiles.b = {
+      id: 'b', name: 'i', conceptType: 'BusinessActor', specialization: true,
+    };
+    first.profiles.c = {
+      id: 'c', name: 'Σ', conceptType: 'BusinessActor', specialization: true,
+    };
+    second.profiles.d = {
+      id: 'd', name: 'ς', conceptType: 'BusinessActor', specialization: true,
+    };
+    second.profiles.e = {
+      id: 'e', name: 'i', conceptType: 'BusinessObject', specialization: true,
+    };
+
+    const catalog = collectTreeSearchCatalog([first, second]);
+    expect(catalog.specializations).toHaveLength(3);
+    expect(new Set(catalog.specializations.map(treeSearchProfileKey))).toEqual(new Set([
+      treeSearchProfileKey({ name: 'i', conceptType: 'BusinessActor' }),
+      treeSearchProfileKey({ name: 'Σ', conceptType: 'BusinessActor' }),
+      treeSearchProfileKey({ name: 'i', conceptType: 'BusinessObject' }),
+    ]));
+  });
+
+  it('matches Java-equivalent selected profiles across models and keeps base types exact', () => {
+    const first = createEmptyModel('First');
+    const second = createEmptyModel('Second');
+    first.profiles.dotted = {
+      id: 'dotted', name: 'İ', conceptType: 'BusinessActor', specialization: true,
+    };
+    first.profiles.sigma = {
+      id: 'sigma', name: 'Σ', conceptType: 'BusinessActor', specialization: true,
+    };
+    second.profiles.i = {
+      id: 'i', name: 'i', conceptType: 'BusinessActor', specialization: true,
+    };
+    second.profiles.finalSigma = {
+      id: 'finalSigma', name: 'ς', conceptType: 'BusinessActor', specialization: true,
+    };
+    second.profiles.object = {
+      id: 'object', name: 'i', conceptType: 'BusinessObject', specialization: true,
+    };
+    const dotted = addElement(second, {
+      id: 'dotted-actor', type: 'BusinessActor', name: 'Dotted', profileIds: ['i'],
+    });
+    const sigma = addElement(second, {
+      id: 'sigma-actor', type: 'BusinessActor', name: 'Sigma', profileIds: ['finalSigma'],
+    });
+    addElement(second, {
+      id: 'object', type: 'BusinessObject', name: 'Object', profileIds: ['object'],
+    });
+
+    const dottedResult = search(second, {
+      searchName: false,
+      specializations: [{ name: 'İ', conceptType: 'BusinessActor' }],
+    });
+    const sigmaResult = search(second, {
+      searchName: false,
+      specializations: [{ name: 'Σ', conceptType: 'BusinessActor' }],
+    });
+
+    expect(dottedResult.matchedIds).toEqual(new Set([dotted.id]));
+    expect(sigmaResult.matchedIds).toEqual(new Set([sigma.id]));
+    expect(collectTreeSearchCatalog([first, second]).specializations).toHaveLength(3);
+  });
+
   it('matches views through the typed OR group and controls unmatched folder visibility', () => {
     const model = createEmptyModel('Model');
     const view = addView(model, { id: 'view', name: 'Any view' });
@@ -441,12 +595,16 @@ describe('structured model-tree search', () => {
 describe('model tree search layout', () => {
   it('keeps the controls compact, responsive, and keyboard-visible', () => {
     const css = readFileSync('src/styles.css', 'utf8');
+    const menu = cssBlock(css, '.tree-search-menu');
 
     expect(cssBlock(css, '.tree-filter')).toMatch(/display:\s*grid;/);
     expect(cssBlock(css, '.tree-filter-input')).toMatch(/min-width:\s*0;/);
     expect(css).toMatch(/\.tree-search-menu\s*\{/);
     expect(css).toMatch(/@container\s*\(max-width:\s*220px\)/);
     expect(css).toMatch(/\.tree-search-menu[^}]*max-height:/s);
+    expect(menu).toMatch(/box-sizing:\s*border-box;/);
+    expect(menu).toMatch(/right:\s*-78px;/);
+    expect(menu).not.toMatch(/right:\s*-94px;/);
     expect(css).toMatch(/\.tree-filter[^}]*:focus-visible/s);
   });
 });

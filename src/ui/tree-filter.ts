@@ -9,6 +9,21 @@ import type {
   ModelState,
   Property,
 } from '../model/types';
+import {
+  JAVA21_CASE_FOLD_DATA_SHA256,
+  JAVA21_CASE_FOLD_SOURCE_SHA256,
+  JAVA21_CASE_FOLD_SOURCE_URL,
+  JAVA21_CASE_FOLD_UNICODE_VERSION,
+  JAVA21_SIMPLE_CASE_FOLD_DATA,
+} from './data/java21-simple-case-fold';
+
+export {
+  JAVA21_CASE_FOLD_DATA_SHA256,
+  JAVA21_CASE_FOLD_SOURCE_SHA256,
+  JAVA21_CASE_FOLD_SOURCE_URL,
+  JAVA21_CASE_FOLD_UNICODE_VERSION,
+  JAVA21_SIMPLE_CASE_FOLD_DATA,
+};
 
 export interface TreeSearchProfile {
   name: string;
@@ -130,8 +145,43 @@ function isConcept(item: SearchableTreeItem): item is ArchimateElement | Archima
   return 'kind' in item && (item.kind === 'element' || item.kind === 'relationship');
 }
 
+const JAVA21_SIMPLE_CASE_FOLD_MAP = new Map<number, number>();
+for (let index = 0; index < JAVA21_SIMPLE_CASE_FOLD_DATA.length; index += 2) {
+  JAVA21_SIMPLE_CASE_FOLD_MAP.set(
+    JAVA21_SIMPLE_CASE_FOLD_DATA[index],
+    JAVA21_SIMPLE_CASE_FOLD_DATA[index + 1],
+  );
+}
+
+function javaCaseFoldCodePoint(codePoint: number): number {
+  return JAVA21_SIMPLE_CASE_FOLD_MAP.get(codePoint) ?? codePoint;
+}
+
+/** Locale-independent Java 21 String.equalsIgnoreCase canonical form. */
+export function javaCaseInsensitiveCanonical(value: string): string {
+  return [...value]
+    .map((character) => String.fromCodePoint(javaCaseFoldCodePoint(character.codePointAt(0)!)))
+    .join('');
+}
+
+/*
+ * Java first requires the same UTF-16 length, then compares corresponding Unicode code points
+ * with its one-code-point lower(upper(codePoint)) rule. Supplementary characters therefore fold
+ * as code points, while unpaired surrogates remain unchanged.
+ */
+export function javaStringEqualsIgnoreCase(left: string, right: string): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  const leftCodePoints = [...left];
+  const rightCodePoints = [...right];
+  if (leftCodePoints.length !== rightCodePoints.length) return false;
+  return leftCodePoints.every((character, index) =>
+    javaCaseFoldCodePoint(character.codePointAt(0)!)
+      === javaCaseFoldCodePoint(rightCodePoints[index].codePointAt(0)!));
+}
+
 export function treeSearchProfileKey(profile: TreeSearchProfile): string {
-  return `${profile.conceptType}\u0000${profile.name.toLowerCase()}`;
+  return `${profile.conceptType}\u0000${javaCaseInsensitiveCanonical(profile.name)}`;
 }
 
 function matchesSpecialization(
@@ -258,6 +308,16 @@ function propertyOwners(model: ModelState): readonly SearchableTreeItem[] {
   ];
 }
 
+function compareCaseInsensitive(left: string, right: string): number {
+  const foldedLeft = javaCaseInsensitiveCanonical(left);
+  const foldedRight = javaCaseInsensitiveCanonical(right);
+  if (foldedLeft < foldedRight) return -1;
+  if (foldedLeft > foldedRight) return 1;
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 /** Aggregate exact property keys and cross-model specialization descriptors. */
 export function collectTreeSearchCatalog(models: readonly ModelState[]): TreeSearchCatalog {
   const propertyKeys = new Set<string>();
@@ -277,12 +337,11 @@ export function collectTreeSearchCatalog(models: readonly ModelState[]): TreeSea
   }
 
   return {
-    propertyKeys: [...propertyKeys].sort((left, right) =>
-      left.toLocaleLowerCase().localeCompare(right.toLocaleLowerCase()) || left.localeCompare(right)),
+    propertyKeys: [...propertyKeys].sort(compareCaseInsensitive),
     specializations: [...specializations.values()].sort((left, right) =>
       Number(isRelationshipType(left.conceptType)) - Number(isRelationshipType(right.conceptType))
-      || left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
-      || left.conceptType.localeCompare(right.conceptType)),
+      || compareCaseInsensitive(left.name, right.name)
+      || (left.conceptType < right.conceptType ? -1 : Number(left.conceptType > right.conceptType))),
   };
 }
 

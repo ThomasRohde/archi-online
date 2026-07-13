@@ -771,11 +771,12 @@ body {
 .tree-search-menu {
   position: absolute;
   top: calc(100% + 4px);
-  right: -94px;
+  right: -78px;
   left: auto;
   z-index: 20;
   display: grid;
   gap: 8px;
+  box-sizing: border-box;
   width: min(252px, calc(100cqw - 12px));
   max-height: min(520px, 72vh);
   overflow: auto;
