@@ -6,7 +6,7 @@ import {
   previewFindReplace,
 } from '../src/model/find-replace';
 import { createEmptyModel } from '../src/model/ops';
-import { createModelStore, type ModelStore } from '../src/model/store';
+import { createModelStore, replaceModel, type ModelStore } from '../src/model/store';
 import type { ModelState } from '../src/model/types';
 import {
   activateModelSession,
@@ -328,6 +328,20 @@ describe('find and replace dialog', () => {
     await act(async () => button('Preview').click());
     await act(async () => store.setState({ activeViewId: 'view-b' }));
     expect(document.querySelector('table[aria-label="Find and replace preview"]')).toBeNull();
+  });
+
+  it('invalidates preview when same-reference model replacement only advances model epoch', async () => {
+    const model = fixture();
+    const store = createModelStore({ model });
+    await renderDialog(store);
+    await setInput('find', 'Alpha');
+    await act(async () => button('Preview').click());
+    expect(document.querySelector('table[aria-label="Find and replace preview"]')).not.toBeNull();
+
+    await act(async () => replaceModel(model, null, false, {}, store));
+
+    expect(document.querySelector('table[aria-label="Find and replace preview"]')).toBeNull();
+    expect(button('Apply').disabled).toBe(true);
   });
 
   it('keeps preview and row navigation enabled read-only while disabling Apply', async () => {

@@ -82,6 +82,11 @@ export function FindReplaceDialog({
     () => capture.store.getState().model,
     () => capture.store.getState().model,
   );
+  const modelEpoch = useSyncExternalStore(
+    capture.store.subscribe,
+    () => capture.store.getState().modelEpoch,
+    () => capture.store.getState().modelEpoch,
+  );
   const activeViewId = useSyncExternalStore(
     capture.store.subscribe,
     () => capture.store.getState().activeViewId,
@@ -92,7 +97,7 @@ export function FindReplaceDialog({
     () => capture.store.getState().readOnly,
     () => capture.store.getState().readOnly,
   );
-  const sourceRef = useRef({ model, activeViewId });
+  const sourceRef = useRef({ model, modelEpoch, activeViewId });
 
   const invalidate = (nextStatus = 'Options changed. Preview again.') => {
     setPreview(null);
@@ -111,11 +116,15 @@ export function FindReplaceDialog({
 
   useEffect(() => {
     const previous = sourceRef.current;
-    sourceRef.current = { model, activeViewId };
-    if (previous.model !== model || previous.activeViewId !== activeViewId) {
+    sourceRef.current = { model, modelEpoch, activeViewId };
+    if (
+      previous.model !== model
+      || previous.modelEpoch !== modelEpoch
+      || previous.activeViewId !== activeViewId
+    ) {
       invalidate('Source changed. Preview again.');
     }
-  }, [activeViewId, model]);
+  }, [activeViewId, model, modelEpoch]);
 
   useEffect(() => {
     const restoreFocus = restoreFocusRef.current;
