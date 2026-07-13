@@ -174,7 +174,11 @@ function LegendCustomPreferenceRow({
   useEffect(() => setLabelDraft(committedLabel), [committedLabel]);
   const hasLabel = Boolean(committedLabel);
   const hasColor = Boolean(settings.legendUserColors[row.type]);
-  const commitLabel = () => updateLabel(row.type, labelDraft);
+  const commitLabel = () => {
+    const normalized = labelDraft.trim();
+    setLabelDraft(normalized);
+    updateLabel(row.type, normalized);
+  };
   return (
     <div className="settings-legend-row">
       <span className="settings-legend-name">{row.label}</span>

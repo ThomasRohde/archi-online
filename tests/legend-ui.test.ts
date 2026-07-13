@@ -338,6 +338,29 @@ describe('native legend palette and properties', () => {
     await act(async () => root.unmount());
   });
 
+  it('canonicalizes a whitespace-only label draft immediately after commit', async () => {
+    const { host, root } = await render(createElement(SettingsPanel));
+    const details = host.querySelector<HTMLDetailsElement>('.settings-legend-custom')!;
+    await act(async () => {
+      details.open = true;
+      details.dispatchEvent(new Event('toggle', { bubbles: true }));
+    });
+    const label = host.querySelector<HTMLInputElement>(
+      '[aria-label="Business Actor legend label"]',
+    )!;
+    const reset = host.querySelector<HTMLButtonElement>(
+      '[aria-label="Reset Business Actor legend preferences"]',
+    )!;
+
+    await change(label, '   ');
+    await act(async () => label.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+
+    expect(label.value).toBe('');
+    expect(reset.disabled).toBe(true);
+    expect(useSettingsStore.getState().settings.legendLabels).toEqual({});
+    await act(async () => root.unmount());
+  });
+
   it('commits custom labels with Enter and restores drafts with Escape or Reset', async () => {
     const { host, root } = await render(createElement(SettingsPanel));
     const details = host.querySelector<HTMLDetailsElement>('.settings-legend-custom')!;
