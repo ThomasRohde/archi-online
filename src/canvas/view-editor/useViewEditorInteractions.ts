@@ -61,6 +61,7 @@ import { copyNodes, pasteNodes } from '../clipboard';
 import {
   closestSegment,
   createConnectionRouteResolver,
+  pointAlong,
   rectsIntersect,
   toRelativeBendpoint,
   type Point,
@@ -123,6 +124,10 @@ export function useViewEditorInteractions({
   const [edit, setEdit] = useState<EditState | null>(null);
   const interRef = useRef(inter);
   const activePointerIdRef = useRef<number | null>(null);
+  const interactionModelRef = useRef<{
+    model: ModelState | null;
+    modelEpoch: number;
+  } | null>(null);
   interRef.current = inter;
   const isConnectionVisible = model
     ? createNestedConnectionVisibilityResolver(model, settings)
@@ -201,7 +206,25 @@ export function useViewEditorInteractions({
 
   const ownsPointer = (pointerId: number) => activePointerIdRef.current === pointerId;
 
-  const capturePointer = (pointerId: number) => {
+  const captureInteractionModel = () => {
+    const state = modelStore.getState();
+    interactionModelRef.current = { model: state.model, modelEpoch: state.modelEpoch };
+  };
+
+  const interactionModelIsCurrent = () => {
+    const source = interactionModelRef.current;
+    if (!source) return true;
+    const state = modelStore.getState();
+    return state.model === source.model && state.modelEpoch === source.modelEpoch;
+  };
+
+  const clearInteraction = () => {
+    interactionModelRef.current = null;
+    setInter({ kind: 'none' });
+  };
+
+  const capturePointer = (pointerId: number, preserveInteractionModel = false) => {
+    if (!preserveInteractionModel || !interactionModelRef.current) captureInteractionModel();
     svgRef.current!.setPointerCapture(pointerId);
     activePointerIdRef.current = pointerId;
   };
@@ -233,7 +256,7 @@ export function useViewEditorInteractions({
   const cancelPointerInteraction = (pointerId: number) => {
     if (!ownsPointer(pointerId)) return;
     activePointerIdRef.current = null;
-    setInter({ kind: 'none' });
+    clearInteraction();
     safelyReleasePointerCapture(pointerId);
   };
 
@@ -255,11 +278,14 @@ export function useViewEditorInteractions({
     elementFirst = false,
   ) => {
     const currentModel = modelStore.getState().model;
-    if (!currentModel) return;
+    if (!currentModel) {
+      clearInteraction();
+      return;
+    }
     const cur = interRef.current;
     if (cur.kind !== 'connect') return;
     const tool = modelStore.getState().activeTool;
-    setInter({ kind: 'none' });
+    clearInteraction();
     const srcNode = currentModel.nodes[cur.sourceId];
     const tgtNode = targetId ? currentModel.nodes[targetId] : undefined;
     if (tool.kind === 'create-plain-connection') {
@@ -360,6 +386,10 @@ export function useViewEditorInteractions({
   const onPointerDown = (e: ReactPointerEvent) => {
     if (!model || !view) return;
     if (activePointerIdRef.current !== null && !ownsPointer(e.pointerId)) return;
+    if (activePointerIdRef.current !== null && !interactionModelIsCurrent()) {
+      cancelPointerInteraction(e.pointerId);
+      return;
+    }
     svgRef.current?.focus();
     if (edit) commitEdit(null);
     if (e.button === 1 || (e.button === 0 && spaceRef.current)) {
@@ -369,7 +399,12 @@ export function useViewEditorInteractions({
       return;
     }
     if (e.button !== 0) return;
-    capturePointer(e.pointerId);
+    const continuingConnect = interRef.current.kind === 'connect';
+    if (continuingConnect && !interactionModelIsCurrent()) {
+      clearInteraction();
+      return;
+    }
+    capturePointer(e.pointerId, continuingConnect);
     const p = toView(e.clientX, e.clientY);
     const hit = hitFromEvent(e);
     const tool = modelStore.getState().activeTool;
@@ -626,7 +661,13 @@ export function useViewEditorInteractions({
   };
 
   const onPointerMove = (e: ReactPointerEvent) => {
-    if (!model || !ownsPointer(e.pointerId)) return;
+    const idleConnect = activePointerIdRef.current === null && interRef.current.kind === 'connect';
+    if (!model || (!ownsPointer(e.pointerId) && !idleConnect)) return;
+    if (!interactionModelIsCurrent()) {
+      if (ownsPointer(e.pointerId)) cancelPointerInteraction(e.pointerId);
+      else clearInteraction();
+      return;
+    }
     const cur = interRef.current;
     if (cur.kind === 'none') return;
     const p = toView(e.clientX, e.clientY);
@@ -721,15 +762,39 @@ export function useViewEditorInteractions({
     }
   };
 
+  const onPointerLeave = () => {
+    if (activePointerIdRef.current !== null) return;
+    const cur = interRef.current;
+    if (cur.kind !== 'connect') return;
+    if (!interactionModelIsCurrent()) {
+      clearInteraction();
+      return;
+    }
+    const bounds = absBounds.get(cur.sourceId);
+    const route = bounds ? undefined : connectionRoutes?.(cur.sourceId);
+    const sourcePoint = bounds
+      ? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+      : route && route.length >= 2
+        ? pointAlong(route, 0.5).point
+        : cur.current;
+    setInter({ ...cur, current: sourcePoint, hoverConnectableId: null });
+  };
+
   const onPointerUp = (e: ReactPointerEvent) => {
     if (!ownsPointer(e.pointerId)) return;
+    if (!interactionModelIsCurrent()) {
+      cancelPointerInteraction(e.pointerId);
+      return;
+    }
     releasePointer(e.pointerId);
-    if (!model) {
-      setInter({ kind: 'none' });
+    const currentModel = modelStore.getState().model;
+    if (!model || !currentModel) {
+      clearInteraction();
       return;
     }
     const cur = interRef.current;
     const p = toView(e.clientX, e.clientY);
+    let keepInteractionModel = false;
     switch (cur.kind) {
       case 'pan':
         if (e.button === 1 || e.button === 0) setInter({ kind: 'none' });
@@ -742,8 +807,18 @@ export function useViewEditorInteractions({
         const dx = cur.current.x - cur.start.x;
         const dy = cur.current.y - cur.start.y;
         const newParent = cur.dropParentId ?? viewId;
+        const validRoots = cur.rootIds.every(
+          (id) => Boolean(currentModel.nodes[id] && absBounds.get(id)),
+        );
+        const validParent = newParent === viewId
+          ? Boolean(currentModel.views[viewId])
+          : Boolean(currentModel.nodes[newParent] && absBounds.get(newParent));
+        if (!validRoots || !validParent) {
+          setInter({ kind: 'none' });
+          break;
+        }
         const parentAbs =
-          newParent === viewId ? { x: 0, y: 0 } : (absBounds.get(newParent) ?? { x: 0, y: 0 });
+          newParent === viewId ? { x: 0, y: 0 } : absBounds.get(newParent)!;
         const entries: MoveEntry[] = cur.rootIds.map((id) => {
           const abs = absBounds.get(id)!;
           return {
@@ -759,14 +834,14 @@ export function useViewEditorInteractions({
         });
         setInter({ kind: 'none' });
         const changesParent = entries.some(
-          (entry) => model.nodes[entry.id]?.parentId !== entry.parentId,
+          (entry) => currentModel.nodes[entry.id]?.parentId !== entry.parentId,
         );
         const changesElementNesting = entries.some((entry) => {
-          const node = model.nodes[entry.id];
+          const node = currentModel.nodes[entry.id];
           if (node?.nodeType !== 'element') return false;
           return (
-            model.nodes[node.parentId]?.nodeType === 'element' ||
-            model.nodes[entry.parentId]?.nodeType === 'element'
+            currentModel.nodes[node.parentId]?.nodeType === 'element' ||
+            currentModel.nodes[entry.parentId]?.nodeType === 'element'
           );
         });
         if (
@@ -794,10 +869,15 @@ export function useViewEditorInteractions({
         break;
       }
       case 'resize': {
-        const node = model.nodes[cur.nodeId]!;
-        const parentAbs =
-          node.parentId === viewId ? { x: 0, y: 0 } : (absBounds.get(node.parentId) ?? { x: 0, y: 0 });
+        const node = currentModel.nodes[cur.nodeId];
+        const nodeAbs = absBounds.get(cur.nodeId);
+        const parentAbs = node?.parentId === viewId
+          ? { x: 0, y: 0 }
+          : node
+            ? absBounds.get(node.parentId)
+            : undefined;
         setInter({ kind: 'none' });
+        if (!node || !nodeAbs || !parentAbs) break;
         commitMove([
           {
             id: cur.nodeId,
@@ -843,6 +923,8 @@ export function useViewEditorInteractions({
         const targetId = hit.nodeId ?? hit.connId;
         if (!targetId || targetId !== cur.sourceId) {
           finishConnect(targetId, e.clientX, e.clientY, e.ctrlKey || e.metaKey);
+        } else {
+          keepInteractionModel = true;
         }
         break;
       }
@@ -884,6 +966,7 @@ export function useViewEditorInteractions({
       default:
         break;
     }
+    if (!keepInteractionModel) interactionModelRef.current = null;
   };
 
   const onPointerCancel = (e: ReactPointerEvent) => {
@@ -916,7 +999,9 @@ export function useViewEditorInteractions({
     const sel = modelStore.getState().selection;
     const viewSel = sel.source === 'view' ? sel.ids : [];
     if (e.key === 'Escape') {
-      setInter({ kind: 'none' });
+      const pointerId = activePointerIdRef.current;
+      if (pointerId === null) clearInteraction();
+      else cancelPointerInteraction(pointerId);
       setActiveTool({ kind: 'select' });
       setSelection('view', []);
       return;
@@ -1179,6 +1264,7 @@ export function useViewEditorInteractions({
       onPointerUp,
       onPointerCancel,
       onLostPointerCapture,
+      onPointerLeave,
       onDoubleClick,
       onKeyDown,
       onContextMenu,

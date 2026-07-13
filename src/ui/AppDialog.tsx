@@ -140,6 +140,12 @@ function present(request: DialogRequest): void {
   else pendingDialogs.push(request);
 }
 
+function cancelDialogRequest(request: DialogRequest): void {
+  if (request.kind === 'alert') request.resolve();
+  else if (request.kind === 'confirm') request.resolve(false);
+  else request.resolve(null);
+}
+
 export function showAlertDialog(options: AlertDialogOptions): Promise<void> {
   return new Promise((resolve) => {
     present({
@@ -237,6 +243,7 @@ export function AppDialogHost() {
   const dialogRef = useRef<HTMLFormElement>(null);
   const focusOwnerRef = useRef<{ element: HTMLElement | null } | null>(null);
   const settledIdsRef = useRef(new Set<number>());
+  const queueRef = useRef<DialogRequest[]>([]);
   const active = queue[0] ?? null;
 
   const restoreOwnedFocus = useCallback(() => {
@@ -249,10 +256,12 @@ export function AppDialogHost() {
   const settleActive = useCallback((request: DialogRequest, resolve: () => void) => {
     if (settledIdsRef.current.has(request.id)) return;
     settledIdsRef.current.add(request.id);
+    const nextQueue = queueRef.current[0]?.id === request.id
+      ? queueRef.current.slice(1)
+      : queueRef.current.filter((candidate) => candidate.id !== request.id);
+    queueRef.current = nextQueue;
     resolve();
-    setQueue((current) =>
-      current[0]?.id === request.id ? current.slice(1) : current,
-    );
+    setQueue(nextQueue);
   }, []);
 
   const confirmActive = useCallback(() => {
@@ -273,21 +282,27 @@ export function AppDialogHost() {
 
   const cancelActive = useCallback(() => {
     if (!active) return;
-    settleActive(active, () => {
-      if (active.kind === 'alert') active.resolve();
-      else if (active.kind === 'confirm') active.resolve(false);
-      else active.resolve(null);
-    });
+    settleActive(active, () => cancelDialogRequest(active));
   }, [active, settleActive]);
 
   useEffect(() => {
+    const settledIds = settledIdsRef.current;
     const hostPresenter = (request: DialogRequest) => {
-      setQueue((current) => [...current, request]);
+      const nextQueue = [...queueRef.current, request];
+      queueRef.current = nextQueue;
+      setQueue(nextQueue);
     };
     presenter = hostPresenter;
     pendingDialogs.splice(0).forEach(hostPresenter);
     return () => {
       if (presenter === hostPresenter) presenter = null;
+      const unresolved = queueRef.current;
+      queueRef.current = [];
+      for (const request of unresolved) {
+        if (settledIds.has(request.id)) continue;
+        settledIds.add(request.id);
+        cancelDialogRequest(request);
+      }
     };
   }, []);
 

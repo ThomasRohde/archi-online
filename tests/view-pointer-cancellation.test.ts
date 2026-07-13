@@ -2,7 +2,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewEditor } from '../src/canvas/ViewEditor';
-import { replaceModel, setSelection } from '../src/model/store';
+import { deleteViewObjects, renameItem } from '../src/model/ops';
+import { replaceModel, setActiveTool, setSelection, undo } from '../src/model/store';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 import { useStore } from '../src/ui/store-hooks';
 import { connectionEndpointModel } from './helpers/connection-endpoints';
@@ -49,8 +50,8 @@ function pointer(
   return event;
 }
 
-async function renderEditor(): Promise<SVGSVGElement> {
-  await act(async () => root.render(createElement(ViewEditor, { viewId: 'view' })));
+async function renderEditor(readOnly = false): Promise<SVGSVGElement> {
+  await act(async () => root.render(createElement(ViewEditor, { viewId: 'view', readOnly })));
   const svg = host.querySelector<SVGSVGElement>('svg.view-svg');
   expect(svg).not.toBeNull();
   return svg!;
@@ -215,5 +216,137 @@ describe('editable view pointer cancellation', () => {
 
     expect(currentModel().nodes['node-a'].bounds).not.toEqual(before.nodes['node-a'].bounds);
     expect(currentModel().nodes['node-b'].bounds).toMatchObject({ x: 200, y: 0 });
+  });
+
+  it.each(['delete', 'undo'] as const)(
+    'cancels a move after an intervening %s and leaves the next gesture clean',
+    async (mutation) => {
+      if (mutation === 'undo') renameItem('node-c', 'Changed before drag');
+      const svg = await renderEditor();
+      emulatePointerCapture(svg);
+      hit = host.querySelector('[data-node-id="node-a"]')!;
+
+      await act(async () => svg.dispatchEvent(pointer('pointerdown', 10, 10, 50)));
+      await act(async () => svg.dispatchEvent(pointer('pointermove', 60, 70, 50)));
+      await act(async () => {
+        if (mutation === 'delete') deleteViewObjects(['node-a']);
+        else undo();
+      });
+      const afterMutation = currentModel();
+      const afterMutationSnapshot = structuredClone(afterMutation);
+      const undoLabels = useStore.getState().undoStack.map((transaction) => transaction.label);
+      const redoLabels = useStore.getState().redoStack.map((transaction) => transaction.label);
+
+      await act(async () => svg.dispatchEvent(pointer('pointerup', 60, 70, 50)));
+
+      expect(currentModel()).toBe(afterMutation);
+      expect(currentModel()).toEqual(afterMutationSnapshot);
+      expect(useStore.getState().undoStack.map((transaction) => transaction.label)).toEqual(undoLabels);
+      expect(useStore.getState().redoStack.map((transaction) => transaction.label)).toEqual(redoLabels);
+
+      const nodeBBefore = structuredClone(currentModel().nodes['node-b'].bounds);
+      hit = host.querySelector('[data-node-id="node-b"]')!;
+      await act(async () => svg.dispatchEvent(pointer('pointerdown', 210, 10, 51)));
+      await act(async () => svg.dispatchEvent(pointer('pointermove', 250, 60, 51)));
+      await act(async () => svg.dispatchEvent(pointer('pointerup', 250, 60, 51)));
+
+      expect(currentModel().nodes['node-b'].bounds).not.toEqual(nodeBBefore);
+      expect(useStore.getState().undoStack.at(-1)?.label).toBe('Move');
+    },
+  );
+
+  it.each(['delete', 'undo'] as const)(
+    'cancels a resize after an intervening %s and leaves the next gesture clean',
+    async (mutation) => {
+      if (mutation === 'undo') renameItem('node-c', 'Changed before drag');
+      setSelection('view', ['node-a']);
+      const svg = await renderEditor();
+      emulatePointerCapture(svg);
+      hit = host.querySelector('[data-handle="se"][data-handle-node="node-a"]')!;
+
+      await act(async () => svg.dispatchEvent(pointer('pointerdown', 100, 40, 60)));
+      await act(async () => svg.dispatchEvent(pointer('pointermove', 140, 80, 60)));
+      await act(async () => {
+        if (mutation === 'delete') deleteViewObjects(['node-a']);
+        else undo();
+      });
+      const afterMutation = currentModel();
+      const afterMutationSnapshot = structuredClone(afterMutation);
+      const undoLabels = useStore.getState().undoStack.map((transaction) => transaction.label);
+      const redoLabels = useStore.getState().redoStack.map((transaction) => transaction.label);
+
+      await act(async () => svg.dispatchEvent(pointer('pointerup', 140, 80, 60)));
+
+      expect(currentModel()).toBe(afterMutation);
+      expect(currentModel()).toEqual(afterMutationSnapshot);
+      expect(useStore.getState().undoStack.map((transaction) => transaction.label)).toEqual(undoLabels);
+      expect(useStore.getState().redoStack.map((transaction) => transaction.label)).toEqual(redoLabels);
+
+      await act(async () => setSelection('view', ['node-b']));
+      const nodeBBefore = structuredClone(currentModel().nodes['node-b'].bounds);
+      hit = host.querySelector('[data-handle="se"][data-handle-node="node-b"]')!;
+      await act(async () => svg.dispatchEvent(pointer('pointerdown', 300, 40, 61)));
+      await act(async () => svg.dispatchEvent(pointer('pointermove', 330, 70, 61)));
+      await act(async () => svg.dispatchEvent(pointer('pointerup', 330, 70, 61)));
+
+      expect(currentModel().nodes['node-b'].bounds).not.toEqual(nodeBBefore);
+      expect(useStore.getState().undoStack.at(-1)?.label).toBe('Move');
+    },
+  );
+
+  it('updates click-click connector feedback between pointer gestures and clears it on leave', async () => {
+    const svg = await renderEditor();
+    emulatePointerCapture(svg);
+    const initialConnectionIds = new Set(Object.keys(currentModel().connections));
+    await act(async () => setActiveTool({ kind: 'create-plain-connection' }));
+    hit = host.querySelector('[data-node-id="node-a"]')!;
+
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 50, 20, 30)));
+    await act(async () => svg.dispatchEvent(pointer('pointerup', 50, 20, 30)));
+
+    const pending = svg.querySelector<SVGLineElement>('line[stroke-dasharray="5 3"]')!;
+    expect(pending).not.toBeNull();
+    const sourceX = pending.getAttribute('x1');
+    const initialTargetX = pending.getAttribute('x2');
+    hit = host.querySelector('[data-node-id="node-b"]')!;
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 250, 20, 30)));
+
+    expect(pending.getAttribute('x2')).not.toBe(initialTargetX);
+    expect(hit.querySelector('rect[stroke="#1d9e46"]')).not.toBeNull();
+
+    await act(async () => svg.dispatchEvent(pointer('pointerout', 250, 20, 30)));
+    expect(pending.getAttribute('x2')).toBe(sourceX);
+    expect(hit.querySelector('rect[stroke="#1d9e46"]')).toBeNull();
+
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 250, 20, 30)));
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 250, 20, 30)));
+    await act(async () => svg.dispatchEvent(pointer('pointerup', 250, 20, 30)));
+
+    expect(Object.values(currentModel().connections).find((connection) => (
+      !initialConnectionIds.has(connection.id)
+    ))).toMatchObject({ sourceId: 'node-a', targetId: 'node-b' });
+  });
+});
+
+describe('read-only view pointer cancellation', () => {
+  it('clears middle-button pan on lost capture without recursion and accepts the next pan', async () => {
+    const svg = await renderEditor(true);
+    const capture = emulatePointerCapture(svg);
+    const viewportGroup = svg.querySelector<SVGGElement>(':scope > g')!;
+
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 100, 100, 40, 1)));
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 140, 150, 40, 1)));
+    const beforeLostCapture = viewportGroup.getAttribute('transform');
+    await act(async () => svg.dispatchEvent(pointer('lostpointercapture', 140, 150, 40, 1)));
+
+    expect(capture.releasePointerCapture).toHaveBeenCalledTimes(1);
+    expect(capture.captured.size).toBe(0);
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 180, 190, 40, 1)));
+    expect(viewportGroup.getAttribute('transform')).toBe(beforeLostCapture);
+
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 180, 190, 41, 1)));
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 200, 220, 41, 1)));
+    await act(async () => svg.dispatchEvent(pointer('pointerup', 200, 220, 41, 1)));
+    expect(viewportGroup.getAttribute('transform')).not.toBe(beforeLostCapture);
   });
 });

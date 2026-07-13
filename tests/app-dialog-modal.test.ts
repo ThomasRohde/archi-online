@@ -126,4 +126,41 @@ describe('shared application dialog modal behavior', () => {
     expect(document.activeElement).toBe(trigger);
     expect(restored).toHaveBeenCalledOnce();
   });
+
+  it('cancels the active and queued requests on teardown without remounting ghosts', async () => {
+    const confirmResult = vi.fn();
+    const promptResult = vi.fn();
+    const alertResult = vi.fn();
+
+    await act(async () => {
+      void showConfirmDialog({ title: 'Active confirmation' }).then(confirmResult);
+      void showPromptDialog({ title: 'Queued prompt' }).then(promptResult);
+      void showAlertDialog({ title: 'Queued alert' }).then(alertResult);
+    });
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Active confirmation');
+
+    await act(async () => {
+      root.unmount();
+      await Promise.resolve();
+    });
+
+    expect(confirmResult).toHaveBeenCalledOnce();
+    expect(confirmResult).toHaveBeenCalledWith(false);
+    expect(promptResult).toHaveBeenCalledOnce();
+    expect(promptResult).toHaveBeenCalledWith(null);
+    expect(alertResult).toHaveBeenCalledOnce();
+    expect(alertResult).toHaveBeenCalledWith(undefined);
+
+    root = createRoot(host);
+    await act(async () => root.render(createElement(AppDialogHost)));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+
+    const freshResult = vi.fn();
+    await act(async () => {
+      void showAlertDialog({ title: 'Fresh alert' }).then(freshResult);
+    });
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Fresh alert');
+    await act(async () => button('OK').click());
+    expect(freshResult).toHaveBeenCalledOnce();
+  });
 });

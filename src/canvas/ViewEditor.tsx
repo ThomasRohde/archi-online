@@ -169,7 +169,10 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
       setCanvasStatus({ x: p.x, y: p.y });
     }
   };
-  const onCanvasPointerLeave = () => setCanvasStatus({ x: null, y: null });
+  const onCanvasPointerLeave = () => {
+    handlers.onPointerLeave();
+    setCanvasStatus({ x: null, y: null });
+  };
 
   const activeC4ViewType = c4ViewType(view);
   const { moveDelta, dropParentId, resizeOverride, liveAbs } = deriveLiveViewState(
@@ -366,8 +369,8 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
 
   const stopPan = (pointerId: number, target: SVGSVGElement) => {
     if (panRef.current?.pointerId !== pointerId) return;
-    if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
     panRef.current = null;
+    if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
   };
 
   return (
@@ -408,6 +411,7 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
         }}
         onPointerUp={(event) => stopPan(event.pointerId, event.currentTarget)}
         onPointerCancel={(event) => stopPan(event.pointerId, event.currentTarget)}
+        onLostPointerCapture={(event) => stopPan(event.pointerId, event.currentTarget)}
         onContextMenu={(event) => event.preventDefault()}
       >
         <g transform={`translate(${viewport.x},${viewport.y}) scale(${viewport.zoom})`}>
