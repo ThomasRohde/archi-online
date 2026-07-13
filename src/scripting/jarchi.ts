@@ -19,4 +19,7 @@ export {
   type JFindReplaceRow,
   type JFindReplaceSearchOptions,
   type JKind,
+  type JPropertyKeyUsage,
+  type JPropertyMutationPreview,
+  type JPropertyOccurrence,
 } from './jarchi/wrappers';

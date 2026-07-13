@@ -150,6 +150,37 @@ declare interface JFindReplacePreview {
   readonly rows: readonly JFindReplaceRow[];
 }
 
+declare interface JPropertyOccurrence {
+  readonly id: string;
+  readonly ownerId: string;
+  readonly ownerKind: 'model' | 'folder' | 'element' | 'relationship' | 'view' | 'group' | 'note' | 'plain-connection';
+  readonly ownerType: string;
+  readonly location: string;
+  readonly propertyIndex: number;
+  readonly key: string;
+  readonly value: string;
+}
+
+declare interface JPropertyKeyUsage {
+  readonly key: string;
+  readonly displayKey: string;
+  readonly occurrenceCount: number;
+  readonly ownerCount: number;
+  readonly occurrences: readonly JPropertyOccurrence[];
+}
+
+declare interface JPropertyMutationPreview {
+  readonly valid: boolean;
+  readonly error: string | null;
+  readonly warning: string | null;
+  readonly operation: 'rename' | 'delete';
+  readonly key: string;
+  readonly newKey: string | null;
+  readonly collision: boolean;
+  readonly collisionAcknowledged: boolean;
+  readonly occurrences: readonly JPropertyOccurrence[];
+}
+
 declare interface JCollection {
   size(): number;
   readonly length: number;
@@ -192,6 +223,11 @@ declare interface JModel {
   search(options: JFindReplaceSearchOptions): JFindReplaceRow[];
   previewReplace(options: JFindReplaceOptions): JFindReplacePreview;
   applyReplace(preview: JFindReplacePreview, selectedRowIds?: readonly string[]): number;
+  propertyUsage(search?: string): readonly JPropertyKeyUsage[];
+  previewRenamePropertyKey(key: string, newKey: string, collisionAcknowledged?: boolean): JPropertyMutationPreview;
+  renamePropertyKey(preview: JPropertyMutationPreview): number;
+  previewDeletePropertyKey(key: string): JPropertyMutationPreview;
+  deletePropertyKey(preview: JPropertyMutationPreview): number;
   readonly specializations: JProfile[];
   createSpecialization(name: string, conceptType: string, image?: { path: string }): JProfile;
   findSpecialization(name: string, conceptType: string): JProfile | undefined;

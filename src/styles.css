@@ -2676,6 +2676,354 @@ body {
   background: #873030;
 }
 
+/* The global property ledger uses the existing desktop palette, with a split
+   summary/detail surface that keeps exact keys and their model locations in view. */
+.property-manager-backdrop {
+  padding: 18px;
+}
+
+.property-manager-dialog {
+  width: min(1040px, 100%);
+  max-height: min(88vh, 760px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #c7d0da;
+  border-radius: 8px;
+  background: var(--panel-bg);
+  box-shadow: 0 24px 60px rgba(24, 34, 46, 0.3);
+}
+
+.property-manager-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px 13px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--header-bg);
+}
+
+.property-manager-header h2 {
+  margin: 1px 0 0;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.property-manager-header > span {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.property-manager-kicker {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.property-manager-body {
+  min-height: 300px;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 285px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.property-manager-keys {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: #f8fafc;
+}
+
+.property-manager-keys > label,
+.property-manager-rename > label:first-child {
+  display: grid;
+  gap: 4px;
+  color: var(--text-mid);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.property-manager-keys > label {
+  padding: 11px 12px 9px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.property-manager-keys input,
+.property-manager-rename input[type='text'],
+.property-manager-rename input:not([type]) {
+  width: 100%;
+  min-width: 0;
+  height: 29px;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text);
+  font: 13px 'Segoe UI', system-ui, sans-serif;
+  box-sizing: border-box;
+}
+
+.property-manager-dialog input:focus-visible,
+.property-manager-dialog button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.property-manager-table-wrap,
+.property-manager-occurrences {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.property-manager-dialog table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: 11px;
+}
+
+.property-manager-dialog th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 7px;
+  border-bottom: 1px solid var(--border);
+  background: #eef2f6;
+  color: var(--text-mid);
+  font-weight: 650;
+  text-align: left;
+}
+
+.property-manager-dialog td {
+  padding: 7px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+
+.property-manager-keys th:first-child { width: auto; }
+.property-manager-keys th:nth-child(2),
+.property-manager-keys th:nth-child(3) {
+  width: 48px;
+  text-align: center;
+}
+
+.property-manager-keys td:nth-child(2),
+.property-manager-keys td:nth-child(3) {
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.property-manager-keys tbody tr.selected {
+  background: #e8f1ff;
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+.property-manager-keys tbody tr:hover,
+.property-manager-occurrences tbody tr:hover {
+  background-color: #f3f7fc;
+}
+
+.property-manager-keys td button,
+.property-manager-navigate {
+  width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #175fbf;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.property-manager-keys td button:hover,
+.property-manager-navigate:hover {
+  text-decoration: underline;
+}
+
+.property-manager-details {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+
+.property-manager-detail-header {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.property-manager-detail-header > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.property-manager-detail-header span {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.property-manager-detail-header strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.property-manager-stage {
+  display: flex;
+  gap: 5px;
+}
+
+.property-manager-stage .active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: #164f96;
+}
+
+.property-manager-rename {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.75fr) minmax(220px, 1.25fr);
+  gap: 12px;
+  align-items: end;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background: #fbfcfd;
+}
+
+.property-manager-acknowledge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 29px;
+  color: #7b5416;
+  font-size: 11px;
+}
+
+.property-manager-feedback {
+  min-height: 29px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background: #fbfcfd;
+  color: var(--text-mid);
+  font-size: 11px;
+}
+
+.property-manager-feedback [role='alert'] {
+  color: #8b5c13;
+  font-weight: 650;
+  text-align: right;
+}
+
+.property-manager-occurrence-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--border);
+  background: #f7f9fb;
+  color: var(--text-mid);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.property-manager-occurrences th:first-child { width: 27%; }
+.property-manager-occurrences th:nth-child(2) { width: 19%; }
+.property-manager-occurrences th { top: 29px; }
+
+.property-manager-occurrences code {
+  display: block;
+  max-height: 48px;
+  overflow: hidden;
+  color: #313943;
+  font: 11px/1.35 'Cascadia Mono', Consolas, monospace;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.property-manager-navigate {
+  color: #355f8b;
+  font-weight: 500;
+}
+
+.property-manager-empty {
+  padding: 18px 12px;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: center;
+}
+
+.property-manager-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 10px 18px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--header-bg);
+}
+
+.tb-btn.primary.danger {
+  border-color: #a63d3d;
+  background: #a63d3d;
+}
+
+.tb-btn.primary.danger:hover:not(:disabled) {
+  background: #873030;
+}
+
+.property-manager-entry {
+  align-self: flex-start;
+  margin: 2px 0 7px;
+  border-color: var(--border);
+}
+
+@media (max-width: 760px) {
+  .property-manager-backdrop { padding: 8px; }
+  .property-manager-dialog { max-height: 94vh; }
+  .property-manager-header > span { display: none; }
+  .property-manager-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(150px, 36%) minmax(220px, 64%);
+  }
+  .property-manager-keys {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .property-manager-rename { grid-template-columns: 1fr; }
+  .property-manager-occurrences th:nth-child(2),
+  .property-manager-occurrences td:nth-child(2) { display: none; }
+}
+
 /* Find/replace is a compact review surface: inputs and scope stay quiet while
    the before/after ledger carries the visual weight. */
 .find-replace-backdrop {

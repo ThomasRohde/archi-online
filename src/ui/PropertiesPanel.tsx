@@ -34,6 +34,11 @@ import { LabelTab } from './properties/LabelTab';
 import { conceptName, resolveTarget, type Target } from './properties/target';
 import { isLegendNote } from '../model/legend';
 import { useSettingsStore } from '../settings/app-settings';
+import {
+  capturePropertyManagerSession,
+  type PropertyManagerSessionCapture,
+} from '../model/property-manager';
+import { PropertiesManagerDialog } from './PropertiesManagerDialog';
 
 // Well-known viewpoints for the picker, sorted by their friendly display name.
 const VIEWPOINTS_BY_NAME = [...VIEWPOINTS].sort((a, b) => a.name.localeCompare(b.name));
@@ -90,49 +95,65 @@ function CommitInput({
   );
 }
 
-function PropertiesTable({ target, readOnly }: { target: Target; readOnly: boolean }) {
+function PropertiesTable({
+  target,
+  readOnly,
+  onManage,
+}: {
+  target: Target;
+  readOnly: boolean;
+  onManage: () => void;
+}) {
   const modelStore = useModelStoreApi();
   const props = target.properties ?? [];
   const commit = (next: Property[]) => {
     if (!readOnly) setProperties(target.conceptId!, next, modelStore);
   };
-  if (!target.conceptId) return <div className="empty-hint">No properties for this selection.</div>;
   return (
     <div className="prop-table">
-      <div className="prop-table-head">
-        <span>Name</span>
-        <span>Value</span>
-        <span />
-      </div>
-      {props.map((p, i) => (
-        <div className="prop-table-row" key={i}>
-          <CommitInput
-            value={p.key}
-            disabled={readOnly}
-            onCommit={(v) => commit(props.map((q, j) => (j === i ? { ...q, key: v } : q)))}
-          />
-          <CommitInput
-            value={p.value}
-            disabled={readOnly}
-            onCommit={(v) => commit(props.map((q, j) => (j === i ? { ...q, value: v } : q)))}
-          />
-          <button
-            className="tb-btn small"
-            title="Remove property"
-            disabled={readOnly}
-            onClick={() => commit(props.filter((_, j) => j !== i))}
-          >
-            ×
-          </button>
-        </div>
-      ))}
-      <button
-        className="tb-btn add-prop"
-        disabled={readOnly}
-        onClick={() => commit([...props, { key: '', value: '' }])}
-      >
-        + Add property
+      <button className="tb-btn property-manager-entry" onClick={onManage}>
+        Manage all model properties
       </button>
+      {!target.conceptId ? (
+        <div className="empty-hint">No properties for this selection.</div>
+      ) : (
+        <>
+          <div className="prop-table-head">
+            <span>Name</span>
+            <span>Value</span>
+            <span />
+          </div>
+          {props.map((p, i) => (
+            <div className="prop-table-row" key={i}>
+              <CommitInput
+                value={p.key}
+                disabled={readOnly}
+                onCommit={(v) => commit(props.map((q, j) => (j === i ? { ...q, key: v } : q)))}
+              />
+              <CommitInput
+                value={p.value}
+                disabled={readOnly}
+                onCommit={(v) => commit(props.map((q, j) => (j === i ? { ...q, value: v } : q)))}
+              />
+              <button
+                className="tb-btn small"
+                title="Remove property"
+                disabled={readOnly}
+                onClick={() => commit(props.filter((_, j) => j !== i))}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button
+            className="tb-btn add-prop"
+            disabled={readOnly}
+            onClick={() => commit([...props, { key: '', value: '' }])}
+          >
+            + Add property
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -417,6 +438,8 @@ export function PropertiesPanel() {
   const selection = useStore((s) => s.selection);
   const readOnly = useStore((s) => s.readOnly);
   const [tab, setTab] = useState<Tab>('main');
+  const [propertiesManagerCapture, setPropertiesManagerCapture] =
+    useState<PropertyManagerSessionCapture | null>(null);
   const target = model ? resolveTarget(model, selection.source, selection.ids) : null;
   const supportsLegend = Boolean(target?.count === 1 && isLegendNote(target.node));
   const supportsAnalysis = Boolean(
@@ -678,7 +701,15 @@ export function PropertiesPanel() {
               {target.count > 1 && <div className="empty-hint">{target.typeLabel}</div>}
             </div>
           )}
-          {tab === 'properties' && <PropertiesTable target={target} readOnly={readOnly} />}
+          {tab === 'properties' && (
+            <PropertiesTable
+              target={target}
+              readOnly={readOnly}
+              onManage={() => setPropertiesManagerCapture(
+                capturePropertyManagerSession(modelStore),
+              )}
+            />
+          )}
           {tab === 'analysis' && supportsAnalysis && target.conceptId && (
             <AnalysisTab model={model} conceptId={target.conceptId} />
           )}
@@ -690,6 +721,12 @@ export function PropertiesPanel() {
           {tab === 'image' && supportsImage && <ImageTab target={target} readOnly={readOnly} />}
         </div>
       </div>
+      {propertiesManagerCapture && (
+        <PropertiesManagerDialog
+          capture={propertiesManagerCapture}
+          onClose={() => setPropertiesManagerCapture(null)}
+        />
+      )}
     </div>
   );
 }

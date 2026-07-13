@@ -8,6 +8,7 @@ import {
 import {
   addConnectionToView,
   applyFindReplace,
+  deletePropertyKey as applyPropertyKeyDelete,
   addElement,
   addElementNodeToView,
   addGroupToView,
@@ -30,6 +31,7 @@ import {
   layoutView,
   renameItem,
   resizeNode,
+  renamePropertyKey as applyPropertyKeyRename,
   setConnectionBendpoints,
   setViewConnectionRouterType,
   setDocumentation,
@@ -51,6 +53,15 @@ import {
   type FindReplaceRow,
   type FindReplaceScope,
 } from '../../model/find-replace';
+import {
+  capturePropertyManagerSession,
+  inspectPropertyUsage,
+  previewPropertyDelete,
+  previewPropertyRename,
+  type PropertyKeyUsage,
+  type PropertyMutationPreview,
+  type PropertyOccurrence,
+} from '../../model/property-manager';
 import {
   absoluteBounds as modelAbsoluteBounds,
   type Bendpoint,
@@ -101,6 +112,9 @@ export interface JFindReplaceOptions extends JFindReplaceSearchOptions {
 
 export type JFindReplaceRow = FindReplaceRow;
 export type JFindReplacePreview = FindReplacePreview;
+export type JPropertyOccurrence = PropertyOccurrence;
+export type JPropertyKeyUsage = PropertyKeyUsage;
+export type JPropertyMutationPreview = PropertyMutationPreview;
 
 function findReplaceOptions(
   options: JFindReplaceSearchOptions,
@@ -1305,6 +1319,40 @@ export class JModel extends JObject {
     selectedRowIds?: readonly string[],
   ): number {
     return applyFindReplace(preview, selectedRowIds);
+  }
+
+  /** Inspect ordered property-key usage across the captured active model. */
+  propertyUsage(search = ''): readonly JPropertyKeyUsage[] {
+    return inspectPropertyUsage(capturePropertyManagerSession(), search);
+  }
+
+  /** Build the mandatory preview consumed by renamePropertyKey(). */
+  previewRenamePropertyKey(
+    key: string,
+    newKey: string,
+    collisionAcknowledged = false,
+  ): JPropertyMutationPreview {
+    return previewPropertyRename(
+      capturePropertyManagerSession(),
+      key,
+      newKey,
+      collisionAcknowledged,
+    );
+  }
+
+  /** Rename every exact occurrence through its preview's captured store. */
+  renamePropertyKey(preview: JPropertyMutationPreview): number {
+    return applyPropertyKeyRename(preview);
+  }
+
+  /** Build the mandatory preview consumed by deletePropertyKey(). */
+  previewDeletePropertyKey(key: string): JPropertyMutationPreview {
+    return previewPropertyDelete(capturePropertyManagerSession(), key);
+  }
+
+  /** Delete every exact occurrence through its preview's captured store. */
+  deletePropertyKey(preview: JPropertyMutationPreview): number {
+    return applyPropertyKeyDelete(preview);
   }
 
   get specializations(): JProfile[] {

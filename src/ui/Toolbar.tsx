@@ -8,6 +8,7 @@ import {
   FilePlus2,
   FolderOpen,
   Images,
+  ListChecks,
   PanelTopOpen,
   PanelsTopLeft,
   Presentation,
@@ -71,6 +72,11 @@ import {
   type FindReplaceSessionCapture,
 } from '../model/find-replace';
 import { FindReplaceDialog } from './FindReplaceDialog';
+import {
+  capturePropertyManagerSession,
+  type PropertyManagerSessionCapture,
+} from '../model/property-manager';
+import { PropertiesManagerDialog } from './PropertiesManagerDialog';
 
 /** Published documentation site (GitHub Pages). */
 const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
@@ -300,6 +306,7 @@ type IconName =
   | 'profiles'
   | 'images'
   | 'replace'
+  | 'properties'
   | 'ext'
   | 'views'
   | 'docs'
@@ -319,6 +326,7 @@ const TB_ICONS: Record<IconName, LucideIcon> = {
   profiles: Tags,
   images: Images,
   replace: ReplaceAll,
+  properties: ListChecks,
   ext: Blocks,
   views: PanelTopOpen,
   docs: BookOpen,
@@ -350,6 +358,8 @@ export function Toolbar() {
   const [showImages, setShowImages] = useState(false);
   const [findReplaceCapture, setFindReplaceCapture] =
     useState<FindReplaceSessionCapture | null>(null);
+  const [propertiesManagerCapture, setPropertiesManagerCapture] =
+    useState<PropertyManagerSessionCapture | null>(null);
   const extensionSnapshot = useSyncExternalStore(
     (listener) => extensionRegistry.subscribe(listener),
     () => extensionRegistry.getSnapshot(),
@@ -533,6 +543,14 @@ export function Toolbar() {
       >
         <TbIcon name="replace" />
       </button>
+      <button
+        className="tb-icon"
+        {...tip('Manage model properties')}
+        disabled={!hasModel}
+        onClick={() => setPropertiesManagerCapture(capturePropertyManagerSession())}
+      >
+        <TbIcon name="properties" />
+      </button>
       <div className="toolbar-spacer" />
       {extensionSnapshot.toolbarButtons.map((button) => (
         <button
@@ -592,6 +610,12 @@ export function Toolbar() {
         <FindReplaceDialog
           capture={findReplaceCapture}
           onClose={() => setFindReplaceCapture(null)}
+        />
+      )}
+      {propertiesManagerCapture && (
+        <PropertiesManagerDialog
+          capture={propertiesManagerCapture}
+          onClose={() => setPropertiesManagerCapture(null)}
         />
       )}
       <SpecializationsManager
