@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-14
+
+### Added
+
+- Deterministic Visualiser graphs with traversal controls, selection sync,
+  history, ELK relayout, and SVG/PNG export
+- Transactional Generate View workflows for semantic selections, viewpoints,
+  internal relationships, and higher-order connection topology
+- Configurable Hammer validation rules plus separately reported model-integrity
+  findings with precise tree and view navigation
+- Atomic `.archimate` import-and-merge previews with conflict handling, asset
+  deduplication, folder options, and navigable reports
+- Desktop-compatible `.architemplate` import, export, and IndexedDB gallery
+  workflows with fresh-ID remapping, thumbnails, categories, and safety checks
+- Reciprocal Phase 3 fixtures and CI verification for analysis, validation,
+  merge, and template compatibility
+
+### Changed
+
+- Validator configuration now briefly explains Hammer rules as modelling checks
+  instead of referring users to a specific Desktop version
+
 ## [1.4.0] - 2026-07-13
 
 ### Added
