@@ -16,11 +16,13 @@ describe('analysis preferences', () => {
       viewpointId: 42,
       elementTypes: ['BusinessActor', 'Nope'],
       relationshipTypes: ['FlowRelationship', 'Nope'],
+      showRelationshipNames: 'yes',
     })).toEqual({
       ...DEFAULT_ANALYSIS_PREFERENCES,
       depth: 6,
       elementTypes: ['BusinessActor'],
       relationshipTypes: ['FlowRelationship'],
+      showRelationshipNames: false,
     });
 
     const failing = {
@@ -33,7 +35,13 @@ describe('analysis preferences', () => {
 
   it('round-trips a versioned preference record', async () => {
     const storage = memoryKeyValueStore();
-    const value = normalizeAnalysisPreferences({ depth: 3, direction: 'incoming', pinned: true });
+    const value = normalizeAnalysisPreferences({
+      depth: 3,
+      direction: 'incoming',
+      pinned: true,
+      showRelationshipNames: true,
+    });
+    expect(value.showRelationshipNames).toBe(true);
     await persistAnalysisPreferences(value, storage);
     await expect(loadAnalysisPreferences(storage)).resolves.toEqual(value);
   });

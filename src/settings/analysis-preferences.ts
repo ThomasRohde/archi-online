@@ -21,6 +21,7 @@ export interface AnalysisPreferences {
   elementTypes: ElementType[];
   relationshipTypes: RelationshipType[];
   pinned: boolean;
+  showRelationshipNames: boolean;
 }
 
 export const DEFAULT_ANALYSIS_PREFERENCES: AnalysisPreferences = {
@@ -31,6 +32,7 @@ export const DEFAULT_ANALYSIS_PREFERENCES: AnalysisPreferences = {
   elementTypes: [],
   relationshipTypes: [],
   pinned: false,
+  showRelationshipNames: false,
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -65,6 +67,9 @@ export function normalizeAnalysisPreferences(value: unknown): AnalysisPreference
         ))]
       : [],
     pinned: typeof source.pinned === 'boolean' ? source.pinned : false,
+    showRelationshipNames: typeof source.showRelationshipNames === 'boolean'
+      ? source.showRelationshipNames
+      : false,
   };
 }
 
