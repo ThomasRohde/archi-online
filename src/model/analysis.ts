@@ -1,4 +1,5 @@
 import type { ArchimateRelationship, DiagramView, ModelState } from './types';
+import type { SelectionState } from './store';
 
 function byNameThenId<T extends { id: string; name: string }>(a: T, b: T): number {
   return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
@@ -73,4 +74,24 @@ export function findInView(
     )?.id;
   }
   return undefined;
+}
+
+/** Semantic concepts represented by a tree or canvas selection, in selection order. */
+export function conceptsFromSelection(
+  state: ModelState | null,
+  selection: SelectionState,
+): string[] {
+  if (!state) return [];
+  const result: string[] = [];
+  for (const id of selection.ids) {
+    let conceptId: string | undefined;
+    if (state.elements[id] || state.relationships[id]) conceptId = id;
+    else if (selection.source === 'view') {
+      const node = state.nodes[id];
+      if (node?.nodeType === 'element') conceptId = node.elementId;
+      else conceptId = state.connections[id]?.relationshipId;
+    }
+    if (conceptId && !result.includes(conceptId)) result.push(conceptId);
+  }
+  return result;
 }

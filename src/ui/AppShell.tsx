@@ -2,6 +2,7 @@ import { ContextMenuHost } from './ContextMenu';
 import { DockLayout } from './DockLayout';
 import { StatusBar } from './StatusBar';
 import { Toolbar } from './Toolbar';
+import { GenerateViewDialogHost } from './GenerateViewDialog';
 
 export function AppShell() {
   const activeSessionId = useWorkspaceStore((state) => state.activeSessionId);
@@ -11,6 +12,7 @@ export function AppShell() {
   const shell = (
     <div className="app-shell">
       <ContextMenuHost />
+      <GenerateViewDialogHost />
       <Toolbar />
       <div className="app-main">
         <DockLayout />

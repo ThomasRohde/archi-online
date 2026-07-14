@@ -193,6 +193,20 @@ describe('dock layout config', () => {
     });
   });
 
+  it('reopens Visualiser beside Navigator and keeps it out of the default layout', () => {
+    const { api, added } = createDockApi();
+
+    buildDefaultLayout(api as never);
+    TOOL_PANELS.find((panel) => panel.id === 'navigator')!.add(api as never);
+    TOOL_PANELS.find((panel) => panel.id === 'visualiser')!.add(api as never);
+
+    const visualiser = added.find((panel) => panel.id === 'visualiser');
+    expect(visualiser?.component).toBe('visualiser');
+    expect(visualiser?.title).toBe('Visualiser');
+    expect(visualiser?.position).toEqual({ referencePanel: 'navigator', direction: 'within' });
+    expect(typeof components.visualiser).toBe('function');
+  });
+
   it('reopens Outline with Models when Models is present and keeps it out of the default layout', () => {
     const { api, added } = createDockApi();
 

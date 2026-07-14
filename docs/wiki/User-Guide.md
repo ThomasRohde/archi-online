@@ -275,6 +275,24 @@ read-only mode.
   panel follows) without re-rooting; double-click an element row to make it
   the new root.
 
+## Visualiser and generated views
+
+Open **Views ▾ → Visualiser** for an ephemeral relationship graph beside the
+Navigator. It follows element or relationship selection unless pinned. Use
+Back/Home, drill in by double-clicking, choose depth 1–6, direction, viewpoint,
+and element/relationship filters, then relayout as needed. Selecting a graph
+node selects the same concept in the Models tree and Properties panel. The
+graph never enters model state or undo history; only its controls are saved in
+IndexedDB. Export it as SVG or PNG, or copy a PNG. Results stop at 1,000
+concepts and show a truncation warning so filters can be tightened.
+
+Select one or more semantic elements in the Models tree or on a view and choose
+**Generate View For…** from the context menu. Set the name, viewpoint, depth,
+and whether every relationship internal to the result should be included. The
+candidate is validated and laid out before mutation; success creates and opens
+the complete view in one undo step, including relationship-to-relationship
+connection topology. A layout or validation failure creates nothing.
+
 ## Outline
 
 The **Outline** is an opt-in minimap of the active view. Open it from
@@ -369,6 +387,13 @@ demand, not live, so re-click after making changes. Results are summarised as
 - **Advice** (ℹ️) — empty views, and elements visually nested inside another
   element without a nesting-type relationship between them.
 
+Use **Configure** to enable or disable any of the eight pinned Archi 5.9 Hammer
+rules. Their severities are fixed and every rule is enabled by default. The
+separate **Model integrity** group checks duplicate or key-mismatched IDs,
+missing references, folder membership/root placement, view ownership, and
+invalid connection topology. These checks are Online safeguards and are not
+labelled as Desktop Hammer rules.
+
 Click any issue to jump to it: view issues open the view and select the
 diagram object, while element and relationship issues select the concept in
 the Models tree so the Properties panel follows. The panel is read-only and
@@ -413,6 +438,11 @@ IndexedDB shortly after every
 change and restores all model roots, file names, dirty flags, active model,
 open views, and image assets on the next launch. It protects against crashes and accidental
 tab closes within the same browser profile — it is not a backup.
+
+Visualiser controls, Validator configuration, and the model-template catalog
+also use versioned IndexedDB records. Loading failures fall back to defaults and
+never block editor startup. These browser-local records are not written into
+`.archimate` files.
 
 ## Installed app and offline use
 

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="Phase 3 Analysis and Reuse" id="id-31000000000000000000000000000001" version="5.0.0">
+  <profile name="External customer" id="id-31000000000000000000000000000002" conceptType="BusinessActor" specialization="true"/>
+  <folder name="Strategy" id="id-31000000000000000000000000000003" type="strategy"/>
+  <folder name="Business" id="id-31000000000000000000000000000004" type="business">
+    <element xsi:type="archimate:BusinessActor" name="Customer" id="id-3100000000000000000000000000000c" profiles="id-31000000000000000000000000000002"/>
+    <element xsi:type="archimate:BusinessRole" name="Buyer" id="id-3100000000000000000000000000000d"/>
+    <element xsi:type="archimate:BusinessProcess" name="Place order" id="id-3100000000000000000000000000000e"/>
+  </folder>
+  <folder name="Application" id="id-31000000000000000000000000000005" type="application"/>
+  <folder name="Technology &amp; Physical" id="id-31000000000000000000000000000006" type="technology"/>
+  <folder name="Motivation" id="id-31000000000000000000000000000007" type="motivation"/>
+  <folder name="Implementation &amp; Migration" id="id-31000000000000000000000000000008" type="implementation_migration"/>
+  <folder name="Other" id="id-31000000000000000000000000000009" type="other"/>
+  <folder name="Relations" id="id-3100000000000000000000000000000a" type="relations">
+    <element xsi:type="archimate:AssignmentRelationship" name="Customer acts as buyer" id="id-3100000000000000000000000000000f" source="id-3100000000000000000000000000000c" target="id-3100000000000000000000000000000d"/>
+    <element xsi:type="archimate:TriggeringRelationship" name="Buyer starts order" id="id-31000000000000000000000000000010" source="id-3100000000000000000000000000000d" target="id-3100000000000000000000000000000e"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Assignment context" id="id-31000000000000000000000000000011" source="id-3100000000000000000000000000000f" target="id-3100000000000000000000000000000e"/>
+  </folder>
+  <folder name="Views" id="id-3100000000000000000000000000000b" type="diagrams">
+    <element xsi:type="archimate:ArchimateDiagramModel" name="Customer ordering" id="id-31000000000000000000000000000012">
+      <child xsi:type="archimate:DiagramObject" id="id-31000000000000000000000000000013" fillColor="#f4c95d" archimateElement="id-3100000000000000000000000000000c">
+        <bounds x="30" y="40" width="150" height="60"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-31000000000000000000000000000016" source="id-31000000000000000000000000000013" target="id-31000000000000000000000000000014" archimateRelationship="id-3100000000000000000000000000000f">
+          <sourceConnection xsi:type="archimate:Connection" id="id-31000000000000000000000000000018" source="id-31000000000000000000000000000016" target="id-31000000000000000000000000000015" archimateRelationship="id-31000000000000000000000000000011"/>
+        </sourceConnection>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-31000000000000000000000000000014" targetConnections="id-31000000000000000000000000000016" archimateElement="id-3100000000000000000000000000000d">
+        <bounds x="260" y="40" width="150" height="60"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-31000000000000000000000000000017" source="id-31000000000000000000000000000014" target="id-31000000000000000000000000000015" archimateRelationship="id-31000000000000000000000000000010"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="id-31000000000000000000000000000015" targetConnections="id-31000000000000000000000000000017 id-31000000000000000000000000000018" archimateElement="id-3100000000000000000000000000000e">
+        <bounds x="500" y="40" width="150" height="60"/>
+      </child>
+    </element>
+  </folder>
+</archimate:model>

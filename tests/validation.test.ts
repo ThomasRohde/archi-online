@@ -16,8 +16,13 @@ import { parseArchimate } from '../src/model/io/archimate-xml';
 import { replaceModel } from '../src/model/store';
 import { useStore } from '../src/ui/store-hooks';
 import type { ModelState } from '../src/model/types';
-import { validateModel, type ValidationIssue } from '../src/model/validation';
+import {
+  DEFAULT_VALIDATION_CONFIG,
+  validateModel,
+  type ValidationIssue,
+} from '../src/model/validation';
 import { ValidatorPanel } from '../src/ui/ValidatorPanel';
+import { useValidatorSettings } from '../src/settings/validator-settings';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -33,6 +38,7 @@ function rulesOf(issues: ValidationIssue[], rule: string): ValidationIssue[] {
 
 beforeEach(() => {
   replaceModel(createEmptyModel('Validation Test'), null);
+  useValidatorSettings.setState({ config: structuredClone(DEFAULT_VALIDATION_CONFIG) });
 });
 
 describe('invalid-relationship checker', () => {
@@ -59,7 +65,7 @@ describe('invalid-relationship checker', () => {
     const issues = rulesOf(validateModel(clone), 'invalid-relationship');
     expect(issues).toHaveLength(1);
     expect(issues[0].severity).toBe('error');
-    expect(issues[0].conceptId).toBe(relId);
+    expect(issues[0].location.modelTree.idPath.at(-1)).toBe(relId);
     expect(issues[0].message).toBe("Realization is not allowed between 'A' and 'B'");
 
     clone.relationships[relId].type = 'TriggeringRelationship';
@@ -78,7 +84,7 @@ describe('junction checker', () => {
     const issues = rulesOf(validateModel(model()), 'junction');
     expect(issues).toHaveLength(1);
     expect(issues[0].severity).toBe('error');
-    expect(issues[0].conceptId).toBe(j);
+    expect(issues[0].location.modelTree.idPath.at(-1)).toBe(j);
   });
 
   it('does not flag a junction whose relationships share a type', () => {
@@ -98,7 +104,7 @@ describe('duplicate-name checker', () => {
     const issues = rulesOf(validateModel(model()), 'duplicate-name');
     expect(issues).toHaveLength(2);
     expect(issues.every((issue) => issue.severity === 'warning')).toBe(true);
-    expect(new Set(issues.map((issue) => issue.conceptId))).toEqual(new Set([a, b]));
+    expect(new Set(issues.map((issue) => issue.location.modelTree.idPath.at(-1)))).toEqual(new Set([a, b]));
     expect(issues[0].message).toBe("The name 'Same' is used more than once for the type 'Business Actor'.");
   });
 
@@ -117,7 +123,7 @@ describe('unused-element checker', () => {
     const issues = rulesOf(validateModel(model()), 'unused-element');
     expect(issues).toHaveLength(1);
     expect(issues[0].severity).toBe('warning');
-    expect(issues[0].conceptId).toBe(a);
+    expect(issues[0].location.modelTree.idPath.at(-1)).toBe(a);
 
     const view = addView('V');
     addElementNodeToView(view, a, view, { x: 0, y: 0, width: 120, height: 55 }, false);
@@ -133,7 +139,7 @@ describe('unused-relationship checker', () => {
     const issues = rulesOf(validateModel(model()), 'unused-relationship');
     expect(issues).toHaveLength(1);
     expect(issues[0].severity).toBe('warning');
-    expect(issues[0].conceptId).toBe(rel);
+    expect(issues[0].location.modelTree.idPath.at(-1)).toBe(rel);
 
     const view = addView('V');
     const na = addElementNodeToView(view, a, view, { x: 0, y: 0, width: 120, height: 55 }, false);
@@ -149,7 +155,7 @@ describe('empty-view checker', () => {
     const issues = rulesOf(validateModel(model()), 'empty-view');
     expect(issues).toHaveLength(1);
     expect(issues[0].severity).toBe('advice');
-    expect(issues[0].viewId).toBe(view);
+    expect(issues[0].location.view?.viewId).toBe(view);
 
     const a = addElement('BusinessActor', 'A');
     addElementNodeToView(view, a, view, { x: 0, y: 0, width: 120, height: 55 }, false);
@@ -167,8 +173,8 @@ describe('viewpoint checker', () => {
     const issues = rulesOf(validateModel(model()), 'viewpoint');
     expect(issues).toHaveLength(1);
     expect(issues[0].severity).toBe('warning');
-    expect(issues[0].viewId).toBe(view);
-    expect(issues[0].objectId).toBe(node);
+    expect(issues[0].location.view?.viewId).toBe(view);
+    expect(issues[0].location.view?.objectId).toBe(node);
 
     setViewpoint(view, ''); // none → allow all
     expect(rulesOf(validateModel(model()), 'viewpoint')).toHaveLength(0);
@@ -198,8 +204,8 @@ describe('nested-elements checker', () => {
     const issues = rulesOf(validateModel(model()), 'nested-elements');
     expect(issues).toHaveLength(1);
     expect(issues[0].severity).toBe('advice');
-    expect(issues[0].viewId).toBe(view);
-    expect(issues[0].objectId).toBe(childNode);
+    expect(issues[0].location.view?.viewId).toBe(view);
+    expect(issues[0].location.view?.objectId).toBe(childNode);
 
     // A composition parent→child (a nesting-type relationship) resolves it.
     const rel = addRelationship('CompositionRelationship', parentEl, childEl)!;
@@ -258,5 +264,28 @@ describe('ValidatorPanel', () => {
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it('configures Hammer rules without presenting integrity checks as Hammer rules', async () => {
+    addElement('BusinessActor', 'Lonely');
+    const { host, root } = await renderPanel();
+
+    await click(button(host, 'Configure'));
+    const dialog = document.body.querySelector<HTMLElement>('.validator-config-dialog')!;
+    expect(dialog.textContent).toContain(
+      'Hammer rules are configurable checks that flag common modelling problems. ' +
+      'Model-integrity checks always run separately.',
+    );
+    expect(dialog.textContent).not.toContain('Archi 5.9 Desktop');
+    expect(dialog.textContent).not.toContain('Missing references');
+    const unusedLabel = Array.from(dialog.querySelectorAll('label')).find(
+      (label) => label.textContent?.includes('Unused elements'),
+    )!;
+    await click(unusedLabel.querySelector('input')!);
+    await click(button(dialog, 'Done'));
+    await click(button(host, 'Validate'));
+
+    expect(host.textContent).not.toContain("'Lonely' is not used in a View");
+    await act(async () => { root.unmount(); });
   });
 });

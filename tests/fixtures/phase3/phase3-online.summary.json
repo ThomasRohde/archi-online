@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "model": {
+    "name": "Phase 3 Analysis and Reuse",
+    "profiles": 1,
+    "folders": 9,
+    "elements": 3,
+    "relationships": 3,
+    "views": 1,
+    "nodes": 3,
+    "connections": 3,
+    "elementNames": [
+      "Buyer",
+      "Customer",
+      "Place order"
+    ],
+    "relationshipNames": [
+      "Assignment context",
+      "Buyer starts order",
+      "Customer acts as buyer"
+    ],
+    "viewNames": [
+      "Customer ordering"
+    ]
+  },
+  "analysis": {
+    "focusName": "Customer",
+    "depth": 2,
+    "direction": "both",
+    "conceptNames": [
+      "Assignment context",
+      "Buyer",
+      "Buyer starts order",
+      "Customer",
+      "Customer acts as buyer",
+      "Place order"
+    ],
+    "nodeCount": 4,
+    "edgeCount": 4,
+    "truncated": false
+  },
+  "validation": [],
+  "merge": {
+    "created": 8,
+    "updated": 0,
+    "moved": 0,
+    "unchanged": 0,
+    "skipped": 0,
+    "warnings": 0
+  },
+  "template": {
+    "manifest": {
+      "name": "Phase 3 Customer Starter",
+      "description": "Analysis, higher-order topology, profile, and view compatibility fixture",
+      "keyThumbnail": "Thumbnails/1.png"
+    },
+    "metadata": {
+      "version": 1,
+      "id": "id-33333333333333333333333333333333",
+      "categories": [
+        "Phase 3",
+        "Business"
+      ]
+    },
+    "entries": [
+      "Thumbnails/1.png",
+      "archi-online.json",
+      "manifest.xml",
+      "model.archimate"
+    ]
+  }
+}

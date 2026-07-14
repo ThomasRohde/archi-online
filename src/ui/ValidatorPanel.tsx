@@ -1,21 +1,31 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { computeAbsBounds } from '../canvas/view-editor/bounds';
 import { requestPanTo } from '../canvas/viewport-bus';
 import { openView, setSelection } from '../model/store';
+import {
+  VALIDATION_RULES,
+  validateModel,
+  type Severity,
+  type ValidationIssue,
+  type ValidationSource,
+} from '../model/validation';
+import { useValidatorSettings } from '../settings/validator-settings';
 import { useStore } from './store-hooks';
-import type { ModelState } from '../model/types';
-import { validateModel, type Severity, type ValidationIssue } from '../model/validation';
 import { layoutBus } from './layout-bus';
 import { requestReveal } from './tree-bus';
 
 const SEVERITY_ORDER: Severity[] = ['error', 'warning', 'advice'];
-
+const SOURCE_ORDER: ValidationSource[] = ['hammer', 'integrity'];
+const SOURCE_LABEL: Record<ValidationSource, string> = {
+  hammer: 'Desktop Hammer rules',
+  integrity: 'Model integrity',
+};
 const SEVERITY_GLYPH: Record<Severity, string> = {
   error: '⛔',
   warning: '⚠️',
   advice: 'ℹ️',
 };
-
 const SEVERITY_LABEL: Record<Severity, string> = {
   error: 'Errors',
   warning: 'Warnings',
@@ -30,109 +40,76 @@ function summary(issues: ValidationIssue[]): string {
   return `${errors} error${errors === 1 ? '' : 's'}, ${warnings} warning${warnings === 1 ? '' : 's'}, ${advice} advice`;
 }
 
-/** Location hint shown on a row: the view or containing folder to look in. */
-function issueLocation(model: ModelState | null, issue: ValidationIssue): string | null {
-  if (!model) return null;
-  if (issue.viewId) {
-    const name = model.views[issue.viewId]?.name;
-    return name ? `view: ${name}` : null;
-  }
-  if (issue.conceptId) {
-    const item =
-      model.elements[issue.conceptId] ??
-      model.relationships[issue.conceptId] ??
-      model.views[issue.conceptId];
-    const folder = item ? model.folders[item.folderId] : undefined;
-    return folder ? `folder: ${folder.name}` : null;
-  }
-  return null;
+function issueLocation(issue: ValidationIssue): string {
+  const path = issue.location.modelTree.labelPath.join(' / ');
+  return issue.location.view?.objectId ? `${path} · object ${issue.location.view.objectId}` : path;
 }
 
 export function ValidatorPanel() {
-  const model = useStore((s) => s.model);
-  const hasModel = model !== null;
-  // null = not yet validated; Archi validates on demand, not live.
+  const model = useStore((state) => state.model);
+  const config = useValidatorSettings((state) => state.config);
+  const setRuleEnabled = useValidatorSettings((state) => state.setRuleEnabled);
   const [issues, setIssues] = useState<ValidationIssue[] | null>(null);
+  const [configure, setConfigure] = useState(false);
 
   const validate = () => {
-    const model = useStore.getState().model;
-    setIssues(model ? validateModel(model) : []);
+    const current = useStore.getState().model;
+    setIssues(current ? validateModel(current, config) : []);
   };
-
   const openIssue = (issue: ValidationIssue) => {
-    const model = useStore.getState().model;
-    if (!model) return;
-    if (issue.viewId) {
-      const viewId = issue.viewId;
-      openView(viewId);
-      if (issue.objectId) {
-        setSelection('view', [issue.objectId]);
-        const b = computeAbsBounds(model, viewId).get(issue.objectId);
-        // Defer the pan a frame so a background view tab is reattached (and
-        // measurable) before the canvas centers on the object.
-        if (b) {
-          requestAnimationFrame(() => requestPanTo(viewId, b.x + b.width / 2, b.y + b.height / 2));
+    const current = useStore.getState().model;
+    if (!current) return;
+    const viewTarget = issue.location.view;
+    if (viewTarget) {
+      openView(viewTarget.viewId);
+      if (viewTarget.objectId) {
+        setSelection('view', [viewTarget.objectId]);
+        const bounds = computeAbsBounds(current, viewTarget.viewId).get(viewTarget.objectId);
+        if (bounds) {
+          requestAnimationFrame(() => requestPanTo(
+            viewTarget.viewId,
+            bounds.x + bounds.width / 2,
+            bounds.y + bounds.height / 2,
+          ));
         }
       }
-    } else if (issue.conceptId) {
-      const conceptId = issue.conceptId;
-      layoutBus()?.showPanel('models');
-      setSelection('tree', [conceptId]);
-      requestReveal(conceptId);
+      return;
     }
+    const targetId = issue.location.modelTree.idPath.at(-1);
+    if (!targetId) return;
+    layoutBus()?.showPanel('models');
+    setSelection('tree', [targetId]);
+    requestReveal(targetId);
   };
 
   return (
     <div className="validator-panel">
       <div className="validator-toolbar">
-        <button
-          className="tb-btn run-btn"
-          onClick={validate}
-          disabled={!hasModel}
-          title="Validate the model"
-        >
-          Validate
-        </button>
+        <button className="tb-btn run-btn" onClick={validate} disabled={!model} title="Validate the model">Validate</button>
+        <button className="tb-btn" onClick={() => setConfigure(true)} title="Configure Desktop Hammer rules">Configure</button>
         {issues && <span className="validator-summary">{summary(issues)}</span>}
       </div>
       <div className="validator-list">
-        {!hasModel && <div className="empty-hint">No model open.</div>}
-        {hasModel && issues === null && (
-          <div className="empty-hint">Click Validate to check the model.</div>
-        )}
-        {hasModel && issues !== null && issues.length === 0 && (
-          <div className="empty-hint">No issues found.</div>
-        )}
-        {issues !== null &&
-          SEVERITY_ORDER.map((severity) => {
-            const group = issues.filter((issue) => issue.severity === severity);
-            if (group.length === 0) return null;
-            return (
-              <div key={severity} className="validator-group">
-                <div className="validator-group-header">
-                  {SEVERITY_LABEL[severity]} ({group.length})
-                </div>
-                {group.map((issue, index) => {
-                  const where = issueLocation(model, issue);
-                  return (
-                    <div
-                      key={severity + index}
-                      className={'validator-row ' + severity}
-                      title={issue.rule}
-                      onClick={() => openIssue(issue)}
-                    >
-                      <span className="validator-glyph">{SEVERITY_GLYPH[severity]}</span>
-                      <span className="validator-text">
-                        <span className="validator-message">{issue.message}</span>
-                        {where && <span className="validator-where">{where}</span>}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+        {!model && <div className="empty-hint">No model open.</div>}
+        {model && issues === null && <div className="empty-hint">Click Validate to check the model.</div>}
+        {model && issues !== null && issues.length === 0 && <div className="empty-hint">No issues found.</div>}
+        {issues !== null && SOURCE_ORDER.map((source) => {
+          const section = issues.filter((issue) => issue.source === source);
+          if (section.length === 0) return null;
+          return <section key={source} className={`validator-section ${source}`}>
+            <h3>{SOURCE_LABEL[source]} ({section.length})</h3>
+            {SEVERITY_ORDER.map((severity) => {
+              const group = section.filter((issue) => issue.severity === severity);
+              if (group.length === 0) return null;
+              return <div key={severity} className="validator-group">
+                <div className="validator-group-header">{SEVERITY_LABEL[severity]} ({group.length})</div>
+                {group.map((issue, index) => <div key={`${issue.rule}:${index}`} className={`validator-row ${severity}`} title={issue.rule} onClick={() => openIssue(issue)}><span className="validator-glyph">{SEVERITY_GLYPH[severity]}</span><span className="validator-text"><span className="validator-message">{issue.message}</span><span className="validator-where">{issueLocation(issue)}</span></span></div>)}
+              </div>;
+            })}
+          </section>;
+        })}
       </div>
+      {configure && createPortal(<div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfigure(false); }}><section className="modal validator-config-dialog" role="dialog" aria-modal="true" aria-labelledby="validator-config-title"><h2 id="validator-config-title">Configure Validator</h2><p>Hammer rules are configurable checks that flag common modelling problems. Model-integrity checks always run separately.</p><div className="validator-config-list">{VALIDATION_RULES.map((rule) => <label key={rule.id}><input type="checkbox" checked={config.enabled[rule.id]} onChange={(event) => setRuleEnabled(rule.id, event.target.checked)} /><span><strong>{rule.name}</strong><small>{rule.severity}</small></span></label>)}</div><footer><button className="tb-btn primary" onClick={() => setConfigure(false)}>Done</button></footer></section></div>, document.body)}
     </div>
   );
 }

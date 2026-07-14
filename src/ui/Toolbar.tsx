@@ -9,6 +9,7 @@ import {
   FolderOpen,
   Images,
   ListChecks,
+  LayoutTemplate,
   PanelTopOpen,
   PanelsTopLeft,
   Presentation,
@@ -77,6 +78,8 @@ import {
   type PropertyManagerSessionCapture,
 } from '../model/property-manager';
 import { PropertiesManagerDialog } from './PropertiesManagerDialog';
+import { ModelMergeDialog } from './ModelMergeDialog';
+import { TemplateGallery } from './TemplateGallery';
 
 /** Published documentation site (GitHub Pages). */
 const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
@@ -307,6 +310,7 @@ type IconName =
   | 'images'
   | 'replace'
   | 'properties'
+  | 'templates'
   | 'ext'
   | 'views'
   | 'docs'
@@ -327,6 +331,7 @@ const TB_ICONS: Record<IconName, LucideIcon> = {
   images: Images,
   replace: ReplaceAll,
   properties: ListChecks,
+  templates: LayoutTemplate,
   ext: Blocks,
   views: PanelTopOpen,
   docs: BookOpen,
@@ -353,6 +358,8 @@ export function Toolbar() {
   const [showExportImage, setShowExportImage] = useState(false);
   const [showExportCsv, setShowExportCsv] = useState(false);
   const [showExportExchange, setShowExportExchange] = useState(false);
+  const [showModelMerge, setShowModelMerge] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [showSpecializations, setShowSpecializations] = useState(false);
   const [showImages, setShowImages] = useState(false);
@@ -402,6 +409,15 @@ export function Toolbar() {
       disabled: readOnly,
       onClick: () => importCsvFromDisk(),
     },
+    {
+      label: 'Import and Merge .archimate…',
+      disabled: readOnly,
+      onClick: () => setShowModelMerge(true),
+    },
+    {
+      label: 'Model Templates (.architemplate)…',
+      onClick: () => setShowTemplates(true),
+    },
   ];
   const extensionMenuItems: MenuItem[] = extensionSnapshot.menus['extensions.menu'].map((item) => ({
     label: item.label,
@@ -446,6 +462,13 @@ export function Toolbar() {
       </button>
       <button className="tb-icon" {...tip('Open .archimate file (Ctrl+O)')} onClick={() => void openModel()}>
         <TbIcon name="open" />
+      </button>
+      <button
+        className="tb-icon"
+        {...tip('Import, save, and create models from templates')}
+        onClick={() => setShowTemplates(true)}
+      >
+        <TbIcon name="templates" />
       </button>
       <button
         className="tb-icon"
@@ -605,6 +628,8 @@ export function Toolbar() {
       {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
       {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}
       {showExportExchange && <ExportExchangeDialog onClose={() => setShowExportExchange(false)} />}
+      {showModelMerge && <ModelMergeDialog onClose={() => setShowModelMerge(false)} />}
+      {showTemplates && <TemplateGallery onClose={() => setShowTemplates(false)} />}
       {presenting && <PresentationMode onClose={() => setPresenting(false)} />}
       {findReplaceCapture && (
         <FindReplaceDialog

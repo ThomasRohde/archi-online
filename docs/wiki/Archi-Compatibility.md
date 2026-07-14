@@ -27,6 +27,13 @@ source in a temporary path, requires exact Desktop output bytes and independent
 source semantics, round-trips both fixtures, and proves committed evidence did
 not change.
 
+Phase 3 adds a frozen Online analysis/reuse fixture. `npm run verify:phase3`
+checks deterministic graph traversal, typed validator results, import/merge
+preview, native model round-trip, the exact template entry contract, and fresh
+IDs when a template creates a model. `npm run verify:phase3:desktop` additionally
+requires the pinned Desktop 5.9 build and load/saves the standard nested
+`model.archimate` payload through Desktop in a temporary directory.
+
 Two details worth knowing:
 
 - **Bendpoints** are stored in Archi's relative offset format
@@ -64,6 +71,13 @@ import/export follows Archi's three-file schema, including specialization
 creation and assignment, special relationship properties, duplicate rejection,
 and atomic failure. See [[Import & Export|Import-and-Export]] for the workflows.
 
+Archi Online also reads and writes Desktop-shaped `.architemplate` ZIP files:
+`manifest.xml`, nested `model.archimate`, and optional numbered
+`Thumbnails/*.png` entries. The optional `archi-online.json` catalog ID and
+categories are ignored by Desktop. Template export and model creation each
+remap every model/object ID while preserving profiles, assets, views, styling,
+and recursive connection topology.
+
 ## Same metamodel and rules
 
 - The full **ArchiMate 3.2** metamodel: every element type across Strategy,
@@ -94,11 +108,14 @@ and atomic failure. See [[Import & Export|Import-and-Export]] for the workflows.
   allows) are ported from Archi's `viewpoints.xml`; the palette greys out
   disallowed element types on views that declare a viewpoint, matching
   desktop Archi's default behavior.
-- The **model Validator** ports desktop Archi's validator checkers (illegal
+- The **model Validator** pins the eight desktop Archi 5.9 Hammer checkers (illegal
   relationships, unused elements and relationships, duplicate names, viewpoint
   violations, empty views, nested-element and junction checks), keeping Archi's
-  severities and messages. See [[User Guide|User-Guide]].
-- The **Navigator**, the Properties panel's **Analysis** tab, and tree
+  fixed severities. Its configurable rule toggles are browser-local. Additional
+  ID/reference/folder/view/topology checks are explicitly labelled **Model
+  integrity**, not presented as Desktop Hammer rules. See [[User Guide|User-Guide]].
+- The **Navigator**, graphical **Visualiser**, **Generate View For**, the
+  Properties panel's **Analysis** tab, and tree
   **Duplicate** (`Ctrl+D`) follow their desktop Archi counterparts'
   semantics. See [[User Guide|User-Guide]].
 

@@ -1,6 +1,11 @@
 import { JView, JVisual } from '../../scripting/jarchi';
+import {
+  layoutElkGraph,
+  type ElkGraphDirection,
+  type ElkGraphEdgeRouting,
+} from '../../model/layout/elk-graph';
 
-type ElkDirection = 'right' | 'down' | 'left' | 'up';
+type ElkDirection = ElkGraphDirection;
 type ElkEdgeRouting = 'preserve' | 'orthogonal' | 'splines';
 type ElkScope = 'selection-or-view' | 'selection' | 'view';
 
@@ -15,39 +20,6 @@ interface Point {
   x: number;
   y: number;
 }
-
-interface ElkPoint {
-  x?: number;
-  y?: number;
-}
-
-interface ElkSection {
-  bendPoints?: ElkPoint[];
-}
-
-interface ElkEdgeResult {
-  id?: string;
-  sections?: ElkSection[];
-}
-
-interface ElkChildResult {
-  id?: string;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-}
-
-interface ElkGraphResult {
-  children?: ElkChildResult[];
-  edges?: ElkEdgeResult[];
-}
-
-interface ElkInstance {
-  layout(graph: unknown): Promise<unknown>;
-}
-
-type ElkConstructor = new () => ElkInstance;
 
 export interface ElkLayoutOptions {
   scope?: ElkScope;
@@ -70,20 +42,6 @@ export interface ElkLayoutResult {
   routedConnectionCount: number;
   elapsedMs: number;
 }
-
-let elkInstance: Promise<ElkInstance> | null = null;
-
-const DIRECTION_OPTION: Record<ElkDirection, string> = {
-  right: 'RIGHT',
-  down: 'DOWN',
-  left: 'LEFT',
-  up: 'UP',
-};
-
-const EDGE_ROUTING_OPTION: Record<Exclude<ElkEdgeRouting, 'preserve'>, string> = {
-  orthogonal: 'ORTHOGONAL',
-  splines: 'SPLINES',
-};
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -114,14 +72,6 @@ function normalizedOptions(options: ElkLayoutOptions): Required<ElkLayoutOptions
     edgeRouting: isEdgeRouting(options.edgeRouting) ? options.edgeRouting : 'orthogonal',
     recursive: options.recursive ?? false,
   };
-}
-
-function loadElk(): Promise<ElkInstance> {
-  elkInstance ??= import('elkjs/lib/elk.bundled.js').then((module) => {
-    const Elk = module.default as ElkConstructor;
-    return new Elk();
-  });
-  return elkInstance;
 }
 
 function selectedVisualRoots(view: JView, selectedVisuals: JVisual[]): JVisual[] {
@@ -160,14 +110,6 @@ function scopeOrigin(bounds: Bounds[]): Point {
   };
 }
 
-function routeFromEdge(edge: ElkEdgeResult, origin: Point): Point[] {
-  const section = edge.sections?.[0];
-  if (!section?.bendPoints) return [];
-  return section.bendPoints
-    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
-    .map((point) => ({ x: origin.x + point.x!, y: origin.y + point.y! }));
-}
-
 export async function runElkLayout(request: ElkLayoutRequest): Promise<ElkLayoutResult> {
   const startedAt = performance.now();
   const options = normalizedOptions(request);
@@ -201,18 +143,8 @@ export async function runElkLayout(request: ElkLayoutRequest): Promise<ElkLayout
     );
   });
 
-  const graph = {
-    id: `${request.view.id}.elk`,
-    layoutOptions: {
-      'elk.algorithm': 'layered',
-      'elk.direction': DIRECTION_OPTION[options.direction],
-      'elk.spacing.nodeNode': String(options.nodeSpacing),
-      'elk.layered.spacing.nodeNodeBetweenLayers': String(options.layerSpacing),
-      ...(options.edgeRouting === 'preserve'
-        ? {}
-        : { 'elk.edgeRouting': EDGE_ROUTING_OPTION[options.edgeRouting] }),
-    },
-    children: nodes.map((node) => {
+  const result = await layoutElkGraph({
+    nodes: nodes.map((node) => {
       const bounds = boundsByNodeId.get(node.id)!;
       return {
         id: node.id,
@@ -222,48 +154,28 @@ export async function runElkLayout(request: ElkLayoutRequest): Promise<ElkLayout
     }),
     edges: connections.map((connection) => ({
       id: connection.id,
-      sources: [connection.source.id],
-      targets: [connection.target.id],
+      sourceId: connection.source.id,
+      targetId: connection.target.id,
     })),
-  };
+  }, {
+    direction: options.direction,
+    nodeSpacing: options.nodeSpacing,
+    layerSpacing: options.layerSpacing,
+    edgeRouting: (options.edgeRouting === 'preserve'
+      ? 'orthogonal'
+      : options.edgeRouting) as ElkGraphEdgeRouting,
+    origin,
+  });
 
-  const elk = await loadElk();
-  const result = await elk.layout(graph) as ElkGraphResult;
-
-  // ELK positions the laid-out graph inside its own padding, so its children start
-  // at (padding.left, padding.top) rather than (0, 0). Anchor the result back to the
-  // scope's original top-left corner; otherwise each run shifts everything by the
-  // padding amount and repeated applies drift diagonally down/right.
-  const placedChildren = (result.children ?? []).filter(
-    (child) => child.id && boundsByNodeId.has(child.id),
-  );
-  const childXs = placedChildren.map((child) => child.x).filter((x): x is number => Number.isFinite(x));
-  const childYs = placedChildren.map((child) => child.y).filter((y): y is number => Number.isFinite(y));
-  const layoutOrigin: Point = {
-    x: origin.x - (childXs.length ? Math.min(...childXs) : 0),
-    y: origin.y - (childYs.length ? Math.min(...childYs) : 0),
-  };
-
-  const layoutNodes = Object.fromEntries(
-    placedChildren.map((child) => {
-      const current = boundsByNodeId.get(child.id!)!;
-      return [child.id!, {
-        x: layoutOrigin.x + finiteNumber(child.x, current.x - layoutOrigin.x),
-        y: layoutOrigin.y + finiteNumber(child.y, current.y - layoutOrigin.y),
-        width: finiteNumber(child.width, current.width),
-        height: finiteNumber(child.height, current.height),
-      }];
-    }),
-  );
+  const layoutNodes = result.nodes;
 
   const layoutConnections =
     options.edgeRouting === 'preserve'
       ? {}
-      : Object.fromEntries(
-          (result.edges ?? [])
-            .filter((edge) => edge.id)
-            .map((edge) => [edge.id!, { route: routeFromEdge(edge, layoutOrigin) }]),
-        );
+      : Object.fromEntries(Object.entries(result.edges).map(([id, edge]) => [
+          id,
+          { route: edge.points.slice(1, -1) },
+        ]));
 
   request.view.layout({
     nodes: layoutNodes,

@@ -26,6 +26,9 @@ import { subscribeLaunchedFiles } from './pwa/launch-queue';
 import { takeSharedFile } from './pwa/share-target-inbox';
 import { shouldBlockUnload } from './pwa/unload-guard';
 import { hydrateSettingsStore } from './settings/app-settings';
+import { hydrateAnalysisPreferences } from './settings/analysis-preferences';
+import { hydrateValidatorSettings } from './settings/validator-settings';
+import { hydrateTemplateCatalog } from './persistence/template-store';
 import { AppDialogHost, showAlertDialog, showConfirmDialog } from './ui/AppDialog';
 import { AppShell } from './ui/AppShell';
 import { blocksReadOnlyShortcut } from './ui/shortcut-policy';
@@ -81,6 +84,9 @@ async function bootEditorRuntime(shouldRestoreWorkspace: boolean): Promise<void>
   const [restoreResult] = await Promise.all([
     shouldRestoreWorkspace ? restoreWorkspace() : Promise.resolve({ restored: 0, failed: 0 }),
     hydrateSettingsStore(),
+    hydrateAnalysisPreferences(),
+    hydrateValidatorSettings(),
+    hydrateTemplateCatalog(),
     hydrateExtensionStore(),
     hydrateExtensionPackageStore(),
   ]).finally(() => {

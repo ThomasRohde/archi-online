@@ -24,6 +24,36 @@ The first command is cross-platform and runs in CI. The second requires the
 exact pinned Desktop Archi 5.9 installation, uses temporary round-trip paths,
 and never rewrites the committed goldens.
 
+## Import and merge
+
+Use **Import/Export ▾ → Import and Merge .archimate…** to reuse another model
+without opening it as a workspace session. The dialog parses the source and
+builds an immutable preview before changing the active model. Objects match by
+global ID and exact kind/type; profiles match by case-insensitive concept type
+and name. A same-ID/different-type conflict blocks the import.
+
+Choose whether to update existing objects, model information, and source folder
+structure. Updates replace complete source-owned fields and view contents while
+never deleting target-only content. Assets are deduplicated by SHA-256. The
+preview reports created, updated, moved, unchanged, skipped, and warning totals;
+click applied details to navigate. Apply is one undoable transaction and is
+rejected if the target changed after preview.
+
+## Model templates
+
+Open **Model Templates** from its toolbar button or **Import/Export ▾**. The
+browser-local gallery can import/export `.architemplate` files, save the current
+model, search and filter categories, edit metadata and the key thumbnail, create
+a new unsaved model, or delete the local gallery copy.
+
+The standard archive entries are `manifest.xml`, nested `model.archimate`, and
+up to 50 numbered `Thumbnails/*.png` images. `archi-online.json` adds a portable
+catalog ID and categories without affecting Desktop readers. Every ID is
+remapped once when saving a template and again when creating a model, while
+profiles, assets, views, appearance, and connection-to-connection topology are
+preserved. Unsafe paths, malformed manifests, invalid IDs, missing models, and
+oversized thumbnails are rejected before IndexedDB storage or model creation.
+
 ## View images
 
 Open the **Import/Export ▾** menu on the toolbar (or use it while a view is
@@ -105,6 +135,6 @@ Archi's CSV format is three files — `elements.csv`, `relations.csv`, and
 
 ## What does not leave the browser
 
-Image, Open Exchange, and CSV export all run locally; the files are produced
+Image, Open Exchange, CSV, merge preview, and template workflows all run locally; the files are produced
 in the page and handed to the browser's save/download. See the
 [[User Guide|User-Guide]] for link- and gist-based model sharing.

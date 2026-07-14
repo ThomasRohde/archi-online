@@ -48,6 +48,7 @@ import {
 } from '../clipboard';
 import type { Point } from '../geometry';
 import { conceptTransformationMenuItems } from '../../ui/concept-transform-menu';
+import { requestGenerateViewFor } from '../../ui/GenerateViewDialog';
 
 export function showEmptyCanvasContextMenu({
   clientX,
@@ -258,6 +259,12 @@ export function showViewObjectContextMenu({
   if (transformationItems.length > 0) {
     items.push(SEPARATOR, ...transformationItems);
   }
+  const generationIds = conceptIds.filter((conceptId) => Boolean(model.elements[conceptId]));
+  items.push(SEPARATOR, {
+    label: 'Generate View For…',
+    disabled: modelStore.getState().readOnly || generationIds.length === 0,
+    onClick: () => requestGenerateViewFor(generationIds),
+  });
   if (conceptIds.length > 0) {
     items.push({
       label: 'Delete from Model',

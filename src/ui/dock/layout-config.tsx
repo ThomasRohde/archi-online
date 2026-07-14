@@ -15,6 +15,7 @@ import { ExtensionPanelHost } from '../ExtensionPanelHost';
 import { ExtensionsPanel } from '../ExtensionsPanel';
 import { ModelTree } from '../ModelTree';
 import { NavigatorPanel } from '../NavigatorPanel';
+import { VisualiserPanel } from '../VisualiserPanel';
 import { OutlinePanel } from '../OutlinePanel';
 import { Palette } from '../Palette';
 import { PropertiesPanel } from '../PropertiesPanel';
@@ -105,6 +106,22 @@ export const TOOL_PANELS: ToolPanelDef[] = [
           ? { referencePanel: 'models', direction: 'within' }
           : { direction: 'left' },
         initialWidth: 260,
+      }),
+  },
+  {
+    id: 'visualiser',
+    title: 'Visualiser',
+    add: (api) =>
+      api.addPanel({
+        id: 'visualiser',
+        component: 'visualiser',
+        title: 'Visualiser',
+        position: api.getPanel('navigator')
+          ? { referencePanel: 'navigator', direction: 'within' }
+          : api.getPanel('models')
+            ? { referencePanel: 'models', direction: 'within' }
+            : { direction: 'left' },
+        initialWidth: 320,
       }),
   },
   {
@@ -375,6 +392,11 @@ export const components: Record<string, React.FunctionComponent<IDockviewPanelPr
   navigator: () => (
     <div className="dock-panel">
       <NavigatorPanel />
+    </div>
+  ),
+  visualiser: () => (
+    <div className="dock-panel">
+      <VisualiserPanel />
     </div>
   ),
   outline: () => (

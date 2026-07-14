@@ -36,6 +36,9 @@ npm run build        # typecheck + production build into dist/
 npm run preview      # serve the production build
 npm run docs:check   # validate wiki page links
 npm run ci:check     # docs + lint + typecheck + tests + audit + build
+npm run fixtures:phase3       # regenerate deterministic Online Phase 3 fixtures
+npm run verify:phase3         # cross-platform analysis/reuse compatibility gate
+npm run verify:phase3:desktop # opt-in pinned Desktop 5.9 payload round-trip
 ```
 
 ## Architecture ground rules

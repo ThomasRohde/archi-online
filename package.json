@@ -29,8 +29,11 @@
     "fixtures:phase2": "node tools/generate-phase2-fixtures.mjs",
     "verify:phase2": "node tools/verify-phase2-parity.mjs",
     "verify:phase2:desktop": "node tools/verify-phase2-desktop.mjs",
+    "fixtures:phase3": "node tools/generate-phase3-fixtures.mjs",
+    "verify:phase3": "node tools/verify-phase3-parity.mjs",
+    "verify:phase3:desktop": "node tools/verify-phase3-desktop.mjs",
     "security:audit": "npm audit --omit=dev",
-    "ci:check": "node tools/sync-versions.mjs --check && npm run docs:check && npm run lint && npm run typecheck && npm test && npm run verify:phase2 && npm run security:audit && npm run build"
+    "ci:check": "node tools/sync-versions.mjs --check && npm run docs:check && npm run lint && npm run typecheck && npm test && npm run verify:phase1 && npm run verify:phase2 && npm run verify:phase3 && npm run security:audit && npm run build"
   },
   "dependencies": {
     "dockview": "^7.0.2",

@@ -43,6 +43,7 @@ import {
   SEPARATOR,
   type MenuItem,
 } from './ContextMenu';
+import { requestGenerateViewFor } from './GenerateViewDialog';
 import { onRevealRequest } from './tree-bus';
 import {
   DEFAULT_TREE_SEARCH_CRITERIA,
@@ -594,6 +595,12 @@ function ModelTreeInner({
     if (transformationItems.length > 0) {
       items.push(SEPARATOR, ...transformationItems);
     }
+    const generationIds = ids.filter((selectedId) => Boolean(model.elements[selectedId]));
+    items.push(SEPARATOR, {
+      label: 'Generate View For…',
+      disabled: readOnly || generationIds.length === 0,
+      onClick: () => requestGenerateViewFor(generationIds),
+    });
     items.push(SEPARATOR, {
       label: ids.length > 1 ? `Delete ${ids.length} items` : 'Delete',
       danger: true,

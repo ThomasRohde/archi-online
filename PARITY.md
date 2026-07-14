@@ -475,27 +475,28 @@ opaque preservation does not count as feature support.
 
 #### ANALYSIS-01 — Graphical Visualiser
 
+- **Status:** Implemented (unreleased)
 - **Priority:** P1
 - **Effort:** M/L
 - **Dependencies:** existing analysis helpers and ELK layout
-- **Current gap:** Navigator provides tree traversal, but there is no graphical
-  relationship network.
-- **Improvement:** Add a Visualiser panel with focus, drill-in/back/home, depth,
+- **Implementation:** The Visualiser panel provides focus, drill-in/back/home, depth,
   incoming/outgoing/both direction, viewpoint/element/relationship filters,
-  relayout, selection synchronization, and image/clipboard export.
+  relayout, selection synchronization, stale-layout suppression, and
+  SVG/PNG/clipboard export without adding ephemeral graphs to model state.
 - **Acceptance:** Selecting a concept anywhere updates the Visualiser, and filter
   combinations remain responsive on large graphs.
 
 #### ANALYSIS-02 — Generate View from selected concepts
 
+- **Status:** Implemented (unreleased)
 - **Priority:** P1
 - **Effort:** M
 - **Dependencies:** analysis traversal and layout
-- **Current gap:** C4 templates and scripted layout exist, but there is no general
-  Desktop-style Generate View For workflow.
-- **Improvement:** Generate a new view around selected elements, choose depth and
+- **Implementation:** Generate View For builds and lays out a candidate around
+  selected elements before mutation, with depth and
   viewpoint, include related concepts and optional all internal relationships,
-  then lay out the result.
+  then applies the complete view and higher-order connection topology in one
+  transaction.
 - **Acceptance:** Generation is deterministic, one undoable operation, and never
   creates duplicate semantic concepts unnecessarily.
 
@@ -523,15 +524,13 @@ opaque preservation does not count as feature support.
 
 #### ANALYSIS-05 — Validator completeness and configuration
 
+- **Status:** Implemented (unreleased)
 - **Priority:** P1/P2
 - **Effort:** M
-- **Current gap:** Online checks illegal relationships, Junction consistency,
-  duplicates, unused concepts, empty views, viewpoints, and nesting. Newer
-  Desktop checks for model integrity and correct folder placement, rule toggles,
-  and some richer navigation are incomplete.
-- **Improvement:** Pin the checker set to Archi 5.9, add missing model/folder/ID
-  checks, configurable rule enablement/severity where Desktop allows it, and
-  precise source locations.
+- **Implementation:** The eight Archi 5.9 Hammer rules retain their fixed
+  severities and browser-local enablement. A separately labelled integrity pass
+  checks IDs, references, folders, view ownership, and connection topology;
+  every finding carries a typed model-tree path and optional exact view target.
 - **Acceptance:** A shared fixture produces equivalent findings and navigation in
   both tools, with differences documented when browser constraints apply.
 
@@ -550,28 +549,29 @@ opaque preservation does not count as feature support.
 
 #### REUSE-01 — Import and merge another Archi model
 
+- **Status:** Implemented (unreleased)
 - **Priority:** P1/P2
 - **Effort:** L
 - **Dependencies:** profiles/assets and complete native schema coverage
-- **Current gap:** Cross-model copy/paste is interactive and selective, but cannot
-  repeatedly update a target from a reference model by stable identity.
-- **Improvement:** Import another `.archimate` model into the active model with
+- **Implementation:** Import another `.archimate` model into the active model with
   ID/type matching, create/update options, model information and folder options,
   property replacement semantics, change preview, atomic application, and a
-  detailed result report.
+  detailed navigable result report. Preview plans become stale when the target
+  changes and target-only content is retained.
 - **Acceptance:** Re-importing an updated reference model is deterministic and
   cannot silently delete target-only content.
 
 #### REUSE-02 — General model templates
 
+- **Status:** Implemented (unreleased)
 - **Priority:** P2
 - **Effort:** M/L
 - **Dependencies:** archive and image support for full Desktop compatibility
-- **Current gap:** Online ships examples and C4 view templates but cannot save or
-  manage arbitrary reusable model templates.
-- **Improvement:** Support `.architemplate` import/export, metadata, descriptions,
+- **Implementation:** The IndexedDB gallery supports `.architemplate`
+  import/export, metadata, descriptions,
   categories, optional view thumbnails, a gallery, and creating a fresh-ID model
-  from a template.
+  from a template. Archives use Desktop's `manifest.xml`, `model.archimate`, and
+  `Thumbnails/*.png` contract with an optional `archi-online.json` sidecar.
 - **Acceptance:** Templates are portable between Online installations and, where
   format-compatible, Desktop Archi.
 
@@ -893,6 +893,10 @@ implementation.
 6. `TREE-01`, `TREE-02`, and `PROP-01` productivity features.
 
 ### Phase 3 — Analysis and reuse
+
+Implemented for the next release. `npm run verify:phase3` checks the committed
+Online compatibility fixture; `npm run verify:phase3:desktop` is the opt-in
+pinned Desktop 5.9 payload round-trip.
 
 1. `ANALYSIS-01` Visualiser.
 2. `ANALYSIS-02` generated views.

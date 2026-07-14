@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import type { Bounds, ModelState } from '../../model/types';
 import { StaticViewContent } from './StaticViewSvg';
+import { copyPngBlobToClipboard, rasterizeSvg, supportsPngClipboard } from './svg-image';
 
 /** Matches the canvas font stack in styles.css so exports render identically. */
 export const EXPORT_FONT_STACK = "'Segoe UI', system-ui, -apple-system, sans-serif";
@@ -226,32 +227,11 @@ export async function renderViewPng(
 ): Promise<Blob> {
   const scale = options.scale ?? 1;
   const { svg, width, height } = renderViewSvg(model, viewId, options);
-  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
-  try {
-    const img = new Image();
-    img.src = url;
-    await img.decode();
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D is unavailable');
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-    if (!blob) throw new Error('PNG encoding failed');
-    return blob;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  return rasterizeSvg(svg, width, height, scale);
 }
 
 export function supportsImageClipboard(): boolean {
-  return (
-    typeof navigator !== 'undefined' &&
-    !!navigator.clipboard &&
-    typeof navigator.clipboard.write === 'function' &&
-    typeof ClipboardItem !== 'undefined'
-  );
+  return supportsPngClipboard();
 }
 
 /**
@@ -264,11 +244,5 @@ export async function copyViewPngToClipboard(
   viewId: string,
   options: ViewImageOptions = {},
 ): Promise<void> {
-  if (!supportsImageClipboard()) {
-    throw new Error(
-      'Copying images to the clipboard is not supported in this browser — use "Export view as image" instead.',
-    );
-  }
-  const item = new ClipboardItem({ 'image/png': renderViewPng(model, viewId, options) });
-  await navigator.clipboard.write([item]);
+  await copyPngBlobToClipboard(renderViewPng(model, viewId, options));
 }
