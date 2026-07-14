@@ -68,6 +68,27 @@ active):
   system clipboard, ready to paste into slides or chat. Where a browser does
   not support image clipboard writes, use **View as image…** instead.
 
+## Static HTML reports
+
+Use **Import/Export ▾ → Static HTML Report (.zip)…** to package the active
+model for people who need to inspect it without Archi Online. Choose the ZIP
+filename, export it, then extract the complete archive and open `index.html`.
+The report works directly from the extracted directory through `file://` and
+from ordinary static web hosting; it makes no network requests.
+
+The report provides the model tree, case-insensitive literal search, stable
+view/object deep links, documentation and ordered properties, relationship
+source/target links, Model Relations and Used in Views analysis, and diagram
+Zoom, Actual size, and Fit controls. Each diagram is produced by the same
+standalone SVG renderer as image export, including embedded model images.
+
+The exported artifact necessarily contains the complete model content. Its
+allowlisted report projection does **not** include browser settings, extensions,
+scripts, autosave records, file handles, sharing associations or credentials,
+tokens, dock layout, or undo history. Keep every extracted file together;
+moving or deleting a `views/*.svg` file leaves the rest of the report usable but
+that diagram cannot be displayed.
+
 ## Presentation mode
 
 The toolbar **Present** button opens a full-screen, chrome-free walkthrough
@@ -135,6 +156,7 @@ Archi's CSV format is three files — `elements.csv`, `relations.csv`, and
 
 ## What does not leave the browser
 
-Image, Open Exchange, CSV, merge preview, and template workflows all run locally; the files are produced
-in the page and handed to the browser's save/download. See the
+Image, static-report, Open Exchange, CSV, merge preview, and template workflows
+all run locally; the files are produced in the page and handed to the browser's
+save/download. See the
 [[User Guide|User-Guide]] for link- and gist-based model sharing.

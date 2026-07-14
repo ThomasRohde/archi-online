@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import type { Bounds, ModelState } from '../../model/types';
+import type { AppSettings } from '../../settings/app-settings';
 import { StaticViewContent } from './StaticViewSvg';
 import { copyPngBlobToClipboard, rasterizeSvg, supportsPngClipboard } from './svg-image';
 
@@ -32,6 +33,8 @@ export interface ViewImageOptions {
   /** Whitespace around the diagram in model pixels. */
   margin?: number;
   background?: 'white' | 'transparent';
+  /** Explicit render preferences for deterministic, browser-profile-independent exports. */
+  renderSettings?: AppSettings;
   /**
    * Content-bounds measurement. Defaults to getBBox on the rendered content
    * group (exact, includes text); injectable because test DOMs lack getBBox.
@@ -79,7 +82,11 @@ export function renderViewSvg(
           createElement(
             'g',
             { 'data-export-content': '' },
-            createElement(StaticViewContent, { model, viewId }),
+            createElement(StaticViewContent, {
+              model,
+              viewId,
+              renderSettings: options.renderSettings,
+            }),
           ),
         ),
       );

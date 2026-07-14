@@ -7,10 +7,10 @@ is represented here, including lower-priority items and optional plug-in parity.
 
 ## Baseline and scope
 
-- **Archi Online baseline:** Phase 2 release candidate, version 1.4.0.
+- **Archi Online baseline:** Phase 3 release, version 1.5.0.
 - **Desktop reference:** Archi 5.9.0, released April 14, 2026.
 - **ArchiMate reference:** ArchiMate 3.2.
-- **Audit date:** July 13, 2026.
+- **Audit date:** July 14, 2026.
 - **Primary Desktop sources:** the
   [Archi 5.9 User Guide](https://www.archimatetool.com/downloads/archi/Archi%20User%20Guide.pdf),
   [version history](https://www.archimatetool.com/version-history/), and
@@ -51,6 +51,19 @@ source-semantic contracts, headed Chrome/Edge smoke evidence, and
 
 This is a Phase 2 feature-area claim, not a declaration of full project parity;
 all unmarked entries remain implementation gaps for later phases.
+
+## Phase 3 implementation status
+
+Phase 3 analysis and reuse parity is implemented in version 1.5.0. The completed
+scope is `ANALYSIS-01`, `ANALYSIS-02`, `ANALYSIS-05`, `REUSE-01`, and `REUSE-02`:
+Visualiser, generated views, validator completion, model import/merge, and general
+model templates. `verify:phase3` pins deterministic traversal, validation,
+merge, template, native-round-trip, and fresh-ID semantics;
+`verify:phase3:desktop` additionally load/saves the nested native payload through
+the exact pinned Desktop Archi build.
+
+This is a Phase 3 feature-area claim. Stakeholder delivery and the remaining
+unmarked core/optional items continue in later phases.
 
 The parity target has three distinct scopes:
 
@@ -112,7 +125,7 @@ The largest remaining gaps are not the basic metamodel. They are:
 | Navigation, analysis, and quality | **Mostly strong** | Visualiser, Hints, generated views, Navigator drag-to-view, parent-folder paths, and the latest validator integrity/configuration behavior. | `ANALYSIS-01`–`ANALYSIS-06` |
 | Native `.archimate` fidelity | **Strong/partial** | Sketch and Canvas remain. ZIP assets, specializations, images, appearance, recursive connection endpoints/routes, note connections, and legends are implemented. | `FILE-02`, `NONSTD-01`–`NONSTD-03` |
 | Open Exchange and CSV | **Strong** | Phase 1 completed metadata, language, organization, XSD validation/copy, specializations, atomic import, and Archi 5.9 CSV edge behavior. | — |
-| Output and reporting | **Partial** | Printing, PDF/JPG/BMP output, HTML reports, report search/zoom/masking/SQL, Jasper templates, Excel export, and gallery output. | `OUTPUT-01`–`OUTPUT-06` |
+| Output and reporting | **Partial** | Static HTML reports are implemented. Printing, PDF/JPG/BMP output, report masking/query, Jasper templates, Excel export, and gallery output remain. | `OUTPUT-02`–`OUTPUT-06` |
 | Model reuse and lifecycle | **Partial** | Full model import/merge, reusable model templates, recent-file workflows, backup files, and richer open/save preferences. | `REUSE-01`, `REUSE-02`, `UX-04` |
 | Scripting and extensibility | **Substantial but browser-scoped** | Full jArchi desktop APIs, Node/CommonJS utilities, external script loading, headless ACLI, remote package lifecycle, and Desktop plug-in outcomes. | `AUTO-01`–`AUTO-04` |
 | Sketch and Canvas | **Missing** | Canvas authoring/templates and Sketch authoring for the pinned Archi 5.9 target. | `NONSTD-01`–`NONSTD-03` |
@@ -475,7 +488,7 @@ opaque preservation does not count as feature support.
 
 #### ANALYSIS-01 — Graphical Visualiser
 
-- **Status:** Implemented (unreleased)
+- **Status:** Completed in 1.5.0
 - **Priority:** P1
 - **Effort:** M/L
 - **Dependencies:** existing analysis helpers and ELK layout
@@ -488,7 +501,7 @@ opaque preservation does not count as feature support.
 
 #### ANALYSIS-02 — Generate View from selected concepts
 
-- **Status:** Implemented (unreleased)
+- **Status:** Completed in 1.5.0
 - **Priority:** P1
 - **Effort:** M
 - **Dependencies:** analysis traversal and layout
@@ -524,7 +537,7 @@ opaque preservation does not count as feature support.
 
 #### ANALYSIS-05 — Validator completeness and configuration
 
-- **Status:** Implemented (unreleased)
+- **Status:** Completed in 1.5.0
 - **Priority:** P1/P2
 - **Effort:** M
 - **Implementation:** The eight Archi 5.9 Hammer rules retain their fixed
@@ -549,7 +562,7 @@ opaque preservation does not count as feature support.
 
 #### REUSE-01 — Import and merge another Archi model
 
-- **Status:** Implemented (unreleased)
+- **Status:** Completed in 1.5.0
 - **Priority:** P1/P2
 - **Effort:** L
 - **Dependencies:** profiles/assets and complete native schema coverage
@@ -563,7 +576,7 @@ opaque preservation does not count as feature support.
 
 #### REUSE-02 — General model templates
 
-- **Status:** Implemented (unreleased)
+- **Status:** Completed in 1.5.0
 - **Priority:** P2
 - **Effort:** M/L
 - **Dependencies:** archive and image support for full Desktop compatibility
@@ -579,13 +592,15 @@ opaque preservation does not count as feature support.
 
 #### OUTPUT-01 — Static HTML report
 
+- **Status:** Implemented (unreleased)
 - **Priority:** P2
 - **Effort:** L
-- **Current gap:** Read-only share links require the hosted application or a Gist;
-  Desktop can generate a self-contained navigable report.
-- **Improvement:** Export a browser-local static report with model tree, object
-  summaries, view images, deep links, search, zoom, Analysis data, and offline
-  assets. Reuse the viewer and SVG renderer where possible.
+- **Implementation:** Export a deterministic offline ZIP with a model tree,
+  literal search, object summaries, stable deep links, Phase 3 Analysis data,
+  and one shared-renderer SVG per view. The framework-free report opens through
+  `file://` or static hosting and allowlists model-file content so browser
+  settings, extensions, scripts, autosave, file handles, sharing credentials,
+  and tokens are excluded.
 - **Acceptance:** The exported report opens from disk or static hosting without a
   server and contains no private token or browser-profile data.
 
@@ -894,7 +909,7 @@ implementation.
 
 ### Phase 3 — Analysis and reuse
 
-Implemented for the next release. `npm run verify:phase3` checks the committed
+Implemented in 1.5.0. `npm run verify:phase3` checks the committed
 Online compatibility fixture; `npm run verify:phase3:desktop` is the opt-in
 pinned Desktop 5.9 payload round-trip.
 
@@ -906,7 +921,7 @@ pinned Desktop 5.9 payload round-trip.
 
 ### Phase 4 — Stakeholder delivery
 
-1. `OUTPUT-01` static HTML report.
+1. `OUTPUT-01` static HTML report — implemented for the next release.
 2. `OUTPUT-02` report masking/query.
 3. `OUTPUT-04` print/PDF/additional output.
 4. `AUTO-01` headless CLI for strict Archi 5.9 core parity, or record its

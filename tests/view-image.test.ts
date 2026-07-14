@@ -9,7 +9,10 @@ import {
 } from '../src/canvas/export/view-image';
 import { computeAbsBounds } from '../src/canvas/view-editor/bounds';
 import { parseArchimate } from '../src/model/io/archimate-xml';
+import { addLegendToView, addView, createElementOnView, createEmptyModel } from '../src/model/ops';
+import { createModelStore } from '../src/model/store';
 import type { ModelState } from '../src/model/types';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 
 const archisurance = readFileSync(join(__dirname, 'fixtures', 'Archisurance.archimate'), 'utf8');
 const model = parseArchimate(archisurance);
@@ -82,6 +85,54 @@ describe('renderViewSvg', () => {
 
   it('throws for an unknown view', () => {
     expect(() => renderViewSvg(model, 'nope', { measure: () => bbox })).toThrow(/View not found/);
+  });
+
+  it('can isolate deterministic report rendering from browser-local legend settings', async () => {
+    const store = createModelStore({ model: createEmptyModel('Legend export') });
+    const legendViewId = addView('Legend View', undefined, store);
+    createElementOnView(
+      'BusinessActor',
+      legendViewId,
+      legendViewId,
+      { x: 20, y: 20, width: 120, height: 55 },
+      'Stakeholder',
+      {},
+      store,
+    );
+    addLegendToView(
+      legendViewId,
+      legendViewId,
+      { x: 20, y: 100, width: 240, height: 180 },
+      undefined,
+      {},
+      store,
+    );
+    const legendModel = store.getState().model!;
+    const legendBounds = geometricMeasure(legendModel, legendViewId);
+    useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        legendLabels: { BusinessActor: 'BROWSER-ONLY-SENTINEL' },
+        legendUserColors: { BusinessActor: '#123456' },
+      },
+    });
+
+    const browserStyled = renderViewSvg(legendModel, legendViewId, {
+      measure: () => legendBounds,
+    });
+    const reportStyled = renderViewSvg(legendModel, legendViewId, {
+      measure: () => legendBounds,
+      renderSettings: {
+        ...DEFAULT_SETTINGS,
+        legendLabels: {},
+        legendUserColors: {},
+      },
+    });
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
+
+    expect(browserStyled.svg).toContain('BROWSER-ONLY-SENTINEL');
+    expect(reportStyled.svg).not.toContain('BROWSER-ONLY-SENTINEL');
+    expect(reportStyled.svg).not.toContain('#123456');
   });
 });
 

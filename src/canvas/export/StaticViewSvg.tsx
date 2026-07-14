@@ -1,6 +1,6 @@
 import type { ModelState } from '../../model/types';
 import { createNestedConnectionVisibilityResolver } from '../../model/ops';
-import { useSettingsStore } from '../../settings/app-settings';
+import { useSettingsStore, type AppSettings } from '../../settings/app-settings';
 import { ConnectionView } from '../ConnectionView';
 import { createConnectionRouteResolver } from '../geometry';
 import { NodeFigure } from '../figures/NodeFigure';
@@ -15,7 +15,7 @@ function StaticNode({
 }: {
   model: ModelState;
   nodeId: string;
-  settings: ReturnType<typeof useSettingsStore.getState>['settings'];
+  settings: AppSettings;
 }) {
   const node = model.nodes[nodeId];
   if (!node) return null;
@@ -57,8 +57,17 @@ function StaticNode({
  * connections) without selection, handles, or overlays — used for image
  * export and anywhere a view must be drawn outside the live canvas.
  */
-export function StaticViewContent({ model, viewId }: { model: ModelState; viewId: string }) {
-  const settings = useSettingsStore((state) => state.settings);
+export function StaticViewContent({
+  model,
+  viewId,
+  renderSettings,
+}: {
+  model: ModelState;
+  viewId: string;
+  renderSettings?: AppSettings;
+}) {
+  const browserSettings = useSettingsStore((state) => state.settings);
+  const settings = renderSettings ?? browserSettings;
   const view = model.views[viewId];
   if (!view) return null;
   const absBounds = computeAbsBounds(model, viewId);

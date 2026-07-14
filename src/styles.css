@@ -2752,6 +2752,53 @@ body {
   min-width: 340px;
 }
 
+.static-report-export-dialog {
+  width: min(520px, calc(100vw - 32px));
+  display: grid;
+  gap: 12px;
+}
+
+.static-report-export-dialog h2,
+.static-report-export-dialog p {
+  margin: 0;
+}
+
+.static-report-export-dialog h2 {
+  color: var(--text);
+  font-size: 19px;
+}
+
+.static-report-export-lead {
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.static-report-file-name {
+  display: grid;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.static-report-file-name input {
+  min-width: 0;
+  padding: 7px 9px;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.static-report-privacy {
+  padding: 10px 12px;
+  color: #405468;
+  font-size: 11px;
+  line-height: 1.45;
+  background: #f4f7fa;
+  border-left: 3px solid var(--accent);
+}
+
 .generate-view-dialog {
   width: min(440px, calc(100vw - 32px));
   display: grid;

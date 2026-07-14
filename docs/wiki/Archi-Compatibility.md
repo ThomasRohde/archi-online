@@ -78,6 +78,21 @@ categories are ignored by Desktop. Template export and model creation each
 remap every model/object ID while preserving profiles, assets, views, styling,
 and recursive connection topology.
 
+## Same static HTML report outcome
+
+**Import/Export ▾ → Static HTML Report (.zip)…** produces a self-contained
+offline report package with model-tree navigation, literal search, stable
+view/object deep links, object documentation and properties, Model Relations,
+Used in Views, and shared-renderer SVG diagrams with zoom controls. Extracted
+`index.html` opens through `file://` or static hosting without Archi Online, a
+server runtime, or network requests.
+
+This implements Desktop's portable navigable-report outcome with a web-native
+static package. Report masking and query tools remain tracked separately as
+`OUTPUT-02`. The report includes the selected model content but excludes
+browser-profile data such as settings, extensions, scripts, autosave, file
+handles, sharing credentials, tokens, dock layout, and undo history.
+
 ## Same metamodel and rules
 
 - The full **ArchiMate 3.2** metamodel: every element type across Strategy,

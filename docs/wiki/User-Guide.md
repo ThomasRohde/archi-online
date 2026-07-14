@@ -40,7 +40,7 @@ Extensions can contribute additional dockable panels; they appear in the
 | **New** | Add a new unsaved model to the workspace. |
 | **Open…** | Add one or more `.archimate` models, or import ArchiMate Open Exchange `.xml` files (`Ctrl+O`). |
 | **Save** / **Save As…** | Save the active model as native `.archimate` XML through its file handle or download fallback (`Ctrl+S`). |
-| **Import/Export ▾** | View image export (PNG/SVG/clipboard), ArchiMate Open Exchange import/export, and CSV import/export. See [[Import & Export|Import-and-Export]]. |
+| **Import/Export ▾** | View image export (PNG/SVG/clipboard), offline static HTML reports, ArchiMate Open Exchange import/export, and CSV import/export. See [[Import & Export|Import-and-Export]]. |
 | **Present** | Full-screen, chrome-free walkthrough of the model's views (arrow keys to step, `Esc` to exit). |
 | **Undo** / **Redo** | Step through model transactions; the tooltip names the operation. |
 | **Find and replace** | Preview and selectively replace text in the captured model or its active view. |
@@ -50,6 +50,13 @@ Extensions can contribute additional dockable panels; they appear in the
 | **Extensions ▾** | Extension menu items, plus registered extension commands that don't already appear in an extension menu. |
 | **Views ▾** | Reopen panels (open ones are check-marked) and reset the layout. |
 | **?** | Keyboard shortcut reference. |
+
+**Static HTML Report (.zip)…** exports the complete active model as an offline
+stakeholder report. Extract the ZIP and open `index.html` to use its model tree,
+literal search, deep links, object details, analysis links, and diagram zoom
+controls. The package contains model content and embedded view images but not
+browser settings, extensions, scripts, autosave, file handles, sharing
+credentials, or tokens.
 
 ## Models tree
 

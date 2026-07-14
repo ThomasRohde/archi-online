@@ -80,6 +80,7 @@ import {
 import { PropertiesManagerDialog } from './PropertiesManagerDialog';
 import { ModelMergeDialog } from './ModelMergeDialog';
 import { TemplateGallery } from './TemplateGallery';
+import { StaticReportExportDialog } from './StaticReportExportDialog';
 
 /** Published documentation site (GitHub Pages). */
 const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
@@ -358,6 +359,7 @@ export function Toolbar() {
   const [showExportImage, setShowExportImage] = useState(false);
   const [showExportCsv, setShowExportCsv] = useState(false);
   const [showExportExchange, setShowExportExchange] = useState(false);
+  const [showStaticReport, setShowStaticReport] = useState(false);
   const [showModelMerge, setShowModelMerge] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [presenting, setPresenting] = useState(false);
@@ -402,6 +404,10 @@ export function Toolbar() {
     {
       label: 'Model to CSV…',
       onClick: () => setShowExportCsv(true),
+    },
+    {
+      label: 'Static HTML Report (.zip)…',
+      onClick: () => setShowStaticReport(true),
     },
     SEPARATOR,
     {
@@ -628,6 +634,9 @@ export function Toolbar() {
       {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
       {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}
       {showExportExchange && <ExportExchangeDialog onClose={() => setShowExportExchange(false)} />}
+      {showStaticReport && (
+        <StaticReportExportDialog onClose={() => setShowStaticReport(false)} />
+      )}
       {showModelMerge && <ModelMergeDialog onClose={() => setShowModelMerge(false)} />}
       {showTemplates && <TemplateGallery onClose={() => setShowTemplates(false)} />}
       {presenting && <PresentationMode onClose={() => setPresenting(false)} />}

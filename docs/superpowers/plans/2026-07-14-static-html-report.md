@@ -153,7 +153,7 @@ Expected: PASS with no warnings.
 
 **Files:**
 - Create: `src/model/report/shell.html`
-- Create: `src/model/report/shell.css`
+- Create: `src/model/report/shell.css.txt`
 - Create: `src/model/report/shell.js`
 - Create: `src/model/report/assets.ts`
 - Create: `src/model/report/archive.ts`
@@ -236,7 +236,7 @@ Expected: PASS with byte-for-byte equal archives.
 ### Task 3: Framework-free report shell
 
 **Files:**
-- Modify: `src/model/report/shell.css`
+- Modify: `src/model/report/shell.css.txt`
 - Modify: `src/model/report/shell.js`
 - Test: `tests/static-report-shell.test.ts`
 
@@ -335,7 +335,7 @@ Inject real lightweight functions instead of module mocks:
 ```ts
 const rendered: string[] = [];
 const saved: Array<{ name: string; type: string }> = [];
-expect(staticReportFileName('A/B:*? Model')).toBe('A_B____ Model-html-report.zip');
+expect(staticReportFileName('A/B:*? Model')).toBe('A_B___ Model-html-report.zip');
 const result = await exportStaticReport(model, 'stakeholder-report.zip', {
   renderView: (_model, viewId) => { rendered.push(viewId); return { svg: `<svg id="${viewId}"/>`, width: 1, height: 1 }; },
   save: async (blob, name) => { saved.push({ name, type: blob.type }); return true; },
