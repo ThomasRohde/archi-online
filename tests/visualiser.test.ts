@@ -112,7 +112,7 @@ describe('Visualiser', () => {
     await act(async () => { root.unmount(); });
   });
 
-  it('renders a standalone SVG suitable for SVG and PNG export', () => {
+  it('renders a standalone SVG without export-only relationship labels', () => {
     const actor = addElement('BusinessActor', 'Actor');
     const role = addElement('BusinessRole', 'Role');
     addRelationship('AssignmentRelationship', actor, role, 'Assigned')!;
@@ -130,6 +130,83 @@ describe('Visualiser', () => {
     });
     expect(svg).toContain('<svg');
     expect(svg).toContain('Actor');
-    expect(svg).toContain('Assigned');
+    expect(svg).toContain('Role');
+    expect(svg).not.toContain('Assigned');
+  });
+
+  it('renders only stored relationship names at the routed half-length when enabled', () => {
+    const actor = addElement('BusinessActor', 'Actor');
+    const role = addElement('BusinessRole', 'Role');
+    const process = addElement('BusinessProcess', 'Process');
+    const assigned = addRelationship('AssignmentRelationship', actor, role, 'Assigned')!;
+    const unnamed = addRelationship('AssociationRelationship', actor, process)!;
+    const graph = buildAnalysisGraph(useStore.getState().model!, {
+      focusIds: [actor], depth: 1, direction: 'both',
+    });
+    const svg = renderAnalysisGraphSvg(graph, {
+      nodes: {
+        [actor]: { x: 0, y: 0, width: 120, height: 55 },
+        [role]: { x: 200, y: 0, width: 120, height: 55 },
+        [process]: { x: 200, y: 100, width: 120, height: 55 },
+      },
+      edges: {
+        [assigned]: {
+          points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 80 }],
+        },
+        [unnamed]: { points: [{ x: 120, y: 27 }, { x: 200, y: 127 }] },
+      },
+    }, { showRelationshipNames: true });
+
+    expect(svg.match(/class="visualiser-edge-label"/g)).toHaveLength(1);
+    expect(svg).toContain('x="20" y="25"');
+    expect(svg).toContain('>Assigned</text>');
+    expect(svg).not.toContain('>Association</text>');
+  });
+
+  it('renders one edge label for a relationship split around a relationship node', async () => {
+    const actor = addElement('BusinessActor', 'Actor');
+    const role = addElement('BusinessRole', 'Role');
+    const process = addElement('BusinessProcess', 'Process');
+    const assigned = addRelationship('AssignmentRelationship', actor, role, 'Assigned')!;
+    addRelationship('AssociationRelationship', assigned, process, 'Context')!;
+    const graph = buildAnalysisGraph(useStore.getState().model!, {
+      focusIds: [assigned], depth: 1, direction: 'both',
+    });
+    const svg = renderAnalysisGraphSvg(
+      graph,
+      await simpleLayout({
+        nodes: graph.nodes.map((node) => ({ id: node.id, width: 120, height: 55 })),
+        edges: graph.edges.map((edge) => ({
+          id: edge.id, sourceId: edge.sourceId, targetId: edge.targetId,
+        })),
+      }),
+      { showRelationshipNames: true },
+    );
+
+    expect(svg.match(/class="visualiser-edge-label"[^>]*>Assigned<\/text>/g)).toHaveLength(1);
+  });
+
+  it('toggles relationship names in the live graph and preferences', async () => {
+    const actor = addElement('BusinessActor', 'Actor');
+    const role = addElement('BusinessRole', 'Role');
+    addRelationship('AssignmentRelationship', actor, role, 'Assigned')!;
+    setSelection('tree', [actor]);
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(createElement(VisualiserPanel, { layoutGraph: simpleLayout }));
+    });
+    await waitFor(() => Boolean(host.querySelector(`[data-concept-id="${role}"]`)));
+
+    expect(host.querySelector('.visualiser-edge-label')).toBeNull();
+    const toggle = Array.from(host.querySelectorAll('label'))
+      .find((label) => label.textContent?.trim() === 'Relationship names')
+      ?.querySelector<HTMLInputElement>('input');
+    expect(toggle?.checked).toBe(false);
+    await act(async () => { toggle?.click(); });
+
+    expect(host.querySelector('.visualiser-edge-label')?.textContent).toBe('Assigned');
+    expect(useAnalysisPreferences.getState().preferences.showRelationshipNames).toBe(true);
+    await act(async () => { root.unmount(); });
   });
 });

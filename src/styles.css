@@ -1177,6 +1177,17 @@ body {
   stroke-width: 1.4;
 }
 
+.visualiser-edge-label {
+  fill: #526170;
+  font-size: 10px;
+  text-anchor: middle;
+  stroke: #fff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  pointer-events: none;
+}
+
 #visualiser-arrow path {
   fill: #596979;
 }

@@ -15,6 +15,7 @@ import {
   type ElkGraphLayoutResult,
 } from '../model/layout/elk-graph';
 import { setSelection } from '../model/store';
+import { pointAlong } from '../canvas/geometry';
 import { copyPngBlobToClipboard, rasterizeSvg } from '../canvas/export/svg-image';
 import { saveBlobToDisk, sanitizeFileName } from '../persistence/files';
 import { useAnalysisPreferences } from '../settings/analysis-preferences';
@@ -70,7 +71,34 @@ function pathData(points: Array<{ x: number; y: number }>): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' ');
 }
 
-function analysisGraphDocument(graph: AnalysisGraphResult, layout: ElkGraphLayoutResult) {
+export interface AnalysisGraphRenderOptions {
+  showRelationshipNames?: boolean;
+}
+
+interface EdgeLabel {
+  text: string;
+  x: number;
+  y: number;
+}
+
+function edgeLabel(
+  edge: AnalysisGraphResult['edges'][number],
+  points: Array<{ x: number; y: number }>,
+  showRelationshipNames: boolean,
+): EdgeLabel | null {
+  const text = edge.name.trim();
+  if (!showRelationshipNames || !text || edge.segment === 'source' || points.length < 2) {
+    return null;
+  }
+  const midpoint = pointAlong(points, 0.5).point;
+  return { text, x: midpoint.x, y: midpoint.y - 5 };
+}
+
+function analysisGraphDocument(
+  graph: AnalysisGraphResult,
+  layout: ElkGraphLayoutResult,
+  options: AnalysisGraphRenderOptions = {},
+) {
   const content = graphBounds(layout);
   const margin = 28;
   const box = {
@@ -82,11 +110,11 @@ function analysisGraphDocument(graph: AnalysisGraphResult, layout: ElkGraphLayou
   const edges = graph.edges.map((edge) => {
     const points = edgePoints(edge, layout);
     if (points.length < 2) return '';
-    const middle = points[Math.floor(points.length / 2)];
-    const label = edge.segment && edge.segment !== 'target'
-      ? ''
-      : (edge.name || relationshipLabel(edge.type));
-    return `<g><path d="${pathData(points)}" fill="none" stroke="#596979" stroke-width="1.4" marker-end="url(#arrow)"/>${label ? `<text x="${middle.x}" y="${middle.y - 5}" text-anchor="middle" font-size="10" fill="#526170">${escapeXml(label)}</text>` : ''}</g>`;
+    const label = edgeLabel(edge, points, options.showRelationshipNames ?? false);
+    const labelMarkup = label
+      ? `<text class="visualiser-edge-label" x="${label.x}" y="${label.y}" text-anchor="middle" font-size="10" fill="#526170" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${escapeXml(label.text)}</text>`
+      : '';
+    return `<g><path d="${pathData(points)}" fill="none" stroke="#596979" stroke-width="1.4" marker-end="url(#arrow)"/>${labelMarkup}</g>`;
   }).join('');
   const nodes = graph.nodes.map((node) => {
     const bounds = layout.nodes[node.id];
@@ -104,8 +132,9 @@ function analysisGraphDocument(graph: AnalysisGraphResult, layout: ElkGraphLayou
 export function renderAnalysisGraphSvg(
   graph: AnalysisGraphResult,
   layout: ElkGraphLayoutResult,
+  options: AnalysisGraphRenderOptions = {},
 ): string {
-  return analysisGraphDocument(graph, layout).svg;
+  return analysisGraphDocument(graph, layout, options).svg;
 }
 
 function currentConceptId(): string | null {
@@ -207,7 +236,9 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
   };
   const exportGraph = async (format: 'svg' | 'png' | 'clipboard') => {
     if (!graph || !layout || !model) return;
-    const document = analysisGraphDocument(graph, layout);
+    const document = analysisGraphDocument(graph, layout, {
+      showRelationshipNames: preferences.showRelationshipNames,
+    });
     const focus = model.elements[focusId ?? ''] ?? model.relationships[focusId ?? ''];
     const base = sanitizeFileName(`Visualiser - ${focus?.name || 'Analysis'}`);
     if (format === 'svg') {
@@ -225,7 +256,11 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
     });
   };
 
-  const document = graph && layout ? analysisGraphDocument(graph, layout) : null;
+  const document = graph && layout
+    ? analysisGraphDocument(graph, layout, {
+        showRelationshipNames: preferences.showRelationshipNames,
+      })
+    : null;
   return (
     <div className="visualiser-panel" data-focus-id={focusId ?? ''}>
       <div className="visualiser-toolbar">
@@ -241,6 +276,7 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
         <label>Depth <select value={preferences.depth} onChange={(event) => setPreferences({ depth: Number(event.target.value) })}>{[1, 2, 3, 4, 5, 6].map((depth) => <option key={depth}>{depth}</option>)}</select></label>
         <label>Direction <select value={preferences.direction} onChange={(event) => setPreferences({ direction: event.target.value as typeof preferences.direction })}><option value="both">Both</option><option value="outgoing">Outgoing</option><option value="incoming">Incoming</option></select></label>
         <label>Viewpoint <select value={preferences.viewpointId} onChange={(event) => setPreferences({ viewpointId: event.target.value })}><option value="">All</option>{VIEWPOINTS.map((viewpoint) => <option key={viewpoint.id} value={viewpoint.id}>{viewpoint.name}</option>)}</select></label>
+        <label><input type="checkbox" checked={preferences.showRelationshipNames} onChange={(event) => setPreferences({ showRelationshipNames: event.target.checked })}/>Relationship names</label>
         <details className="visualiser-filters"><summary>Type filters</summary><div><strong>Elements</strong>{ELEMENT_TYPES.map((definition) => <label key={definition.type}><input type="checkbox" checked={preferences.elementTypes.includes(definition.type)} onChange={() => setPreferences({ elementTypes: preferences.elementTypes.includes(definition.type) ? preferences.elementTypes.filter((type) => type !== definition.type) : [...preferences.elementTypes, definition.type] })}/>{definition.label}</label>)}<strong>Relationships</strong>{RELATIONSHIP_TYPES.map((definition) => <label key={definition.type}><input type="checkbox" checked={preferences.relationshipTypes.includes(definition.type)} onChange={() => setPreferences({ relationshipTypes: preferences.relationshipTypes.includes(definition.type) ? preferences.relationshipTypes.filter((type) => type !== definition.type) : [...preferences.relationshipTypes, definition.type] })}/>{definition.label}</label>)}</div></details>
       </div>
       <div className="visualiser-export"><button className="tb-btn small" disabled={!layout} onClick={() => void exportGraph('svg')}>SVG</button><button className="tb-btn small" disabled={!layout} onClick={() => void exportGraph('png')}>PNG</button><button className="tb-btn small" disabled={!layout} onClick={() => void exportGraph('clipboard')}>Copy PNG</button>{graph?.truncated && <span className="visualiser-truncated">Limited to {graph.maxConcepts} concepts — tighten filters.</span>}</div>
@@ -250,7 +286,11 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
         {error && <div className="empty-hint">{error}</div>}
         {graph && layout && document && <svg viewBox={`${document.box.x} ${document.box.y} ${document.box.width} ${document.box.height}`} aria-label="Visualiser graph">
           <defs><marker id="visualiser-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" /></marker></defs>
-          {graph.edges.map((edge) => <path key={edge.id} className="visualiser-edge" d={pathData(edgePoints(edge, layout))} markerEnd="url(#visualiser-arrow)" />)}
+          {graph.edges.map((edge) => {
+            const points = edgePoints(edge, layout);
+            const label = edgeLabel(edge, points, preferences.showRelationshipNames);
+            return <g key={edge.id}><path className="visualiser-edge" d={pathData(points)} markerEnd="url(#visualiser-arrow)" />{label && <text className="visualiser-edge-label" x={label.x} y={label.y}>{label.text}</text>}</g>;
+          })}
           {graph.nodes.map((node) => {
             const bounds = layout.nodes[node.id];
             if (!bounds) return null;
