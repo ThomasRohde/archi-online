@@ -1098,6 +1098,19 @@ body {
   color: var(--text-dim);
 }
 
+.visualiser-controls label.visualiser-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.visualiser-toggle input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
 .visualiser-controls select {
   min-width: 0;
   height: 24px;
