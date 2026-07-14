@@ -134,6 +134,37 @@ describe('Visualiser', () => {
     expect(svg).not.toContain('Assigned');
   });
 
+  it('wraps long node labels consistently in the live graph and exported SVG', async () => {
+    const process = addElement('BusinessProcess', 'Document Processing SSC');
+    const role = addElement('BusinessRole', 'Role');
+    addRelationship('AssignmentRelationship', role, process)!;
+    const graph = buildAnalysisGraph(useStore.getState().model!, {
+      focusIds: [process], depth: 1, direction: 'both',
+    });
+    const layout = await simpleLayout({
+      nodes: graph.nodes.map((node) => ({ id: node.id, width: 120, height: 55 })),
+      edges: graph.edges.map((edge) => ({
+        id: edge.id, sourceId: edge.sourceId, targetId: edge.targetId,
+      })),
+    });
+    const svg = renderAnalysisGraphSvg(graph, layout);
+
+    expect(svg).toMatch(/<tspan[^>]*>Document<\/tspan><tspan[^>]*>Processing SSC<\/tspan>/);
+
+    setSelection('tree', [process]);
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(createElement(VisualiserPanel, { layoutGraph: simpleLayout }));
+    });
+    await waitFor(() => Boolean(host.querySelector(`[data-concept-id="${process}"]`)));
+
+    expect(Array.from(host.querySelectorAll(
+      `[data-concept-id="${process}"] tspan`,
+    )).map((line) => line.textContent)).toEqual(['Document', 'Processing SSC']);
+    await act(async () => { root.unmount(); });
+  });
+
   it('renders only stored relationship names at the routed half-length when enabled', () => {
     const actor = addElement('BusinessActor', 'Actor');
     const role = addElement('BusinessRole', 'Role');

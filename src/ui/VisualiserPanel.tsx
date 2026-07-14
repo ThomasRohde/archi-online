@@ -81,6 +81,89 @@ interface EdgeLabel {
   y: number;
 }
 
+type AnalysisGraphNode = AnalysisGraphResult['nodes'][number];
+
+interface NodeLabelLayout {
+  fontSize: number;
+  lineHeight: number;
+  lines: string[];
+  startY: number;
+}
+
+function nodeLabelText(node: AnalysisGraphNode): string {
+  return node.name || (node.kind === 'element'
+    ? elementLabel(node.type)
+    : relationshipLabel(node.type));
+}
+
+function approximateTextWidth(text: string, fontSize: number): number {
+  return Array.from(text).reduce((width, character) => {
+    if (character === ' ') return width + fontSize * 0.32;
+    if (/[ilI1'.,:;]/.test(character)) return width + fontSize * 0.28;
+    if (/[mMwW@#%&]/.test(character)) return width + fontSize * 0.82;
+    if (/[A-Z]/.test(character)) return width + fontSize * 0.64;
+    return width + fontSize * 0.54;
+  }, 0);
+}
+
+function splitWord(word: string, maxWidth: number, fontSize: number): string[] {
+  const chunks: string[] = [];
+  let chunk = '';
+  for (const character of word) {
+    if (chunk && approximateTextWidth(chunk + character, fontSize) > maxWidth) {
+      chunks.push(chunk);
+      chunk = character;
+    } else {
+      chunk += character;
+    }
+  }
+  if (chunk) chunks.push(chunk);
+  return chunks;
+}
+
+function wrapNodeLabel(text: string, width: number, fontSize: number): string[] {
+  const maxWidth = Math.max(fontSize, width - 16);
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [''];
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    for (const chunk of splitWord(word, maxWidth, fontSize)) {
+      const candidate = line ? `${line} ${chunk}` : chunk;
+      if (line && approximateTextWidth(candidate, fontSize) > maxWidth) {
+        lines.push(line);
+        line = chunk;
+      } else {
+        line = candidate;
+      }
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function nodeLabelLayout(
+  node: AnalysisGraphNode,
+  width: number,
+  height: number,
+): NodeLabelLayout {
+  const fontSize = node.compact ? 10 : 11;
+  const lineHeight = fontSize * 1.2;
+  const lines = wrapNodeLabel(nodeLabelText(node), width, fontSize);
+  const startY = height / 2 - ((lines.length - 1) * lineHeight) / 2 + fontSize * 0.35;
+  return { fontSize, lineHeight, lines, startY };
+}
+
+function visualiserNodeSize(node: AnalysisGraphNode) {
+  const width = node.kind === 'relationship' ? 96 : ELEMENT_TYPE_MAP[node.type].width;
+  const baseHeight = node.kind === 'relationship' ? 28 : ELEMENT_TYPE_MAP[node.type].height;
+  const label = nodeLabelLayout(node, width, baseHeight);
+  return {
+    width,
+    height: Math.max(baseHeight, Math.ceil(label.lines.length * label.lineHeight + 12)),
+  };
+}
+
 function edgeLabel(
   edge: AnalysisGraphResult['edges'][number],
   points: Array<{ x: number; y: number }>,
@@ -120,10 +203,9 @@ function analysisGraphDocument(
     const bounds = layout.nodes[node.id];
     if (!bounds) return '';
     const fill = node.kind === 'element' ? ELEMENT_TYPE_MAP[node.type].fill : '#f1f4f7';
-    const label = node.name || (node.kind === 'element'
-      ? elementLabel(node.type)
-      : relationshipLabel(node.type));
-    return `<g transform="translate(${bounds.x} ${bounds.y})"><rect width="${bounds.width}" height="${bounds.height}" rx="${node.compact ? 13 : 4}" fill="${fill}" stroke="${node.focus ? '#1f6feb' : '#526170'}" stroke-width="${node.focus ? 2 : 1.2}"/><text x="${bounds.width / 2}" y="${bounds.height / 2 + 4}" text-anchor="middle" font-size="${node.compact ? 10 : 12}" fill="#1f2730">${escapeXml(label)}</text></g>`;
+    const label = nodeLabelLayout(node, bounds.width, bounds.height);
+    const labelMarkup = label.lines.map((line, index) => `<tspan x="${bounds.width / 2}" y="${label.startY + index * label.lineHeight}">${escapeXml(line)}</tspan>`).join('');
+    return `<g transform="translate(${bounds.x} ${bounds.y})"><rect width="${bounds.width}" height="${bounds.height}" rx="${node.compact ? 13 : 4}" fill="${fill}" stroke="${node.focus ? '#1f6feb' : '#526170'}" stroke-width="${node.focus ? 2 : 1.2}"/><text x="${bounds.width / 2}" text-anchor="middle" font-size="${label.fontSize}" fill="#1f2730">${labelMarkup}</text></g>`;
   }).join('');
   const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}" viewBox="${box.x} ${box.y} ${box.width} ${box.height}" font-family="Segoe UI,system-ui,sans-serif"><rect x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" fill="#ffffff"/><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#596979"/></marker></defs>${edges}${nodes}</svg>`;
   return { svg, width: box.width, height: box.height, box };
@@ -204,13 +286,7 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
     const token = gate.current.next();
     setError('');
     void layoutGraph({
-      nodes: graph.nodes.map((node) => node.kind === 'relationship'
-        ? { id: node.id, width: 96, height: 28 }
-        : {
-            id: node.id,
-            width: ELEMENT_TYPE_MAP[node.type].width,
-            height: ELEMENT_TYPE_MAP[node.type].height,
-          }),
+      nodes: graph.nodes.map((node) => ({ id: node.id, ...visualiserNodeSize(node) })),
       edges: graph.edges.map((edge) => ({
         id: edge.id,
         sourceId: edge.sourceId,
@@ -295,8 +371,8 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
             const bounds = layout.nodes[node.id];
             if (!bounds) return null;
             const fill = node.kind === 'element' ? ELEMENT_TYPE_MAP[node.type].fill : '#f1f4f7';
-            const label = node.name || (node.kind === 'element' ? elementLabel(node.type) : relationshipLabel(node.type));
-            return <g key={node.id} className={'visualiser-node' + (node.focus ? ' focus' : '')} data-concept-id={node.id} transform={`translate(${bounds.x} ${bounds.y})`} onClick={() => selectConcept(node.id)} onDoubleClick={() => navigate(node.id)}><rect width={bounds.width} height={bounds.height} rx={node.compact ? 14 : 4} fill={fill}/><text x={bounds.width / 2} y={bounds.height / 2 + 4}>{label}</text></g>;
+            const label = nodeLabelLayout(node, bounds.width, bounds.height);
+            return <g key={node.id} className={'visualiser-node' + (node.focus ? ' focus' : '')} data-concept-id={node.id} transform={`translate(${bounds.x} ${bounds.y})`} onClick={() => selectConcept(node.id)} onDoubleClick={() => navigate(node.id)}><rect width={bounds.width} height={bounds.height} rx={node.compact ? 14 : 4} fill={fill}/><text x={bounds.width / 2} style={{ fontSize: label.fontSize }}>{label.lines.map((line, index) => <tspan key={`${index}:${line}`} x={bounds.width / 2} y={label.startY + index * label.lineHeight}>{line}</tspan>)}</text></g>;
           })}
         </svg>}
       </div>
