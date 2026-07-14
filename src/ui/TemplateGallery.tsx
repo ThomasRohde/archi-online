@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  Download,
+  LayoutTemplate,
+  Plus,
+  Save,
+  Search,
+  SearchX,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { rasterizeSvg } from '../canvas/export/svg-image';
 import { renderViewSvg } from '../canvas/export/view-image';
 import {
@@ -42,11 +53,11 @@ export function TemplateGallery({ onClose }: { onClose(): void }) {
     () => searchTemplateCatalog(records, query, category ? [category] : []),
     [category, query, records],
   );
-  const selected = records.find((record) => record.id === selectedId);
+  const selected = shown.find((record) => record.id === selectedId);
 
   useEffect(() => {
-    if (!selected && records[0]) setSelectedId(records[0].id);
-  }, [records, selected]);
+    if (!selected && shown[0]) setSelectedId(shown[0].id);
+  }, [selected, shown]);
 
   useEffect(() => {
     if (!selected) {
@@ -84,6 +95,8 @@ export function TemplateGallery({ onClose }: { onClose(): void }) {
 
   const importFile = (file: File) => run(async () => {
     const record = await importTemplateToCatalog(new Uint8Array(await file.arrayBuffer()));
+    setQuery('');
+    setCategory('');
     setSelectedId(record.id);
   });
 
@@ -99,6 +112,8 @@ export function TemplateGallery({ onClose }: { onClose(): void }) {
       metadata: { version: 1, id: newId(), categories: [] },
       thumbnails,
     }));
+    setQuery('');
+    setCategory('');
     setSelectedId(record.id);
   });
 
@@ -152,48 +167,173 @@ export function TemplateGallery({ onClose }: { onClose(): void }) {
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !busy) onClose();
     }}>
-      <section className="modal template-gallery-dialog" role="dialog" aria-modal="true" aria-label="Model Templates">
-        <header>
-          <div><span className="dialog-kicker">Phase 3 reuse</span><h2>Model Templates</h2></div>
-          <button className="tb-btn" disabled={busy} onClick={onClose}>Close</button>
+      <section
+        className="modal template-gallery-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Model Templates"
+        aria-labelledby="template-gallery-title"
+        aria-describedby="template-gallery-description"
+      >
+        <header className="template-gallery-header">
+          <div className="template-gallery-heading">
+            <span className="template-gallery-heading-icon" aria-hidden="true">
+              <LayoutTemplate size={22} strokeWidth={1.8} />
+            </span>
+            <div>
+              <span className="dialog-kicker">Template library</span>
+              <h2 id="template-gallery-title">Model templates</h2>
+              <p id="template-gallery-description">Start a new model from a proven structure.</p>
+            </div>
+          </div>
+          <button
+            className="template-gallery-close"
+            type="button"
+            aria-label="Close model templates"
+            disabled={busy}
+            onClick={onClose}
+          >
+            <X size={18} />
+          </button>
         </header>
-        <div className="template-gallery-toolbar">
-          <input aria-label="Search templates" type="search" placeholder="Search templates" value={query} onChange={(event) => setQuery(event.target.value)} />
-          <select aria-label="Filter template category" value={category} onChange={(event) => setCategory(event.target.value)}>
+        {records.length > 0 && <div className="template-gallery-toolbar">
+          <label className="template-gallery-search">
+            <Search size={16} aria-hidden="true" />
+            <input
+              aria-label="Search templates"
+              type="search"
+              placeholder="Search templates"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <select
+            aria-label="Filter template category"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+          >
             <option value="">All categories</option>
             {allCategories.map((value) => <option key={value} value={value}>{value}</option>)}
           </select>
-          <label className="tb-btn template-import">Import<input type="file" accept=".architemplate" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }} /></label>
-          <button className="tb-btn" disabled={!model || busy} onClick={() => void saveCurrent()}>Save Current Model</button>
-        </div>
-        <div className="template-gallery-body">
-          <div className="template-card-list" aria-label="Template catalog">
-            {shown.map((record) => (
-              <button key={record.id} aria-label={record.name} className={`template-card${selectedId === record.id ? ' selected' : ''}`} onClick={() => setSelectedId(record.id)}>
-                <TemplateThumbnail record={record} />
-                <span><strong>{record.name}</strong><small>{record.categories.join(' · ') || 'Uncategorised'}</small></span>
-              </button>
-            ))}
-            {shown.length === 0 && <div className="empty-hint">No templates match this search.</div>}
+          <div className="template-gallery-utility-actions">
+            <label className="tb-btn template-import">
+              <Upload size={15} aria-hidden="true" />
+              Import
+              <input
+                type="file"
+                accept=".architemplate"
+                disabled={busy}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void importFile(file);
+                  event.target.value = '';
+                }}
+              />
+            </label>
+            <button className="tb-btn" disabled={!model || busy} onClick={() => void saveCurrent()}>
+              <Save size={15} aria-hidden="true" />
+              Save current
+            </button>
           </div>
-          <div className="template-editor">
-            {selected ? <>
+        </div>}
+        {records.length === 0 ? <main className="template-gallery-empty">
+          <span className="template-gallery-empty-icon" aria-hidden="true">
+            <LayoutTemplate size={34} strokeWidth={1.5} />
+          </span>
+          <div>
+            <h3>Build your template library</h3>
+            <p>Import an Archi template, or save the open model as a reusable starting point.</p>
+          </div>
+          <div className="template-gallery-empty-actions">
+            <label className="tb-btn primary template-import">
+              <Upload size={16} aria-hidden="true" />
+              Import template
+              <input
+                type="file"
+                accept=".architemplate"
+                disabled={busy}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void importFile(file);
+                  event.target.value = '';
+                }}
+              />
+            </label>
+            <button className="tb-btn" disabled={!model || busy} onClick={() => void saveCurrent()}>
+              <Save size={16} aria-hidden="true" />
+              Save current model
+            </button>
+          </div>
+          <small>Templates are stored in this browser and can be exported as .architemplate files.</small>
+        </main> : shown.length === 0 ? <main className="template-gallery-empty template-gallery-no-results">
+          <span className="template-gallery-empty-icon" aria-hidden="true">
+            <SearchX size={32} strokeWidth={1.5} />
+          </span>
+          <div>
+            <h3>No matching templates</h3>
+            <p>Try a different search or category.</p>
+          </div>
+          <button className="tb-btn" onClick={() => { setQuery(''); setCategory(''); }}>Clear filters</button>
+        </main> : <main className="template-gallery-body">
+          <section className="template-catalog-panel" aria-label="Template catalog">
+            <div className="template-panel-heading">
+              <span>Library</span>
+              <small>{shown.length} {shown.length === 1 ? 'template' : 'templates'}</small>
+            </div>
+            <div className="template-card-list">
+              {shown.map((record) => (
+                <button
+                  key={record.id}
+                  aria-label={record.name}
+                  className={`template-card${selectedId === record.id ? ' selected' : ''}`}
+                  onClick={() => setSelectedId(record.id)}
+                >
+                  <TemplateThumbnail record={record} />
+                  <span className="template-card-copy">
+                    <strong>{record.name}</strong>
+                    <span>{record.description || 'No description'}</span>
+                    <small>{record.categories.join(' · ') || 'Uncategorised'}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+          <aside className="template-editor" aria-label="Template details">
+            {selected && <>
+              <div className="template-panel-heading">
+                <span>Template details</span>
+                <small>Edit before reuse</small>
+              </div>
               <TemplateThumbnail record={selected} large />
-              <label>Name<input value={name} onChange={(event) => setName(event.target.value)} /></label>
-              <label>Description<textarea rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
-              <label>Categories<input aria-label="Template categories" value={categories} placeholder="Business, Starter" onChange={(event) => setCategories(event.target.value)} /></label>
-              <label>Key thumbnail<select aria-label="Key thumbnail" value={keyThumbnail} onChange={(event) => setKeyThumbnail(event.target.value)}><option value="">None</option>{thumbnailPaths.map((path) => <option key={path} value={path}>{path}</option>)}</select></label>
-              <button className="tb-btn" disabled={busy} onClick={() => void saveMetadata()}>Save Metadata</button>
-            </> : <div className="empty-hint">Import or save a model to start the gallery.</div>}
-          </div>
-        </div>
+              <div className="template-editor-fields">
+                <label>Name<input value={name} onChange={(event) => setName(event.target.value)} /></label>
+                <label>Description<textarea rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+                <label>Categories<input aria-label="Template categories" value={categories} placeholder="Business, Starter" onChange={(event) => setCategories(event.target.value)} /></label>
+                <label>Key thumbnail<select aria-label="Key thumbnail" value={keyThumbnail} onChange={(event) => setKeyThumbnail(event.target.value)}><option value="">None</option>{thumbnailPaths.map((path) => <option key={path} value={path}>{path}</option>)}</select></label>
+              </div>
+              <button className="tb-btn template-save-metadata" disabled={busy} onClick={() => void saveMetadata()}>
+                <Save size={15} aria-hidden="true" />
+                Save changes
+              </button>
+            </>}
+          </aside>
+        </main>}
         {error && <p className="template-gallery-error" role="alert">{error}</p>}
-        <footer>
-          <button className="tb-btn danger" disabled={!selected || busy} onClick={() => void deleteTemplate()}>Delete</button>
+        {records.length > 0 && <footer>
+          <button className="tb-btn danger" disabled={!selected || busy} onClick={() => void deleteTemplate()}>
+            <Trash2 size={15} aria-hidden="true" />
+            Delete
+          </button>
           <span />
-          <button className="tb-btn" disabled={!selected || busy} onClick={() => void exportTemplate()}>Export</button>
-          <button className="tb-btn primary" disabled={!selected || busy} onClick={() => void createModel()}>Create Model</button>
-        </footer>
+          <button className="tb-btn" disabled={!selected || busy} onClick={() => void exportTemplate()}>
+            <Download size={15} aria-hidden="true" />
+            Export
+          </button>
+          <button className="tb-btn primary" disabled={!selected || busy} onClick={() => void createModel()}>
+            <Plus size={15} aria-hidden="true" />
+            Create model
+          </button>
+        </footer>}
       </section>
     </div>,
     document.body,
@@ -225,6 +365,6 @@ function TemplateThumbnail({ record, large = false }: { record: TemplateRecord; 
     return () => URL.revokeObjectURL(next);
   }, [record.thumbnail]);
   return <span className={`template-thumbnail${large ? ' large' : ''}`}>
-    {url ? <img src={url} alt="" /> : <span aria-hidden="true">A</span>}
+    {url ? <img src={url} alt="" /> : <LayoutTemplate aria-hidden="true" />}
   </span>;
 }

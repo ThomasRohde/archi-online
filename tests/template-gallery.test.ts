@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -82,7 +83,7 @@ describe('template gallery', () => {
 
     const before = workspaceStore.getState().order.length;
     await click(Array.from(dialog.querySelectorAll('button')).find(
-      (button) => button.textContent === 'Create Model',
+      (button) => button.textContent === 'Create model',
     )!);
     expect(workspaceStore.getState().order).toHaveLength(before + 1);
     const active = workspaceStore.getState().sessions[workspaceStore.getState().activeSessionId!]!;
@@ -91,5 +92,27 @@ describe('template gallery', () => {
     expect(active.store.getState().dirty).toBe(true);
     expect(onClose).toHaveBeenCalled();
     await act(async () => root.unmount());
+  });
+
+  it('turns an empty catalog into a guided starting state', async () => {
+    const { root } = await render(createElement(TemplateGallery, { onClose: vi.fn() }));
+    const dialog = document.body.querySelector<HTMLElement>('[aria-label="Model Templates"]')!;
+
+    expect(dialog.textContent).toContain('Build your template library');
+    expect(dialog.textContent).toContain('Import template');
+    expect(dialog.textContent).toContain('Save current model');
+    expect(dialog.querySelector('input[aria-label="Search templates"]')).toBeNull();
+    expect(dialog.querySelector('footer')).toBeNull();
+
+    await act(async () => root.unmount());
+  });
+
+  it('overrides the generic modal width cap and includes narrow-screen layouts', () => {
+    const css = readFileSync('src/styles.css', 'utf8');
+    const dialogRule = css.match(/\.template-gallery-dialog\s*\{([^}]*)\}/)?.[1] ?? '';
+
+    expect(dialogRule).toContain('max-width: none;');
+    expect(css).toContain('@media (max-width: 760px)');
+    expect(css).toContain('@media (max-width: 520px)');
   });
 });

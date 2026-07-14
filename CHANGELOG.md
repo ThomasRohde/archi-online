@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-07-14
+
+### Changed
+
+- Reworked the model-template gallery into a responsive master-detail workspace
+  with clearer search, filtering, selection, metadata, and reuse actions
+- Added guided empty and no-results states for building and searching the local
+  browser template library
+
+### Fixed
+
+- Removed the generic modal width cap that clipped template controls, details,
+  and footer actions at common viewport sizes
+
 ## [1.5.0] - 2026-07-14
 
 ### Added
