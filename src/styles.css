@@ -1167,42 +1167,78 @@ body {
 }
 
 .visualiser-canvas {
+  position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
+  outline: none;
+  background-color: #fbfcfe;
+  background-image:
+    radial-gradient(#d6e0eb 0.75px, transparent 0.75px),
+    linear-gradient(180deg, rgba(247, 250, 253, 0.2), rgba(232, 239, 247, 0.16));
+  background-size: 16px 16px, 100% 100%;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.visualiser-canvas-empty {
   display: flex;
-  background-color: #fff;
-  background-image: radial-gradient(#dbe2ea 0.7px, transparent 0.7px);
-  background-size: 14px 14px;
+}
+
+.visualiser-canvas:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 74%, white);
+}
+
+.visualiser-canvas.is-space-held {
+  cursor: grab;
+}
+
+.visualiser-canvas.is-panning,
+.visualiser-canvas.is-panning .visualiser-node {
+  cursor: grabbing;
 }
 
 .visualiser-canvas svg {
+  display: block;
   width: 100%;
-  min-width: 420px;
-  min-height: 260px;
-  margin: auto;
-  overflow: visible;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .visualiser-edge {
   fill: none;
-  stroke: #596979;
-  stroke-width: 1.4;
+  stroke: #536679;
+  stroke-width: 1.45;
+  stroke-linecap: square;
+  stroke-linejoin: round;
+  opacity: 0.92;
 }
 
 .visualiser-edge-label {
-  fill: #526170;
-  font-size: 10px;
-  text-anchor: middle;
-  stroke: #fff;
-  stroke-width: 3px;
-  stroke-linejoin: round;
-  paint-order: stroke;
   pointer-events: none;
 }
 
+.visualiser-edge-label rect {
+  fill: rgba(255, 255, 255, 0.98);
+  stroke: #b9c5d1;
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 1px 1.5px rgba(30, 47, 64, 0.16));
+}
+
+.visualiser-edge-label text {
+  fill: #405164;
+  font-size: 10px;
+  font-weight: 550;
+  text-anchor: middle;
+  letter-spacing: 0.005em;
+}
+
 #visualiser-arrow path {
-  fill: #596979;
+  fill: #536679;
 }
 
 .visualiser-node {
@@ -1210,25 +1246,93 @@ body {
 }
 
 .visualiser-node rect {
-  stroke: #526170;
-  stroke-width: 1.2;
-  filter: drop-shadow(0 1px 1px rgba(30, 45, 60, 0.16));
+  stroke: #4c6073;
+  stroke-width: 1.25;
+  filter: drop-shadow(0 1.5px 2px rgba(30, 45, 60, 0.18));
+  transition: stroke 100ms ease, filter 100ms ease;
 }
 
 .visualiser-node.focus rect {
   stroke: #1f6feb;
-  stroke-width: 2.2;
+  stroke-width: 2.4;
+  filter: drop-shadow(0 2px 3px rgba(31, 111, 235, 0.24));
 }
 
 .visualiser-node:hover rect {
   stroke: #0b5dbb;
+  filter: drop-shadow(0 2px 3px rgba(25, 69, 112, 0.24));
 }
 
 .visualiser-node text {
   pointer-events: none;
   text-anchor: middle;
   font-size: 11px;
-  fill: #1f2730;
+  font-weight: 500;
+  fill: #192632;
+}
+
+.visualiser-zoom-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(155, 170, 187, 0.72);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 8px 22px rgba(35, 52, 70, 0.15),
+    0 1px 2px rgba(35, 52, 70, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.visualiser-zoom-controls button {
+  min-width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: #425469;
+  cursor: pointer;
+  font: 600 12px/1 'Segoe UI', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 90ms ease, color 90ms ease;
+}
+
+.visualiser-zoom-controls button:hover {
+  background: #eaf2fd;
+  color: #155fb9;
+}
+
+.visualiser-zoom-controls button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.visualiser-zoom-controls .visualiser-zoom-percent {
+  min-width: 48px;
+  border-right: 1px solid #d7dfe8;
+  border-left: 1px solid #d7dfe8;
+  color: #2e4054;
+}
+
+.visualiser-zoom-controls .visualiser-fit-button {
+  min-width: 42px;
+  border-left: 1px solid #d7dfe8;
+  font-weight: 650;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visualiser-node rect,
+  .visualiser-zoom-controls button {
+    transition: none;
+  }
 }
 
 .visualiser-status {

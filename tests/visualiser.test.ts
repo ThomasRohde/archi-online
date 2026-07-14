@@ -14,7 +14,7 @@ import {
   renderAnalysisGraphSvg,
   VisualiserPanel,
 } from '../src/ui/VisualiserPanel';
-import type { ElkGraph } from '../src/model/layout/elk-graph';
+import type { ElkGraph, ElkGraphLayoutOptions } from '../src/model/layout/elk-graph';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -189,9 +189,37 @@ describe('Visualiser', () => {
     }, { showRelationshipNames: true });
 
     expect(svg.match(/class="visualiser-edge-label"/g)).toHaveLength(1);
-    expect(svg).toContain('x="20" y="25"');
-    expect(svg).toContain('>Assigned</text>');
-    expect(svg).not.toContain('>Association</text>');
+    expect(svg).toContain('data-label-source="fallback"');
+    expect(svg).toContain('transform="translate(-9 2)"');
+    expect(svg).toContain('>Assigned</tspan>');
+    expect(svg).not.toContain('>Association</tspan>');
+  });
+
+  it('uses authoritative ELK label bounds for route placards in export', () => {
+    const actor = addElement('BusinessActor', 'Actor');
+    const role = addElement('BusinessRole', 'Role');
+    const assigned = addRelationship('AssignmentRelationship', actor, role, 'Assigned')!;
+    const graph = buildAnalysisGraph(useStore.getState().model!, {
+      focusIds: [actor], depth: 1, direction: 'both',
+    });
+    const svg = renderAnalysisGraphSvg(graph, {
+      nodes: {
+        [actor]: { x: 0, y: 0, width: 120, height: 55 },
+        [role]: { x: 240, y: 0, width: 120, height: 55 },
+      },
+      edges: {
+        [assigned]: {
+          points: [{ x: 120, y: 27.5 }, { x: 240, y: 27.5 }],
+          labels: [{ id: `${assigned}:label`, x: 142, y: 42, width: 76, height: 24 }],
+        },
+      },
+    }, { showRelationshipNames: true });
+
+    expect(svg).toContain('class="visualiser-edge-label"');
+    expect(svg).toContain('data-label-source="elk"');
+    expect(svg).toContain('transform="translate(142 42)"');
+    expect(svg).toContain('<rect width="76" height="24" rx="4"');
+    expect(svg).toContain('>Assigned</tspan>');
   });
 
   it('renders one edge label for a relationship split around a relationship node', async () => {
@@ -214,7 +242,9 @@ describe('Visualiser', () => {
       { showRelationshipNames: true },
     );
 
-    expect(svg.match(/class="visualiser-edge-label"[^>]*>Assigned<\/text>/g)).toHaveLength(1);
+    const assignedLabels = (svg.match(/<g class="visualiser-edge-label"[\s\S]*?<\/g>/g) ?? [])
+      .filter((markup) => markup.includes('>Assigned</tspan>'));
+    expect(assignedLabels).toHaveLength(1);
   });
 
   it('toggles relationship names in the live graph and preferences', async () => {
@@ -238,6 +268,48 @@ describe('Visualiser', () => {
 
     expect(host.querySelector('.visualiser-edge-label')?.textContent).toBe('Assigned');
     expect(useAnalysisPreferences.getState().preferences.showRelationshipNames).toBe(true);
+    await act(async () => { root.unmount(); });
+  });
+
+  it('relayouts with label-aware ELK options and labelled port routes when names are enabled', async () => {
+    const actor = addElement('BusinessActor', 'Actor');
+    const role = addElement('BusinessRole', 'Role');
+    addRelationship('AssignmentRelationship', actor, role, 'Assigned')!;
+    setSelection('tree', [actor]);
+    const requests: Array<{ graph: ElkGraph; options: ElkGraphLayoutOptions | undefined }> = [];
+    const layoutGraph = async (graph: ElkGraph, options?: ElkGraphLayoutOptions) => {
+      requests.push({ graph, options });
+      return simpleLayout(graph);
+    };
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(createElement(VisualiserPanel, { layoutGraph }));
+    });
+    await waitFor(() => requests.length === 1);
+
+    expect(requests[0].options).toMatchObject({ nodeSpacing: 40, layerSpacing: 80 });
+    expect(requests[0].graph.edges[0].labels).toBeUndefined();
+    const toggle = Array.from(host.querySelectorAll('label'))
+      .find((label) => label.textContent?.trim() === 'Relationship names')
+      ?.querySelector<HTMLInputElement>('input');
+    await act(async () => { toggle?.click(); });
+    await waitFor(() => requests.length === 2);
+
+    expect(requests[1].options).toMatchObject({
+      nodeSpacing: 56,
+      layerSpacing: 112,
+      layoutOptions: {
+        'elk.edgeLabels.inline': false,
+        'elk.layered.edgeLabels.sideSelection': 'SMART_DOWN',
+        'elk.layered.edgeLabels.centerLabelPlacementStrategy': 'SPACE_EFFICIENT_LAYER',
+      },
+    });
+    expect(requests[1].graph.edges[0]).toMatchObject({
+      sourcePortId: expect.stringContaining(':source-port'),
+      targetPortId: expect.stringContaining(':target-port'),
+      labels: [expect.objectContaining({ text: 'Assigned' })],
+    });
     await act(async () => { root.unmount(); });
   });
 });

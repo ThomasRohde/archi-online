@@ -6,20 +6,28 @@ import {
   ELEMENT_TYPES,
   ELEMENT_TYPE_MAP,
   RELATIONSHIP_TYPES,
-  elementLabel,
-  relationshipLabel,
 } from '../model/metamodel';
 import {
   layoutElkGraph,
   type ElkGraph,
+  type ElkGraphLayoutOptions,
   type ElkGraphLayoutResult,
 } from '../model/layout/elk-graph';
 import { setSelection } from '../model/store';
-import { pointAlong } from '../canvas/geometry';
 import { copyPngBlobToClipboard, rasterizeSvg } from '../canvas/export/svg-image';
 import { saveBlobToDisk, sanitizeFileName } from '../persistence/files';
 import { useAnalysisPreferences } from '../settings/analysis-preferences';
 import { useModelStoreApi, useStore } from './store-hooks';
+import { VisualiserCanvas } from './visualiser/VisualiserCanvas';
+import {
+  buildVisualiserLayoutRequest,
+  edgePoints,
+  escapeXml,
+  graphContentBounds,
+  nodeLabelLayout,
+  pathData,
+  resolveRelationshipLabel,
+} from './visualiser/presentation';
 
 export interface LayoutRequestGate {
   next(): number;
@@ -34,147 +42,8 @@ export function createLayoutRequestGate(): LayoutRequestGate {
   };
 }
 
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function graphBounds(layout: ElkGraphLayoutResult) {
-  const nodes = Object.values(layout.nodes);
-  if (nodes.length === 0) return { x: 0, y: 0, width: 1, height: 1 };
-  const minX = Math.min(...nodes.map((node) => node.x));
-  const minY = Math.min(...nodes.map((node) => node.y));
-  const maxX = Math.max(...nodes.map((node) => node.x + node.width));
-  const maxY = Math.max(...nodes.map((node) => node.y + node.height));
-  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-}
-
-function edgePoints(
-  edge: AnalysisGraphResult['edges'][number],
-  layout: ElkGraphLayoutResult,
-): Array<{ x: number; y: number }> {
-  const routed = layout.edges[edge.id]?.points;
-  if (routed?.length) return routed;
-  const source = layout.nodes[edge.sourceId];
-  const target = layout.nodes[edge.targetId];
-  if (!source || !target) return [];
-  return [
-    { x: source.x + source.width / 2, y: source.y + source.height / 2 },
-    { x: target.x + target.width / 2, y: target.y + target.height / 2 },
-  ];
-}
-
-function pathData(points: Array<{ x: number; y: number }>): string {
-  return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' ');
-}
-
 export interface AnalysisGraphRenderOptions {
   showRelationshipNames?: boolean;
-}
-
-interface EdgeLabel {
-  text: string;
-  x: number;
-  y: number;
-}
-
-type AnalysisGraphNode = AnalysisGraphResult['nodes'][number];
-
-interface NodeLabelLayout {
-  fontSize: number;
-  lineHeight: number;
-  lines: string[];
-  startY: number;
-}
-
-function nodeLabelText(node: AnalysisGraphNode): string {
-  return node.name || (node.kind === 'element'
-    ? elementLabel(node.type)
-    : relationshipLabel(node.type));
-}
-
-function approximateTextWidth(text: string, fontSize: number): number {
-  return Array.from(text).reduce((width, character) => {
-    if (character === ' ') return width + fontSize * 0.32;
-    if (/[ilI1'.,:;]/.test(character)) return width + fontSize * 0.28;
-    if (/[mMwW@#%&]/.test(character)) return width + fontSize * 0.82;
-    if (/[A-Z]/.test(character)) return width + fontSize * 0.64;
-    return width + fontSize * 0.54;
-  }, 0);
-}
-
-function splitWord(word: string, maxWidth: number, fontSize: number): string[] {
-  const chunks: string[] = [];
-  let chunk = '';
-  for (const character of word) {
-    if (chunk && approximateTextWidth(chunk + character, fontSize) > maxWidth) {
-      chunks.push(chunk);
-      chunk = character;
-    } else {
-      chunk += character;
-    }
-  }
-  if (chunk) chunks.push(chunk);
-  return chunks;
-}
-
-function wrapNodeLabel(text: string, width: number, fontSize: number): string[] {
-  const maxWidth = Math.max(fontSize, width - 16);
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [''];
-  const lines: string[] = [];
-  let line = '';
-  for (const word of words) {
-    for (const chunk of splitWord(word, maxWidth, fontSize)) {
-      const candidate = line ? `${line} ${chunk}` : chunk;
-      if (line && approximateTextWidth(candidate, fontSize) > maxWidth) {
-        lines.push(line);
-        line = chunk;
-      } else {
-        line = candidate;
-      }
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
-function nodeLabelLayout(
-  node: AnalysisGraphNode,
-  width: number,
-  height: number,
-): NodeLabelLayout {
-  const fontSize = node.compact ? 10 : 11;
-  const lineHeight = fontSize * 1.2;
-  const lines = wrapNodeLabel(nodeLabelText(node), width, fontSize);
-  const startY = height / 2 - ((lines.length - 1) * lineHeight) / 2 + fontSize * 0.35;
-  return { fontSize, lineHeight, lines, startY };
-}
-
-function visualiserNodeSize(node: AnalysisGraphNode) {
-  const width = node.kind === 'relationship' ? 96 : ELEMENT_TYPE_MAP[node.type].width;
-  const baseHeight = node.kind === 'relationship' ? 28 : ELEMENT_TYPE_MAP[node.type].height;
-  const label = nodeLabelLayout(node, width, baseHeight);
-  return {
-    width,
-    height: Math.max(baseHeight, Math.ceil(label.lines.length * label.lineHeight + 12)),
-  };
-}
-
-function edgeLabel(
-  edge: AnalysisGraphResult['edges'][number],
-  points: Array<{ x: number; y: number }>,
-  showRelationshipNames: boolean,
-): EdgeLabel | null {
-  const text = edge.name.trim();
-  if (!showRelationshipNames || !text || edge.segment === 'source' || points.length < 2) {
-    return null;
-  }
-  const midpoint = pointAlong(points, 0.5).point;
-  return { text, x: midpoint.x, y: midpoint.y - 5 };
 }
 
 function analysisGraphDocument(
@@ -182,7 +51,8 @@ function analysisGraphDocument(
   layout: ElkGraphLayoutResult,
   options: AnalysisGraphRenderOptions = {},
 ) {
-  const content = graphBounds(layout);
+  const showRelationshipNames = options.showRelationshipNames ?? false;
+  const content = graphContentBounds(graph, layout, showRelationshipNames);
   const margin = 28;
   const box = {
     x: content.x - margin,
@@ -193,9 +63,16 @@ function analysisGraphDocument(
   const edges = graph.edges.map((edge) => {
     const points = edgePoints(edge, layout);
     if (points.length < 2) return '';
-    const label = edgeLabel(edge, points, options.showRelationshipNames ?? false);
+    const label = resolveRelationshipLabel(edge, layout, showRelationshipNames);
+    const labelStartY = label
+      ? label.height / 2 - ((label.lines.length - 1) * label.lineHeight) / 2
+        + label.fontSize * 0.35
+      : 0;
+    const labelText = label?.lines.map((line, index) => (
+      `<tspan x="${label.width / 2}" y="${labelStartY + index * label.lineHeight}">${escapeXml(line)}</tspan>`
+    )).join('') ?? '';
     const labelMarkup = label
-      ? `<text class="visualiser-edge-label" x="${label.x}" y="${label.y}" text-anchor="middle" font-size="10" fill="#526170" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${escapeXml(label.text)}</text>`
+      ? `<g class="visualiser-edge-label" data-label-source="${label.source}" transform="translate(${label.x} ${label.y})"><rect width="${label.width}" height="${label.height}" rx="4" fill="#ffffff" stroke="#b8c3cf" stroke-width="1"/><text x="${label.width / 2}" text-anchor="middle" font-size="${label.fontSize}" fill="#445364">${labelText}</text></g>`
       : '';
     return `<g><path d="${pathData(points)}" fill="none" stroke="#596979" stroke-width="1.4" marker-end="url(#arrow)"/>${labelMarkup}</g>`;
   }).join('');
@@ -225,10 +102,15 @@ function currentConceptId(): string | null {
 }
 
 export interface VisualiserPanelProps {
-  layoutGraph?: (graph: ElkGraph) => Promise<ElkGraphLayoutResult>;
+  layoutGraph?: (
+    graph: ElkGraph,
+    options?: ElkGraphLayoutOptions,
+  ) => Promise<ElkGraphLayoutResult>;
 }
 
-const defaultVisualiserLayout = (graph: ElkGraph) => layoutElkGraph(graph, { direction: 'right' });
+const defaultVisualiserLayout = (graph: ElkGraph, options?: ElkGraphLayoutOptions) => (
+  layoutElkGraph(graph, options)
+);
 
 export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: VisualiserPanelProps) {
   const modelStore = useModelStoreApi();
@@ -242,6 +124,7 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
   });
   const [layoutState, setLayoutState] = useState<{
     graph: AnalysisGraphResult;
+    showRelationshipNames: boolean;
     layout: ElkGraphLayoutResult;
   } | null>(null);
   const [error, setError] = useState('');
@@ -276,7 +159,10 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
       relationshipTypes: preferences.relationshipTypes,
     });
   }, [focusId, model, preferences]);
-  const layout = layoutState?.graph === graph ? layoutState.layout : null;
+  const layout = layoutState?.graph === graph
+    && layoutState.showRelationshipNames === preferences.showRelationshipNames
+    ? layoutState.layout
+    : null;
 
   useEffect(() => {
     if (!graph) {
@@ -285,22 +171,20 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
     }
     const token = gate.current.next();
     setError('');
-    void layoutGraph({
-      nodes: graph.nodes.map((node) => ({ id: node.id, ...visualiserNodeSize(node) })),
-      edges: graph.edges.map((edge) => ({
-        id: edge.id,
-        sourceId: edge.sourceId,
-        targetId: edge.targetId,
-      })),
-    }).then((next) => {
-      if (gate.current.isCurrent(token)) setLayoutState({ graph, layout: next });
+    const request = buildVisualiserLayoutRequest(graph, preferences.showRelationshipNames);
+    void layoutGraph(request.graph, request.options).then((next) => {
+      if (gate.current.isCurrent(token)) setLayoutState({
+        graph,
+        showRelationshipNames: preferences.showRelationshipNames,
+        layout: next,
+      });
     }).catch((reason) => {
       if (gate.current.isCurrent(token)) {
         setLayoutState(null);
         setError(reason instanceof Error ? reason.message : String(reason));
       }
     });
-  }, [graph, layoutGraph, revision]);
+  }, [graph, layoutGraph, preferences.showRelationshipNames, revision]);
 
   const navigate = (id: string) => {
     if (id === focusId) return;
@@ -332,11 +216,6 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
     });
   };
 
-  const document = graph && layout
-    ? analysisGraphDocument(graph, layout, {
-        showRelationshipNames: preferences.showRelationshipNames,
-      })
-    : null;
   return (
     <div className="visualiser-panel" data-focus-id={focusId ?? ''}>
       <div className="visualiser-toolbar">
@@ -356,26 +235,19 @@ export function VisualiserPanel({ layoutGraph = defaultVisualiserLayout }: Visua
         <details className="visualiser-filters"><summary>Type filters</summary><div><strong>Elements</strong>{ELEMENT_TYPES.map((definition) => <label key={definition.type}><input type="checkbox" checked={preferences.elementTypes.includes(definition.type)} onChange={() => setPreferences({ elementTypes: preferences.elementTypes.includes(definition.type) ? preferences.elementTypes.filter((type) => type !== definition.type) : [...preferences.elementTypes, definition.type] })}/>{definition.label}</label>)}<strong>Relationships</strong>{RELATIONSHIP_TYPES.map((definition) => <label key={definition.type}><input type="checkbox" checked={preferences.relationshipTypes.includes(definition.type)} onChange={() => setPreferences({ relationshipTypes: preferences.relationshipTypes.includes(definition.type) ? preferences.relationshipTypes.filter((type) => type !== definition.type) : [...preferences.relationshipTypes, definition.type] })}/>{definition.label}</label>)}</div></details>
       </div>
       <div className="visualiser-export"><button className="tb-btn small" disabled={!layout} onClick={() => void exportGraph('svg')}>SVG</button><button className="tb-btn small" disabled={!layout} onClick={() => void exportGraph('png')}>PNG</button><button className="tb-btn small" disabled={!layout} onClick={() => void exportGraph('clipboard')}>Copy PNG</button>{graph?.truncated && <span className="visualiser-truncated">Limited to {graph.maxConcepts} concepts — tighten filters.</span>}</div>
-      <div className="visualiser-canvas">
+      {graph && layout ? (
+        <VisualiserCanvas
+          graph={graph}
+          layout={layout}
+          showRelationshipNames={preferences.showRelationshipNames}
+          onSelectConcept={selectConcept}
+          onOpenConcept={navigate}
+        />
+      ) : <div className="visualiser-canvas visualiser-canvas-empty">
         {!model && <div className="empty-hint">No model open.</div>}
         {model && !focusId && <div className="empty-hint">Select an element or relationship.</div>}
         {error && <div className="empty-hint">{error}</div>}
-        {graph && layout && document && <svg viewBox={`${document.box.x} ${document.box.y} ${document.box.width} ${document.box.height}`} aria-label="Visualiser graph">
-          <defs><marker id="visualiser-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" /></marker></defs>
-          {graph.edges.map((edge) => {
-            const points = edgePoints(edge, layout);
-            const label = edgeLabel(edge, points, preferences.showRelationshipNames);
-            return <g key={edge.id}><path className="visualiser-edge" d={pathData(points)} markerEnd="url(#visualiser-arrow)" />{label && <text className="visualiser-edge-label" x={label.x} y={label.y}>{label.text}</text>}</g>;
-          })}
-          {graph.nodes.map((node) => {
-            const bounds = layout.nodes[node.id];
-            if (!bounds) return null;
-            const fill = node.kind === 'element' ? ELEMENT_TYPE_MAP[node.type].fill : '#f1f4f7';
-            const label = nodeLabelLayout(node, bounds.width, bounds.height);
-            return <g key={node.id} className={'visualiser-node' + (node.focus ? ' focus' : '')} data-concept-id={node.id} transform={`translate(${bounds.x} ${bounds.y})`} onClick={() => selectConcept(node.id)} onDoubleClick={() => navigate(node.id)}><rect width={bounds.width} height={bounds.height} rx={node.compact ? 14 : 4} fill={fill}/><text x={bounds.width / 2} style={{ fontSize: label.fontSize }}>{label.lines.map((line, index) => <tspan key={`${index}:${line}`} x={bounds.width / 2} y={label.startY + index * label.lineHeight}>{line}</tspan>)}</text></g>;
-          })}
-        </svg>}
-      </div>
+      </div>}
       {graph && <div className="visualiser-status">{graph.elementIds.length} elements · {graph.relationshipIds.length} relationships</div>}
     </div>
   );
