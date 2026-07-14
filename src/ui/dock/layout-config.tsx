@@ -116,12 +116,7 @@ export const TOOL_PANELS: ToolPanelDef[] = [
         id: 'visualiser',
         component: 'visualiser',
         title: 'Visualiser',
-        position: api.getPanel('navigator')
-          ? { referencePanel: 'navigator', direction: 'within' }
-          : api.getPanel('models')
-            ? { referencePanel: 'models', direction: 'within' }
-            : { direction: 'left' },
-        initialWidth: 320,
+        position: centerPosition(api, 'visualiser'),
       }),
   },
   {

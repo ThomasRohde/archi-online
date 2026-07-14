@@ -277,14 +277,15 @@ read-only mode.
 
 ## Visualiser and generated views
 
-Open **Views ▾ → Visualiser** for an ephemeral relationship graph beside the
-Navigator. It follows element or relationship selection unless pinned. Use
+Open **Views ▾ → Visualiser** for an ephemeral relationship graph in a main
+canvas tab. It follows element or relationship selection unless pinned. Use
 Back/Home, drill in by double-clicking, choose depth 1–6, direction, viewpoint,
-and element/relationship filters, then relayout as needed. Selecting a graph
-node selects the same concept in the Models tree and Properties panel. The
-graph never enters model state or undo history; only its controls are saved in
-IndexedDB. Export it as SVG or PNG, or copy a PNG. Results stop at 1,000
-concepts and show a truncation warning so filters can be tightened.
+and element/relationship filters, then relayout as needed. Enable
+**Relationship names** to show stored relationship names in both the live graph
+and its SVG, PNG, or copied PNG output. Selecting a graph node selects the same
+concept in the Models tree and Properties panel. The graph never enters model
+state or undo history; only its controls are saved in IndexedDB. Results stop at
+1,000 concepts and show a truncation warning so filters can be tightened.
 
 Select one or more semantic elements in the Models tree or on a view and choose
 **Generate View For…** from the context menu. Set the name, viewpoint, depth,
