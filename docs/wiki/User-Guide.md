@@ -20,6 +20,11 @@ You can:
 - reset everything with **Views ▾ → Reset Layout**.
 
 The layout persists across sessions in the current browser profile.
+On a fresh profile, Models and Palette share the left side, Welcome and view
+tabs occupy the center, and Properties is active beside Settings on the right.
+Scripting and Extensions remain available from **Views ▾**, but are not opened
+until you choose them. Reset Layout restores this fresh default; a previously
+saved layout is otherwise left exactly as you arranged it.
 
 Core panels:
 
@@ -77,6 +82,12 @@ asterisk after a root name means that model has unsaved changes.
   text. Clearing all active criteria restores the previous expansion and
   selection state.
 - **Open a view** — double-click it, or right-click → **Open View**.
+- **Keyboard navigation** — `Up`/`Down` moves focus and selection through the
+  visible rows; `Home`/`End` jumps to the first/last row; `Left` collapses a
+  folder or moves to its parent; `Right` expands a folder or moves to its first
+  child. `Enter` opens a focused view, `F2` renames, and `Space` toggles the
+  focused row in the tree selection. Hold `Ctrl` (or `Cmd`) with navigation
+  keys to move focus without replacing the current selection.
 - **Create content** — right-click a folder: **New Element** offers the
   element types belonging to that folder's layer, **New ArchiMate View**
   appears under the Views folder, and **New Folder** creates a subfolder.
@@ -150,6 +161,10 @@ preview before applying. In a read-only model, preview and navigation remain
 available, but **Apply** is disabled.
 
 ## Palette
+
+The palette is enabled only while an editable view is active. With no open
+view, or when the active view is read-only, every tool is disabled and the
+panel explains that you must open an editable view first.
 
 From top to bottom:
 
@@ -433,7 +448,7 @@ style. Each row has a reset button, and **Reset all** restores the defaults.
 
 | Section | Settings (defaults) |
 | --- | --- |
-| General | Add a note to a Relation's documentation field when changing type (off). When enabled, an automatically converted Association is prefixed with `(Changed from <type>)`. |
+| General | Theme (System, the default; Light; or Dark). System follows the operating-system preference. Add a note to a Relation's documentation field when changing type (off). When enabled, an automatically converted Association is prefixed with `(Changed from <type>)`. |
 | Model tree search | Name (on); Documentation, Property Value, Views, Show All Folders, Match Case, and Regular Expression (off). Query text and selected keys/types are intentionally not persisted. |
 | Automatic relationships | Use nested connections and prompt for palette creation, tree drop, and canvas movement (on); normal relationship candidates use Desktop defaults; reverse candidates default off; every relationship type is hidden while represented by nesting. |
 | Legends | New legends use 15 rows per column, Core colours, and Category sort. Custom labels and User colours are browser-local and never enter `.archimate` files. |
@@ -442,7 +457,7 @@ style. Each row has a reset button, and **Reset all** restores the defaults.
 | New object defaults | Text align (center) and text position (center) for new objects; default sizes for elements (120×55), junctions (15), notes (185×80), groups (400×140), and view references (200×140). |
 | Canvas interaction | Drop offset (16 px), paste offset (16 px), minimum node size (20 px), move drag threshold (4 px), bendpoint drag threshold (5 px). |
 | Align & distribute | Alignment anchor (last selected) — the element Align and Match Size snap the rest of the selection to. |
-| Viewport | Zoom limits (0.1–4), wheel zoom factor (1.1), button zoom factor (1.2), fit-to-window maximum zoom (1.5) and padding (24 px). |
+| Viewport | Zoom limits (0.1–4), wheel zoom factor (1.1), button zoom factor (1.2), fit-to-window maximum zoom (1.5) and padding (24 px). Each view remembers its own zoom and pan position in the browser workspace. A view without a saved position starts at 100% with a 20 px offset unless its diagram is too large, in which case it fits once when the canvas becomes visible. |
 
 Values are validated and clamped to sensible ranges when loaded or edited.
 
@@ -462,7 +477,7 @@ See [[Getting Started|Getting-Started]] for the storage overview and
 Autosave version 2 writes the complete open workspace as document bytes to
 IndexedDB shortly after every
 change and restores all model roots, file names, dirty flags, active model,
-open views, and image assets on the next launch. It protects against crashes and accidental
+open views, per-view viewport positions, and image assets on the next launch. It protects against crashes and accidental
 tab closes within the same browser profile — it is not a backup.
 
 Visualiser controls, Validator configuration, and the model-template catalog
@@ -473,8 +488,11 @@ never block editor startup. These browser-local records are not written into
 ## Installed app and offline use
 
 Production builds are installable as a PWA in supporting browsers. The
-service worker precaches the editor shell, build assets, examples, icons, and
-manifest, so the installed app can launch offline after it has loaded once.
+service worker precaches the editor shell, core build assets, the autosave
+worker, examples, icons, and manifest, so the installed app can launch offline
+after it has loaded once. Monaco editor and language-worker assets are cached
+at runtime after their first successful load rather than being added to the
+initial precache.
 Model files, autosave, settings, scripts, extensions, and layout still stay
 local to the current browser profile or file system.
 
@@ -497,8 +515,10 @@ Open this table anytime with the **?** toolbar button.
 | `Ctrl+A` | Select all on the active view |
 | `Delete` | Delete from view (canvas) or from model (tree) |
 | `F2` or double-click | Rename |
-| Arrow keys | Nudge selection by 1 px |
+| Arrow keys (canvas) | Nudge selection by 1 px |
 | `Shift`+arrows | Nudge selection by one grid step |
+| Arrow keys / `Home` / `End` (model tree) | Move focus and selection; `Ctrl`/`Cmd` moves focus only |
+| `Enter` / `Space` (model tree) | Open a focused view / toggle the focused row in the selection |
 | `Ctrl+wheel`, `Ctrl+=`, `Ctrl+-` | Zoom canvas (per view) |
 | `Ctrl+0` | Zoom to 100% |
 | `Home` | Fit diagram to window |

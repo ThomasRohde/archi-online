@@ -58,6 +58,12 @@ export interface SelectionState {
   ids: string[];
 }
 
+export interface ViewViewport {
+  zoom: number;
+  x: number;
+  y: number;
+}
+
 export interface TransactionOptions {
   selectionAfter?: SelectionState;
 }
@@ -72,6 +78,7 @@ export interface AppState {
   selection: SelectionState;
   openViewIds: string[];
   activeViewId: string | null;
+  viewportsByViewId: Record<string, ViewViewport>;
   activeTool: Tool;
   modelEpoch: number;
   /** Retained for viewer/test compatibility; editor boot state lives in the workspace. */
@@ -105,6 +112,7 @@ function initialState(overrides: Partial<AppState> = {}): AppState {
     selection: { source: 'tree', ids: [] },
     openViewIds: [],
     activeViewId: null,
+    viewportsByViewId: {},
     activeTool: { kind: 'select' },
     modelEpoch: 0,
     booted: false,

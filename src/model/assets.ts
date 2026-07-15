@@ -1,4 +1,3 @@
-import { decodeTiff, encodePng } from 'image-js';
 import type { ModelAsset, ModelState } from './types';
 import {
   MAX_IMAGE_BYTES,
@@ -40,6 +39,7 @@ export async function createModelAsset(
   let renderMediaType = mediaType;
   let renderBytes = bytes;
   if (mediaType === 'image/tiff') {
+    const { decodeTiff, encodePng } = await import('image-js');
     renderBytes = new Uint8Array(encodePng(decodeTiff(bytes)));
     renderMediaType = 'image/png';
   }

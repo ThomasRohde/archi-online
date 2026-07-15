@@ -6,6 +6,9 @@ import {
   precacheAndRoute,
 } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
+import { CacheFirst } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
+import { isMonacoRuntimeAsset } from './pwa/monaco-cache';
 import {
   SHARE_FILE_NAME_HEADER,
   SHARE_INBOX_CACHE,
@@ -18,6 +21,14 @@ declare const self: ServiceWorkerGlobalScope;
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 clientsClaim();
+
+registerRoute(
+  ({ url }) => isMonacoRuntimeAsset(url, self.location.origin),
+  new CacheFirst({
+    cacheName: 'archi-online-monaco-v1',
+    plugins: [new ExpirationPlugin({ maxEntries: 8, purgeOnQuotaError: true })],
+  }),
+);
 
 // registerType 'prompt': the waiting worker activates only when the user
 // confirms the update toast (UpdatePrompt.tsx).

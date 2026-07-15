@@ -1,21 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { Bounds } from '../../model/types';
+import type { ModelStore } from '../../model/store';
 import { useSettingsStore } from '../../settings/app-settings';
 import type { Point } from '../geometry';
 import { onPanRequest, publishViewport } from '../viewport-bus';
 import type { Viewport } from './types';
-
-const viewports = new Map<string, Viewport>();
+import { DEFAULT_VIEWPORT, initialViewportForBounds } from './viewport-state';
 
 export function useCanvasViewport(
   viewId: string,
   svgRef: RefObject<SVGSVGElement>,
   absBounds: Map<string, Bounds>,
+  modelStore: ModelStore,
 ) {
   const settings = useSettingsStore((s) => s.settings);
   const [viewport, setViewportState] = useState<Viewport>(
-    () => viewports.get(viewId) ?? { zoom: 1, x: 20, y: 20 },
+    () => modelStore.getState().viewportsByViewId[viewId] ?? DEFAULT_VIEWPORT,
+  );
+  const initialViewportStored = useRef(
+    Boolean(modelStore.getState().viewportsByViewId[viewId]),
   );
   const [spaceHeld, setSpaceHeld] = useState(false);
   const viewportRef = useRef(viewport);
@@ -26,7 +30,12 @@ export function useCanvasViewport(
   spaceRef.current = spaceHeld;
 
   const setViewport = (v: Viewport) => {
-    viewports.set(viewId, v);
+    const current = modelStore.getState().viewportsByViewId;
+    if (current[viewId] !== v) {
+      modelStore.setState({
+        viewportsByViewId: { ...current, [viewId]: v },
+      });
+    }
     setViewportState(v);
   };
   const setViewportRefFn = useRef(setViewport);
@@ -47,6 +56,24 @@ export function useCanvasViewport(
   };
   const publishCurrentViewportRef = useRef(publishCurrentViewport);
   publishCurrentViewportRef.current = publishCurrentViewport;
+
+  const initializeViewport = () => {
+    if (initialViewportStored.current) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    initialViewportStored.current = true;
+    setViewportRefFn.current(initialViewportForBounds(absBounds, rect, settingsRef.current));
+  };
+  const initializeViewportRef = useRef(initializeViewport);
+  initializeViewportRef.current = initializeViewport;
+
+  useEffect(() => {
+    if (initialViewportStored.current) return;
+    const frame = requestAnimationFrame(() => initializeViewportRef.current());
+    return () => cancelAnimationFrame(frame);
+  }, [absBounds, svgRef]);
 
   const toView = (clientX: number, clientY: number): Point => {
     const rect = svgRef.current!.getBoundingClientRect();
@@ -86,7 +113,7 @@ export function useCanvasViewport(
       maxY = Math.max(maxY, b.y + b.height);
     }
     if (!isFinite(minX)) {
-      setViewport({ zoom: 1, x: 20, y: 20 });
+      setViewport(DEFAULT_VIEWPORT);
       return;
     }
     const rect = svg.getBoundingClientRect();
@@ -119,7 +146,10 @@ export function useCanvasViewport(
     const resizeObserver =
       typeof ResizeObserver === 'undefined'
         ? null
-        : new ResizeObserver(() => publishCurrentViewportRef.current());
+        : new ResizeObserver(() => {
+            initializeViewportRef.current();
+            publishCurrentViewportRef.current();
+          });
     resizeObserver?.observe(svg);
     const unsubscribePan = onPanRequest(viewId, (centerX, centerY) => {
       const current = viewportRef.current;

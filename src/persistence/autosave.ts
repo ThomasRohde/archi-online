@@ -1,4 +1,4 @@
-import { parseArchimateDocument, serializeArchimateDocument } from '../model/io/archimate-xml';
+import { parseArchimateDocument } from '../model/io/archimate-xml';
 import {
   activateModelSession,
   addModelSession,
@@ -7,7 +7,9 @@ import {
   type ModelSession,
 } from '../model/workspace';
 import type { ModelState } from '../model/types';
+import type { ViewViewport } from '../model/store';
 import { defaultKeyValueStore } from './keyval';
+import { serializeModelForAutosave } from './autosave-serializer';
 
 const KEY = 'archi-online.workspace';
 const VERSION = 2;
@@ -19,6 +21,7 @@ interface WorkspaceSessionRecord {
   dirty: boolean;
   openViewIds: string[];
   activeViewId: string | null;
+  viewportsByViewId?: Record<string, ViewViewport>;
   savedAt: number;
   fileHandle?: FileSystemFileHandle;
 }
@@ -40,6 +43,7 @@ let timer: number | undefined;
 let workspaceUnsubscribe: (() => void) | undefined;
 const sessionUnsubscribes = new Map<string, () => void>();
 const documentCache = new Map<string, { model: ModelState; bytes: Uint8Array }>();
+const serializationGenerations = new Map<string, number>();
 let recoveryStore: ReturnType<typeof defaultKeyValueStore> | null = null;
 let recoverySessions: WorkspaceSessionRecord[] = [];
 let recoveryOrder: string[] = [];
@@ -58,6 +62,7 @@ function syncSessionSubscriptions(sessions: Record<string, ModelSession>): void 
       unsubscribe();
       sessionUnsubscribes.delete(id);
       documentCache.delete(id);
+      serializationGenerations.delete(id);
     }
   }
   for (const [id, session] of Object.entries(sessions)) {
@@ -70,7 +75,8 @@ function syncSessionSubscriptions(sessions: Record<string, ModelSession>): void 
           state.fileName !== previous.fileName ||
           state.dirty !== previous.dirty ||
           state.openViewIds !== previous.openViewIds ||
-          state.activeViewId !== previous.activeViewId
+          state.activeViewId !== previous.activeViewId ||
+          state.viewportsByViewId !== previous.viewportsByViewId
         ) {
           schedulePersist();
         }
@@ -112,7 +118,17 @@ async function sessionRecord(
   if (!state.model) return null;
   let cached = documentCache.get(session.id);
   if (!cached || cached.model !== state.model) {
-    cached = { model: state.model, bytes: await serializeArchimateDocument(state.model) };
+    const requestedModel = state.model;
+    const generation = (serializationGenerations.get(session.id) ?? 0) + 1;
+    serializationGenerations.set(session.id, generation);
+    const bytes = await serializeModelForAutosave(requestedModel);
+    if (
+      serializationGenerations.get(session.id) !== generation ||
+      session.store.getState().model !== requestedModel
+    ) {
+      return sessionRecord(session, savedAt);
+    }
+    cached = { model: requestedModel, bytes };
     documentCache.set(session.id, cached);
   }
   return {
@@ -122,6 +138,7 @@ async function sessionRecord(
     dirty: state.dirty,
     openViewIds: state.openViewIds,
     activeViewId: state.activeViewId,
+    viewportsByViewId: state.viewportsByViewId,
     savedAt,
     ...(session.fileHandle ? { fileHandle: session.fileHandle } : {}),
   };
@@ -206,6 +223,10 @@ export async function restoreWorkspace(): Promise<RestoreWorkspaceResult> {
           saved.activeViewId && openViewIds.includes(saved.activeViewId)
             ? saved.activeViewId
             : (openViewIds[openViewIds.length - 1] ?? null),
+        viewportsByViewId: Object.fromEntries(
+          Object.entries(saved.viewportsByViewId ?? {})
+            .filter(([viewId]) => Boolean(model.views[viewId])),
+        ),
       });
       restored++;
     } catch (error) {

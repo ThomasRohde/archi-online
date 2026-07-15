@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -51,7 +52,6 @@ import {
   compileTreeSearch,
   resetTreeSearchCriteria,
   searchModelTree,
-  treeItemLabel,
   treeSearchCatalogSignature,
   type TreeSearchCriteria,
   type TreeSearchResult,
@@ -64,6 +64,14 @@ import {
 import { useSettingsStore } from '../settings/app-settings';
 import { conceptTransformationMenuItems } from './concept-transform-menu';
 import { TreeSearchBar } from './TreeSearchBar';
+import { matchesShortcut } from './shortcuts';
+import {
+  getTreeRowsForWindow,
+  getTreeRowWindow,
+  projectModelTreeRows,
+  TREE_ROW_HEIGHT,
+  type ProjectedTreeRow,
+} from './tree-row-projection';
 
 const FOLDER_LAYERS: Record<string, Layer[]> = {
   strategy: ['strategy'],
@@ -78,7 +86,7 @@ const FOLDER_LAYERS: Record<string, Layer[]> = {
 function ElementIcon({ type }: { type: ElementType }) {
   const def = ELEMENT_TYPE_MAP[type];
   return (
-    <span className="tree-el-icon" style={{ color: '#5c5c5c' }} title={def.label}>
+    <span className="tree-el-icon" style={{ color: 'var(--chrome-icon)' }} title={def.label}>
       <StandaloneIcon type={type} size={13} />
     </span>
   );
@@ -96,6 +104,13 @@ interface RowProps {
   onDropIds?: (ids: string[]) => void;
   renaming: boolean;
   onRenamed: (name: string | null) => void;
+  level?: number;
+  expanded?: boolean;
+  tabIndex?: number;
+  onFocus?: () => void;
+  onActivate?: () => void;
+  posInSet?: number;
+  setSize?: number;
 }
 
 const ModelTreeActiveContext = createContext(true);
@@ -110,7 +125,12 @@ function TreeRow(props: RowProps) {
 
   if (props.renaming) {
     return (
-      <div className="tree-row renaming" style={{ paddingLeft: props.depth * 14 + 4 }}>
+      <div
+        className="tree-row renaming"
+        role="treeitem"
+        aria-level={props.level ?? props.depth + 1}
+        style={{ paddingLeft: props.depth * 14 + 4 }}
+      >
         <span className="tree-icon">{props.icon}</span>
         <input
           autoFocus
@@ -131,6 +151,14 @@ function TreeRow(props: RowProps) {
       className={'tree-row' + (selected ? ' selected' : '') + (dragOver ? ' drag-over' : '')}
       style={{ paddingLeft: props.depth * 14 + 4 }}
       data-tree-id={props.id}
+      role="treeitem"
+      aria-level={props.level ?? props.depth + 1}
+      aria-posinset={props.posInSet}
+      aria-setsize={props.setSize}
+      aria-selected={selected}
+      aria-expanded={props.expanded}
+      tabIndex={props.tabIndex ?? -1}
+      onFocus={props.onFocus}
       draggable={props.draggable}
       onClick={(e) => {
         const cur = modelStore.getState().selection;
@@ -145,6 +173,7 @@ function TreeRow(props: RowProps) {
         } else {
           setSelection('tree', [props.id], modelStore);
         }
+        props.onActivate?.();
       }}
       onDoubleClick={props.onDoubleClick}
       onContextMenu={(e) => {
@@ -229,7 +258,8 @@ export function ModelTree() {
   const catalog = useMemo(() => collectTreeSearchCatalog(searchableModels), [searchableModels]);
   const catalogSignature = treeSearchCatalogSignature(catalog);
   const previousCatalogSignature = useRef<string | null>(null);
-  const compiled = useMemo(() => compileTreeSearch(criteria), [criteria]);
+  const deferredCriteria = useDeferredValue(criteria);
+  const compiled = useMemo(() => compileTreeSearch(deferredCriteria), [deferredCriteria]);
   const results = useMemo(() => {
     void modelRevision;
     void refreshToken;
@@ -348,12 +378,10 @@ export function ModelTree() {
     const scroll = (attempt: number) => {
       const container = treeContainerRef.current;
       const owner = sessionId === 'legacy'
-        ? container
+        ? container?.querySelector<HTMLElement>('.legacy-model-tree-session')
         : [...(container?.querySelectorAll<HTMLElement>('[data-model-session-id]') ?? [])]
             .find((candidate) => candidate.dataset.modelSessionId === sessionId);
-      const row = [...(owner?.querySelectorAll<HTMLElement>('[data-tree-id]') ?? [])]
-        .find((candidate) => candidate.dataset.treeId === id);
-      if (row) row.scrollIntoView?.({ block: 'center' });
+      if (owner) owner.dispatchEvent(new CustomEvent('archi-tree-reveal-row', { detail: { id } }));
       else if (attempt < 3) requestAnimationFrame(() => scroll(attempt + 1));
     };
     requestAnimationFrame(() => scroll(0));
@@ -381,7 +409,7 @@ export function ModelTree() {
         className="model-tree workspace-model-tree"
         tabIndex={0}
         onKeyDownCapture={(event) => {
-          if (event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'f') {
+          if (matchesShortcut('tree-filter', event)) {
             event.preventDefault();
             event.currentTarget.querySelector<HTMLInputElement>('.tree-filter-input')?.focus();
           }
@@ -523,6 +551,31 @@ function ModelTreeInner({
   const settings = useSettingsStore((s) => s.settings);
   const visible = searchResult.visibleIds;
   const filtering = searchResult.active;
+  const rows = useMemo(
+    () => projectModelTreeRows(model, collapsed, collapsePrefix, filtering, visible),
+    [collapsePrefix, collapsed, filtering, model, visible],
+  );
+  const [focusedId, setFocusedId] = useState(model.info.id);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(440);
+  const virtualized = rows.length > 100;
+  const activeFocusedId = rows.some((row) => row.id === focusedId)
+    ? focusedId
+    : rows[0]?.id;
+  const rowWindow = virtualized
+    ? getTreeRowWindow(rows.length, scrollTop, viewportHeight)
+    : { start: 0, end: rows.length, offset: 0, totalHeight: rows.length * TREE_ROW_HEIGHT };
+
+  useEffect(() => {
+    const element = treeRef.current;
+    if (!element) return;
+    const measure = () => setViewportHeight(Math.max(TREE_ROW_HEIGHT, element.clientHeight || 440));
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [virtualized]);
 
   const toggle = (id: string) => {
     if (filtering) return;
@@ -532,6 +585,40 @@ function ModelTreeInner({
     else next.add(key);
     setCollapsed(next);
   };
+
+  const focusRowAt = (index: number, select = true) => {
+    const row = rows[Math.max(0, Math.min(rows.length - 1, index))];
+    if (!row) return;
+    setFocusedId(row.id);
+    if (select) setSelection('tree', [row.id], modelStore);
+    if (virtualized && treeRef.current) {
+      const top = index * TREE_ROW_HEIGHT;
+      const bottom = top + TREE_ROW_HEIGHT;
+      const currentTop = treeRef.current.scrollTop;
+      const currentBottom = currentTop + treeRef.current.clientHeight;
+      if (top < currentTop || bottom > currentBottom) {
+        treeRef.current.scrollTop = Math.max(0, top - treeRef.current.clientHeight / 2);
+        setScrollTop(treeRef.current.scrollTop);
+      }
+    }
+    requestAnimationFrame(() => {
+      [...(treeRef.current?.querySelectorAll<HTMLElement>('[data-tree-id]') ?? [])]
+        .find((candidate) => candidate.dataset.treeId === row.id)
+        ?.focus();
+    });
+  };
+
+  useEffect(() => {
+    const element = treeRef.current;
+    if (!element) return;
+    const reveal = (event: Event) => {
+      const id = (event as CustomEvent<{ id?: string }>).detail?.id;
+      const index = id ? rows.findIndex((row) => row.id === id) : -1;
+      if (index >= 0) focusRowAt(index);
+    };
+    element.addEventListener('archi-tree-reveal-row', reveal);
+    return () => element.removeEventListener('archi-tree-reveal-row', reveal);
+  });
 
   const finishRename = (id: string) => (name: string | null) => {
     setRenamingId(null);
@@ -556,8 +643,6 @@ function ModelTreeInner({
     );
     void extensionRegistry.emitEvent('tree.contextMenu', trigger);
   };
-
-  const itemLabel = (id: string): string => treeItemLabel(model, id);
 
   const conceptMenu = (id: string): MenuItem[] => {
     const sel = modelStore.getState().selection;
@@ -708,104 +793,81 @@ function ModelTreeInner({
     return items;
   };
 
-  const renderFolder = (folderId: string, depth: number): ReactNode => {
-    const folder = model.folders[folderId];
-    if (!folder) return null;
-    if (filtering && !visible.has(folderId)) return null;
-    // While filtering, matches must be reachable: ignore collapse state.
-    const isCollapsed = !filtering && collapsed.has(`${collapsePrefix}:${folderId}`);
-    const subfolders = [...folder.folderIds].sort((a, b) =>
-      (model.folders[a]?.name ?? '').localeCompare(model.folders[b]?.name ?? ''),
-    );
-    const allItems = filtering
-      ? folder.itemIds.filter((id) => visible.has(id))
-      : folder.itemIds;
-    const items = [...allItems].sort((a, b) => itemLabel(a).localeCompare(itemLabel(b)));
+  const renderProjectedRow = (row: ProjectedTreeRow) => {
+    const common = {
+      id: row.id,
+      depth: row.level - 1,
+      label: row.kind === 'model' ? `${row.label}${dirty ? ' *' : ''}` : row.label,
+      level: row.level,
+      posInSet: row.posInSet,
+      setSize: row.setSize,
+      expanded: row.expandable ? row.expanded : undefined,
+      tabIndex: activeFocusedId === row.id ? 0 : -1,
+      onFocus: () => setFocusedId(row.id),
+      renaming: renamingId === row.id,
+      onRenamed: finishRename(row.id),
+    };
+    if (row.kind === 'model') {
+      return (
+        <TreeRow
+          {...common}
+          icon={<span className="tree-model-icon">{row.expanded ? '▾' : '▸'} ◈</span>}
+          onDoubleClick={() => toggle(row.id)}
+          onContextMenu={(x, y) => showTreeContextMenu(x, y, rootMenu(), row.id)}
+        />
+      );
+    }
+    if (row.kind === 'folder') {
+      const folder = model.folders[row.id];
+      return (
+        <TreeRow
+          {...common}
+          icon={<span className="tree-chevron">{row.expanded ? '▾' : '▸'}</span>}
+          onActivate={() => toggle(row.id)}
+          onContextMenu={(x, y) => showTreeContextMenu(x, y, folderMenu(folder), row.id)}
+          draggable={folder.parentId !== null}
+          onDropIds={(ids) => moveItemsToFolder(ids, row.id, modelStore)}
+        />
+      );
+    }
+    if (row.kind === 'element') {
+      return (
+        <TreeRow
+          {...common}
+          icon={<ElementIcon type={model.elements[row.id].type} />}
+          onContextMenu={(x, y) => showTreeContextMenu(x, y, conceptMenu(row.id), row.id)}
+          draggable
+        />
+      );
+    }
+    if (row.kind === 'relationship') {
+      return (
+        <TreeRow
+          {...common}
+          icon={<span className="tree-rel-icon">→</span>}
+          dim
+          onContextMenu={(x, y) => showTreeContextMenu(x, y, conceptMenu(row.id), row.id)}
+          draggable
+        />
+      );
+    }
     return (
-      <div key={folderId}>
-        <div onClick={() => toggle(folderId)}>
-          <TreeRow
-            id={folderId}
-            depth={depth}
-            icon={<span className="tree-chevron">{isCollapsed ? '▸' : '▾'}</span>}
-            label={itemLabel(folder.id)}
-            onContextMenu={(x, y) => showTreeContextMenu(x, y, folderMenu(folder), folderId)}
-            draggable={folder.parentId !== null}
-            onDropIds={(ids) => moveItemsToFolder(ids, folderId, modelStore)}
-            renaming={renamingId === folderId}
-            onRenamed={finishRename(folderId)}
-          />
-        </div>
-        {!isCollapsed && (
-          <div>
-            {subfolders.map((sub) => renderFolder(sub, depth + 1))}
-            {items.map((itemId) => {
-              const el = model.elements[itemId];
-              if (el) {
-                return (
-                  <TreeRow
-                    key={itemId}
-                    id={itemId}
-                    depth={depth + 1}
-                    icon={<ElementIcon type={el.type} />}
-                    label={el.name}
-                    onContextMenu={(x, y) => showTreeContextMenu(x, y, conceptMenu(itemId), itemId)}
-                    draggable
-                    renaming={renamingId === itemId}
-                    onRenamed={finishRename(itemId)}
-                  />
-                );
-              }
-              const rel = model.relationships[itemId];
-              if (rel) {
-                return (
-                  <TreeRow
-                    key={itemId}
-                    id={itemId}
-                    depth={depth + 1}
-                    icon={<span className="tree-rel-icon">→</span>}
-                    label={itemLabel(itemId)}
-                    dim
-                    onContextMenu={(x, y) => showTreeContextMenu(x, y, conceptMenu(itemId), itemId)}
-                    draggable
-                    renaming={renamingId === itemId}
-                    onRenamed={finishRename(itemId)}
-                  />
-                );
-              }
-              const view = model.views[itemId];
-              if (view) {
-                return (
-                  <TreeRow
-                    key={itemId}
-                    id={itemId}
-                    depth={depth + 1}
-                    icon={<span className="tree-view-icon">▦</span>}
-                    label={view.name}
-                    onDoubleClick={() => openView(itemId, modelStore)}
-                    onContextMenu={(x, y) =>
-                      showTreeContextMenu(
-                        x,
-                        y,
-                        [
-                          { label: 'Open View', onClick: () => openView(itemId, modelStore) },
-                          SEPARATOR,
-                          ...conceptMenu(itemId),
-                        ],
-                        itemId,
-                      )
-                    }
-                    draggable
-                    renaming={renamingId === itemId}
-                    onRenamed={finishRename(itemId)}
-                  />
-                );
-              }
-              return null;
-            })}
-          </div>
+      <TreeRow
+        {...common}
+        icon={<span className="tree-view-icon">▦</span>}
+        onDoubleClick={() => openView(row.id, modelStore)}
+        onContextMenu={(x, y) => showTreeContextMenu(
+          x,
+          y,
+          [
+            { label: 'Open View', onClick: () => openView(row.id, modelStore) },
+            SEPARATOR,
+            ...conceptMenu(row.id),
+          ],
+          row.id,
         )}
-      </div>
+        draggable
+      />
     );
   };
 
@@ -838,14 +900,15 @@ function ModelTreeInner({
       },
     ];
   };
-  const rootCollapsed = !filtering && collapsed.has(`${collapsePrefix}:${model.info.id}`);
-
   return (
     <div
       ref={treeRef}
-      className={embedded ? 'model-tree-session' : 'model-tree-session legacy-model-tree-session'}
+      className={`${embedded ? 'model-tree-session' : 'model-tree-session legacy-model-tree-session'}${virtualized ? ' virtualized' : ''}`}
       data-model-session-id={embedded ? collapsePrefix : undefined}
-      tabIndex={0}
+      role="tree"
+      aria-label={`${model.info.name} model tree`}
+      tabIndex={-1}
+      onScroll={virtualized ? (event) => setScrollTop(event.currentTarget.scrollTop) : undefined}
       onPointerDownCapture={() => {
         if (embedded) activateModelSession(collapsePrefix);
       }}
@@ -856,7 +919,7 @@ function ModelTreeInner({
         if (embedded) activateModelSession(collapsePrefix);
       }}
       onKeyDown={(e) => {
-        if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+        if (matchesShortcut('tree-filter', e)) {
           e.preventDefault();
           treeRef.current
             ?.closest('.model-tree, .workspace-model-tree')
@@ -866,6 +929,62 @@ function ModelTreeInner({
         }
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
         const sel = modelStore.getState().selection;
+        const currentIndex = Math.max(0, rows.findIndex((row) => row.id === activeFocusedId));
+        const selectOnMove = !(e.ctrlKey || e.metaKey);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
+          e.preventDefault();
+          focusRowAt(e.key === 'ArrowDown'
+            ? currentIndex + 1
+            : e.key === 'ArrowUp'
+              ? currentIndex - 1
+              : e.key === 'Home'
+                ? 0
+                : rows.length - 1, selectOnMove);
+          return;
+        }
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          const row = rows[currentIndex];
+          if (row?.expandable && !row.expanded) toggle(row.id);
+          else if (rows[currentIndex + 1]?.parentId === row?.id) {
+            focusRowAt(currentIndex + 1, selectOnMove);
+          }
+          return;
+        }
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const row = rows[currentIndex];
+          if (row?.expandable && row.expanded) toggle(row.id);
+          else if (row?.parentId) {
+            focusRowAt(
+              rows.findIndex((candidate) => candidate.id === row.parentId),
+              selectOnMove,
+            );
+          }
+          return;
+        }
+        if (e.key === ' ') {
+          const row = rows[currentIndex];
+          if (!row) return;
+          e.preventDefault();
+          const currentIds = sel.source === 'tree' ? sel.ids : [];
+          setSelection(
+            'tree',
+            currentIds.includes(row.id)
+              ? currentIds.filter((id) => id !== row.id)
+              : [...currentIds, row.id],
+            modelStore,
+          );
+          return;
+        }
+        if (e.key === 'Enter') {
+          const row = rows[currentIndex];
+          if (row?.kind === 'view') {
+            e.preventDefault();
+            openView(row.id, modelStore);
+          }
+          return;
+        }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && sel.source === 'tree') {
           e.preventDefault();
           copyTreeItems(modelStore, collapsePrefix, sel.ids);
@@ -881,23 +1000,31 @@ function ModelTreeInner({
           e.preventDefault();
           deleteItems(sel.ids, modelStore);
         }
-        if (e.key === 'F2' && sel.source === 'tree' && sel.ids.length === 1) {
+        if (matchesShortcut('rename', e) && sel.source === 'tree' && sel.ids.length === 1) {
           setRenamingId(sel.ids[0]);
         }
       }}
     >
-      <div onDoubleClick={() => toggle(model.info.id)}>
-        <TreeRow
-          id={model.info.id}
-          depth={0}
-          icon={<span className="tree-model-icon">{rootCollapsed ? '▸' : '▾'} ◈</span>}
-          label={`${model.info.name}${dirty ? ' *' : ''}`}
-          onContextMenu={(x, y) => showTreeContextMenu(x, y, rootMenu(), model.info.id)}
-          renaming={renamingId === model.info.id}
-          onRenamed={finishRename(model.info.id)}
-        />
+      <div
+        className="tree-row-window"
+        role="none"
+        style={{ height: virtualized ? rowWindow.totalHeight : undefined }}
+      >
+        {(virtualized
+          ? getTreeRowsForWindow(rows, rowWindow, activeFocusedId)
+          : rows.map((row, index) => ({ row, index }))).map(({ row, index }) => (
+          <div
+            key={row.id}
+            role="none"
+            className="tree-row-slot"
+            style={virtualized
+              ? { position: 'absolute', top: index * TREE_ROW_HEIGHT }
+              : undefined}
+          >
+            {renderProjectedRow(row)}
+          </div>
+        ))}
       </div>
-      {!rootCollapsed && model.rootFolderIds.map((fid) => renderFolder(fid, 1))}
     </div>
   );
 }

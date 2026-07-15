@@ -120,6 +120,7 @@ describe('multi-model workspace', () => {
       selection: { source: 'tree', ids: [] },
       openViewIds: [],
       activeViewId: null,
+      viewportsByViewId: {},
       activeTool: { kind: 'select' },
       modelEpoch: 0,
       booted: false,

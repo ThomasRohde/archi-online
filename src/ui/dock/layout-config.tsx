@@ -137,15 +137,14 @@ export const TOOL_PANELS: ToolPanelDef[] = [
     id: 'palette',
     title: 'Palette',
     add: (api) => {
-      const center = centerPosition(api, 'palette');
       api.addPanel({
         id: 'palette',
         component: 'palette',
         title: 'Palette',
-        position: center
-          ? { referencePanel: center.referencePanel, direction: 'left' }
+        position: api.getPanel('models')
+          ? { referencePanel: 'models', direction: 'within' }
           : { direction: 'left' },
-        initialWidth: 90,
+        initialWidth: 260,
       });
     },
   },
@@ -170,7 +169,9 @@ export const TOOL_PANELS: ToolPanelDef[] = [
         id: 'settings',
         component: 'settings',
         title: 'Settings',
-        position: { direction: 'right' },
+        position: api.getPanel('properties')
+          ? { referencePanel: 'properties', direction: 'within' }
+          : { direction: 'right' },
         initialWidth: 340,
       }),
   },
@@ -241,35 +242,22 @@ export function buildDefaultLayout(api: DockviewApi): void {
     id: 'palette',
     component: 'palette',
     title: 'Palette',
-    position: { referencePanel: 'welcome', direction: 'left' },
-  });
-  api.addPanel({
-    id: 'scripts',
-    component: 'scripts',
-    title: 'Scripting',
-    position: { referencePanel: 'welcome', direction: 'below' },
-    initialHeight: 230,
+    position: { referencePanel: 'models', direction: 'within' },
   });
   api.addPanel({
     id: 'properties',
     component: 'properties',
     title: 'Properties',
-    position: { referencePanel: 'scripts', direction: 'within' },
+    position: { referencePanel: 'welcome', direction: 'right' },
   });
   api.addPanel({
     id: 'settings',
     component: 'settings',
     title: 'Settings',
-    position: { referencePanel: 'welcome', direction: 'right' },
-  });
-  api.addPanel({
-    id: 'extensions',
-    component: 'extensions',
-    title: 'Extensions',
-    position: { referencePanel: 'settings', direction: 'within' },
+    position: { referencePanel: 'properties', direction: 'within' },
   });
   api.getPanel('models')?.api.setSize({ width: 250 });
-  api.getPanel('palette')?.api.setSize({ width: 88 });
+  api.getPanel('models')?.api.setActive();
   api.getPanel('properties')?.api.setActive();
 }
 

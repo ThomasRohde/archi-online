@@ -1,7 +1,8 @@
 // Reader/writer for the ArchiMate Open Exchange format (.xml), ported from
 // Archi's org.opengroup.archimate.xmlexchange plugin.
 
-export { ExchangeParseError, isExchangeXml, parseExchange, parseExchangeDocument } from './exchange-xml/parse';
+export { isExchangeXml } from './exchange-xml/detect';
+export { ExchangeParseError, parseExchange, parseExchangeDocument } from './exchange-xml/parse';
 export { serializeExchange } from './exchange-xml/serialize';
 export { exportExchange } from './exchange-xml/export';
 export { EXCHANGE_SCHEMAS } from './exchange-xml/schemas';

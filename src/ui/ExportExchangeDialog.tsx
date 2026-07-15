@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DUBLIN_CORE_FIELDS, type DublinCoreEntry } from '../model/types';
-import { exportExchange } from '../model/io/exchange-xml';
 import { setModelExchangeInfo } from '../model/ops';
 import { sanitizeFileName, saveFilesToDisk } from '../persistence/files';
 import { showAlertDialog } from './AppDialog';
@@ -34,6 +33,7 @@ export function ExportExchangeDialog({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setDiagnostics([]);
     try {
+      const { exportExchange } = await import('../model/io/exchange-xml');
       const result = await exportExchange(model, { language, metadata, includeOrganization, validate, copySchemas });
       if (!result.valid) {
         setDiagnostics(result.diagnostics.map((diagnostic) => diagnostic.message));

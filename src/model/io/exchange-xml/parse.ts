@@ -42,10 +42,6 @@ import {
 
 export class ExchangeParseError extends Error {}
 
-export function isExchangeXml(text: string): boolean {
-  return text.includes(EXCHANGE_NS);
-}
-
 export function parseExchange(xml: string, options: ExchangeImportOptions = {}): ModelState {
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   const root = doc.documentElement;

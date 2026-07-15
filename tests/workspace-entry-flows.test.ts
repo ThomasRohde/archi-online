@@ -5,6 +5,7 @@ import { createEmptyModel } from '../src/model/ops';
 import { addModelSession, getModelSession, resetWorkspaceForTests } from '../src/model/workspace';
 import { useWorkspaceStore } from '../src/ui/store-hooks';
 import { loadExampleModel } from '../src/ui/WelcomePanel';
+import { viewsInTreeOrder } from '../src/ui/PresentationMode';
 
 beforeEach(() => resetWorkspaceForTests());
 
@@ -21,5 +22,7 @@ describe('workspace entry flows', () => {
     expect(useWorkspaceStore.getState().order).toEqual([existingId, exampleId]);
     expect(getModelSession(exampleId)?.store.getState().fileName).toBe('Archisurance.archimate');
     expect(useWorkspaceStore.getState().activeSessionId).toBe(exampleId);
+    const state = getModelSession(exampleId)!.store.getState();
+    expect(state.activeViewId).toBe(viewsInTreeOrder(state.model!)[0]);
   });
 });

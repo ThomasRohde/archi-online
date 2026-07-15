@@ -165,6 +165,7 @@ afterEach(() => {
 
 describe('native legend palette and properties', () => {
   it('offers a distinct accessible sticky-capable Legend tool', async () => {
+    openView(addView('View'));
     const { host, root } = await render(createElement(Palette));
     const legend = host.querySelector<HTMLButtonElement>('button[title="Legend"]')!;
     const note = host.querySelector<HTMLButtonElement>('button[title="Note"]')!;

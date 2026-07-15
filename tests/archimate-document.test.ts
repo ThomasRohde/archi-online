@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 describe('native Archi document codec', () => {
-  it('keeps TIFF source bytes and derives browser-renderable PNG bytes', async () => {
+  it('keeps TIFF source bytes and derives browser-renderable PNG bytes', { timeout: 30_000 }, async () => {
     const bytes = minimalTiff();
     const path = await importModelAsset(bytes, 'pixel.tiff', 'image/tiff');
     const asset = model().assets[path];

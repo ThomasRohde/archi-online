@@ -34,7 +34,7 @@ export function ResizeHandles({
           width={7}
           height={7}
           fill="#ffffff"
-          stroke="#2a6cc4"
+          stroke="var(--canvas-selection)"
           strokeWidth={1.2}
           style={{ cursor: h.cursor }}
         />
@@ -64,7 +64,7 @@ export function BendpointHandles({
           width={7}
           height={7}
           fill="#ffffff"
-          stroke="#2a6cc4"
+          stroke="var(--canvas-selection)"
           strokeWidth={1.2}
           style={{ cursor: 'move' }}
         />
@@ -97,7 +97,7 @@ export function ConnectionEndpointHandles({
           cy={point.y}
           r={4}
           fill="#ffffff"
-          stroke="#2a6cc4"
+          stroke="var(--canvas-selection)"
           strokeWidth={1.4}
           style={{ cursor: 'crosshair' }}
         />
@@ -115,7 +115,7 @@ export function MarqueeOverlay({ inter }: { inter: Interaction }) {
       width={Math.abs(inter.current.x - inter.start.x)}
       height={Math.abs(inter.current.y - inter.start.y)}
       fill="rgba(42,108,196,0.08)"
-      stroke="#2a6cc4"
+      stroke="var(--canvas-selection)"
       strokeWidth={1}
       strokeDasharray="4 3"
       pointerEvents="none"
@@ -137,7 +137,7 @@ export function PendingConnectionOverlay({
       y1={sourcePoint.y}
       x2={inter.current.x}
       y2={inter.current.y}
-      stroke="#2a6cc4"
+      stroke="var(--canvas-selection)"
       strokeWidth={1.2}
       strokeDasharray="5 3"
       pointerEvents="none"
@@ -163,7 +163,7 @@ export function PendingReconnectionOverlay({
       y1={fixed.y}
       x2={inter.current.x}
       y2={inter.current.y}
-      stroke={valid === false ? '#b43a3a' : valid === true ? '#2f7d32' : '#2a6cc4'}
+      stroke={valid === false ? 'var(--canvas-invalid)' : valid === true ? 'var(--canvas-valid)' : 'var(--canvas-selection)'}
       strokeWidth={1.4}
       strokeDasharray="5 3"
       pointerEvents="none"

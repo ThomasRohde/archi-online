@@ -17,6 +17,7 @@ import {
   JAVA21_CASE_FOLD_SOURCE_URL,
   JAVA21_CASE_FOLD_UNICODE_VERSION,
   JAVA21_SIMPLE_CASE_FOLD_DATA,
+  collectModelTreeSearchCatalog,
   collectTreeSearchCatalog,
   compileTreeSearch,
   javaCaseInsensitiveCanonical,
@@ -111,6 +112,12 @@ function search(model: ModelState, patch: Partial<TreeSearchCriteria>) {
 }
 
 describe('structured model-tree search', () => {
+  it('caches model-derived catalogs by model identity', () => {
+    const model = createEmptyModel('Catalog cache');
+    expect(collectModelTreeSearchCatalog(model)).toBe(collectModelTreeSearchCatalog(model));
+    expect(collectModelTreeSearchCatalog({ ...model })).not.toBe(collectModelTreeSearchCatalog(model));
+  });
+
   it('is inactive until a query-backed field or a typed/dynamic filter is selected', () => {
     const model = createEmptyModel('Model');
     expect(search(model, {}).active).toBe(false);

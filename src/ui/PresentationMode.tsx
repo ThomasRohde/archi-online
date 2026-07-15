@@ -2,29 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ViewEditor } from '../canvas/ViewEditor';
 import { useStore } from './store-hooks';
-import type { ModelState } from '../model/types';
-import { treeItemLabel } from './tree-filter';
+import { viewsInTreeOrder } from '../model/tree-order';
+
+export { viewsInTreeOrder } from '../model/tree-order';
 
 /** All views in the order the model tree displays them (subfolders first,
  * then items, both sorted alphabetically) — the walk order for presenting. */
-export function viewsInTreeOrder(model: ModelState): string[] {
-  const result: string[] = [];
-  const walk = (folderId: string) => {
-    const folder = model.folders[folderId];
-    if (!folder) return;
-    const subs = [...folder.folderIds].sort((a, b) =>
-      (model.folders[a]?.name ?? '').localeCompare(model.folders[b]?.name ?? ''),
-    );
-    for (const sub of subs) walk(sub);
-    const items = [...folder.itemIds].sort((a, b) =>
-      treeItemLabel(model, a).localeCompare(treeItemLabel(model, b)),
-    );
-    for (const id of items) if (model.views[id]) result.push(id);
-  };
-  for (const fid of model.rootFolderIds) walk(fid);
-  return result;
-}
-
 /**
  * Full-screen, chrome-free walkthrough of the model's views. Renders as a
  * fixed overlay (never touching the dockview layout) and requests browser

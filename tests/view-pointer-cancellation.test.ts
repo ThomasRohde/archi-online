@@ -394,11 +394,11 @@ describe('editable view pointer cancellation', () => {
     await act(async () => svg.dispatchEvent(pointer('pointermove', 250, 20, 30)));
 
     expect(pending.getAttribute('x2')).not.toBe(initialTargetX);
-    expect(hit.querySelector('rect[stroke="#1d9e46"]')).not.toBeNull();
+    expect(hit.querySelector('rect[stroke="var(--canvas-valid)"]')).not.toBeNull();
 
     await act(async () => svg.dispatchEvent(pointer('pointerout', 250, 20, 30)));
     expect(pending.getAttribute('x2')).toBe(sourceX);
-    expect(hit.querySelector('rect[stroke="#1d9e46"]')).toBeNull();
+    expect(hit.querySelector('rect[stroke="var(--canvas-valid)"]')).toBeNull();
 
     await act(async () => svg.dispatchEvent(pointer('pointermove', 250, 20, 30)));
     await act(async () => svg.dispatchEvent(pointer('pointerdown', 250, 20, 30)));

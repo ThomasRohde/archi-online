@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import {
   C4_VISUAL_DEFAULTS,
   c4RelationshipLabelParts,
@@ -264,7 +264,7 @@ export interface ConnectionViewProps {
   displayLabel?: string;
 }
 
-export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghosted, displayLabel }: ConnectionViewProps) {
+function ConnectionViewComponent({ conn, rel, points, selected, c4ViewType, ghosted, displayLabel }: ConnectionViewProps) {
   if (points.length < 2) return null;
   const isC4Relationship = !!c4ViewType && !!rel;
   const color = conn.lineColor ?? (isC4Relationship ? C4_VISUAL_DEFAULTS.relationshipLine : DEFAULT_LINE);
@@ -320,11 +320,11 @@ export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghoste
         d={d}
         data-c4-relationship={isC4Relationship ? 'true' : undefined}
         fill="none"
-        stroke={conn.lineStyle === 3 ? 'none' : selected ? '#2a6cc4' : color}
+        stroke={conn.lineStyle === 3 ? 'none' : selected ? 'var(--canvas-selection)' : color}
         strokeWidth={(conn.lineWidth ?? 1) * (selected ? 1.6 : 1)}
         strokeDasharray={style.dash}
       />
-      {conn.lineStyle !== 3 && style.decorations(points, selected ? '#2a6cc4' : color)}
+      {conn.lineStyle !== 3 && style.decorations(points, selected ? 'var(--canvas-selection)' : color)}
       {labelLines.length > 0 && (
         <text
           x={mid.x}
@@ -351,3 +351,5 @@ export function ConnectionView({ conn, rel, points, selected, c4ViewType, ghoste
     </g>
   );
 }
+
+export const ConnectionView = memo(ConnectionViewComponent);

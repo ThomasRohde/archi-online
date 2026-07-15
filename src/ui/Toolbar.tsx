@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { createPortal } from 'react-dom';
 import {
   ArrowUpDown,
   Blocks,
@@ -81,30 +80,11 @@ import { PropertiesManagerDialog } from './PropertiesManagerDialog';
 import { ModelMergeDialog } from './ModelMergeDialog';
 import { TemplateGallery } from './TemplateGallery';
 import { StaticReportExportDialog } from './StaticReportExportDialog';
+import { ModalSurface } from './ModalSurface';
+import { SHORTCUTS } from './shortcuts';
 
 /** Published documentation site (GitHub Pages). */
 const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
-
-const SHORTCUTS: [string, string][] = [
-  ['Ctrl+S / Ctrl+O', 'Save / open model'],
-  ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
-  ['Ctrl+C / Ctrl+V', 'Copy / paste diagram objects or tree items (including across models)'],
-  ['Ctrl+D', 'Duplicate (model tree or view selection)'],
-  ['Ctrl+A', 'Select all on view'],
-  ['Delete', 'Delete from view (canvas) or model (tree)'],
-  ['F2 or double-click', 'Rename'],
-  ['Arrows (+Shift)', 'Nudge selection by 1px (grid step)'],
-  ['Ctrl+wheel / Ctrl+= / Ctrl+-', 'Zoom canvas (per view)'],
-  ['Ctrl+0 / Home', 'Zoom 100% / fit diagram to window'],
-  ['Middle-drag or Space+drag', 'Pan canvas'],
-  ['Wheel / Shift+wheel', 'Scroll canvas'],
-  ['Alt while dragging', 'Disable grid snap'],
-  ['Escape', 'Cancel tool / clear selection'],
-  ['Ctrl+Enter (editor)', 'Run script'],
-  ['Double-click bendpoint', 'Remove bendpoint'],
-  ['Ctrl+F (model tree)', 'Filter the model tree'],
-  ['←/→, PgUp/PgDn (presentation)', 'Previous / next view'],
-];
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -815,12 +795,12 @@ export function Toolbar() {
         open={showSpecializations}
         onClose={() => setShowSpecializations(false)}
       />
-      {showImages && createPortal(
-        <div className="modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setShowImages(false);
-        }}>
-          <div className="modal image-gallery-dialog" role="dialog" aria-label="Model Images">
-            <div className="modal-title">Model Images</div>
+      {showImages && (
+        <ModalSurface
+          title="Model Images"
+          className="image-gallery-dialog"
+          onClose={() => setShowImages(false)}
+        >
             <p className="prop-hint">Choose an image, then click the active view to place it.</p>
             <ImageGallery
               selectedPath={undefined}
@@ -830,23 +810,18 @@ export function Toolbar() {
               }}
             />
             <button className="tb-btn" onClick={() => setShowImages(false)}>Cancel</button>
-          </div>
-        </div>,
-        document.body,
+        </ModalSurface>
       )}
-      {showHelp &&
-        createPortal(
-          <div className="modal-backdrop" onClick={() => setShowHelp(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-title">Keyboard shortcuts</div>
+      {showHelp && (
+        <ModalSurface title="Keyboard shortcuts" onClose={() => setShowHelp(false)}>
               <table className="shortcut-table">
                 <tbody>
-                  {SHORTCUTS.map(([keys, desc]) => (
-                    <tr key={keys}>
+                  {SHORTCUTS.map(({ id, keys, description }) => (
+                    <tr key={id}>
                       <td>
                         <code>{keys}</code>
                       </td>
-                      <td>{desc}</td>
+                      <td>{description}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -854,10 +829,8 @@ export function Toolbar() {
               <button className="tb-btn small" onClick={() => setShowHelp(false)}>
                 Close
               </button>
-            </div>
-          </div>,
-          document.body,
-        )}
+        </ModalSurface>
+      )}
     </div>
   );
 }

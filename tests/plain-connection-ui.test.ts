@@ -11,7 +11,7 @@ import {
   setPlainConnectionAttributes,
 } from '../src/model/ops';
 import { PLAIN_CONNECTION_TYPE } from '../src/model/types';
-import { replaceModel, setActiveTool, setSelection } from '../src/model/store';
+import { openView, replaceModel, setActiveTool, setSelection } from '../src/model/store';
 import { Palette } from '../src/ui/Palette';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
 import { useStore } from '../src/ui/store-hooks';
@@ -67,6 +67,7 @@ beforeEach(() => {
 
 describe('VIEW-05 plain connection UI', () => {
   it('offers an accessible sticky-capable palette tool', async () => {
+    openView(addView('View'));
     const { host, root } = await render(createElement(Palette));
     const button = host.querySelector<HTMLButtonElement>('button[title="Plain connection"]')!;
     expect(button).not.toBeNull();

@@ -24,7 +24,14 @@ describe('app settings', () => {
       snapToGrid: true,
       snapToAlignmentGuides: true,
       pasteSpecialMode: 'reference',
+      themeMode: 'system',
     });
+  });
+
+  it('accepts only system, light, and dark theme modes', () => {
+    expect(normalizeSettings({ themeMode: 'dark' }).themeMode).toBe('dark');
+    expect(normalizeSettings({ themeMode: 'light' }).themeMode).toBe('light');
+    expect(normalizeSettings({ themeMode: 'unknown' }).themeMode).toBe('system');
   });
 
   it('loads defaults when no settings are stored', async () => {

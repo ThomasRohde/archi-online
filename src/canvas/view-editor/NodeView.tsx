@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useStore } from '../../ui/store-hooks';
 import type { C4ViewType } from '../../model/c4';
 import type { Bounds, ModelState } from '../../model/types';
@@ -7,19 +8,9 @@ import { GHOST_OPACITY, isNodeGhosted } from './viewpoint-ghost';
 import { assetDataUrl } from '../../model/assets';
 import { evaluateLabelExpression } from '../../model/label-expression';
 import { useSettingsStore } from '../../settings/app-settings';
+import { evaluateCachedLabelExpression } from './label-cache';
 
-export function NodeView({
-  model,
-  nodeId,
-  moveDelta,
-  resize,
-  dropParentId,
-  connectSource,
-  connectHover,
-  anchorId,
-  c4ViewType,
-  viewpoint,
-}: {
+interface NodeViewProps {
   model: ModelState;
   nodeId: string;
   moveDelta: Map<string, Point>;
@@ -27,10 +18,27 @@ export function NodeView({
   dropParentId: string | null;
   connectSource: string | null;
   connectHover: { id: string; valid: boolean } | null;
+  interactionVersions?: Map<string, string>;
   anchorId?: string | null;
   c4ViewType?: C4ViewType;
   viewpoint?: string;
-}) {
+}
+
+const EMPTY_INTERACTION_VERSIONS = new Map<string, string>();
+
+function NodeViewComponent({
+  model,
+  nodeId,
+  moveDelta,
+  resize,
+  dropParentId,
+  connectSource,
+  connectHover,
+  interactionVersions = EMPTY_INTERACTION_VERSIONS,
+  anchorId,
+  c4ViewType,
+  viewpoint,
+}: NodeViewProps) {
   const node = model.nodes[nodeId];
   const settings = useSettingsStore((state) => state.settings);
   const selected = useStore(
@@ -63,7 +71,12 @@ export function NodeView({
   // nodes keep their own opacity.
   const ghosted = isNodeGhosted(model, nodeId, viewpoint);
   const displayLabel = node.labelExpression !== undefined
-    ? evaluateLabelExpression(model, nodeId, node.labelExpression).text
+    ? evaluateCachedLabelExpression(
+        model,
+        nodeId,
+        node.labelExpression,
+        evaluateLabelExpression,
+      ).text
     : undefined;
 
   return (
@@ -92,7 +105,7 @@ export function NodeView({
           width={width + 3}
           height={height + 3}
           fill="none"
-          stroke={invalid ? '#c43a3a' : highlight ? '#1d9e46' : anchorCue ? '#e8820c' : '#2a6cc4'}
+          stroke={invalid ? 'var(--canvas-invalid)' : highlight ? 'var(--canvas-valid)' : anchorCue ? 'var(--canvas-anchor)' : 'var(--canvas-selection)'}
           strokeWidth={highlight || invalid ? 2 : anchorCue ? 1.8 : 1.2}
           pointerEvents="none"
         />
@@ -110,7 +123,7 @@ export function NodeView({
             y={cy - 3}
             width={6}
             height={6}
-            fill="#e8820c"
+            fill="var(--canvas-anchor)"
             pointerEvents="none"
           />
         ))}
@@ -124,6 +137,7 @@ export function NodeView({
           dropParentId={dropParentId}
           connectSource={connectSource}
           connectHover={connectHover}
+          interactionVersions={interactionVersions}
           anchorId={anchorId}
           c4ViewType={c4ViewType}
           viewpoint={viewpoint}
@@ -132,3 +146,13 @@ export function NodeView({
     </g>
   );
 }
+
+export const NodeView = memo(NodeViewComponent, (previous, next) =>
+  previous.model === next.model &&
+  previous.nodeId === next.nodeId &&
+  previous.interactionVersions?.get(previous.nodeId) ===
+    next.interactionVersions?.get(next.nodeId) &&
+  previous.anchorId === next.anchorId &&
+  previous.c4ViewType === next.c4ViewType &&
+  previous.viewpoint === next.viewpoint
+);

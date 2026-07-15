@@ -25,13 +25,15 @@ import { signalEditorRuntimeReady } from './pwa/boot-signal';
 import { subscribeLaunchedFiles } from './pwa/launch-queue';
 import { takeSharedFile } from './pwa/share-target-inbox';
 import { shouldBlockUnload } from './pwa/unload-guard';
-import { hydrateSettingsStore } from './settings/app-settings';
+import { hydrateSettingsStore, useSettingsStore } from './settings/app-settings';
 import { hydrateAnalysisPreferences } from './settings/analysis-preferences';
 import { hydrateValidatorSettings } from './settings/validator-settings';
 import { hydrateTemplateCatalog } from './persistence/template-store';
 import { AppDialogHost, showAlertDialog, showConfirmDialog } from './ui/AppDialog';
 import { AppShell } from './ui/AppShell';
 import { blocksReadOnlyShortcut } from './ui/shortcut-policy';
+import { matchesShortcut } from './ui/shortcuts';
+import { applyThemeMode } from './ui/theme';
 import { newModel, openModel, saveModel } from './ui/Toolbar';
 import { ViewerShell } from './ui/ViewerShell';
 
@@ -62,6 +64,19 @@ if (import.meta.env.DEV) {
       const logs: string[] = [];
       const res = runScript(code, (e) => logs.push(`${e.level}: ${e.text}`));
       return { ...res, logs };
+    };
+  });
+  void import('./dev/canvas-benchmark').then(({ createCanvasBenchmarkModel }) => {
+    (window as unknown as Record<string, unknown>).__archiCreateCanvasBenchmark = () => {
+      const { model, viewId } = createCanvasBenchmarkModel();
+      addModelSession({
+        model,
+        fileName: 'canvas-benchmark.archimate',
+        dirty: false,
+        openViewIds: [viewId],
+        activeViewId: viewId,
+      });
+      return { viewId, nodes: 400, connections: 200 };
     };
   });
 }
@@ -196,6 +211,7 @@ function clearViewerUrl(): void {
 }
 
 export function App() {
+  const themeMode = useSettingsStore((state) => state.settings.themeMode);
   const [viewerStore] = useState(() => createModelStore({ readOnly: true }));
   const [mode, setMode] = useState<AppMode>(() =>
     isViewerLocation(new URL(window.location.href))
@@ -206,6 +222,10 @@ export function App() {
     viewerRouteKey(new URL(window.location.href)),
   );
   const [editorBoot, setEditorBoot] = useState({ restoreWorkspace: true });
+
+  useEffect(() => {
+    applyThemeMode(themeMode);
+  }, [themeMode]);
 
   useEffect(() => {
     if (mode.kind !== 'viewer-loading') return;
@@ -235,28 +255,31 @@ export function App() {
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
         (e.target instanceof HTMLElement && e.target.isContentEditable);
-      if (!e.ctrlKey && !e.metaKey) return;
       const key = e.key.toLowerCase();
       const activeStore = getActiveModelSession()?.store;
       if (activeStore?.getState().readOnly && blocksReadOnlyShortcut(key)) return;
-      if (key === 's') {
+      if (matchesShortcut('new-model', e)) {
+        e.preventDefault();
+        void newModel();
+      } else if (matchesShortcut('save', e)) {
         e.preventDefault();
         void saveModel(false);
-      } else if (key === 'o') {
+      } else if (matchesShortcut('open', e)) {
         e.preventDefault();
         void openModel();
-      } else if (!inText && key === 'd') {
+      } else if (!inText && matchesShortcut('duplicate', e)) {
         e.preventDefault();
         const sel = activeStore?.getState().selection;
         if (sel?.source === 'tree' && sel.ids.length > 0) {
           const newIds = duplicateItems(sel.ids, activeStore);
           if (newIds.length) setSelection('tree', newIds, activeStore);
         }
-      } else if (!inText && key === 'z') {
+      } else if (!inText && matchesShortcut('undo', e)) {
         e.preventDefault();
-        if (e.shiftKey) redo(activeStore);
-        else undo(activeStore);
-      } else if (!inText && key === 'y') {
+        undo(activeStore);
+      } else if (!inText && (
+        matchesShortcut('redo', e) || matchesShortcut('redo-shift', e)
+      )) {
         e.preventDefault();
         redo(activeStore);
       }

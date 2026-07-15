@@ -21,8 +21,11 @@ export default defineConfig({
       manifest: webManifest,
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,ttf,webmanifest,archimate}'],
-        // Monaco's ts.worker chunk is ~7 MB; default cap is 2 MB.
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        globIgnores: [
+          '**/MonacoEditor-*.{js,css}',
+          '**/{css,editor,html,json,ts}.worker-*.js',
+        ],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       // Never register the SW against the dev server.
       devOptions: { enabled: false },

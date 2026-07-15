@@ -158,17 +158,22 @@ function ToolButton({
 }) {
   const modelStore = useModelStoreApi();
   const activeTool = useStore((s) => s.activeTool);
+  const hasEditableView = useStore(
+    (s) => Boolean(s.model && s.activeViewId && !s.readOnly),
+  );
+  const effectiveDisabled = disabled || !hasEditableView;
   const active = toolEq(activeTool, tool);
   const activate = (sticky: boolean) =>
     setActiveTool(setToolSticky(tool, sticky), modelStore);
   return (
     <button
-      className={'pal-btn' + (active ? ' active' : '') + (disabled ? ' palette-item-disabled' : '')}
-      title={title}
-      disabled={disabled}
+      className={'pal-btn' + (active ? ' active' : '') + (effectiveDisabled ? ' palette-item-disabled' : '')}
+      title={hasEditableView ? title : 'Open an editable view to use the palette'}
+      disabled={effectiveDisabled}
       aria-pressed={active}
+      data-tool-kind={tool.kind}
       data-profile-id={'profileId' in tool ? tool.profileId : undefined}
-      onClick={disabled ? undefined : (event) => {
+      onClick={effectiveDisabled ? undefined : (event) => {
         if (tool.kind === 'select') {
           setActiveTool({ kind: 'select' }, modelStore);
         } else if (event.shiftKey || event.detail > 1) {
@@ -182,7 +187,7 @@ function ToolButton({
           );
         }
       }}
-      onDoubleClick={disabled || tool.kind === 'select' ? undefined : (event) => {
+      onDoubleClick={effectiveDisabled || tool.kind === 'select' ? undefined : (event) => {
         event.preventDefault();
         activate(true);
       }}

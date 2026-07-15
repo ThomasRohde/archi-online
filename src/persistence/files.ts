@@ -4,7 +4,9 @@ import {
   parseArchimateDocument,
   serializeArchimateDocument,
 } from '../model/io/archimate-xml';
-import { isExchangeXml, parseExchange } from '../model/io/exchange-xml';
+import { isExchangeXml } from '../model/io/exchange-xml/detect';
+import { viewsInTreeOrder } from '../model/tree-order';
+import { openView } from '../model/store';
 import {
   activateModelSession,
   addModelSession,
@@ -27,6 +29,18 @@ function supportsOpenFsAccess(): boolean {
 
 function supportsSaveFsAccess(): boolean {
   return typeof window !== 'undefined' && 'showSaveFilePicker' in window;
+}
+
+function addLoadedModelSession(
+  model: Parameters<typeof addModelSession>[0]['model'],
+  fileName: string | null,
+  dirty: boolean,
+): ModelSessionId {
+  const sessionId = addModelSession({ model, fileName, dirty });
+  const firstViewId = viewsInTreeOrder(model)[0];
+  const session = getModelSession(sessionId);
+  if (firstViewId && session) openView(firstViewId, session.store);
+  return sessionId;
 }
 
 export async function openModelFromDisk(): Promise<ModelSessionId[]> {
@@ -111,18 +125,19 @@ export async function openModelFromHandle(handle: FileSystemFileHandle): Promise
   return sessionId;
 }
 
-export function loadModelText(
+export async function loadModelText(
   text: string,
   fileName: string,
-): { format: 'archimate' | 'exchange'; sessionId: ModelSessionId } {
+): Promise<{ format: 'archimate' | 'exchange'; sessionId: ModelSessionId }> {
   if (isExchangeXml(text)) {
     // Like desktop Archi, an Open Exchange file imports as a new, unsaved model.
+    const { parseExchange } = await import('../model/io/exchange-xml');
     const model = parseExchange(text);
-    const sessionId = addModelSession({ model, fileName: null, dirty: true });
+    const sessionId = addLoadedModelSession(model, null, true);
     return { format: 'exchange', sessionId };
   }
   const model = parseArchimate(text);
-  const sessionId = addModelSession({ model, fileName, dirty: false });
+  const sessionId = addLoadedModelSession(model, fileName, false);
   return { format: 'archimate', sessionId };
 }
 
@@ -132,12 +147,13 @@ export async function loadModelBytes(
 ): Promise<{ format: 'archimate' | 'exchange'; sessionId: ModelSessionId }> {
   const text = bytes[0] === 0x50 && bytes[1] === 0x4b ? '' : new TextDecoder().decode(bytes);
   if (text && isExchangeXml(text)) {
+    const { parseExchange } = await import('../model/io/exchange-xml');
     const model = parseExchange(text);
-    const sessionId = addModelSession({ model, fileName: null, dirty: true });
+    const sessionId = addLoadedModelSession(model, null, true);
     return { format: 'exchange', sessionId };
   }
   const model = await parseArchimateDocument(bytes);
-  const sessionId = addModelSession({ model, fileName, dirty: false });
+  const sessionId = addLoadedModelSession(model, fileName, false);
   return { format: 'archimate', sessionId };
 }
 

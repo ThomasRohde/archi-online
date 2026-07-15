@@ -33,6 +33,7 @@ async function render(element: React.ReactElement): Promise<{ host: HTMLDivEleme
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   replaceModel(createEmptyModel('Palette Test'), null);
+  openView(addView('Palette View'));
 });
 
 afterEach(() => {
@@ -40,9 +41,20 @@ afterEach(() => {
 });
 
 describe('Palette', () => {
+  it('disables every tool until an editable view is active', async () => {
+    useStore.setState({ activeViewId: null, openViewIds: [] });
+    const { host, root } = await render(createElement(Palette));
+    const buttons = [...host.querySelectorAll<HTMLButtonElement>('button')];
+
+    expect(buttons.length).toBeGreaterThan(10);
+    expect(buttons.every((button) => button.disabled)).toBe(true);
+    expect(buttons[0].title).toBe('Open an editable view to use the palette');
+    await act(async () => root.unmount());
+  });
+
   it('offers Format Painter with one-shot and sticky activation', async () => {
     const { host, root } = await render(createElement(Palette));
-    const button = host.querySelector<HTMLButtonElement>('button[title="Format Painter"]');
+    const button = host.querySelector<HTMLButtonElement>('button[data-tool-kind="format-painter"]');
 
     expect(button).not.toBeNull();
     await act(async () => button!.click());
@@ -60,15 +72,14 @@ describe('Palette', () => {
   });
 
   it('disables Format Painter in a read-only model session', async () => {
-    const store = createModelStore({
-      model: createEmptyModel('Read-only palette'),
-      readOnly: true,
-    });
+    const store = createModelStore({ model: createEmptyModel('Read-only palette') });
+    openView(addView('Read-only View', undefined, store), store);
+    store.setState({ readOnly: true });
     const { host, root } = await render(createElement(
       ModelStoreProvider,
       { store, children: createElement(Palette) },
     ));
-    const button = host.querySelector<HTMLButtonElement>('button[title="Format Painter"]');
+    const button = host.querySelector<HTMLButtonElement>('button[data-tool-kind="format-painter"]');
 
     expect(button?.disabled).toBe(true);
     await act(async () => button?.click());
@@ -214,6 +225,7 @@ describe('Palette', () => {
     const providerStore = createModelStore({ model: createEmptyModel('Provider') });
     const globalStore = createModelStore({ model: createEmptyModel('Global') });
     setActiveModelStore(globalStore);
+    openView(addView('Provider View', undefined, providerStore), providerStore);
     let root: Root | undefined;
     try {
       const rendered = await render(createElement(

@@ -4,6 +4,7 @@ import { getModelSession, addModelSession, resetWorkspaceForTests } from '../src
 import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
   loadModelBytes,
+  loadModelText,
   openModelFromDisk,
   openModelFromHandle,
   saveModelToDisk,
@@ -126,6 +127,15 @@ describe('file persistence', () => {
       .rejects.toThrow();
 
     expect(getModelSession(sessionId)?.fileHandle).toBe(handle);
+  });
+
+  it('keeps the text-loading compatibility boundary asynchronous', async () => {
+    const loading = loadModelText(serializeArchimate(createEmptyModel('Text load')), 'text.archimate');
+
+    expect(loading).toBeInstanceOf(Promise);
+    const result = await loading;
+    expect(result.format).toBe('archimate');
+    expect(getModelSession(result.sessionId)?.store.getState().fileName).toBe('text.archimate');
   });
 
   it('saves only the requested session through its own handle', async () => {

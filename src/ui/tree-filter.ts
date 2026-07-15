@@ -318,24 +318,48 @@ function compareCaseInsensitive(left: string, right: string): number {
   return 0;
 }
 
+const modelSearchCatalogCache = new WeakMap<ModelState, TreeSearchCatalog>();
+
+/** Collect model-derived choices once for each immutable model identity. */
+export function collectModelTreeSearchCatalog(model: ModelState): TreeSearchCatalog {
+  const cached = modelSearchCatalogCache.get(model);
+  if (cached) return cached;
+  const propertyKeys = new Set<string>();
+  const specializations = new Map<string, TreeSearchProfile>();
+
+  for (const owner of propertyOwners(model)) {
+    for (const property of owner.properties) {
+      if (property.key.trim()) propertyKeys.add(property.key);
+    }
+  }
+  for (const profile of Object.values(model.profiles)) {
+    const descriptor = { name: profile.name, conceptType: profile.conceptType };
+    const key = treeSearchProfileKey(descriptor);
+    if (!specializations.has(key)) specializations.set(key, descriptor);
+  }
+  const catalog = {
+    propertyKeys: [...propertyKeys].sort(compareCaseInsensitive),
+    specializations: [...specializations.values()].sort((left, right) =>
+      Number(isRelationshipType(left.conceptType)) - Number(isRelationshipType(right.conceptType))
+      || compareCaseInsensitive(left.name, right.name)
+      || (left.conceptType < right.conceptType ? -1 : Number(left.conceptType > right.conceptType))),
+  };
+  modelSearchCatalogCache.set(model, catalog);
+  return catalog;
+}
+
 /** Aggregate exact property keys and cross-model specialization descriptors. */
 export function collectTreeSearchCatalog(models: readonly ModelState[]): TreeSearchCatalog {
   const propertyKeys = new Set<string>();
   const specializations = new Map<string, TreeSearchProfile>();
-
   for (const model of models) {
-    for (const owner of propertyOwners(model)) {
-      for (const property of owner.properties) {
-        if (property.key.trim()) propertyKeys.add(property.key);
-      }
-    }
-    for (const profile of Object.values(model.profiles)) {
-      const descriptor = { name: profile.name, conceptType: profile.conceptType };
-      const key = treeSearchProfileKey(descriptor);
-      if (!specializations.has(key)) specializations.set(key, descriptor);
-    }
+    const catalog = collectModelTreeSearchCatalog(model);
+    catalog.propertyKeys.forEach((key) => propertyKeys.add(key));
+    catalog.specializations.forEach((profile) => {
+      const key = treeSearchProfileKey(profile);
+      if (!specializations.has(key)) specializations.set(key, profile);
+    });
   }
-
   return {
     propertyKeys: [...propertyKeys].sort(compareCaseInsensitive),
     specializations: [...specializations.values()].sort((left, right) =>

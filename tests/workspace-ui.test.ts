@@ -261,4 +261,39 @@ describe('multi-model tree', () => {
     expect(query.value).toBe('After');
     expect(host.querySelector(`[data-model-session-id="${sessionId}"]`)).not.toBeNull();
   });
+
+  it('exposes tree semantics and roving keyboard focus', async () => {
+    const sessionId = addModelSession({ model: createEmptyModel('Keyboard'), fileName: null });
+    const session = getModelSession(sessionId)!;
+    await act(async () => root.render(createElement(ModelTree)));
+
+    const tree = host.querySelector<HTMLElement>('[role="tree"]')!;
+    const items = [...tree.querySelectorAll<HTMLElement>('[role="treeitem"]')];
+    expect(items[0].getAttribute('aria-level')).toBe('1');
+    expect(items[0].getAttribute('aria-expanded')).toBe('true');
+    expect(items.filter((item) => item.tabIndex === 0)).toHaveLength(1);
+
+    await act(async () => {
+      items[0].focus();
+      items[0].dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+    expect(document.activeElement).toBe(items[1]);
+    expect(items[1].tabIndex).toBe(0);
+    expect(session.store.getState().selection).toEqual({
+      source: 'tree',
+      ids: [items[1].dataset.treeId],
+    });
+  });
+
+  it('keeps a large model tree DOM bounded to the visible window plus overscan', async () => {
+    addModelSession({ model: createEmptyModel('Large tree'), fileName: null });
+    for (let index = 0; index < 180; index++) {
+      addElement('BusinessActor', `Actor ${String(index).padStart(3, '0')}`);
+    }
+    await act(async () => root.render(createElement(ModelTree)));
+
+    expect(host.querySelectorAll('[role="treeitem"]').length).toBeLessThanOrEqual(40);
+    expect(host.querySelector('.model-tree-session.virtualized')).not.toBeNull();
+  });
 });

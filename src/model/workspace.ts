@@ -5,6 +5,7 @@ import {
   resetEmptyModelStore,
   setActiveModelStore,
   type ModelStore,
+  type ViewViewport,
 } from './store';
 import type { ModelState } from './types';
 
@@ -59,6 +60,7 @@ export interface AddModelSessionOptions {
   fileHandle?: FileSystemFileHandle | null;
   openViewIds?: string[];
   activeViewId?: string | null;
+  viewportsByViewId?: Record<string, ViewViewport>;
 }
 
 export interface WorkspaceState {
@@ -93,6 +95,7 @@ export function addModelSession(options: AddModelSessionOptions): ModelSessionId
     readOnly: options.readOnly ?? false,
     openViewIds: options.openViewIds ?? [],
     activeViewId: options.activeViewId ?? null,
+    viewportsByViewId: options.viewportsByViewId ?? {},
   });
   openWorkspaceLease(store);
   const session: ModelSession = {

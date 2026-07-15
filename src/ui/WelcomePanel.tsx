@@ -1,8 +1,9 @@
 import { parseArchimateDocument } from '../model/io/archimate-xml';
 import { addView } from '../model/ops';
 import { openView } from '../model/store';
+import { viewsInTreeOrder } from '../model/tree-order';
 import { useStore } from './store-hooks';
-import { addModelSession, type ModelSessionId } from '../model/workspace';
+import { addModelSession, getModelSession, type ModelSessionId } from '../model/workspace';
 import { showAlertDialog } from './AppDialog';
 import { newModel, openModel } from './Toolbar';
 
@@ -11,7 +12,11 @@ export async function loadExampleModel(
 ): Promise<ModelSessionId> {
   const res = await fetch(import.meta.env.BASE_URL + `examples/${fileName}`);
   const model = await parseArchimateDocument(new Uint8Array(await res.arrayBuffer()));
-  return addModelSession({ model, fileName, dirty: false });
+  const sessionId = addModelSession({ model, fileName, dirty: false });
+  const firstViewId = viewsInTreeOrder(model)[0];
+  const session = getModelSession(sessionId);
+  if (firstViewId && session) openView(firstViewId, session.store);
+  return sessionId;
 }
 
 function errorMessage(error: unknown): string {

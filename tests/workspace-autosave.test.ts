@@ -54,6 +54,11 @@ describe('workspace autosave', () => {
     });
     const firstViewId = addView('First View');
     openView(firstViewId, getModelSession(firstId)?.store);
+    getModelSession(firstId)?.store.setState({
+      viewportsByViewId: {
+        [firstViewId]: { zoom: 0.75, x: 31, y: 47 },
+      },
+    });
     const secondId = addModelSession({
       model: createEmptyModel('Second'),
       fileName: 'second.archimate',
@@ -73,6 +78,9 @@ describe('workspace autosave', () => {
       dirty: true,
       openViewIds: [firstViewId],
       activeViewId: firstViewId,
+      viewportsByViewId: {
+        [firstViewId]: { zoom: 0.75, x: 31, y: 47 },
+      },
     });
     expect(getModelSession(secondId)?.store.getState()).toMatchObject({
       fileName: 'second.archimate',

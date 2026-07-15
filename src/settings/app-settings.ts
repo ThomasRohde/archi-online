@@ -20,6 +20,7 @@ import { defaultKeyValueStore, type AsyncKeyValueStore } from '../persistence/ke
 export const SETTINGS_STORAGE_KEY = 'archi-online.settings.v1';
 
 export interface AppSettings {
+  themeMode: ThemeMode;
   addDocumentationNoteOnRelationChange: boolean;
   treeSearchName: boolean;
   treeSearchDocumentation: boolean;
@@ -73,6 +74,7 @@ export interface AppSettings {
 }
 
 export type SettingKey = keyof AppSettings;
+export type ThemeMode = 'system' | 'light' | 'dark';
 export type TextAlignment = 1 | 2 | 4;
 export type TextPosition = 0 | 1 | 2;
 export type AnchorMode = 'first' | 'last';
@@ -124,6 +126,7 @@ export interface SettingSection {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  themeMode: 'system',
   addDocumentationNoteOnRelationChange: false,
   treeSearchName: true,
   treeSearchDocumentation: false,
@@ -180,6 +183,17 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
     title: 'General',
     description: 'General modeling behavior.',
     rows: [
+      {
+        key: 'themeMode',
+        kind: 'string-select',
+        label: 'Application theme',
+        description: 'Follow the operating system theme or use an explicit light or dark theme.',
+        options: [
+          { value: 'system', label: 'System' },
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ],
+      },
       {
         key: 'addDocumentationNoteOnRelationChange',
         kind: 'boolean',

@@ -16,6 +16,7 @@ interface Constraints {
 
 interface Group {
   id: string;
+  activePanelId?: string;
   constraints?: Constraints;
   api: { setConstraints: (value: Constraints) => void };
 }
@@ -57,6 +58,7 @@ function createDockApi() {
         panel.position?.direction === 'within' && reference?.group
           ? reference.group
           : makeGroup();
+      panel.group.activePanelId = panel.id;
       added.push(panel);
       activePanelId = panel.id;
     },
@@ -74,6 +76,7 @@ function createDockApi() {
           },
           setSize: () => undefined,
           setActive: () => {
+            if (panel.group) panel.group.activePanelId = id;
             activePanelId = id;
           },
           moveTo: (options: { group: Group; skipSetActive?: boolean }) => {
@@ -103,18 +106,27 @@ describe('dock layout config', () => {
     expect(parseViewPanelId('welcome')).toBeNull();
   });
 
-  it('places Properties with the Scripting panel by default', () => {
+  it('starts with Models and Palette on the left and Properties and Settings on the right', () => {
     const { api, added } = createDockApi();
 
     buildDefaultLayout(api as never);
 
     const scripts = added.find((panel) => panel.id === 'scripts');
+    const models = added.find((panel) => panel.id === 'models');
+    const palette = added.find((panel) => panel.id === 'palette');
     const properties = added.find((panel) => panel.id === 'properties');
     const settings = added.find((panel) => panel.id === 'settings');
 
-    expect(scripts?.position).toEqual({ referencePanel: 'welcome', direction: 'below' });
-    expect(properties?.position).toEqual({ referencePanel: 'scripts', direction: 'within' });
-    expect(settings?.position).toEqual({ referencePanel: 'welcome', direction: 'right' });
+    expect(scripts).toBeUndefined();
+    expect(added.find((panel) => panel.id === 'extensions')).toBeUndefined();
+    expect(palette?.position).toEqual({ referencePanel: 'models', direction: 'within' });
+    expect(palette?.group).toBe(models?.group);
+    expect(properties?.position).toEqual({ referencePanel: 'welcome', direction: 'right' });
+    expect(settings?.position).toEqual({ referencePanel: 'properties', direction: 'within' });
+    expect(settings?.group).toBe(properties?.group);
+    expect(models?.group?.activePanelId).toBe('models');
+    expect(properties?.group?.activePanelId).toBe('properties');
+    expect(api.activePanel?.id).toBe('properties');
   });
 
   it('pins the Welcome panel with the non-closeable Home tab', () => {
@@ -136,8 +148,8 @@ describe('dock layout config', () => {
     applySidePanelConstraints(api as never);
 
     expect(api.getPanel('palette')?.api.group?.constraints).toEqual({
-      minimumWidth: 60,
-      maximumWidth: 160,
+      minimumWidth: 180,
+      maximumWidth: 460,
     });
     expect(api.getPanel('models')?.api.group?.constraints).toEqual({
       minimumWidth: 180,
@@ -166,7 +178,27 @@ describe('dock layout config', () => {
       direction: 'within',
     });
     expect(api.panels.find((panel) => panel.id === 'settings')?.position).toEqual({
-      direction: 'right',
+      referencePanel: 'properties',
+      direction: 'within',
+    });
+  });
+
+  it('reopens Palette with Models and Settings with Properties', () => {
+    const { api, added } = createDockApi();
+
+    api.addPanel({ id: 'models', component: 'models', title: 'Models' });
+    api.addPanel({ id: 'properties', component: 'properties', title: 'Properties' });
+
+    TOOL_PANELS.find((panel) => panel.id === 'palette')!.add(api as never);
+    TOOL_PANELS.find((panel) => panel.id === 'settings')!.add(api as never);
+
+    expect(added.find((panel) => panel.id === 'palette')?.position).toEqual({
+      referencePanel: 'models',
+      direction: 'within',
+    });
+    expect(added.find((panel) => panel.id === 'settings')?.position).toEqual({
+      referencePanel: 'properties',
+      direction: 'within',
     });
   });
 
@@ -235,6 +267,7 @@ describe('dock layout config', () => {
     const { api, added } = createDockApi();
 
     buildDefaultLayout(api as never);
+    TOOL_PANELS.find((panel) => panel.id === 'scripts')!.add(api as never);
     TOOL_PANELS.find((panel) => panel.id === 'validator')!.add(api as never);
 
     const validator = added.find((panel) => panel.id === 'validator');

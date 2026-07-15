@@ -36,9 +36,11 @@ static file server.
 
 When Archi Online is served from a production build, supported browsers can
 install it as a standalone app. After the first load, the service worker
-precaches the app shell, hashed build assets, workers, examples, icons, and
-manifest so the editor can launch offline. Your models still live in files or
-browser storage on the current machine; nothing is uploaded by installation.
+precaches the app shell, core hashed build assets, the autosave worker,
+examples, icons, and manifest so the editor can launch offline. The Monaco
+editor and language workers enter a runtime cache after their first successful
+load, keeping them out of the initial precache. Your models still live in files
+or browser storage on the current machine; nothing is uploaded by installation.
 
 On browsers and operating systems that expose the relevant PWA features, the
 installed app also provides:
@@ -82,7 +84,10 @@ That file opens directly in desktop Archi — see
 
 - **Open…** (`Ctrl+O`) adds one or more `.archimate` files, including models
   created with desktop Archi. It also accepts ArchiMate Open Exchange `.xml`
-  files and imports them as new, unsaved models.
+  files and imports them as new, unsaved models. After a disk, installed-app,
+  share-target, Exchange, or example import, the first view in the model tree
+  opens automatically. Blank new models and restored workspaces whose saved
+  open-view list is empty remain viewless.
 - **Save** (`Ctrl+S`) writes back to the file you opened when the browser
   supports the File System Access API. Otherwise — or when browser policy
   blocks file handles — the app saves via a regular download. Saving always
@@ -93,6 +98,11 @@ The Models panel shows every open model as a separate root and marks dirty
 models with `*`. Toolbar commands and the status area follow the active model.
 Right-click a model root to save or close that model; dirty closes offer Save,
 Don't Save, and Cancel.
+
+Each view keeps its own zoom and pan position in the browser workspace. The
+first time a view opens, it remains at 100% with a 20 px offset when the diagram
+already fits; an oversized diagram is fitted once when its canvas becomes
+visible. Saved viewport positions restore independently in each model session.
 
 ## Where your work lives
 

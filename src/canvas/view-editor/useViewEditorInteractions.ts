@@ -59,6 +59,7 @@ import {
 import { showContextMenu } from '../../ui/ContextMenu';
 import { requestNestingChange } from '../../ui/automatic-relationships';
 import { requestConnectionReconnection } from '../../ui/connection-reconnection';
+import { matchesShortcut } from '../../ui/shortcuts';
 import { copyNodes, cutNodes, pasteNodes } from '../clipboard';
 import {
   closestSegment,
@@ -1120,7 +1121,7 @@ export function useViewEditorInteractions({
     if (!model || edit) return;
     const sel = modelStore.getState().selection;
     const viewSel = sel.source === 'view' ? sel.ids : [];
-    if (e.key === 'Escape') {
+    if (matchesShortcut('cancel', e)) {
       const pointerId = activePointerIdRef.current;
       if (pointerId === null) clearInteraction();
       else cancelPointerInteraction(pointerId);
@@ -1128,57 +1129,57 @@ export function useViewEditorInteractions({
       setSelection('view', []);
       return;
     }
-    if (e.key === 'Delete' && viewSel.length > 0) {
+    if (matchesShortcut('delete', e) && viewSel.length > 0) {
       e.preventDefault();
       e.stopPropagation();
       deleteViewObjects(viewSel, modelStore);
       return;
     }
-    if (e.key === 'F2' && viewSel.length === 1) {
+    if (matchesShortcut('rename', e) && viewSel.length === 1) {
       startEdit(viewSel[0]);
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+    if (matchesShortcut('select-all', e)) {
       e.preventDefault();
       setSelection('view', [...absBounds.keys()]);
       return;
     }
-    if (e.key === 'Home') {
+    if (matchesShortcut('fit-view', e)) {
       e.preventDefault();
       fitToView();
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+    if (matchesShortcut('zoom-reset', e)) {
       e.preventDefault();
       zoomTo(1);
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+    if (matchesShortcut('zoom-in', e) || ((e.ctrlKey || e.metaKey) && e.key === '+')) {
       e.preventDefault();
       zoomBy(settings.buttonZoomFactor);
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+    if (matchesShortcut('zoom-out', e)) {
       e.preventDefault();
       zoomBy(1 / settings.buttonZoomFactor);
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && viewSel.length > 0) {
+    if (matchesShortcut('copy', e) && viewSel.length > 0) {
       copyNodes(viewSel, modelStore, sessionId);
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x' && viewSel.length > 0) {
+    if (matchesShortcut('cut', e) && viewSel.length > 0) {
       e.preventDefault();
       const cutIds = cutNodes(viewSel, modelStore, sessionId);
       if (cutIds.length > 0) setSelection('view', []);
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+    if (matchesShortcut('paste', e)) {
       const ids = pasteNodes(viewId, undefined, modelStore, sessionId);
       if (ids.length > 0) setSelection('view', ids);
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && viewSel.length > 0) {
+    if (matchesShortcut('duplicate', e) && viewSel.length > 0) {
       e.preventDefault();
       e.stopPropagation();
       const ids = duplicateViewObjects(viewId, viewSel, settings.pasteOffset, modelStore);

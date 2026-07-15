@@ -11,6 +11,8 @@ import { useModelStoreApi, useStore } from '../ui/store-hooks';
 import { getActiveModelSession, getModelSessionForStore } from '../model/workspace';
 import type { Bounds } from '../model/types';
 import { setCanvasStatus } from '../ui/canvas-status';
+import { matchesShortcut } from '../ui/shortcuts';
+import { createFrameThrottle } from '../ui/frame-throttle';
 import { useSettingsStore } from '../settings/app-settings';
 import { ConnectionView } from './ConnectionView';
 import { evaluateLabelExpression } from '../model/label-expression';
@@ -36,6 +38,11 @@ import {
 import { useCanvasViewport } from './view-editor/useCanvasViewport';
 import { useViewEditorInteractions } from './view-editor/useViewEditorInteractions';
 import { copyNodes, cutNodes } from './clipboard';
+import { evaluateCachedLabelExpression } from './view-editor/label-cache';
+import {
+  createNodeInteractionVersions,
+  stableRoutePoints,
+} from './view-editor/live-render';
 import {
   showEmptyCanvasContextMenu,
   showViewObjectContextMenu,
@@ -113,6 +120,10 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   const pasteOffset = settings.pasteOffset;
   const svgRef = useRef<SVGSVGElement>(null);
   const gridPatternId = `view-grid-${useId().replace(/:/g, '')}`;
+  const stableRoutesRef = useRef(new Map<string, Point[]>());
+  const cursorPublisherRef = useRef(
+    createFrameThrottle((point: Point) => setCanvasStatus({ x: point.x, y: point.y })),
+  );
 
   const view = model?.views[viewId];
   const absBounds = useMemo(
@@ -123,8 +134,14 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     () => (model ? Object.values(model.connections).filter((c) => c.viewId === viewId) : []),
     [model, viewId],
   );
+  const isConnectionVisible = useMemo(
+    () => model
+      ? createNestedConnectionVisibilityResolver(model, settings)
+      : () => false,
+    [model, settings],
+  );
 
-  const viewportApi = useCanvasViewport(viewId, svgRef, absBounds);
+  const viewportApi = useCanvasViewport(viewId, svgRef, absBounds, modelStore);
   const { viewport, setViewport, toView, zoomTo, zoomBy, fitToView, spaceHeld, spaceRef } =
     viewportApi;
   const {
@@ -161,6 +178,8 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     if (isActive) setCanvasStatus({ zoom: viewport.zoom });
   }, [isActive, viewport.zoom]);
 
+  useEffect(() => () => cursorPublisherRef.current.cancel(), []);
+
   useEffect(() => {
     if (!isActive) return;
     const onWindowKeyDown = (event: KeyboardEvent) => {
@@ -180,10 +199,10 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
       if (state.readOnly || state.selection.source !== 'view' || state.selection.ids.length === 0) {
         return;
       }
-      if (event.key === 'Delete') {
+      if (matchesShortcut('delete', event)) {
         event.preventDefault();
         deleteViewObjects(state.selection.ids, modelStore);
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+      } else if (matchesShortcut('duplicate', event)) {
         event.preventDefault();
         const ids = duplicateViewObjects(
           viewId,
@@ -192,7 +211,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
           modelStore,
         );
         if (ids.length > 0) setSelection('view', ids, modelStore);
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x') {
+      } else if (matchesShortcut('cut', event)) {
         event.preventDefault();
         const cutIds = cutNodes(
           state.selection.ids,
@@ -214,11 +233,12 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     handlers.onPointerMove(e);
     if (isActive) {
       const p = toView(e.clientX, e.clientY);
-      setCanvasStatus({ x: p.x, y: p.y });
+      cursorPublisherRef.current.push(p);
     }
   };
   const onCanvasPointerLeave = () => {
     handlers.onPointerLeave();
+    cursorPublisherRef.current.cancel();
     setCanvasStatus({ x: null, y: null });
   };
 
@@ -230,6 +250,14 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     absBounds,
     inter,
   );
+  const interactionVersions = createNodeInteractionVersions(model, {
+    moveDelta,
+    resize: resizeOverride,
+    dropParentId,
+    connectSourceId:
+      inter.kind === 'connect' && model.nodes[inter.sourceId] ? inter.sourceId : null,
+    connectHover,
+  });
   const viewSelected = selection.source === 'view' ? new Set(selection.ids) : new Set<string>();
   // The element Align / Match Size snap the rest of the selection to. Only
   // meaningful when ≥ 2 alignable nodes are selected (matches the ops).
@@ -244,7 +272,6 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     singleSelected && model.nodes[singleSelected] ? singleSelected : null;
   const selectedConnectionCandidate = singleSelected ? model.connections[singleSelected] : undefined;
   const editNodeAbs = edit ? liveAbs.get(edit.nodeId) : undefined;
-  const isConnectionVisible = createNestedConnectionVisibilityResolver(model, settings);
   const selectedConnection =
     selectedConnectionCandidate && isConnectionVisible(selectedConnectionCandidate.id)
       ? selectedConnectionCandidate
@@ -317,6 +344,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
                 inter.kind === 'connect' && model.nodes[inter.sourceId] ? inter.sourceId : null
               }
               connectHover={connectHover}
+              interactionVersions={interactionVersions}
               anchorId={anchorId}
               c4ViewType={activeC4ViewType}
               viewpoint={view.viewpoint}
@@ -324,8 +352,10 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
           ))}
           <g>
             {connections.map((conn) => {
-              const points = routes(conn.id);
-              if (!points) return null;
+              const nextPoints = routes(conn.id);
+              if (!nextPoints) return null;
+              const points = stableRoutePoints(stableRoutesRef.current.get(conn.id), nextPoints);
+              stableRoutesRef.current.set(conn.id, points);
               const displayConnection = previewConnections.get(conn.id) ?? conn;
               return (
                 <ConnectionView
@@ -338,7 +368,14 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
                   ghosted={
                     isConnectableGhosted(model, conn.id, view.viewpoint)
                   }
-                  displayLabel={conn.labelExpression !== undefined ? evaluateLabelExpression(model, conn.id, conn.labelExpression).text : undefined}
+                  displayLabel={conn.labelExpression !== undefined
+                    ? evaluateCachedLabelExpression(
+                        model,
+                        conn.id,
+                        conn.labelExpression,
+                        evaluateLabelExpression,
+                      ).text
+                    : undefined}
                 />
               );
             })}
@@ -415,6 +452,8 @@ function ReadOnlyViewEditor({
     originY: number;
   } | null>(null);
   const emptyMoveDelta = useMemo(() => new Map<string, Point>(), []);
+  const emptyInteractionVersions = useMemo(() => new Map<string, string>(), []);
+  const stableRoutesRef = useRef(new Map<string, Point[]>());
 
   const view = model?.views[viewId];
   const absBounds = useMemo(
@@ -425,21 +464,31 @@ function ReadOnlyViewEditor({
     () => (model ? Object.values(model.connections).filter((c) => c.viewId === viewId) : []),
     [model, viewId],
   );
+  const isConnectionVisible = useMemo(
+    () => model
+      ? createNestedConnectionVisibilityResolver(model, settings)
+      : () => false,
+    [model, settings],
+  );
+  const routes = useMemo(
+    () => model
+      ? createConnectionRouteResolver(model, absBounds, {
+          isVisible: isConnectionVisible,
+        })
+      : null,
+    [absBounds, isConnectionVisible, model],
+  );
   const { viewport, setViewport, toView, zoomTo, zoomBy, fitToView } = useCanvasViewport(
     viewId,
     svgRef,
     absBounds,
+    modelStore,
   );
 
-  if (!model || !view) return null;
+  if (!model || !view || !routes) return null;
 
   const activeC4ViewType = c4ViewType(view);
   const viewSelected = selection.source === 'view' ? new Set(selection.ids) : new Set<string>();
-  const isConnectionVisible = createNestedConnectionVisibilityResolver(model, settings);
-  const routes = createConnectionRouteResolver(model, absBounds, {
-    isVisible: isConnectionVisible,
-  });
-
   const stopPan = (pointerId: number, target: SVGSVGElement) => {
     if (panRef.current?.pointerId !== pointerId) return;
     panRef.current = null;
@@ -529,7 +578,7 @@ function ReadOnlyViewEditor({
           });
         }}
         onKeyDown={(event) => {
-          if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'c') return;
+          if (!matchesShortcut('copy', event)) return;
           const current = modelStore.getState().selection;
           if (current.source !== 'view' || current.ids.length === 0) return;
           event.preventDefault();
@@ -550,14 +599,17 @@ function ReadOnlyViewEditor({
               dropParentId={null}
               connectSource={null}
               connectHover={null}
+              interactionVersions={emptyInteractionVersions}
               c4ViewType={activeC4ViewType}
               viewpoint={view.viewpoint}
             />
           ))}
           <g>
             {connections.map((conn) => {
-              const points = routes(conn.id);
-              if (!points) return null;
+              const nextPoints = routes(conn.id);
+              if (!nextPoints) return null;
+              const points = stableRoutePoints(stableRoutesRef.current.get(conn.id), nextPoints);
+              stableRoutesRef.current.set(conn.id, points);
               return (
                 <ConnectionView
                   key={conn.id}
@@ -569,7 +621,14 @@ function ReadOnlyViewEditor({
                   ghosted={
                     isConnectableGhosted(model, conn.id, view.viewpoint)
                   }
-                  displayLabel={conn.labelExpression !== undefined ? evaluateLabelExpression(model, conn.id, conn.labelExpression).text : undefined}
+                  displayLabel={conn.labelExpression !== undefined
+                    ? evaluateCachedLabelExpression(
+                        model,
+                        conn.id,
+                        conn.labelExpression,
+                        evaluateLabelExpression,
+                      ).text
+                    : undefined}
                 />
               );
             })}
