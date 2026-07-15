@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-15
+
+### Added
+
+- Per-view viewport persistence, deterministic first-view opening for imports,
+  and one-time fitting for diagrams larger than the visible canvas
+- A fixed-row virtualized model tree with accessible tree semantics, roving
+  keyboard focus, indexed reveal, deferred search, and bounded rendering for
+  large models
+- Reusable accessible modal behavior, a typed shortcut registry, and complete
+  system, light, and dark application themes while preserving white diagrams
+- Worker-backed autosave serialization with idle fallback and runtime caching
+  for lazily loaded Monaco assets
+
+### Changed
+
+- Isolated live canvas rendering with memoized node and connection projections,
+  stable route data, cached label expressions, and benchmark coverage for large
+  diagrams
+- Split Exchange XML, TIFF conversion, and editor code from the initial bundle
+  through boundary-level dynamic imports
+- Improved the fresh dock layout, palette disabled state, focus indicators,
+  contrast tokens, and animation-frame-throttled canvas status coordinates
+
 ## [1.5.1] - 2026-07-14
 
 ### Changed

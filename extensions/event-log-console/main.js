@@ -1,7 +1,7 @@
 app.extension({
   id: 'examples.event-log-console',
   name: 'Event Log Console',
-  version: '1.5.1'
+  version: '1.6.0'
 });
 
 var config = app.assets.json('data/events.json');
