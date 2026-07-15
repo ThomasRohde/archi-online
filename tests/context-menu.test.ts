@@ -1,7 +1,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ContextMenuHost, showContextMenu } from '../src/ui/ContextMenu';
+import { ContextMenuHost, showContextMenu, type MenuItem } from '../src/ui/ContextMenu';
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -45,6 +45,30 @@ function focusedMenuItem(label: string): HTMLElement {
 }
 
 describe('ContextMenuHost', () => {
+  it('resolves lazy submenu children only when the submenu opens', async () => {
+    const childFactory = vi.fn(() => [
+      { label: 'Deferred child', onClick: vi.fn() },
+    ] satisfies MenuItem[]);
+    const items = [
+      { label: 'Deferred parent', children: childFactory },
+    ] satisfies MenuItem[];
+    const { host, root } = await render(createElement(ContextMenuHost));
+
+    await act(async () => showContextMenu(20, 20, items));
+
+    expect(childFactory).not.toHaveBeenCalled();
+    const parent = menuItem('Deferred parent');
+    await act(async () => {
+      parent.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    });
+
+    expect(childFactory).toHaveBeenCalledOnce();
+    expect(menuItem('Deferred child')).toBeDefined();
+
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
   it('renders nested menus outside the parent menu so toolbar submenus stay selectable', async () => {
     const onContainer = vi.fn();
     const { host, root } = await render(createElement(ContextMenuHost));

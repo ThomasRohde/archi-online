@@ -29,8 +29,44 @@ export function conceptTransformationMenuItems(
   const elementIds = conceptIds.filter((id) => Boolean(model.elements[id]));
   const relationshipIds = conceptIds.filter((id) => Boolean(model.relationships[id]));
   const items: MenuItem[] = [];
-  const typeChildren: MenuItem[] = [];
+  const canChangeElementType = elementIds.length > 0 && elementIds.every(
+    (id) => model.elements[id]?.type !== 'Junction',
+  );
+  if (canChangeElementType || relationshipIds.length > 0) {
+    items.push({
+      label: 'Set Concept Type',
+      disabled: store.getState().readOnly,
+      children: () => conceptTypeChildren(model, elementIds, relationshipIds, store, settings),
+    });
+  }
 
+  if (relationshipIds.length > 0) {
+    const inversion = analyzeRelationshipInversion(model, { ids: relationshipIds });
+    items.push({
+      label: 'Invert Connection Direction',
+      disabled: store.getState().readOnly || !inversion.valid,
+      onClick: () => {
+        const current = store.getState().model;
+        if (!current) return;
+        applyRelationshipInversion(
+          analyzeRelationshipInversion(current, { ids: relationshipIds }),
+          store,
+        );
+      },
+    });
+  }
+
+  return items;
+}
+
+function conceptTypeChildren(
+  model: ModelState,
+  elementIds: string[],
+  relationshipIds: string[],
+  store: ModelStore,
+  settings: AppSettings,
+): MenuItem[] {
+  const typeChildren: MenuItem[] = [];
   if (elementIds.length > 0) {
     const layerMenus = LAYERS.flatMap((layer) => {
       const children = ELEMENT_TYPES
@@ -80,31 +116,7 @@ export function conceptTransformationMenuItems(
       typeChildren.push(...relationshipTypeItems);
     }
   }
-  if (typeChildren.length > 0) {
-    items.push({
-      label: 'Set Concept Type',
-      disabled: store.getState().readOnly,
-      children: typeChildren,
-    });
-  }
-
-  if (relationshipIds.length > 0) {
-    const inversion = analyzeRelationshipInversion(model, { ids: relationshipIds });
-    items.push({
-      label: 'Invert Connection Direction',
-      disabled: store.getState().readOnly || !inversion.valid,
-      onClick: () => {
-        const current = store.getState().model;
-        if (!current) return;
-        applyRelationshipInversion(
-          analyzeRelationshipInversion(current, { ids: relationshipIds }),
-          store,
-        );
-      },
-    });
-  }
-
-  return items;
+  return typeChildren;
 }
 
 async function performConceptTypeChange(

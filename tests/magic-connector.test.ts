@@ -377,10 +377,10 @@ describe('Magic Connector existing targets', () => {
       analyze(f.store.getState().model!, existingInput(f)),
       () => undefined,
     );
-    const assignment = menu[0].children?.find((item) => item.label === 'Assignment');
+    const assignment = menuChildren(menu[0]).find((item) => item.label === 'Assignment');
 
     expect(menu.map((item) => item.label)).toEqual(['Forward', 'Reverse']);
-    expect(assignment?.children?.filter((item) => !item.separator).map((item) => item.label)).toEqual([
+    expect(menuChildren(assignment).filter((item) => !item.separator).map((item) => item.label)).toEqual([
       'Reuse Carries work',
       'New Assignment',
     ]);
@@ -522,15 +522,14 @@ describe('Magic Connector target creation', () => {
       'Course of Action',
     ];
     expect(
-      relationshipFirst
-        .find((item) => item.label === 'Association')
-        ?.children?.find((item) => item.label === 'Strategy')
-        ?.children?.map((item) => item.label),
+      menuChildren(
+        menuChildren(relationshipFirst.find((item) => item.label === 'Association'))
+          .find((item) => item.label === 'Strategy'),
+      ).map((item) => item.label),
     ).toEqual(expectedStrategyOrder);
     expect(
-      elementFirst
-        .find((item) => item.label === 'Strategy')
-        ?.children?.map((item) => item.label),
+      menuChildren(elementFirst.find((item) => item.label === 'Strategy'))
+        .map((item) => item.label),
     ).toEqual(expectedStrategyOrder);
   });
 
@@ -733,3 +732,8 @@ describe('Magic Connector target creation', () => {
     });
   });
 });
+
+function menuChildren(item: MenuItem | undefined): MenuItem[] {
+  if (typeof item?.children === 'function') return item.children();
+  return item?.children ?? [];
+}

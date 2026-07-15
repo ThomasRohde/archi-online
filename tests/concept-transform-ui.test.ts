@@ -50,6 +50,33 @@ afterEach(async () => {
 });
 
 describe('concept transformation context menus', () => {
+  it('defers concept type analysis until the submenu is opened', () => {
+    const store = createModelStore({ model: createEmptyModel('Lazy menu'), fileName: null });
+    const actorId = addElement('BusinessActor', 'Actor', undefined, store);
+    const cloneSpy = vi.spyOn(globalThis, 'structuredClone');
+
+    try {
+      const items = conceptTransformationMenuItems(
+        store.getState().model!,
+        [actorId],
+        store,
+        DEFAULT_SETTINGS,
+      );
+      const typeMenu = items.find((item) => item.label === 'Set Concept Type');
+      const childSource = typeMenu?.children as MenuItem[] | (() => MenuItem[]) | undefined;
+
+      expect(typeMenu).toBeDefined();
+      expect(cloneSpy).not.toHaveBeenCalled();
+      expect(typeof childSource).toBe('function');
+      if (typeof childSource !== 'function') return;
+
+      expect(childSource()).not.toHaveLength(0);
+      expect(cloneSpy).toHaveBeenCalled();
+    } finally {
+      cloneSpy.mockRestore();
+    }
+  });
+
   it('offers Set Concept Type for canvas concept occurrences', async () => {
     const store = createModelStore({ model: createEmptyModel('Canvas'), fileName: null });
     const actorId = addElement('BusinessActor', 'Actor', undefined, store);
@@ -131,7 +158,7 @@ describe('concept transformation context menus', () => {
       DEFAULT_SETTINGS,
     );
     const typeMenu = items.find((item) => item.label === 'Set Concept Type')!;
-    const labels = typeMenu.children?.map((item) => item.label) ?? [];
+    const labels = resolveChildren(typeMenu).map((item) => item.label);
 
     expect(labels).toContain('Association');
     expect(labels).not.toContain('Access');
@@ -180,7 +207,7 @@ describe('concept transformation context menus', () => {
       DEFAULT_SETTINGS,
     );
     const typeMenu = items.find((item) => item.label === 'Set Concept Type')!;
-    const labels = typeMenu.children?.map((item) => item.label) ?? [];
+    const labels = resolveChildren(typeMenu).map((item) => item.label);
 
     expect(labels).not.toContain('Assignment');
     expect(labels).toContain('Association');
@@ -260,8 +287,13 @@ describe('concept transformation context menus', () => {
 
 function businessObjectAction(items: MenuItem[]): MenuItem {
   const typeMenu = items.find((item) => item.label === 'Set Concept Type');
-  const businessMenu = typeMenu?.children?.find((item) => item.label === 'Business');
-  const action = businessMenu?.children?.find((item) => item.label === 'Business Object');
+  const businessMenu = resolveChildren(typeMenu).find((item) => item.label === 'Business');
+  const action = resolveChildren(businessMenu).find((item) => item.label === 'Business Object');
   if (!action) throw new Error('Business Object type action is missing');
   return action;
+}
+
+function resolveChildren(item: MenuItem | undefined): MenuItem[] {
+  if (typeof item?.children === 'function') return item.children();
+  return item?.children ?? [];
 }

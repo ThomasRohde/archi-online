@@ -18,7 +18,7 @@ export interface MenuItem {
   disabled?: boolean;
   danger?: boolean;
   onClick?: () => void;
-  children?: MenuItem[];
+  children?: MenuItem[] | (() => MenuItem[]);
   separator?: boolean;
 }
 
@@ -97,6 +97,11 @@ function nextEnabledItemIndex(items: MenuItem[], current: number, direction: 1 |
   return -1;
 }
 
+function resolveMenuChildren(item: MenuItem): MenuItem[] {
+  if (typeof item.children === 'function') return item.children();
+  return item.children ?? [];
+}
+
 type FocusableElement = Element & { focus: () => void };
 
 function isFocusableElement(element: Element | null): element is FocusableElement {
@@ -143,9 +148,11 @@ function MenuList({
     const item = items[index];
     const element = itemRefs.current[index];
     if (!item?.children || item.disabled || !element) return;
-    const { x, y } = submenuPosition(element.getBoundingClientRect(), item.children.length);
+    const children = resolveMenuChildren(item);
+    if (children.length === 0) return;
+    const { x, y } = submenuPosition(element.getBoundingClientRect(), children.length);
     setActiveIndex(index);
-    setOpenSub({ index, x, y, items: item.children, focusOnOpen });
+    setOpenSub({ index, x, y, items: children, focusOnOpen });
   };
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -221,13 +228,12 @@ function MenuList({
             aria-haspopup={item.children ? 'menu' : undefined}
             aria-expanded={item.children ? openSub?.index === i : undefined}
             onFocus={() => setActiveIndex(i)}
-            onMouseEnter={(e) => {
+            onMouseEnter={() => {
               if (item.disabled || !item.children) {
                 setOpenSub(null);
                 return;
               }
-              const { x, y } = submenuPosition(e.currentTarget.getBoundingClientRect(), item.children.length);
-              setOpenSub({ index: i, x, y, items: item.children, focusOnOpen: false });
+              openSubmenu(i, false);
             }}
             onClick={(e) => {
               e.stopPropagation();
