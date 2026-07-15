@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowUpDown,
@@ -344,17 +344,29 @@ function TbIcon({ name }: { name: IconName }) {
   return <Icon size={18} strokeWidth={1.6} aria-hidden="true" />;
 }
 
-/** Props for a fast custom tooltip on a toolbar icon button (see styles.css).
- * `align: 'end'` right-anchors the tooltip for buttons near the right edge. */
-function tip(text: string, align?: 'end') {
-  return {
-    'aria-label': text,
-    'data-tip': text,
-    ...(align ? { 'data-tip-align': align } : {}),
-  };
+type ToolbarTip = {
+  icon: IconName;
+  label: string;
+  description: string;
+  shortcut?: string;
+  accessibleName?: string;
+};
+
+const DEFAULT_TOOLBAR_TIP: ToolbarTip = {
+  icon: 'help',
+  label: 'Toolbar help',
+  description: 'Hover or focus a command to see what it does.',
+};
+
+function toolbarMenuAnchor(button: HTMLButtonElement): { x: number; y: number } {
+  const buttonRect = button.getBoundingClientRect();
+  const toolbarRect = button.closest('.toolbar-shell')?.getBoundingClientRect();
+  return { x: buttonRect.left, y: (toolbarRect?.bottom ?? buttonRect.bottom) + 4 };
 }
 
 export function Toolbar() {
+  const [activeTip, setActiveTip] = useState<ToolbarTip | null>(null);
+  const tipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showExportImage, setShowExportImage] = useState(false);
   const [showExportCsv, setShowExportCsv] = useState(false);
@@ -369,6 +381,37 @@ export function Toolbar() {
     useState<FindReplaceSessionCapture | null>(null);
   const [propertiesManagerCapture, setPropertiesManagerCapture] =
     useState<PropertyManagerSessionCapture | null>(null);
+  const clearTipTimer = () => {
+    if (tipTimer.current !== null) {
+      clearTimeout(tipTimer.current);
+      tipTimer.current = null;
+    }
+  };
+  const clearTip = () => {
+    clearTipTimer();
+    setActiveTip(null);
+  };
+  const tip = (value: ToolbarTip) => ({
+    'aria-label': value.accessibleName
+      ?? (value.shortcut ? `${value.label} (${value.shortcut})` : value.label),
+    'aria-describedby': 'toolbar-context-description',
+    onMouseEnter: () => {
+      clearTipTimer();
+      tipTimer.current = setTimeout(() => {
+        setActiveTip(value);
+        tipTimer.current = null;
+      }, 150);
+    },
+    onMouseLeave: clearTip,
+    onFocus: () => {
+      clearTipTimer();
+      setActiveTip(value);
+    },
+    onBlur: clearTip,
+  });
+  useEffect(() => () => {
+    if (tipTimer.current !== null) clearTimeout(tipTimer.current);
+  }, []);
   const extensionSnapshot = useSyncExternalStore(
     (listener) => extensionRegistry.subscribe(listener),
     () => extensionRegistry.getSnapshot(),
@@ -460,25 +503,55 @@ export function Toolbar() {
       onClick: () => void validateActiveC4View(),
     },
   ];
+  const shownTip = activeTip ?? DEFAULT_TOOLBAR_TIP;
 
   return (
-    <div className="toolbar">
-      <button className="tb-icon" {...tip('New model (Ctrl+Alt+N)')} onClick={() => void newModel()}>
+    <div className="toolbar-shell">
+      <div className="toolbar">
+      <button
+        className="tb-icon"
+        {...tip({
+          icon: 'new',
+          label: 'New model',
+          description: 'Create a blank ArchiMate model.',
+          shortcut: 'Ctrl+Alt+N',
+        })}
+        onClick={() => void newModel()}
+      >
         <TbIcon name="new" />
       </button>
-      <button className="tb-icon" {...tip('Open .archimate file (Ctrl+O)')} onClick={() => void openModel()}>
+      <button
+        className="tb-icon"
+        {...tip({
+          icon: 'open',
+          label: 'Open .archimate file',
+          description: 'Open an existing model from this device.',
+          shortcut: 'Ctrl+O',
+        })}
+        onClick={() => void openModel()}
+      >
         <TbIcon name="open" />
       </button>
       <button
         className="tb-icon"
-        {...tip('Import, save, and create models from templates')}
+        {...tip({
+          icon: 'templates',
+          label: 'Model templates',
+          description: 'Import, save, or create models from templates.',
+          accessibleName: 'Import, save, and create models from templates',
+        })}
         onClick={() => setShowTemplates(true)}
       >
         <TbIcon name="templates" />
       </button>
       <button
         className="tb-icon"
-        {...tip('Save model (Ctrl+S)')}
+        {...tip({
+          icon: 'save',
+          label: 'Save model',
+          description: 'Save changes to the current .archimate file.',
+          shortcut: 'Ctrl+S',
+        })}
         disabled={!hasModel}
         onClick={() => saveModel(false)}
       >
@@ -486,7 +559,11 @@ export function Toolbar() {
       </button>
       <button
         className="tb-icon"
-        {...tip('Save model as…')}
+        {...tip({
+          icon: 'saveas',
+          label: 'Save model as…',
+          description: 'Save a copy to a new .archimate file.',
+        })}
         disabled={!hasModel}
         onClick={() => saveModel(true)}
       >
@@ -494,7 +571,11 @@ export function Toolbar() {
       </button>
       <button
         className="tb-icon"
-        {...tip('Share model')}
+        {...tip({
+          icon: 'share',
+          label: 'Share model',
+          description: 'Create a shareable link to the current model.',
+        })}
         disabled={!hasModel || readOnly}
         onClick={() => void runShareModel()}
       >
@@ -503,7 +584,12 @@ export function Toolbar() {
       <div className="toolbar-sep" />
       <button
         className="tb-icon"
-        {...tip(canUndo ? `Undo ${undoLabel} (Ctrl+Z)` : 'Undo (Ctrl+Z)')}
+        {...tip({
+          icon: 'undo',
+          label: canUndo && undoLabel ? `Undo ${undoLabel}` : 'Undo',
+          description: 'Reverse the most recent model change.',
+          shortcut: 'Ctrl+Z',
+        })}
         disabled={!canUndo}
         onClick={() => undo()}
       >
@@ -511,7 +597,12 @@ export function Toolbar() {
       </button>
       <button
         className="tb-icon"
-        {...tip(canRedo ? `Redo ${redoLabel} (Ctrl+Y)` : 'Redo (Ctrl+Y)')}
+        {...tip({
+          icon: 'redo',
+          label: canRedo && redoLabel ? `Redo ${redoLabel}` : 'Redo',
+          description: 'Restore the most recently undone model change.',
+          shortcut: 'Ctrl+Y',
+        })}
         disabled={!canRedo}
         onClick={() => redo()}
       >
@@ -520,18 +611,28 @@ export function Toolbar() {
       <div className="toolbar-sep" />
       <button
         className="tb-icon"
-        {...tip('Import or export images, Open Exchange, and CSV')}
+        {...tip({
+          icon: 'export',
+          label: 'Import and export',
+          description: 'Exchange model data, images, CSV files, and reports.',
+          accessibleName: 'Import or export images, Open Exchange, and CSV',
+        })}
         disabled={!hasModel}
         onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          showContextMenu(rect.left, rect.bottom + 4, exportMenuItems);
+          const anchor = toolbarMenuAnchor(e.currentTarget);
+          showContextMenu(anchor.x, anchor.y, exportMenuItems);
         }}
       >
         <TbIcon name="export" />
       </button>
       <button
         className="tb-icon"
-        {...tip('Presentation mode — full-screen view walkthrough')}
+        {...tip({
+          icon: 'present',
+          label: 'Presentation mode',
+          description: 'Walk through the current view in full screen.',
+          accessibleName: 'Presentation mode — full-screen view walkthrough',
+        })}
         disabled={!hasActiveView}
         onClick={() => setPresenting(true)}
       >
@@ -539,18 +640,27 @@ export function Toolbar() {
       </button>
       <button
         className="tb-icon"
-        {...tip('Create and validate C4 views')}
+        {...tip({
+          icon: 'c4',
+          label: 'C4 tools',
+          description: 'Create, update, and validate C4 views.',
+          accessibleName: 'Create and validate C4 views',
+        })}
         disabled={!hasModel}
         onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          showContextMenu(rect.left, rect.bottom + 4, c4MenuItems);
+          const anchor = toolbarMenuAnchor(e.currentTarget);
+          showContextMenu(anchor.x, anchor.y, c4MenuItems);
         }}
       >
         <TbIcon name="c4" />
       </button>
       <button
         className="tb-icon"
-        {...tip('Manage specializations')}
+        {...tip({
+          icon: 'profiles',
+          label: 'Manage specializations',
+          description: 'Manage custom names and images for ArchiMate concepts.',
+        })}
         disabled={!hasModel || readOnly}
         onClick={() => setShowSpecializations(true)}
       >
@@ -558,7 +668,12 @@ export function Toolbar() {
       </button>
       <button
         className="tb-icon"
-        {...tip('Import or place model images')}
+        {...tip({
+          icon: 'images',
+          label: 'Model images',
+          description: 'Import images or place one on the current view.',
+          accessibleName: 'Import or place model images',
+        })}
         disabled={!hasModel || readOnly}
         onClick={() => setShowImages(true)}
       >
@@ -566,7 +681,11 @@ export function Toolbar() {
       </button>
       <button
         className="tb-icon"
-        {...tip('Find and replace')}
+        {...tip({
+          icon: 'replace',
+          label: 'Find and replace',
+          description: 'Search model content and replace matching values.',
+        })}
         disabled={!hasModel}
         onClick={() => setFindReplaceCapture(captureFindReplaceSession())}
       >
@@ -574,7 +693,11 @@ export function Toolbar() {
       </button>
       <button
         className="tb-icon"
-        {...tip('Manage model properties')}
+        {...tip({
+          icon: 'properties',
+          label: 'Manage model properties',
+          description: 'Inspect, rename, delete, or update model properties.',
+        })}
         disabled={!hasModel}
         onClick={() => setPropertiesManagerCapture(capturePropertyManagerSession())}
       >
@@ -585,7 +708,11 @@ export function Toolbar() {
         <button
           key={button.id}
           className="tb-icon tb-icon-text"
-          title={button.label}
+          {...tip({
+            icon: 'ext',
+            label: button.label,
+            description: `Run the ${button.label} extension command.`,
+          })}
           onClick={() => void extensionRegistry.runCommand(button.command)}
         >
           {button.label}
@@ -593,22 +720,30 @@ export function Toolbar() {
       ))}
       <button
         className="tb-icon"
-        {...tip('Run extension commands', 'end')}
+        {...tip({
+          icon: 'ext',
+          label: 'Run extension commands',
+          description: 'Browse and run commands installed by extensions.',
+        })}
         disabled={extensionMenuItems.length === 0}
         onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          showContextMenu(rect.left, rect.bottom + 4, extensionMenuItems);
+          const anchor = toolbarMenuAnchor(e.currentTarget);
+          showContextMenu(anchor.x, anchor.y, extensionMenuItems);
         }}
       >
         <TbIcon name="ext" />
       </button>
       <button
         className="tb-icon"
-        {...tip('Show or reopen panels', 'end')}
+        {...tip({
+          icon: 'views',
+          label: 'Panels',
+          description: 'Show, reopen, or reset docked panels.',
+          accessibleName: 'Show or reopen panels',
+        })}
         onClick={(e) => {
           const bus = layoutBus();
           if (!bus) return;
-          const rect = e.currentTarget.getBoundingClientRect();
           const items: MenuItem[] = bus.getPanels().map((p) => ({
             label: p.title,
             icon: p.open ? <span className="menu-check">✓</span> : undefined,
@@ -616,21 +751,45 @@ export function Toolbar() {
           }));
           items.push(SEPARATOR);
           items.push({ label: 'Reset Layout', onClick: () => bus.reset() });
-          showContextMenu(rect.left, rect.bottom + 4, items);
+          const anchor = toolbarMenuAnchor(e.currentTarget);
+          showContextMenu(anchor.x, anchor.y, items);
         }}
       >
         <TbIcon name="views" />
       </button>
       <button
         className="tb-icon"
-        {...tip('Documentation', 'end')}
+        {...tip({
+          icon: 'docs',
+          label: 'Documentation',
+          description: 'Open the Archi Online user documentation.',
+        })}
         onClick={() => window.open(DOCS_URL, '_blank', 'noopener,noreferrer')}
       >
         <TbIcon name="docs" />
       </button>
-      <button className="tb-icon" {...tip('Keyboard shortcuts', 'end')} onClick={() => setShowHelp(true)}>
+      <button
+        className="tb-icon"
+        {...tip({
+          icon: 'help',
+          label: 'Keyboard shortcuts',
+          description: 'View all keyboard shortcuts.',
+        })}
+        onClick={() => setShowHelp(true)}
+      >
         <TbIcon name="help" />
       </button>
+      </div>
+      <div id="toolbar-context-help" className="toolbar-context-help" role="status" aria-live="polite">
+        <span className="toolbar-context-icon"><TbIcon name={shownTip.icon} /></span>
+        <span className="toolbar-context-label">{shownTip.label}</span>
+        <span id="toolbar-context-description" className="toolbar-context-description">
+          {shownTip.description}
+        </span>
+        {shownTip.shortcut && (
+          <kbd className="toolbar-context-shortcut">{shownTip.shortcut}</kbd>
+        )}
+      </div>
       {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
       {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}
       {showExportExchange && <ExportExchangeDialog onClose={() => setShowExportExchange(false)} />}

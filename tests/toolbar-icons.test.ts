@@ -1,6 +1,6 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Toolbar } from '../src/ui/Toolbar';
 
 const BUILT_IN_ACTIONS = [
@@ -25,6 +25,7 @@ const BUILT_IN_ACTIONS = [
 
 describe('toolbar built-in icons', () => {
   afterEach(() => {
+    vi.useRealTimers();
     document.body.replaceChildren();
   });
 
@@ -46,6 +47,44 @@ describe('toolbar built-in icons', () => {
       expect(button.textContent).toBe('');
       expect(button.classList.contains('tb-icon-text')).toBe(false);
     }
+
+    await act(async () => root.unmount());
+  });
+
+  it('shows contextual command help after the fast hover delay and immediately on focus', async () => {
+    vi.useFakeTimers();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(Toolbar)));
+
+    const help = host.querySelector<HTMLElement>('#toolbar-context-help')!;
+    const newModel = host.querySelector<HTMLButtonElement>(
+      'button[aria-label="New model (Ctrl+Alt+N)"]',
+    )!;
+    expect(help.textContent).toContain('Hover or focus a command');
+
+    await act(async () => {
+      newModel.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    });
+    expect(help.textContent).not.toContain('Create a blank ArchiMate model.');
+
+    await act(async () => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(help.textContent).toContain('New model');
+    expect(help.textContent).toContain('Create a blank ArchiMate model.');
+    expect(help.querySelector('kbd')?.textContent).toBe('Ctrl+Alt+N');
+
+    await act(async () => {
+      newModel.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: host }));
+    });
+    expect(help.textContent).toContain('Hover or focus a command');
+
+    await act(async () => {
+      newModel.focus();
+    });
+    expect(help.textContent).toContain('Create a blank ArchiMate model.');
 
     await act(async () => root.unmount());
   });
