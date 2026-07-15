@@ -75,6 +75,10 @@ describe('clipboard context menus', () => {
     }));
 
     expect(menuLabels()).toContain('Copy (Ctrl+C)');
+    expect(menuLabels()).toContain('Cut (Ctrl+X)');
+    expect(menuLabels()).toContain('Order');
+    expect(menuLabels()).toContain('Select Objects of Same Type');
+    expect(menuLabels()).toContain('Delete from View but Keep Children');
 
     copyNodes([created.nodeId], session.store, sessionId);
     await act(async () => showEmptyCanvasContextMenu({
@@ -96,10 +100,10 @@ describe('clipboard context menus', () => {
     }));
 
     expect(menuLabels()).toContain('Paste (Ctrl+V)');
-    expect(menuLabels()).toContain('Paste as Reference');
+    expect(menuLabels()).toContain('Paste Special (References)');
     expect(document.querySelector('.ctx-item.disabled .ctx-label')?.textContent).not.toBe('Paste (Ctrl+V)');
     const referenceLabel = [...document.querySelectorAll<HTMLElement>('.ctx-label')]
-      .find((item) => item.textContent === 'Paste as Reference');
+      .find((item) => item.textContent === 'Paste Special (References)');
     expect(referenceLabel?.closest('.ctx-item')?.classList.contains('disabled')).toBe(false);
     expect(contextPayload).toMatchObject({
       sessionId,

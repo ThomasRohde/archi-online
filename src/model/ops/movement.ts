@@ -68,6 +68,66 @@ export function reorderNode(
   }, store);
 }
 
+export type ReorderMode = 'front' | 'forward' | 'backward' | 'back';
+
+/** Reorder selected sibling runs while preserving their relative order. */
+export function reorderViewObjects(
+  ids: string[],
+  mode: ReorderMode,
+  store?: ModelStore,
+): void {
+  const labels: Record<ReorderMode, string> = {
+    front: 'Bring to Front',
+    forward: 'Bring Forward',
+    backward: 'Send Backward',
+    back: 'Send to Back',
+  };
+  transact(labels[mode], (draft) => {
+    const selected = new Set(ids.filter((id) => Boolean(draft.nodes[id])));
+    const siblingLists = [
+      ...Object.values(draft.views).map((view) => view.childIds),
+      ...Object.values(draft.nodes).map((node) => node.childIds),
+    ];
+    for (const siblings of siblingLists) {
+      if (mode === 'front' || mode === 'back') {
+        const chosen = siblings.filter((id) => selected.has(id));
+        if (chosen.length === 0) continue;
+        const unselected = siblings.filter((id) => !selected.has(id));
+        const ordered = mode === 'front'
+          ? [...unselected, ...chosen]
+          : [...chosen, ...unselected];
+        siblings.splice(0, siblings.length, ...ordered);
+        continue;
+      }
+      if (mode === 'backward') {
+        for (let start = 1; start < siblings.length;) {
+          if (!selected.has(siblings[start]) || selected.has(siblings[start - 1])) {
+            start++;
+            continue;
+          }
+          let end = start;
+          while (end + 1 < siblings.length && selected.has(siblings[end + 1])) end++;
+          const adjacent = siblings.splice(start - 1, 1)[0];
+          siblings.splice(end, 0, adjacent);
+          start = end + 1;
+        }
+        continue;
+      }
+      for (let end = siblings.length - 2; end >= 0;) {
+        if (!selected.has(siblings[end]) || selected.has(siblings[end + 1])) {
+          end--;
+          continue;
+        }
+        let start = end;
+        while (start > 0 && selected.has(siblings[start - 1])) start--;
+        const adjacent = siblings.splice(end + 1, 1)[0];
+        siblings.splice(start, 0, adjacent);
+        end = start - 1;
+      }
+    }
+  }, store);
+}
+
 export function moveNodes(
   moves: { id: string; x: number; y: number }[],
   store?: ModelStore,
@@ -122,6 +182,39 @@ export function deleteViewObjects(ids: string[], store?: ModelStore): void {
     for (const id of ids) {
       if (draft.connections[id]) deleteConnectionFromDraft(draft, id);
       else if (draft.nodes[id]) deleteNodeFromDraft(draft, id);
+    }
+    pruneUnreferencedAssets(draft);
+  }, store);
+}
+
+/** Delete selected view objects while lifting direct children into their parent. */
+export function deleteViewObjectsKeepingChildren(ids: string[], store?: ModelStore): void {
+  transact('Delete from View but Keep Children', (draft) => {
+    const deletingConnections = new Set<string>();
+    for (const id of ids) {
+      if (draft.connections[id]) deleteConnectionFromDraft(draft, id, deletingConnections);
+    }
+    for (const id of ids) {
+      const node = draft.nodes[id];
+      if (!node) continue;
+      for (const connectionId of [...node.sourceConnectionIds, ...node.targetConnectionIds]) {
+        deleteConnectionFromDraft(draft, connectionId, deletingConnections);
+      }
+      const siblings = node.parentId === node.viewId
+        ? draft.views[node.viewId]?.childIds
+        : draft.nodes[node.parentId]?.childIds;
+      if (!siblings) continue;
+      const index = siblings.indexOf(id);
+      const children = [...node.childIds];
+      for (const childId of children) {
+        const child = draft.nodes[childId];
+        if (!child) continue;
+        child.parentId = node.parentId;
+        child.bounds.x += node.bounds.x;
+        child.bounds.y += node.bounds.y;
+      }
+      if (index >= 0) siblings.splice(index, 1, ...children);
+      delete draft.nodes[id];
     }
     pruneUnreferencedAssets(draft);
   }, store);

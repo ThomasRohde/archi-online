@@ -28,8 +28,11 @@ export interface AppSettings {
   treeSearchShowAllFolders: boolean;
   treeSearchMatchCase: boolean;
   treeSearchRegex: boolean;
+  gridVisible: boolean;
   snapToGrid: boolean;
+  snapToAlignmentGuides: boolean;
   gridSize: number;
+  pasteSpecialMode: 'reference' | 'duplicate';
   defaultTextAlignment: TextAlignment;
   defaultTextPosition: TextPosition;
   elementWidth: number;
@@ -97,6 +100,11 @@ export interface SelectSettingRow extends BaseSettingRow {
   options: readonly { value: number; label: string }[];
 }
 
+export interface StringSelectSettingRow extends BaseSettingRow {
+  kind: 'string-select';
+  options: readonly { value: string; label: string }[];
+}
+
 export interface RelationshipMaskSettingRow extends BaseSettingRow {
   kind: 'relationship-mask';
 }
@@ -105,6 +113,7 @@ export type SettingRow =
   | BooleanSettingRow
   | NumberSettingRow
   | SelectSettingRow
+  | StringSelectSettingRow
   | RelationshipMaskSettingRow;
 
 export interface SettingSection {
@@ -123,8 +132,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   treeSearchShowAllFolders: false,
   treeSearchMatchCase: false,
   treeSearchRegex: false,
+  gridVisible: false,
   snapToGrid: true,
+  snapToAlignmentGuides: true,
   gridSize: 12,
+  pasteSpecialMode: 'reference',
   defaultTextAlignment: 2,
   defaultTextPosition: 1,
   elementWidth: 120,
@@ -318,10 +330,22 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
     description: 'Grid behavior for placement and movement.',
     rows: [
       {
+        key: 'gridVisible',
+        kind: 'boolean',
+        label: 'Grid visible',
+        description: 'Show the editor-only alignment grid behind diagram objects.',
+      },
+      {
         key: 'snapToGrid',
         kind: 'boolean',
         label: 'Snap to grid',
         description: 'Align new and dragged objects to the grid by default.',
+      },
+      {
+        key: 'snapToAlignmentGuides',
+        kind: 'boolean',
+        label: 'Snap to alignment guides',
+        description: 'Align moved and resized objects with sibling edges and centres.',
       },
       {
         key: 'gridSize',
@@ -332,6 +356,23 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
         max: 200,
         step: 1,
         unit: 'px',
+      },
+    ],
+  },
+  {
+    id: 'clipboard',
+    title: 'Clipboard',
+    description: 'Paste behavior for diagram objects.',
+    rows: [
+      {
+        key: 'pasteSpecialMode',
+        kind: 'string-select',
+        label: 'Paste Special mode',
+        description: 'Reuse existing concepts or create semantic duplicates.',
+        options: [
+          { value: 'reference', label: 'Reference existing concepts' },
+          { value: 'duplicate', label: 'Duplicate concepts' },
+        ],
       },
     ],
   },
@@ -646,6 +687,10 @@ export function sanitizeSettingValue(key: SettingKey, value: unknown): AppSettin
   }
   if (row.kind === 'select') {
     if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+    return (row.options.some((option) => option.value === value) ? value : fallback) as AppSettings[SettingKey];
+  }
+  if (row.kind === 'string-select') {
+    if (typeof value !== 'string') return fallback;
     return (row.options.some((option) => option.value === value) ? value : fallback) as AppSettings[SettingKey];
   }
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;

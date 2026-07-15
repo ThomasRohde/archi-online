@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useId, useMemo, useRef } from 'react';
 import { c4ViewType } from '../model/c4';
 import {
   alignableNodeIds,
@@ -8,7 +8,7 @@ import {
 } from '../model/ops';
 import { getActiveModelStore, setSelection } from '../model/store';
 import { useModelStoreApi, useStore } from '../ui/store-hooks';
-import { getActiveModelSession } from '../model/workspace';
+import { getActiveModelSession, getModelSessionForStore } from '../model/workspace';
 import type { Bounds } from '../model/types';
 import { setCanvasStatus } from '../ui/canvas-status';
 import { useSettingsStore } from '../settings/app-settings';
@@ -35,6 +35,11 @@ import {
 } from './view-editor/overlays';
 import { useCanvasViewport } from './view-editor/useCanvasViewport';
 import { useViewEditorInteractions } from './view-editor/useViewEditorInteractions';
+import { copyNodes, cutNodes } from './clipboard';
+import {
+  showEmptyCanvasContextMenu,
+  showViewObjectContextMenu,
+} from './view-editor/contextMenu';
 
 export type { Viewport } from './view-editor/types';
 
@@ -46,7 +51,41 @@ export interface ViewEditorProps {
 export function ViewEditor({ viewId, readOnly: readOnlyProp }: ViewEditorProps) {
   const readOnlyStore = useStore((s) => s.readOnly);
   const readOnly = readOnlyProp ?? readOnlyStore;
-  return readOnly ? <ReadOnlyViewEditor viewId={viewId} /> : <EditableViewEditor viewId={viewId} />;
+  return readOnly ? (
+    <ReadOnlyViewEditor
+      viewId={viewId}
+      editorReadOnly={readOnlyProp === undefined && readOnlyStore}
+    />
+  ) : <EditableViewEditor viewId={viewId} />;
+}
+
+function ViewGrid({ patternId, gridSize }: { patternId: string; gridSize: number }) {
+  return (
+    <>
+      <defs>
+        <pattern
+          id={patternId}
+          width={gridSize}
+          height={gridSize}
+          patternUnits="userSpaceOnUse"
+        >
+          <path
+            className="view-grid-line"
+            d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`}
+          />
+        </pattern>
+      </defs>
+      <rect
+        data-view-grid
+        className="view-grid"
+        x={-100000}
+        y={-100000}
+        width={200000}
+        height={200000}
+        fill={`url(#${patternId})`}
+      />
+    </>
+  );
 }
 
 function readOnlyHitTarget(
@@ -73,6 +112,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   const alignmentAnchor = settings.alignmentAnchor;
   const pasteOffset = settings.pasteOffset;
   const svgRef = useRef<SVGSVGElement>(null);
+  const gridPatternId = `view-grid-${useId().replace(/:/g, '')}`;
 
   const view = model?.views[viewId];
   const absBounds = useMemo(
@@ -152,6 +192,14 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
           modelStore,
         );
         if (ids.length > 0) setSelection('view', ids, modelStore);
+      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x') {
+        event.preventDefault();
+        const cutIds = cutNodes(
+          state.selection.ids,
+          modelStore,
+          activeSession?.id ?? 'legacy-single-model',
+        );
+        if (cutIds.length > 0) setSelection('view', [], modelStore);
       }
     };
     window.addEventListener('keydown', onWindowKeyDown);
@@ -175,6 +223,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   };
 
   const activeC4ViewType = c4ViewType(view);
+  const alignmentGuides = inter.kind === 'move' || inter.kind === 'resize' ? inter.guides : [];
   const { moveDelta, dropParentId, resizeOverride, liveAbs } = deriveLiveViewState(
     model,
     viewId,
@@ -253,6 +302,9 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
         onDrop={handlers.onDrop}
       >
         <g transform={`translate(${viewport.x},${viewport.y}) scale(${viewport.zoom})`}>
+          {settings.gridVisible && (
+            <ViewGrid patternId={gridPatternId} gridSize={settings.gridSize} />
+          )}
           {view.childIds.map((id) => (
             <NodeView
               key={id}
@@ -295,6 +347,19 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
             conn={selectedConnection}
             points={selectedConnection ? routes(selectedConnection.id) : undefined}
           />
+          <g className="alignment-guides" pointerEvents="none">
+            {alignmentGuides.map((guide, index) => (
+              <line
+                key={`${guide.orientation}-${guide.position}-${index}`}
+                className="alignment-guide"
+                x1={guide.orientation === 'vertical' ? guide.position : guide.from}
+                x2={guide.orientation === 'vertical' ? guide.position : guide.to}
+                y1={guide.orientation === 'vertical' ? guide.from : guide.position}
+                y2={guide.orientation === 'vertical' ? guide.to : guide.position}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+          </g>
           <BendpointHandles
             conn={view.connectionRouterType === 2 ? undefined : selectedConnection}
             sourcePoint={selectedConnection ? routes.endpointPoints(selectedConnection.id)?.source : undefined}
@@ -329,11 +394,19 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   );
 }
 
-function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
+function ReadOnlyViewEditor({
+  viewId,
+  editorReadOnly,
+}: {
+  viewId: string;
+  editorReadOnly: boolean;
+}) {
+  const modelStore = useModelStoreApi();
   const model = useStore((s) => s.model);
   const selection = useStore((s) => s.selection);
   const settings = useSettingsStore((s) => s.settings);
   const svgRef = useRef<SVGSVGElement>(null);
+  const gridPatternId = `view-grid-${useId().replace(/:/g, '')}`;
   const panRef = useRef<{
     pointerId: number;
     startX: number;
@@ -352,7 +425,7 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
     () => (model ? Object.values(model.connections).filter((c) => c.viewId === viewId) : []),
     [model, viewId],
   );
-  const { viewport, setViewport, zoomTo, zoomBy, fitToView } = useCanvasViewport(
+  const { viewport, setViewport, toView, zoomTo, zoomBy, fitToView } = useCanvasViewport(
     viewId,
     svgRef,
     absBounds,
@@ -385,8 +458,8 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
             const hit = readOnlyHitTarget(event.target, event.currentTarget);
             // Clicking empty canvas selects the view itself (its properties),
             // like Archi's diagram background; clicking an object selects it.
-            if (hit) setSelection('view', [hit.id]);
-            else setSelection('tree', [viewId]);
+            if (hit) setSelection('view', [hit.id], modelStore);
+            else setSelection('tree', [viewId], modelStore);
             return;
           }
           if (event.button !== 1) return;
@@ -412,9 +485,61 @@ function ReadOnlyViewEditor({ viewId }: { viewId: string }) {
         onPointerUp={(event) => stopPan(event.pointerId, event.currentTarget)}
         onPointerCancel={(event) => stopPan(event.pointerId, event.currentTarget)}
         onLostPointerCapture={(event) => stopPan(event.pointerId, event.currentTarget)}
-        onContextMenu={(event) => event.preventDefault()}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          const hit = readOnlyHitTarget(event.target, event.currentTarget);
+          const sessionId = getModelSessionForStore(modelStore)?.id ?? 'legacy-single-model';
+          if (hit) {
+            const current = modelStore.getState().selection;
+            const ids = current.source === 'view' && current.ids.includes(hit.id)
+              ? current.ids
+              : [hit.id];
+            setSelection('view', ids, modelStore);
+            showViewObjectContextMenu({
+              clientX: event.clientX,
+              clientY: event.clientY,
+              viewId,
+              id: hit.id,
+              ids,
+              model,
+              settings,
+              modelStore,
+              sessionId,
+              startEdit: () => undefined,
+            });
+            return;
+          }
+          if (!editorReadOnly) return;
+          showEmptyCanvasContextMenu({
+            clientX: event.clientX,
+            clientY: event.clientY,
+            viewId,
+            parentId: viewId,
+            parentAbs: { x: 0, y: 0 },
+            point: toView(event.clientX, event.clientY),
+            absBounds,
+            startEdit: () => undefined,
+            settings,
+            modelStore,
+            sessionId,
+            snap: (value) => value,
+            zoomBy,
+            zoomTo,
+            fitToView,
+          });
+        }}
+        onKeyDown={(event) => {
+          if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'c') return;
+          const current = modelStore.getState().selection;
+          if (current.source !== 'view' || current.ids.length === 0) return;
+          event.preventDefault();
+          copyNodes(current.ids, modelStore);
+        }}
       >
         <g transform={`translate(${viewport.x},${viewport.y}) scale(${viewport.zoom})`}>
+          {editorReadOnly && settings.gridVisible && (
+            <ViewGrid patternId={gridPatternId} gridSize={settings.gridSize} />
+          )}
           {view.childIds.map((id) => (
             <NodeView
               key={id}

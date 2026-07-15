@@ -40,6 +40,42 @@ afterEach(() => {
 });
 
 describe('Palette', () => {
+  it('offers Format Painter with one-shot and sticky activation', async () => {
+    const { host, root } = await render(createElement(Palette));
+    const button = host.querySelector<HTMLButtonElement>('button[title="Format Painter"]');
+
+    expect(button).not.toBeNull();
+    await act(async () => button!.click());
+    expect(useStore.getState().activeTool).toEqual({ kind: 'format-painter' });
+
+    await act(async () => button!.dispatchEvent(new MouseEvent('dblclick', {
+      bubbles: true,
+      detail: 2,
+    })));
+    expect(useStore.getState().activeTool).toEqual({
+      kind: 'format-painter',
+      sticky: true,
+    });
+    await act(async () => root.unmount());
+  });
+
+  it('disables Format Painter in a read-only model session', async () => {
+    const store = createModelStore({
+      model: createEmptyModel('Read-only palette'),
+      readOnly: true,
+    });
+    const { host, root } = await render(createElement(
+      ModelStoreProvider,
+      { store, children: createElement(Palette) },
+    ));
+    const button = host.querySelector<HTMLButtonElement>('button[title="Format Painter"]');
+
+    expect(button?.disabled).toBe(true);
+    await act(async () => button?.click());
+    expect(store.getState().activeTool).toEqual({ kind: 'select' });
+    await act(async () => root.unmount());
+  });
+
   it('renders the Junction element as a dot instead of a filled square swatch', async () => {
     const { host, root } = await render(createElement(Palette));
     const button = host.querySelector<HTMLButtonElement>('button[title="Junction (Other)"]');

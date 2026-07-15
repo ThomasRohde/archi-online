@@ -74,6 +74,8 @@ describe('renderViewSvg', () => {
   it('does not leak selection or editing overlays into the export', () => {
     expect(rendered.svg).not.toContain('data-node-id');
     expect(rendered.svg).not.toContain('resize-handle');
+    expect(rendered.svg).not.toContain('data-view-grid');
+    expect(rendered.svg).not.toContain('alignment-guide');
   });
 
   it('contains no foreignObject (labels are native SVG text)', () => {

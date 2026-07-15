@@ -4,6 +4,7 @@ import {
   pasteTransferBundle,
   type ModelTransferBundle,
 } from '../model/transfer';
+import { deleteViewObjects } from '../model/ops';
 import { getActiveModelStore, type ModelStore } from '../model/store';
 import { getModelSessionForStore } from '../model/workspace';
 import {
@@ -29,6 +30,23 @@ export function copyNodes(
   if (!model || !firstNode) return;
   const bundle = createCanvasTransferBundle(sourceSessionId, model, firstNode.viewId, ids);
   if (bundle.roots.length > 0) clipboard = bundle;
+}
+
+export function cutNodes(
+  ids: string[],
+  store: ModelStore = getActiveModelStore(),
+  sourceSessionId = sessionIdForStore(store),
+): string[] {
+  const state = store.getState();
+  if (!state.model || state.readOnly) return [];
+  const firstNode = ids.map((id) => state.model!.nodes[id]).find((node) => node !== undefined);
+  if (!firstNode) return [];
+  const bundle = createCanvasTransferBundle(sourceSessionId, state.model, firstNode.viewId, ids);
+  const rootIds = bundle.roots.flatMap((root) => root.kind === 'node' ? [root.id] : []);
+  if (rootIds.length === 0) return [];
+  clipboard = bundle;
+  store.runBatch('Cut', () => deleteViewObjects(rootIds, store));
+  return rootIds;
 }
 
 export function copyTreeItems(
@@ -74,14 +92,15 @@ export function pasteNodes(
   at?: { x: number; y: number },
   store: ModelStore = getActiveModelStore(),
   targetSessionId = sessionIdForStore(store),
-  mode: 'default' | 'reference' = 'default',
+  mode: 'default' | 'reference' | 'duplicate' = 'default',
 ): string[] {
   if (!clipboard) return [];
+  if (mode === 'reference' && clipboard.sourceSessionId !== targetSessionId) return [];
   const settings = useSettingsStore.getState().settings;
   return pasteTransferBundle(clipboard, store, {
     targetSessionId,
     targetViewId: viewId,
-    sameModelMode: mode === 'reference' ? 'reference' : 'archi',
+    sameModelMode: mode === 'default' ? 'archi' : mode,
     offset: settings.pasteOffset,
     at,
     visualDefaults: {

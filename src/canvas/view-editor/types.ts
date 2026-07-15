@@ -7,6 +7,13 @@ export interface Viewport {
   y: number;
 }
 
+export interface AlignmentGuide {
+  orientation: 'vertical' | 'horizontal';
+  position: number;
+  from: number;
+  to: number;
+}
+
 export type Interaction =
   | { kind: 'none' }
   | { kind: 'pan'; startX: number; startY: number; vx: number; vy: number }
@@ -18,6 +25,8 @@ export type Interaction =
       current: Point;
       rootIds: string[];
       dropParentId: string | null;
+      guides: AlignmentGuide[];
+      guideSnapped: { x: boolean; y: boolean };
     }
   | {
       kind: 'resize';
@@ -25,6 +34,8 @@ export type Interaction =
       handle: string;
       startAbs: Bounds;
       currentAbs: Bounds;
+      guides: AlignmentGuide[];
+      guideSnapped: { x: boolean; y: boolean };
     }
   | { kind: 'marquee'; start: Point; current: Point; additive: boolean }
   | { kind: 'connect'; sourceId: string; current: Point; hoverConnectableId: string | null }

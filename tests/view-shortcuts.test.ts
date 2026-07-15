@@ -6,6 +6,7 @@ import { copyNodes } from '../src/canvas/clipboard';
 import { addElement, addView, createElementOnView, createEmptyModel } from '../src/model/ops';
 import { openView, setSelection } from '../src/model/store';
 import { ModelStoreProvider } from '../src/ui/store-hooks';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 import {
   activateModelSession,
   addModelSession,
@@ -28,6 +29,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   resetWorkspaceForTests();
+  useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
   delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
 });
 
@@ -65,6 +67,17 @@ async function renderEditor(source: ReturnType<typeof buildInactiveEditor>['sour
 }
 
 describe('view keyboard shortcuts', () => {
+  it('renders the optional grid only in the editable canvas', async () => {
+    const fixture = buildInactiveEditor();
+    useSettingsStore.setState({
+      settings: { ...DEFAULT_SETTINGS, gridVisible: true },
+    });
+
+    const svg = await renderEditor(fixture.source, fixture.viewId);
+
+    expect(svg.querySelector('[data-view-grid]')).not.toBeNull();
+  });
+
   it('Delete mutates the view-owning model even when another model is globally active', async () => {
     const fixture = buildInactiveEditor();
     const svg = await renderEditor(fixture.source, fixture.viewId);
@@ -121,6 +134,23 @@ describe('view keyboard shortcuts', () => {
 
     expect(Object.keys(fixture.source.store.getState().model!.nodes)).toHaveLength(2);
     expect(Object.keys(fixture.source.store.getState().model!.elements)).toHaveLength(2);
+  });
+
+  it('Ctrl+X cuts from the active view when keyboard focus is outside the SVG', async () => {
+    const fixture = buildInactiveEditor();
+    activateModelSession(fixture.source.id);
+    openView(fixture.viewId, fixture.source.store);
+    await renderEditor(fixture.source, fixture.viewId);
+
+    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      key: 'x',
+      ctrlKey: true,
+    })));
+
+    expect(fixture.source.store.getState().model!.nodes[fixture.nodeId]).toBeUndefined();
+    expect(Object.keys(fixture.source.store.getState().model!.elements)).toHaveLength(1);
+    expect(fixture.source.store.getState().undoStack.at(-1)?.label).toBe('Cut');
   });
 
   it('drops tree items into the view-owning model without a target pointer activation', async () => {

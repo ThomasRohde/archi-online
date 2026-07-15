@@ -207,24 +207,29 @@ The view editor is a custom SVG canvas. It supports:
 - **Selection** — click, `Ctrl`-click to add or toggle, marquee-drag over
   empty space (hold `Ctrl` to add to the current selection), `Ctrl+A` for all.
 - **Move and resize** — drag objects or their resize handles. Grid snapping
-  applies by default; hold `Alt` to bypass it for one drag. Arrow keys nudge
-  the selection by 1 px, `Shift`+arrows by one grid step.
+  and blue edge/centre alignment guides apply by default; hold `Alt` to bypass
+  both for one drag. Right-click empty canvas → **Grid and Guides** to show or
+  hide the editor-only grid and toggle either snapping system. Arrow keys
+  nudge the selection by 1 px, `Shift`+arrows by one grid step.
 - **Nesting and automatic relationships** — drop an element inside a group or
   another element to nest it; child bounds stay relative to the parent. When
   Automatic Relationships are enabled, an element container offers the valid
   normal/reverse semantic relationships configured in Settings. Accepting one
   creates the relationship and nesting in one undo step, hides configured
   relationship occurrences while nested, and reveals them when un-nested.
-- **Copy / paste** — `Ctrl+C` / `Ctrl+V`, or the diagram context menus. Pasting
+- **Cut / copy / paste** — `Ctrl+X` / `Ctrl+C` / `Ctrl+V`, or the diagram
+  context menus. Cut removes transferable node roots in one undo step while
+  leaving their semantic concepts in the model. Pasting
   a copied tree element creates a visual element; pasting a copied tree view
   creates a view-reference object. Pasting diagram objects into another model
   tree copies their referenced concepts and internal relationships without
   copying the source diagram geometry. Within one model, normal diagram paste
   matches desktop Archi: if a concept already occurs in the target view, paste
   creates an independent copied concept; if it does not, the new visual
-  references the existing concept. Use **Paste as Reference** from the canvas
-  context menu to explicitly reuse concepts even when they already occur in
-  the target view.
+  references the existing concept. **Paste Special** follows the browser-local
+  Clipboard setting: **Reference existing concepts** explicitly reuses
+  same-model concepts, while **Duplicate concepts** always clones them.
+  Reference mode is unavailable across models; regular paste is unchanged.
 - **Duplicate** — `Ctrl+D` or right-click → **Duplicate** clones the selected
   diagram objects in place (slightly offset). Element nodes receive independent
   copied model concepts, and internal relationship connections receive copied
@@ -237,6 +242,18 @@ The view editor is a custom SVG canvas. It supports:
   distribute**). With three or more objects, **Distribute**
   (horizontally/vertically) equalizes the gaps between them, keeping the two
   outermost fixed — PowerPoint semantics. Each action is one undo step.
+- **Order, select, and remove** — right-click diagram objects for the four
+  stable multi-selection ordering commands (**Bring to Front**, **Bring
+  Forward**, **Send Backward**, **Send to Back**) or **Select Objects of Same
+  Type**. **Delete from View** removes selected containers recursively;
+  **Delete from View but Keep Children** reparents surviving children without
+  moving them on screen. Both leave semantic concepts in the model.
+- **Format Painter** — choose the paint-roller tool, click a source object, and
+  click a compatible target. A normal palette click paints once; `Shift`-click
+  or double-click keeps the painter active across views in the same model.
+  `Escape` or double-clicking empty canvas clears it. The painter copies only
+  applicable appearance—not bounds, labels, content, properties, semantics,
+  routes, or bendpoints.
 - **Direct edit** — `F2` or double-click to rename in place.
 - **Concept commands** — right-click selected element or relationship
   occurrences to use **Set Concept Type**. Relationship occurrences also offer
@@ -420,7 +437,8 @@ style. Each row has a reset button, and **Reset all** restores the defaults.
 | Model tree search | Name (on); Documentation, Property Value, Views, Show All Folders, Match Case, and Regular Expression (off). Query text and selected keys/types are intentionally not persisted. |
 | Automatic relationships | Use nested connections and prompt for palette creation, tree drop, and canvas movement (on); normal relationship candidates use Desktop defaults; reverse candidates default off; every relationship type is hidden while represented by nesting. |
 | Legends | New legends use 15 rows per column, Core colours, and Category sort. Custom labels and User colours are browser-local and never enter `.archimate` files. |
-| Canvas snapping | Snap to grid (on); grid size (12 px) — also the `Shift`+arrow nudge step. |
+| Canvas snapping | Grid visible (off); snap to grid and alignment guides (on); grid size (12 px) — also the `Shift`+arrow nudge step. |
+| Clipboard | Paste Special mode: Reference existing concepts. Duplicate concepts is the alternative. |
 | New object defaults | Text align (center) and text position (center) for new objects; default sizes for elements (120×55), junctions (15), notes (185×80), groups (400×140), and view references (200×140). |
 | Canvas interaction | Drop offset (16 px), paste offset (16 px), minimum node size (20 px), move drag threshold (4 px), bendpoint drag threshold (5 px). |
 | Align & distribute | Alignment anchor (last selected) — the element Align and Match Size snap the rest of the selection to. |
@@ -474,7 +492,7 @@ Open this table anytime with the **?** toolbar button.
 | `Ctrl+S` / `Ctrl+O` | Save / open model |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` or `Ctrl+Shift+Z` | Redo |
-| `Ctrl+C` / `Ctrl+V` | Copy / paste diagram objects or model-tree elements/views, including across models |
+| `Ctrl+X` / `Ctrl+C` / `Ctrl+V` | Cut / copy / paste diagram objects; copy and paste model-tree elements/views, including across models |
 | `Ctrl+D` | Duplicate (model-tree or view selection) |
 | `Ctrl+A` | Select all on the active view |
 | `Delete` | Delete from view (canvas) or from model (tree) |
@@ -486,7 +504,7 @@ Open this table anytime with the **?** toolbar button.
 | `Home` | Fit diagram to window |
 | Middle-drag or `Space`+drag | Pan canvas |
 | Wheel / `Shift`+wheel | Scroll canvas |
-| `Alt` while dragging | Disable grid snap |
+| `Alt` while dragging | Disable grid and alignment-guide snapping |
 | `Escape` | Cancel tool / clear selection |
 | `Ctrl+Enter` (script editor) | Run script |
 | Double-click bendpoint | Remove bendpoint |

@@ -14,6 +14,8 @@ import { useStore } from '../src/ui/store-hooks';
 import { ViewEditor } from '../src/canvas/ViewEditor';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
 import { ViewerShell } from '../src/ui/ViewerShell';
+import { ContextMenuHost } from '../src/ui/ContextMenu';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 function state() {
@@ -80,6 +82,83 @@ describe('read-only store mode', () => {
 });
 
 describe('read-only UI', () => {
+  it('shows the editor grid in a read-only editor session but not explicit viewer output', async () => {
+    replaceModel(createEmptyModel('Grid boundary'), null, false);
+    const viewId = addView('View');
+    replaceModel(state().model, null, false, { readOnly: true });
+    useSettingsStore.setState({
+      settings: { ...DEFAULT_SETTINGS, gridVisible: true },
+    });
+    const host = document.createElement('div');
+    const root = createRoot(host);
+
+    await act(async () => root.render(createElement(ViewEditor, { viewId })));
+    expect(host.querySelector('[data-view-grid]')).not.toBeNull();
+
+    await act(async () => root.render(createElement(ViewEditor, { viewId, readOnly: true })));
+    expect(host.querySelector('[data-view-grid]')).toBeNull();
+
+    await act(async () => root.unmount());
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
+  });
+
+  it('keeps inspection commands and grid controls available in read-only context menus', async () => {
+    replaceModel(createEmptyModel('Read-only commands'), null, false);
+    const viewId = addView('View');
+    const elementId = addElement('BusinessActor', 'Actor');
+    const nodeId = addElementNodeToView(viewId, elementId, viewId, {
+      x: 20,
+      y: 20,
+      width: 120,
+      height: 55,
+    });
+    replaceModel(state().model, null, false, { readOnly: true });
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(
+      'div',
+      null,
+      createElement(ViewEditor, { viewId }),
+      createElement(ContextMenuHost),
+    )));
+
+    const node = host.querySelector(`[data-node-id="${nodeId}"]`)!;
+    await act(async () => node.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      button: 2,
+      clientX: 30,
+      clientY: 30,
+    })));
+    let labels = [...document.querySelectorAll<HTMLElement>('.ctx-label')]
+      .map((item) => item.textContent ?? '');
+    expect(labels).toContain('Copy (Ctrl+C)');
+    expect(labels).toContain('Select Objects of Same Type');
+    const cut = [...document.querySelectorAll<HTMLElement>('.ctx-label')]
+      .find((item) => item.textContent === 'Cut (Ctrl+X)');
+    expect(cut?.closest('.ctx-item')?.classList.contains('disabled')).toBe(true);
+
+    const svg = host.querySelector('svg.view-svg')!;
+    await act(async () => svg.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      button: 2,
+      clientX: 300,
+      clientY: 300,
+    })));
+    labels = [...document.querySelectorAll<HTMLElement>('.ctx-label')]
+      .map((item) => item.textContent ?? '');
+    expect(labels).toContain('Grid and Guides');
+    const newNote = [...document.querySelectorAll<HTMLElement>('.ctx-label')]
+      .find((item) => item.textContent === 'New Note');
+    expect(newNote?.closest('.ctx-item')?.classList.contains('disabled')).toBe(true);
+
+    await act(async () => root.unmount());
+    document.querySelectorAll('.ctx-root').forEach((item) => item.remove());
+    host.remove();
+  });
+
   it('renders and selects connections attached to other connections', async () => {
     replaceModel(connectionEndpointModel(), null, false, { readOnly: true });
 

@@ -18,6 +18,15 @@ import {
 import { memoryKeyValueStore } from '../src/persistence/keyval';
 
 describe('app settings', () => {
+  it('defaults diagram productivity preferences for backward-compatible settings', () => {
+    expect(normalizeSettings({})).toMatchObject({
+      gridVisible: false,
+      snapToGrid: true,
+      snapToAlignmentGuides: true,
+      pasteSpecialMode: 'reference',
+    });
+  });
+
   it('loads defaults when no settings are stored', async () => {
     await expect(loadSettings(memoryKeyValueStore())).resolves.toEqual(DEFAULT_SETTINGS);
   });

@@ -37,7 +37,7 @@ export interface ModelTransferBundle {
 export interface PasteTransferOptions {
   targetSessionId: string;
   targetViewId?: string;
-  sameModelMode?: 'archi' | 'reference';
+  sameModelMode?: 'archi' | 'reference' | 'duplicate';
   offset?: number;
   at?: { x: number; y: number };
   visualDefaults?: {
@@ -342,6 +342,16 @@ export function pasteTransferBundle(
       }
     }
   }
+  if (
+    !crossModel &&
+    bundle.kind === 'canvas' &&
+    destination === 'view' &&
+    sameModelMode === 'duplicate'
+  ) {
+    for (const node of baseNodesToPaste) {
+      if (node.nodeType === 'element') elementIdsToClone.add(node.elementId);
+    }
+  }
 
   const requiredRelationshipIds = new Set(
     connectionsToPaste.flatMap((connection) =>
@@ -352,6 +362,7 @@ export function pasteTransferBundle(
     if (!requiredRelationshipIds.has(relationship.id) && !crossModel) continue;
     if (
       crossModel ||
+      sameModelMode === 'duplicate' ||
       !targetState.model.relationships[relationship.id] ||
       elementIdsToClone.has(relationship.sourceId) ||
       elementIdsToClone.has(relationship.targetId)

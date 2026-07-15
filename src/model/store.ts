@@ -8,6 +8,7 @@ import {
 import type { ModelState } from './types';
 import type { ElementType, RelationshipType } from './metamodel';
 import type { C4ElementKind } from './c4';
+import type { DiagramStyleSnapshot } from './ops/style';
 import { captureThen, promiseFromCapturedThen } from './promise-like';
 
 enablePatches();
@@ -33,6 +34,7 @@ export type Tool =
   | StickyCreationTool<{ kind: 'create-relationship'; type: RelationshipType }>
   | StickyCreationTool<{ kind: 'create-plain-connection' }>
   | StickyCreationTool<{ kind: 'magic-connector' }>
+  | StickyCreationTool<{ kind: 'format-painter'; snapshot?: DiagramStyleSnapshot }>
   | StickyCreationTool<{ kind: 'create-note' }>
   | StickyCreationTool<{ kind: 'create-legend' }>
   | StickyCreationTool<{ kind: 'create-group' }>

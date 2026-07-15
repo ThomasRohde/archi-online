@@ -165,6 +165,7 @@ function ToolButton({
     <button
       className={'pal-btn' + (active ? ' active' : '') + (disabled ? ' palette-item-disabled' : '')}
       title={title}
+      disabled={disabled}
       aria-pressed={active}
       data-profile-id={'profileId' in tool ? tool.profileId : undefined}
       onClick={disabled ? undefined : (event) => {
@@ -197,6 +198,7 @@ function ToolButton({
 }
 
 export function Palette() {
+  const readOnly = useStore((s) => s.readOnly);
   const profileMap = useStore((s) => s.model?.profiles);
   const profiles = Object.values(profileMap ?? {});
   const activeC4ViewType = useStore((s) => {
@@ -211,6 +213,16 @@ export function Palette() {
       <ToolButton tool={{ kind: 'select' }} title="Select / move (Esc)">
         <svg viewBox="0 0 16 16" width="16" height="16">
           <path d="M4,1.5 L12,8.5 L8.2,9 L10.3,13.6 L8.4,14.5 L6.3,9.8 L3.8,12 Z" fill="currentColor" />
+        </svg>
+      </ToolButton>
+      <ToolButton
+        tool={{ kind: 'format-painter' }}
+        title="Format Painter"
+        disabled={readOnly}
+      >
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <path d="M2 2.5 H11 V6.5 H2 Z M11 3.5 H13.5 V8 H8 V10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+          <path d="M6.5 9 H9.5 V14 H6.5 Z" fill="currentColor" />
         </svg>
       </ToolButton>
       <ToolButton tool={{ kind: 'magic-connector' }} title="Magic connector — pick a valid relationship after drawing">

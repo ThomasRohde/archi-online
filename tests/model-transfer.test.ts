@@ -22,6 +22,7 @@ import {
 import {
   copyNodes,
   copyTreeItems,
+  cutNodes,
   pasteNodes,
   pasteTreeItems,
 } from '../src/canvas/clipboard';
@@ -56,6 +57,24 @@ function buildSourceModel() {
 }
 
 describe('cross-model transfer', () => {
+  it('does not offer reference-mode canvas paste across model sessions', () => {
+    const source = buildSourceModel();
+    const sourceSession = getModelSession(source.sessionId)!;
+    copyNodes([source.actor.nodeId], sourceSession.store, source.sessionId);
+    const targetId = addModelSession({ model: createEmptyModel('Target'), fileName: null });
+    const target = getModelSession(targetId)!;
+    const targetViewId = addView('Target View', undefined, target.store);
+
+    expect(pasteNodes(
+      targetViewId,
+      undefined,
+      target.store,
+      targetId,
+      'reference',
+    )).toEqual([]);
+    expect(Object.keys(target.store.getState().model!.nodes)).toHaveLength(0);
+  });
+
   it('copies and deduplicates specialization and image assets across models', async () => {
     const source = buildSourceModel();
     const sourceSession = getModelSession(source.sessionId)!;
@@ -368,6 +387,59 @@ describe('cross-model transfer', () => {
     expect(pastedNode.nodeType).toBe('element');
     expect(pastedNode.nodeType === 'element' && pastedNode.elementId).toBe(source.actor.elementId);
     expect(Object.keys(session.store.getState().model!.elements)).toHaveLength(2);
+  });
+
+  it('supports explicit Paste Special duplication in another same-model view', () => {
+    const source = buildSourceModel();
+    const session = getModelSession(source.sessionId)!;
+    const targetViewId = addView('Duplicate target');
+    copyNodes(
+      [source.actor.nodeId, source.service.nodeId],
+      session.store,
+      source.sessionId,
+    );
+
+    const pastedIds = pasteNodes(
+      targetViewId,
+      undefined,
+      session.store,
+      source.sessionId,
+      'duplicate',
+    );
+    const pasted = session.store.getState().model!;
+    const pastedElementIds = pastedIds.flatMap((id) => {
+      const node = pasted.nodes[id];
+      return node?.nodeType === 'element' ? [node.elementId] : [];
+    });
+
+    expect(pastedElementIds).toHaveLength(2);
+    expect(pastedElementIds).not.toContain(source.actor.elementId);
+    expect(pastedElementIds).not.toContain(source.service.elementId);
+    expect(Object.keys(pasted.elements)).toHaveLength(4);
+    expect(Object.keys(pasted.relationships)).toHaveLength(2);
+  });
+
+  it('cuts transferable node roots in one undo step without clearing the clipboard on undo', () => {
+    const source = buildSourceModel();
+    const session = getModelSession(source.sessionId)!;
+    const targetViewId = addView('Cut target');
+    const undoBefore = session.store.getState().undoStack.length;
+
+    const cutIds = cutNodes(
+      [source.actor.nodeId, source.service.nodeId],
+      session.store,
+      source.sessionId,
+    );
+
+    expect(cutIds).toEqual([source.actor.nodeId, source.service.nodeId]);
+    expect(session.store.getState().model!.nodes[source.actor.nodeId]).toBeUndefined();
+    expect(session.store.getState().model!.elements[source.actor.elementId]).toBeDefined();
+    expect(session.store.getState().undoStack).toHaveLength(undoBefore + 1);
+    expect(session.store.getState().undoStack.at(-1)?.label).toBe('Cut');
+
+    undo(session.store);
+    expect(session.store.getState().model!.nodes[source.actor.nodeId]).toBeDefined();
+    expect(pasteNodes(targetViewId, undefined, session.store, source.sessionId)).toHaveLength(2);
   });
 
   it.each(['same-view', 'other-view', 'tree'] as const)(

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   DragEvent as ReactDragEvent,
   KeyboardEvent as ReactKeyboardEvent,
@@ -15,10 +15,12 @@ import {
   addImageToView,
   addLegendToView,
   addNoteToView,
+  applyFormatPainterSnapshot,
   analyzeConnectionReconnection,
   analyzeMagicConnectionTarget,
   analyzeMagicTargetCreation,
   canCreatePlainConnection,
+  captureDiagramStyleSnapshot,
   createC4ElementOnView,
   commitMove,
   createElementOnView,
@@ -57,7 +59,7 @@ import {
 import { showContextMenu } from '../../ui/ContextMenu';
 import { requestNestingChange } from '../../ui/automatic-relationships';
 import { requestConnectionReconnection } from '../../ui/connection-reconnection';
-import { copyNodes, pasteNodes } from '../clipboard';
+import { copyNodes, cutNodes, pasteNodes } from '../clipboard';
 import {
   closestSegment,
   createConnectionRouteResolver,
@@ -66,7 +68,13 @@ import {
   toRelativeBendpoint,
   type Point,
 } from '../geometry';
-import { containerAt, dropTargetFor, selectionRoots } from './bounds';
+import {
+  containerAt,
+  dropTargetFor,
+  selectionRoots,
+  snapMoveToAlignmentGuides,
+  snapResizeToAlignmentGuides,
+} from './bounds';
 import { showEmptyCanvasContextMenu, showViewObjectContextMenu } from './contextMenu';
 import { addDroppedItemsToView, planDroppedItemsToView } from './drop';
 import {
@@ -128,6 +136,7 @@ export function useViewEditorInteractions({
     model: ModelState | null;
     modelEpoch: number;
   } | null>(null);
+  const interactionContextRef = useRef({ model, viewId });
   interRef.current = inter;
   const isConnectionVisible = model
     ? createNestedConnectionVisibilityResolver(model, settings)
@@ -229,7 +238,7 @@ export function useViewEditorInteractions({
     activePointerIdRef.current = pointerId;
   };
 
-  const safelyReleasePointerCapture = (pointerId: number) => {
+  const safelyReleasePointerCapture = useCallback((pointerId: number) => {
     const svg = svgRef.current;
     try {
       if (
@@ -242,7 +251,20 @@ export function useViewEditorInteractions({
     } catch {
       // Capture can disappear between the ownership check and release.
     }
-  };
+  }, [svgRef]);
+
+  useEffect(() => {
+    const previous = interactionContextRef.current;
+    interactionContextRef.current = { model, viewId };
+    if (previous.model === model && previous.viewId === viewId) return;
+    const pointerId = activePointerIdRef.current;
+    if (pointerId === null && interRef.current.kind === 'none') return;
+    activePointerIdRef.current = null;
+    interactionModelRef.current = null;
+    setInter({ kind: 'none' });
+    if (pointerId === null) return;
+    safelyReleasePointerCapture(pointerId);
+  }, [model, safelyReleasePointerCapture, viewId]);
 
   const releasePointer = (pointerId: number) => {
     if (!ownsPointer(pointerId)) return false;
@@ -408,6 +430,20 @@ export function useViewEditorInteractions({
     const p = toView(e.clientX, e.clientY);
     const hit = hitFromEvent(e);
     const tool = modelStore.getState().activeTool;
+
+    if (tool.kind === 'format-painter') {
+      const targetId = hit.nodeId ?? hit.connId;
+      if (!targetId) return;
+      if (!tool.snapshot) {
+        const snapshot = captureDiagramStyleSnapshot(model, targetId);
+        if (snapshot) setActiveTool({ ...tool, snapshot });
+        return;
+      }
+      if (applyFormatPainterSnapshot(targetId, tool.snapshot, modelStore)) {
+        finishPaletteToolUse(tool, modelStore);
+      }
+      return;
+    }
 
     if (
       tool.kind === 'create-element' ||
@@ -601,7 +637,15 @@ export function useViewEditorInteractions({
 
     if (hit.handle && hit.nodeId) {
       const abs = absBounds.get(hit.nodeId)!;
-      setInter({ kind: 'resize', nodeId: hit.nodeId, handle: hit.handle, startAbs: abs, currentAbs: abs });
+      setInter({
+        kind: 'resize',
+        nodeId: hit.nodeId,
+        handle: hit.handle,
+        startAbs: abs,
+        currentAbs: abs,
+        guides: [],
+        guideSnapped: { x: false, y: false },
+      });
       return;
     }
     if (hit.connectionEnd && hit.connId) {
@@ -688,7 +732,15 @@ export function useViewEditorInteractions({
           const ids = sel.source === 'view' && sel.ids.includes(cur.nodeId) ? sel.ids : [cur.nodeId];
           const rootIds = selectionRoots(model, ids);
           if (rootIds.length > 0) {
-            setInter({ kind: 'move', start: cur.start, current: p, rootIds, dropParentId: null });
+            setInter({
+              kind: 'move',
+              start: cur.start,
+              current: p,
+              rootIds,
+              dropParentId: null,
+              guides: [],
+              guideSnapped: { x: false, y: false },
+            });
           }
         }
         break;
@@ -715,7 +767,26 @@ export function useViewEditorInteractions({
       }
       case 'move': {
         const dropParentId = dropTargetFor(model, viewId, absBounds, p, cur.rootIds);
-        setInter({ ...cur, current: p, dropParentId });
+        const rawDelta = { x: p.x - cur.start.x, y: p.y - cur.start.y };
+        const guideResult = settings.snapToAlignmentGuides && !e.altKey
+          ? snapMoveToAlignmentGuides(
+              model,
+              absBounds,
+              cur.rootIds,
+              rawDelta,
+              6 / viewport.zoom,
+            )
+          : { delta: rawDelta, guides: [], snapped: { x: false, y: false } };
+        setInter({
+          ...cur,
+          current: {
+            x: cur.start.x + guideResult.delta.x,
+            y: cur.start.y + guideResult.delta.y,
+          },
+          dropParentId,
+          guides: guideResult.guides,
+          guideSnapped: guideResult.snapped,
+        });
         break;
       }
       case 'resize': {
@@ -724,22 +795,56 @@ export function useViewEditorInteractions({
         const dx = p.x - (handle.includes('w') ? startAbs.x : startAbs.x + startAbs.width);
         const dy = p.y - (handle.includes('n') ? startAbs.y : startAbs.y + startAbs.height);
         if (handle.includes('e')) {
-          width = Math.max(settings.minNodeSize, snap(startAbs.width + dx, e.altKey));
+          width = Math.max(settings.minNodeSize, startAbs.width + dx);
         }
         if (handle.includes('s')) {
-          height = Math.max(settings.minNodeSize, snap(startAbs.height + dy, e.altKey));
+          height = Math.max(settings.minNodeSize, startAbs.height + dy);
         }
         if (handle.includes('w')) {
-          const nx = snap(startAbs.x + dx, e.altKey);
+          const nx = startAbs.x + dx;
           width = Math.max(settings.minNodeSize, startAbs.width + (startAbs.x - nx));
           x = startAbs.x + startAbs.width - width;
         }
         if (handle.includes('n')) {
-          const ny = snap(startAbs.y + dy, e.altKey);
+          const ny = startAbs.y + dy;
           height = Math.max(settings.minNodeSize, startAbs.height + (startAbs.y - ny));
           y = startAbs.y + startAbs.height - height;
         }
-        setInter({ ...cur, currentAbs: { x, y, width, height } });
+        const rawBounds = { x, y, width, height };
+        const guideResult = settings.snapToAlignmentGuides && !e.altKey
+          ? snapResizeToAlignmentGuides(
+              model,
+              absBounds,
+              cur.nodeId,
+              rawBounds,
+              handle,
+              6 / viewport.zoom,
+              settings.minNodeSize,
+            )
+          : { bounds: rawBounds, guides: [], snapped: { x: false, y: false } };
+        ({ x, y, width, height } = guideResult.bounds);
+        if (!guideResult.snapped.x) {
+          if (handle.includes('e')) width = Math.max(settings.minNodeSize, snap(rawBounds.width, e.altKey));
+          if (handle.includes('w')) {
+            const nx = snap(rawBounds.x, e.altKey);
+            width = Math.max(settings.minNodeSize, startAbs.x + startAbs.width - nx);
+            x = startAbs.x + startAbs.width - width;
+          }
+        }
+        if (!guideResult.snapped.y) {
+          if (handle.includes('s')) height = Math.max(settings.minNodeSize, snap(rawBounds.height, e.altKey));
+          if (handle.includes('n')) {
+            const ny = snap(rawBounds.y, e.altKey);
+            height = Math.max(settings.minNodeSize, startAbs.y + startAbs.height - ny);
+            y = startAbs.y + startAbs.height - height;
+          }
+        }
+        setInter({
+          ...cur,
+          currentAbs: { x, y, width, height },
+          guides: guideResult.guides,
+          guideSnapped: guideResult.snapped,
+        });
         break;
       }
       case 'marquee':
@@ -763,8 +868,13 @@ export function useViewEditorInteractions({
   };
 
   const onPointerLeave = () => {
-    if (activePointerIdRef.current !== null) return;
     const cur = interRef.current;
+    if (activePointerIdRef.current !== null) {
+      if (cur.kind === 'move' || cur.kind === 'resize') {
+        setInter({ ...cur, guides: [] });
+      }
+      return;
+    }
     if (cur.kind !== 'connect') return;
     if (!interactionModelIsCurrent()) {
       clearInteraction();
@@ -804,8 +914,8 @@ export function useViewEditorInteractions({
         setInter({ kind: 'none' });
         break;
       case 'move': {
-        const dx = cur.current.x - cur.start.x;
-        const dy = cur.current.y - cur.start.y;
+        const dx = e.altKey ? p.x - cur.start.x : cur.current.x - cur.start.x;
+        const dy = e.altKey ? p.y - cur.start.y : cur.current.y - cur.start.y;
         const newParent = cur.dropParentId ?? viewId;
         const validRoots = cur.rootIds.every(
           (id) => Boolean(currentModel.nodes[id] && absBounds.get(id)),
@@ -825,8 +935,12 @@ export function useViewEditorInteractions({
             id,
             parentId: newParent,
             bounds: {
-              x: snap(abs.x + dx - parentAbs.x, e.altKey),
-              y: snap(abs.y + dy - parentAbs.y, e.altKey),
+              x: cur.guideSnapped.x && !e.altKey
+                ? abs.x + dx - parentAbs.x
+                : snap(abs.x + dx - parentAbs.x, e.altKey),
+              y: cur.guideSnapped.y && !e.altKey
+                ? abs.y + dy - parentAbs.y
+                : snap(abs.y + dy - parentAbs.y, e.altKey),
               width: abs.width,
               height: abs.height,
             },
@@ -980,6 +1094,14 @@ export function useViewEditorInteractions({
   const onDoubleClick = (e: ReactMouseEvent) => {
     if (!model) return;
     const hit = hitFromEvent(e);
+    if (
+      modelStore.getState().activeTool.kind === 'format-painter' &&
+      !hit.nodeId &&
+      !hit.connId
+    ) {
+      setActiveTool({ kind: 'select' });
+      return;
+    }
     if (hit.connId !== undefined && hit.bendIndex !== undefined) {
       const conn = model.connections[hit.connId];
       if (conn) {
@@ -1043,6 +1165,12 @@ export function useViewEditorInteractions({
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && viewSel.length > 0) {
       copyNodes(viewSel, modelStore, sessionId);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x' && viewSel.length > 0) {
+      e.preventDefault();
+      const cutIds = cutNodes(viewSel, modelStore, sessionId);
+      if (cutIds.length > 0) setSelection('view', []);
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {

@@ -7,7 +7,7 @@ is represented here, including lower-priority items and optional plug-in parity.
 
 ## Baseline and scope
 
-- **Archi Online baseline:** Phase 3 release, version 1.5.0.
+- **Archi Online baseline:** Phase 4 report release, version 1.5.1.
 - **Desktop reference:** Archi 5.9.0, released April 14, 2026.
 - **ArchiMate reference:** ArchiMate 3.2.
 - **Audit date:** July 14, 2026.
@@ -76,6 +76,14 @@ The parity target has three distinct scopes:
    but officially described as work in progress, so it must not define the core
    parity completion gate.
 
+### Product-scope decisions
+
+The comparison register remains deliberately complete, but the current product
+roadmap does not include `OUTPUT-02`, `OUTPUT-03`, `OUTPUT-05`, `OUTPUT-06`,
+`AUTO-01`, or `COLLAB-*`. These are explicit product-scope decisions rather than
+implemented parity. Where an omitted item is part of Desktop core, Archi Online
+will document the deviation instead of claiming strict Desktop parity.
+
 ## Priority and effort
 
 | Priority | Meaning |
@@ -120,8 +128,8 @@ The largest remaining gaps are not the basic metamodel. They are:
 | --- | --- | --- | --- |
 | ArchiMate 3.2 metamodel and rules | **Strong** | The visible relationship matrix remains. Specializations, interchange, and connection-to-connection diagram endpoints are complete. | `MODEL-06` |
 | Workspace and model tree | **Strong/partial** | Cut, drill-down, hidden folders, richer sorting and unused markers, and some Desktop tree preferences. Phase 2 completed advanced search and find/replace. | `TREE-03`–`TREE-06`, `UX-03`, `UX-04` |
-| Everyday view editing | **Strong/partial** | Remaining manipulation commands and Format Painter. Phase 2 completed ARM, Magic Connector reuse/creation, connection endpoints and routers, transformations, note connections, and legends. | `VIEW-06`, `VIEW-07` |
-| Properties and appearance | **Strong/partial** | Format Painter, richer property reuse/bulk editing, and hyperlinks. Phase 1 completed the appearance schema; Phase 2 completed global property management. | `VIEW-07`, `PROP-02`, `PROP-03` |
+| Everyday view editing | **Strong** | Phase 2 completed ARM, Magic Connector reuse/creation, connection endpoints and routers, transformations, note connections, and legends. Diagram productivity now includes full ordering, Cut/Paste Special, keep-children deletion, same-type selection, grid/guides, and Format Painter. | — |
+| Properties and appearance | **Strong/partial** | Richer property reuse/bulk editing and hyperlinks remain. Phase 1 completed the appearance schema; Phase 2 completed global property management; Format Painter is implemented. | `PROP-02`, `PROP-03` |
 | Navigation, analysis, and quality | **Mostly strong** | Visualiser, Hints, generated views, Navigator drag-to-view, parent-folder paths, and the latest validator integrity/configuration behavior. | `ANALYSIS-01`–`ANALYSIS-06` |
 | Native `.archimate` fidelity | **Strong/partial** | Sketch and Canvas remain. ZIP assets, specializations, images, appearance, recursive connection endpoints/routes, note connections, and legends are implemented. | `FILE-02`, `NONSTD-01`–`NONSTD-03` |
 | Open Exchange and CSV | **Strong** | Phase 1 completed metadata, language, organization, XSD validation/copy, specializations, atomic import, and Archi 5.9 CSV edge behavior. | — |
@@ -446,6 +454,7 @@ opaque preservation does not count as feature support.
 
 #### VIEW-06 — Remaining manipulation commands
 
+- **Status:** Implemented (unreleased)
 - **Priority:** P2
 - **Effort:** M
 - **Current gap:** Online has front/back ordering and strong alignment, but lacks
@@ -458,6 +467,7 @@ opaque preservation does not count as feature support.
 
 #### VIEW-07 — Format Painter
 
+- **Status:** Implemented (unreleased)
 - **Priority:** P2
 - **Effort:** M
 - **Dependencies:** complete style schema from `VIEW-08`
@@ -592,7 +602,7 @@ opaque preservation does not count as feature support.
 
 #### OUTPUT-01 — Static HTML report
 
-- **Status:** Implemented (unreleased)
+- **Status:** Completed in 1.5.1
 - **Priority:** P2
 - **Effort:** L
 - **Implementation:** Export a deterministic offline ZIP with a model tree,
@@ -606,6 +616,7 @@ opaque preservation does not count as feature support.
 
 #### OUTPUT-02 — HTML report masking and query tools
 
+- **Status:** Not planned — product-scope decision
 - **Priority:** P2/P3
 - **Effort:** M/L
 - **Dependencies:** `OUTPUT-01`
@@ -619,6 +630,7 @@ opaque preservation does not count as feature support.
 
 #### OUTPUT-03 — Jasper-style formatted reports
 
+- **Status:** Not planned — product-scope decision
 - **Priority:** P3
 - **Effort:** XL
 - **Dependencies:** complete model and image fidelity
@@ -646,6 +658,7 @@ opaque preservation does not count as feature support.
 
 #### OUTPUT-05 — View gallery / Lightbox outcome
 
+- **Status:** Not planned — product-scope decision
 - **Priority:** P3 — optional plug-in parity
 - **Effort:** M
 - **Dependencies:** view image cache
@@ -658,6 +671,7 @@ opaque preservation does not count as feature support.
 
 #### OUTPUT-06 — Native Excel export
 
+- **Status:** Not planned — product-scope decision
 - **Priority:** P3 — optional plug-in parity
 - **Effort:** M
 - **Dependencies:** `MODEL-01`
@@ -673,6 +687,7 @@ opaque preservation does not count as feature support.
 
 #### AUTO-01 — Headless command-line interface
 
+- **Status:** Not planned — product-scope decision
 - **Priority:** P2/P3
 - **Effort:** L
 - **Current gap:** Desktop ACLI can load/create/save models and automate CSV,
@@ -724,7 +739,8 @@ opaque preservation does not count as feature support.
 ### 9. Collaboration and versioning
 
 These items are optional plug-in parity, not core Archi parity. Gist sharing is
-useful publishing but does not supply repository collaboration.
+useful publishing but does not supply repository collaboration. Repository
+collaboration is not planned under the current product scope.
 
 #### COLLAB-01 — Repository lifecycle and local commits
 
@@ -921,22 +937,15 @@ pinned Desktop 5.9 payload round-trip.
 
 ### Phase 4 — Stakeholder delivery
 
-1. `OUTPUT-01` static HTML report — implemented for the next release.
-2. `OUTPUT-02` report masking/query.
-3. `OUTPUT-04` print/PDF/additional output.
-4. `AUTO-01` headless CLI for strict Archi 5.9 core parity, or record its
-   omission as an explicit product-scope deviation.
+1. `OUTPUT-01` static HTML report — completed in 1.5.1.
+2. `OUTPUT-04` print/PDF/additional output.
 
 ### Phase 5 — Long-tail core and optional ecosystem parity
 
-1. Repository collaboration (`COLLAB-*`).
-2. Fuller jArchi (`AUTO-02`).
-3. Excel and gallery outputs (`OUTPUT-05`, `OUTPUT-06`).
-4. Canvas authoring/templates (`NONSTD-01`, `NONSTD-02`) — Desktop core, but a
+1. Fuller jArchi (`AUTO-02`).
+2. Canvas authoring/templates (`NONSTD-01`, `NONSTD-02`) — Desktop core, but a
    later delivery priority.
-5. Jasper-style reports (`OUTPUT-03`) — Desktop core; exact compatibility is
-   required for a strict parity claim.
-6. Sketch authoring (`NONSTD-03`) for the pinned Archi 5.9 target.
+3. Sketch authoring (`NONSTD-03`) for the pinned Archi 5.9 target.
 
 ## Definition of parity completion
 

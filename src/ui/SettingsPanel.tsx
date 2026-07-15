@@ -22,6 +22,9 @@ function formatValue(value: AppSettings[SettingKey], row: SettingRow): string {
   if (row.kind === 'select') {
     return row.options.find((option) => option.value === value)?.label ?? String(value);
   }
+  if (row.kind === 'string-select') {
+    return row.options.find((option) => option.value === value)?.label ?? String(value);
+  }
   if (row.kind === 'relationship-mask') {
     const count = ARM_RELATIONSHIP_ORDER.filter(
       (type) => ((value as number) & ARM_RELATIONSHIP_BITS[type]) !== 0,
@@ -67,6 +70,18 @@ function SettingsRow({
             className="prop-input settings-select"
             value={value as number}
             onChange={(e) => setSetting(row.key, Number(e.target.value))}
+          >
+            {row.options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : row.kind === 'string-select' ? (
+          <select
+            className="prop-input settings-select"
+            value={value as string}
+            onChange={(e) => setSetting(row.key, e.target.value)}
           >
             {row.options.map((option) => (
               <option key={option.value} value={option.value}>

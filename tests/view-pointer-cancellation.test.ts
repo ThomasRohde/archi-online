@@ -2,7 +2,13 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewEditor } from '../src/canvas/ViewEditor';
-import { deleteViewObjects, renameItem } from '../src/model/ops';
+import {
+  addNoteToView,
+  addView,
+  deleteViewObjects,
+  renameItem,
+  setNodeStyle,
+} from '../src/model/ops';
 import { replaceModel, setActiveTool, setSelection, undo } from '../src/model/store';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 import { useStore } from '../src/ui/store-hooks';
@@ -50,8 +56,8 @@ function pointer(
   return event;
 }
 
-async function renderEditor(readOnly = false): Promise<SVGSVGElement> {
-  await act(async () => root.render(createElement(ViewEditor, { viewId: 'view', readOnly })));
+async function renderEditor(readOnly = false, viewId = 'view'): Promise<SVGSVGElement> {
+  await act(async () => root.render(createElement(ViewEditor, { viewId, readOnly })));
   const svg = host.querySelector<SVGSVGElement>('svg.view-svg');
   expect(svg).not.toBeNull();
   return svg!;
@@ -78,6 +84,67 @@ function currentModel() {
 }
 
 describe('editable view pointer cancellation', () => {
+  it('captures and applies a one-shot Format Painter without changing selection', async () => {
+    setNodeStyle(['node-a'], { fillColor: '#123456', lineColor: '#654321' });
+    setSelection('view', ['node-b']);
+    setActiveTool({ kind: 'format-painter' });
+    useStore.setState({ undoStack: [], redoStack: [], dirty: false });
+    const svg = await renderEditor();
+    emulatePointerCapture(svg);
+
+    hit = host.querySelector('[data-node-id="node-a"]')!;
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 10, 10, 40)));
+    await act(async () => svg.dispatchEvent(pointer('pointerup', 10, 10, 40)));
+
+    expect(useStore.getState().activeTool).toMatchObject({
+      kind: 'format-painter',
+      snapshot: { sourceKind: 'node' },
+    });
+    expect(useStore.getState().selection).toEqual({ source: 'view', ids: ['node-b'] });
+
+    hit = host.querySelector('[data-node-id="node-b"]')!;
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 200, 20, 41)));
+    await act(async () => svg.dispatchEvent(pointer('pointerup', 200, 20, 41)));
+
+    expect(currentModel().nodes['node-b']).toMatchObject({
+      fillColor: '#123456',
+      lineColor: '#654321',
+    });
+    expect(useStore.getState().selection).toEqual({ source: 'view', ids: ['node-b'] });
+    expect(useStore.getState().activeTool).toEqual({ kind: 'select' });
+    expect(useStore.getState().undoStack.at(-1)?.label).toBe('Apply Format');
+  });
+
+  it('keeps a sticky Format Painter snapshot while switching views in one model', async () => {
+    const targetViewId = addView('Painter target');
+    const targetId = addNoteToView(
+      targetViewId,
+      targetViewId,
+      { x: 20, y: 20, width: 100, height: 50 },
+      'Target',
+    );
+    setNodeStyle(['node-a'], { fillColor: '#abcdef' });
+    setActiveTool({ kind: 'format-painter', sticky: true });
+    let svg = await renderEditor();
+    emulatePointerCapture(svg);
+    hit = host.querySelector('[data-node-id="node-a"]')!;
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 10, 10, 42)));
+    await act(async () => svg.dispatchEvent(pointer('pointerup', 10, 10, 42)));
+
+    svg = await renderEditor(false, targetViewId);
+    emulatePointerCapture(svg);
+    hit = host.querySelector(`[data-node-id="${targetId}"]`)!;
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 20, 20, 43)));
+    await act(async () => svg.dispatchEvent(pointer('pointerup', 20, 20, 43)));
+
+    expect(currentModel().nodes[targetId].fillColor).toBe('#abcdef');
+    expect(useStore.getState().activeTool).toMatchObject({
+      kind: 'format-painter',
+      sticky: true,
+      snapshot: { sourceKind: 'node' },
+    });
+  });
+
   it('cancels a move without mutation and accepts a clean next move', async () => {
     const svg = await renderEditor();
     const capture = emulatePointerCapture(svg);
@@ -216,6 +283,21 @@ describe('editable view pointer cancellation', () => {
 
     expect(currentModel().nodes['node-a'].bounds).not.toEqual(before.nodes['node-a'].bounds);
     expect(currentModel().nodes['node-b'].bounds).toMatchObject({ x: 200, y: 0 });
+  });
+
+  it('clears transient alignment guides when the model changes mid-gesture', async () => {
+    const svg = await renderEditor();
+    emulatePointerCapture(svg);
+    hit = host.querySelector('[data-node-id="node-a"]')!;
+
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 10, 10, 48)));
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 110, 10, 48)));
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 110, 10, 48)));
+    expect(Boolean(svg.querySelector('.alignment-guide'))).toBe(true);
+
+    await act(async () => renameItem('node-c', 'External model change'));
+
+    expect(Boolean(svg.querySelector('.alignment-guide'))).toBe(false);
   });
 
   it.each(['delete', 'undo'] as const)(
