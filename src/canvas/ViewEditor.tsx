@@ -278,6 +278,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
       : undefined;
   const storedRoutes = createConnectionRouteResolver(model, liveAbs, {
     isVisible: isConnectionVisible,
+    orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
   });
   const previewConnections = new Map<string, typeof selectedConnection>();
   if (inter.kind === 'bend') {
@@ -298,6 +299,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   const routes = createConnectionRouteResolver(model, liveAbs, {
     connection: (connectionId) => previewConnections.get(connectionId),
     isVisible: isConnectionVisible,
+    orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
   });
   const pendingConnectionSourcePoint = (() => {
     if (inter.kind !== 'connect') return undefined;
@@ -474,9 +476,10 @@ function ReadOnlyViewEditor({
     () => model
       ? createConnectionRouteResolver(model, absBounds, {
           isVisible: isConnectionVisible,
+          orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
         })
       : null,
-    [absBounds, isConnectionVisible, model],
+    [absBounds, isConnectionVisible, model, settings.useOrthogonalConnectionAnchors],
   );
   const { viewport, setViewport, toView, zoomTo, zoomBy, fitToView } = useCanvasViewport(
     viewId,

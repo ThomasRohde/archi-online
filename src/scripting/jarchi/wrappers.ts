@@ -326,11 +326,13 @@ function renderedRouteForConnection(m: ModelState, conn: DiagramConnection): JPo
       .filter((node) => node.viewId === conn.viewId)
       .map((node) => [node.id, modelAbsoluteBounds(m, node.id)]),
   );
+  const settings = useSettingsStore.getState().settings;
   const route = createConnectionRouteResolver(m, bounds, {
     isVisible: createNestedConnectionVisibilityResolver(
       m,
-      useSettingsStore.getState().settings,
+      settings,
     ),
+    orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
   })(conn.id);
   if (!route) throw new Error(`Connection ${conn.id} has a missing endpoint`);
   return route.map((point) => ({ ...point }));

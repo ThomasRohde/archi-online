@@ -33,6 +33,69 @@ describe('shared connection route resolver', () => {
     expect(resolve('dependent')).toBe(dependent);
   });
 
+  it('keeps radial anchors by default and opts into orthogonal sides and corners', () => {
+    const model = connectionEndpointModel();
+    model.connections.base.targetId = 'node-c';
+    model.nodes['node-b'].targetConnectionIds = [];
+    model.nodes['node-c'].targetConnectionIds.push('base');
+    const bounds = computeAbsBounds(model, 'view');
+
+    const radial = geometry.createConnectionRouteResolver(model, bounds)('base');
+    const orthogonal = geometry.createConnectionRouteResolver(model, bounds, {
+      orthogonalAnchors: true,
+    })('base');
+
+    expect(radial).toEqual([
+      { x: 62.5, y: 40 },
+      { x: 137.5, y: 160 },
+    ]);
+    expect(orthogonal).toEqual([
+      { x: 100, y: 40 },
+      { x: 100, y: 160 },
+    ]);
+  });
+
+  it('uses orthogonal anchors directed by bendpoints and falls back for overlaps', () => {
+    const model = connectionEndpointModel();
+    model.connections.base.bendpoints = [
+      { startX: 30, startY: 80, endX: -170, endY: 80 },
+    ];
+    const bounds = computeAbsBounds(model, 'view');
+
+    expect(geometry.createConnectionRouteResolver(model, bounds, {
+      orthogonalAnchors: true,
+    })('base')).toEqual([
+      { x: 80, y: 40 },
+      { x: 80, y: 100 },
+      { x: 200, y: 40 },
+    ]);
+
+    model.connections.base.bendpoints = [];
+    model.nodes['node-b'].bounds = { x: 20, y: 10, width: 100, height: 40 };
+    const overlappingBounds = computeAbsBounds(model, 'view');
+    const radial = geometry.createConnectionRouteResolver(model, overlappingBounds)('base');
+    expect(geometry.createConnectionRouteResolver(model, overlappingBounds, {
+      orthogonalAnchors: true,
+    })('base')).toEqual(radial);
+  });
+
+  it('feeds orthogonal endpoint anchors into Manhattan routing', () => {
+    const model = connectionEndpointModel();
+    model.connections.base.targetId = 'node-c';
+    model.nodes['node-b'].targetConnectionIds = [];
+    model.nodes['node-c'].targetConnectionIds.push('base');
+    model.views.view.connectionRouterType = 2;
+
+    const route = geometry.createConnectionRouteResolver(
+      model,
+      computeAbsBounds(model, 'view'),
+      { orthogonalAnchors: true },
+    )('base');
+
+    expect(route?.[0]).toEqual({ x: 100, y: 40 });
+    expect(route?.at(-1)).toEqual({ x: 100, y: 160 });
+  });
+
   it('keeps relative bendpoint semantics for connection endpoints', () => {
     const model = connectionEndpointModel();
     model.connections.dependent.bendpoints = [

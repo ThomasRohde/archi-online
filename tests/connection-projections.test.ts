@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { StaticViewContent } from '../src/canvas/export/StaticViewSvg';
+import { DEFAULT_SETTINGS } from '../src/settings/app-settings';
 import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 describe('connection endpoint projections', () => {
@@ -29,5 +30,26 @@ describe('connection endpoint projections', () => {
 
     expect(markup).toContain('d="M150,20 L150,90 L150,90 L150,160"');
     expect(model.connections.dependent.bendpoints).toEqual(before);
+  });
+
+  it('uses explicit orthogonal anchor render settings in static SVG export', () => {
+    const model = connectionEndpointModel();
+    model.connections.base.targetId = 'node-c';
+    model.nodes['node-b'].targetConnectionIds = [];
+    model.nodes['node-c'].targetConnectionIds.push('base');
+
+    const markup = renderToStaticMarkup(
+      createElement('svg', null, createElement(StaticViewContent, {
+        model,
+        viewId: 'view',
+        renderSettings: {
+          ...DEFAULT_SETTINGS,
+          useOrthogonalConnectionAnchors: true,
+        },
+      })),
+    );
+
+    expect(markup).toContain('data-conn-id="base"');
+    expect(markup).toContain('d="M100,40 L100,160"');
   });
 });

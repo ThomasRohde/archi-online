@@ -57,6 +57,7 @@ export interface AppSettings {
   fitMaxZoom: number;
   fitPadding: number;
   alignmentAnchor: number;
+  useOrthogonalConnectionAnchors: boolean;
   useNestedConnections: boolean;
   createRelationWhenAddingNewElementToContainer: boolean;
   createRelationWhenAddingModelTreeElementToContainer: boolean;
@@ -163,6 +164,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   fitMaxZoom: 1.5,
   fitPadding: 24,
   alignmentAnchor: 1,
+  useOrthogonalConnectionAnchors: false,
   useNestedConnections: true,
   createRelationWhenAddingNewElementToContainer: true,
   createRelationWhenAddingModelTreeElementToContainer: true,
@@ -298,6 +300,20 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
         kind: 'relationship-mask',
         label: 'Hidden while nested',
         description: 'Relationship connections represented by direct nesting.',
+      },
+    ],
+  },
+  {
+    id: 'connections',
+    title: 'Connections',
+    description: 'Connection drawing preferences retained between browser sessions.',
+    rows: [
+      {
+        key: 'useOrthogonalConnectionAnchors',
+        kind: 'boolean',
+        label: 'Use orthogonal connection anchors',
+        description:
+          'Prefer horizontal or vertical attachment points, using corners when alignment is not possible.',
       },
     ],
   },

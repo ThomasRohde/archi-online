@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SETTINGS,
+  SETTING_SECTIONS,
   SETTINGS_STORAGE_KEY,
   defaultElementSize,
   defaultGroupSize,
@@ -25,7 +26,26 @@ describe('app settings', () => {
       snapToAlignmentGuides: true,
       pasteSpecialMode: 'reference',
       themeMode: 'system',
+      useOrthogonalConnectionAnchors: false,
     });
+  });
+
+  it('persists the opt-in orthogonal connection anchor preference', async () => {
+    const connections = SETTING_SECTIONS.find((section) => section.id === 'connections');
+    expect(connections?.rows).toContainEqual(expect.objectContaining({
+      key: 'useOrthogonalConnectionAnchors',
+      kind: 'boolean',
+      label: 'Use orthogonal connection anchors',
+    }));
+
+    const loaded = await loadSettings(memoryKeyValueStore([[
+      SETTINGS_STORAGE_KEY,
+      { useOrthogonalConnectionAnchors: true },
+    ]]));
+
+    expect(loaded.useOrthogonalConnectionAnchors).toBe(true);
+    expect(resetSetting(loaded, 'useOrthogonalConnectionAnchors').useOrthogonalConnectionAnchors)
+      .toBe(false);
   });
 
   it('accepts only system, light, and dark theme modes', () => {

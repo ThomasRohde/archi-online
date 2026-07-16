@@ -103,6 +103,7 @@ function collidingJArchiStores() {
 }
 
 beforeEach(() => {
+  useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
   replaceModel(createEmptyModel('Script Test'), null);
 });
 
@@ -672,6 +673,31 @@ describe('jArchi scripting API', () => {
     expect(logs).toEqual([
       'log:manual 1',
       'log:manhattan C C 1 4 100 400',
+    ]);
+  });
+
+  it('uses the browser orthogonal anchor preference for rendered routes only', () => {
+    useSettingsStore.setState({
+      settings: { ...DEFAULT_SETTINGS, useOrthogonalConnectionAnchors: true },
+    });
+    const { logs, error } = run(`
+      var a = model.createElement("business-actor", "A");
+      var b = model.createElement("business-role", "B");
+      var rel = model.createRelationship("assignment-relationship", "assigned", a, b);
+      var view = model.createArchimateView("Anchors");
+      var aNode = view.add(a, 0, 0, 100, 40);
+      var bNode = view.add(b, 100, 160, 100, 40);
+      var conn = view.add(rel, aNode, bNode);
+      var route = conn.routedPoints();
+      console.log(Math.round(route[0].x), Math.round(route[0].y),
+        Math.round(route[route.length - 1].x), Math.round(route[route.length - 1].y));
+      console.log(conn.absoluteRoute().length);
+    `);
+
+    expect(error).toBeUndefined();
+    expect(logs).toEqual([
+      'log:100 40 100 160',
+      'log:0',
     ]);
   });
 

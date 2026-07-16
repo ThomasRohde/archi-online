@@ -32,6 +32,8 @@ export interface ConnectionRouteResolverOptions {
   connection?: (connectionId: string) => DiagramConnection | undefined;
   /** Derived visibility. Hidden dependencies make their dependents unroutable. */
   isVisible?: (connectionId: string) => boolean;
+  /** Prefer horizontal or vertical node attachment points, falling back to corners. */
+  orthogonalAnchors?: boolean;
 }
 
 export interface ConnectionRouteResolver {
@@ -54,6 +56,7 @@ export function createConnectionRouteResolver(
   const resolving = new Set<string>();
   const manhattanState = new Map<string, ManhattanRouterState>();
   const connection = (id: string) => options.connection?.(id) ?? model.connections[id];
+  const anchor = options.orthogonalAnchors ? orthogonalRectAnchor : rectAnchor;
 
   const connectableGeometry = (
     id: string,
@@ -109,10 +112,10 @@ export function createConnectionRouteResolver(
     let route: Point[];
     if ((model.views[conn.viewId]?.connectionRouterType ?? 0) === 2) {
       const source = sourceBounds
-        ? rectAnchor(sourceBounds, endpoints.target)
+        ? anchor(sourceBounds, endpoints.target)
         : endpoints.source;
       const target = targetBounds
-        ? rectAnchor(targetBounds, endpoints.source)
+        ? anchor(targetBounds, endpoints.source)
         : endpoints.target;
       const result = routeManhattanConnection(
         {
@@ -136,10 +139,10 @@ export function createConnectionRouteResolver(
     } else {
       const mids = bendpointPositions(conn.bendpoints, endpoints.source, endpoints.target);
       const source = sourceBounds
-        ? rectAnchor(sourceBounds, mids[0] ?? endpoints.target)
+        ? anchor(sourceBounds, mids[0] ?? endpoints.target)
         : endpoints.source;
       const target = targetBounds
-        ? rectAnchor(targetBounds, mids[mids.length - 1] ?? endpoints.source)
+        ? anchor(targetBounds, mids[mids.length - 1] ?? endpoints.source)
         : endpoints.target;
       route = [source, ...mids, target];
     }
@@ -225,6 +228,30 @@ export function rectAnchor(rect: Bounds, toward: Point): Point {
   const s = Math.min(sx, sy);
   if (s >= 1) return { x: cx, y: cy }; // toward is inside the rect
   return { x: cx + dx * s, y: cy + dy * s };
+}
+
+/**
+ * Desktop-style orthogonal node anchor. A vertically or horizontally aligned
+ * approach keeps that axis; a diagonal approach terminates on a corner.
+ * Points inside the bounds use the radial fallback for overlapping figures.
+ */
+export function orthogonalRectAnchor(rect: Bounds, toward: Point): Point {
+  const right = rect.x + rect.width;
+  const bottom = rect.y + rect.height;
+  const withinX = toward.x >= rect.x && toward.x <= right;
+  const withinY = toward.y >= rect.y && toward.y <= bottom;
+
+  if (withinX && withinY) return rectAnchor(rect, toward);
+  if (withinX) {
+    return { x: toward.x, y: toward.y < rect.y ? rect.y : bottom };
+  }
+  if (withinY) {
+    return { x: toward.x < rect.x ? rect.x : right, y: toward.y };
+  }
+  return {
+    x: toward.x < rect.x ? rect.x : right,
+    y: toward.y < rect.y ? rect.y : bottom,
+  };
 }
 
 /** Full polyline of a connection in absolute view coordinates. */

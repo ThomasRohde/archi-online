@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewEditor } from '../src/canvas/ViewEditor';
 import { showViewObjectContextMenu } from '../src/canvas/view-editor/contextMenu';
 import { createModelStore, replaceModel, setSelection } from '../src/model/store';
-import { DEFAULT_SETTINGS } from '../src/settings/app-settings';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 import { ContextMenuHost } from '../src/ui/ContextMenu';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
 import { useStore } from '../src/ui/store-hooks';
@@ -15,6 +15,7 @@ let root: Root;
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -78,6 +79,25 @@ describe('view router and endpoint controls', () => {
     expect(host.querySelectorAll('[data-connection-endpoint-handle]')).toHaveLength(0);
   });
 
+  it('uses the orthogonal anchor preference in editable and read-only viewers', async () => {
+    const model = connectionEndpointModel();
+    model.connections.base.targetId = 'node-c';
+    model.nodes['node-b'].targetConnectionIds = [];
+    model.nodes['node-c'].targetConnectionIds.push('base');
+    replaceModel(model, null);
+    useSettingsStore.setState({
+      settings: { ...DEFAULT_SETTINGS, useOrthogonalConnectionAnchors: true },
+    });
+
+    await act(async () => root.render(createElement(ViewEditor, { viewId: 'view' })));
+    const editable = host.querySelector('[data-conn-id="base"] path')?.getAttribute('d');
+    await act(async () => root.render(createElement(ViewEditor, { viewId: 'view', readOnly: true })));
+    const viewer = host.querySelector('[data-conn-id="base"] path')?.getAttribute('d');
+
+    expect(editable).toBe('M100,40 L100,160');
+    expect(viewer).toBe(editable);
+  });
+
   it('provides a compact accessible Manual/Manhattan view property', async () => {
     const model = connectionEndpointModel();
     replaceModel(model, null);
@@ -131,6 +151,70 @@ describe('view router and endpoint controls', () => {
 
     expect(useStore.getState().model!.connections.base.targetId).toBe('node-c');
     expect(useStore.getState().undoStack.at(-1)?.label).toBe('Reconnect Connection');
+  });
+
+  it('drags a selected endpoint handle on its current node to edit its anchor', async () => {
+    const model = connectionEndpointModel();
+    replaceModel(model, null);
+    setSelection('view', ['base']);
+    await act(async () => root.render(createElement(ViewEditor, { viewId: 'view' })));
+    const svg = host.querySelector<SVGSVGElement>('svg.view-svg')!;
+    Object.defineProperty(svg, 'setPointerCapture', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const targetHandle = host.querySelector<SVGCircleElement>(
+      '[data-connection-endpoint-handle="target"]',
+    )!;
+    const currentTarget = host.querySelector<SVGGElement>('[data-node-id="node-b"]')!;
+    const hit = vi.fn(() => targetHandle as Element);
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: hit,
+    });
+
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 200, 20)));
+    expect(host.querySelector('[data-connection-endpoint-handle="target"]')).toBeNull();
+    hit.mockReturnValue(currentTarget);
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 300, 12)));
+    expect(host.querySelector('[data-reconnection-preview="target"]')?.getAttribute('stroke'))
+      .toBe('var(--canvas-valid)');
+    await act(async () => svg.dispatchEvent(pointer('pointerup', 300, 12)));
+
+    const edited = useStore.getState().model!.connections.base;
+    expect(edited.targetId).toBe('node-b');
+    expect(edited.bendpoints).toHaveLength(2);
+    expect(useStore.getState().undoStack.at(-1)?.label).toBe('Edit Bendpoints');
+  });
+
+  it('does not edit an anchor when the same endpoint is dropped in Manhattan mode', async () => {
+    const model = connectionEndpointModel();
+    model.views.view.connectionRouterType = 2;
+    replaceModel(model, null);
+    setSelection('view', ['base']);
+    await act(async () => root.render(createElement(ViewEditor, { viewId: 'view' })));
+    const svg = host.querySelector<SVGSVGElement>('svg.view-svg')!;
+    Object.defineProperty(svg, 'setPointerCapture', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const targetHandle = host.querySelector<SVGCircleElement>(
+      '[data-connection-endpoint-handle="target"]',
+    )!;
+    const currentTarget = host.querySelector<SVGGElement>('[data-node-id="node-b"]')!;
+    const hit = vi.fn(() => targetHandle as Element);
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: hit,
+    });
+
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 200, 20)));
+    hit.mockReturnValue(currentTarget);
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 300, 12)));
+    await act(async () => svg.dispatchEvent(pointer('pointerup', 300, 12)));
+
+    expect(useStore.getState().model!.connections.base.bendpoints).toEqual([]);
+    expect(useStore.getState().undoStack).toEqual([]);
   });
 
   it('does not offer bendpoint editing from a Manhattan connection context menu', async () => {

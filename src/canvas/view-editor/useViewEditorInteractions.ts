@@ -78,6 +78,7 @@ import {
 } from './bounds';
 import { showEmptyCanvasContextMenu, showViewObjectContextMenu } from './contextMenu';
 import { addDroppedItemsToView, planDroppedItemsToView } from './drop';
+import { planConnectionAnchorBendpoints } from './connection-anchor-edit';
 import {
   buildMagicConnectionMenuItems,
   buildMagicTargetMenuItems,
@@ -143,7 +144,10 @@ export function useViewEditorInteractions({
     ? createNestedConnectionVisibilityResolver(model, settings)
     : () => false;
   const connectionRoutes = model
-    ? createConnectionRouteResolver(model, absBounds, { isVisible: isConnectionVisible })
+    ? createConnectionRouteResolver(model, absBounds, {
+        isVisible: isConnectionVisible,
+        orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
+      })
     : undefined;
 
   const snap = (v: number, disable?: boolean) =>
@@ -1047,7 +1051,31 @@ export function useViewEditorInteractions({
         const hit = hitFromEvent(e);
         const endpointId = hit.nodeId ?? hit.connId;
         setInter({ kind: 'none' });
-        if (endpointId) {
+        const connection = currentModel.connections[cur.connId];
+        const currentEndpointId = connection
+          ? cur.end === 'source' ? connection.sourceId : connection.targetId
+          : undefined;
+        if (
+          connection &&
+          endpointId !== undefined &&
+          endpointId === currentEndpointId &&
+          view?.connectionRouterType !== 2 &&
+          Boolean(currentModel.nodes[endpointId])
+        ) {
+          const endpoints = connectionRoutes?.endpointPoints(connection.id);
+          const route = connectionRoutes?.(connection.id);
+          if (!endpoints || !route) break;
+          const bendpoints = planConnectionAnchorBendpoints({
+            connection,
+            end: cur.end,
+            dropPoint: { x: snap(p.x, e.altKey), y: snap(p.y, e.altKey) },
+            nodeBounds: absBounds,
+            endpointPoints: endpoints,
+            currentRoute: route,
+            orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
+          });
+          if (bendpoints) setConnectionBendpoints(connection.id, bendpoints, modelStore);
+        } else if (endpointId && endpointId !== currentEndpointId) {
           void requestConnectionReconnection({
             connectionId: cur.connId,
             end: cur.end,
@@ -1355,6 +1383,16 @@ export function useViewEditorInteractions({
 
   const reconnectHover: { id: string; valid: boolean } | null = (() => {
     if (!model || inter.kind !== 'reconnect' || !inter.hoverConnectableId) return null;
+    const connection = model.connections[inter.connId];
+    const currentEndpointId = connection
+      ? inter.end === 'source' ? connection.sourceId : connection.targetId
+      : undefined;
+    if (inter.hoverConnectableId === currentEndpointId) {
+      return {
+        id: inter.hoverConnectableId,
+        valid: view?.connectionRouterType !== 2 && Boolean(model.nodes[currentEndpointId]),
+      };
+    }
     const plan = analyzeConnectionReconnection(model, {
       connectionId: inter.connId,
       end: inter.end,

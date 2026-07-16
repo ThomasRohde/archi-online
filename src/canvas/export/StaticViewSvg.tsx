@@ -75,6 +75,7 @@ export function StaticViewContent({
   const isConnectionVisible = createNestedConnectionVisibilityResolver(model, settings);
   const route = createConnectionRouteResolver(model, absBounds, {
     isVisible: isConnectionVisible,
+    orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
   });
   return (
     <>

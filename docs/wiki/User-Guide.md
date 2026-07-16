@@ -278,12 +278,21 @@ The view editor is a custom SVG canvas. It supports:
   palette; view references are created by dragging a view from the tree.
 - **Connection endpoints** — semantic and plain connections can terminate on
   nodes or other connections. Select a connection and drag its source/target
-  handle to reconnect it; invalid, cross-view, or cyclic results are rejected.
+  handle onto another connectable to reconnect it; invalid, cross-view, or
+  cyclic results are rejected. In a Manual view, drop the handle back onto its
+  current element to reposition the visual anchor where the line touches the
+  element. Anchor positions are stored as native bendpoints and survive
+  `.archimate` save and reload. Connection-to-connection endpoints remain
+  reconnectable but do not have a border anchor.
 - **Routers and bendpoints** — choose **Manual** or **Manhattan** on the view's
   Properties. Manual mode renders and edits bendpoints; Manhattan mode derives
   an orthogonal route while preserving dormant manual bendpoints for a later
   switch back. Drag a manual connection to add a bendpoint and double-click a
-  bendpoint to remove it.
+  bendpoint to remove it. **Settings → Connections → Use orthogonal connection
+  anchors** changes automatic attachment points to horizontal or vertical
+  approaches, using corners when alignment is not possible. This browser-local
+  preference applies to both routers, but direct anchor positioning is Manual
+  only.
 - **Zoom** — `Ctrl+wheel`, `Ctrl+=` / `Ctrl+-`, `Ctrl+0` for 100%, `Home` to
   fit the diagram to the window. Zoom is per view.
 - **Pan / scroll** — middle-drag or `Space`+drag to pan; wheel and
@@ -443,14 +452,16 @@ works in the shared read-only viewer.
 
 **Settings** are app-wide preferences for the current browser profile. They
 are stored in IndexedDB, never in `.archimate` files, and changing them
-affects *future* edits only — existing objects keep their stored bounds and
-style. Each row has a reset button, and **Reset all** restores the defaults.
+either updates display behavior immediately or affects *future* edits —
+existing objects keep their stored bounds and style. Each row has a reset
+button, and **Reset all** restores the defaults.
 
 | Section | Settings (defaults) |
 | --- | --- |
 | General | Theme (System, the default; Light; or Dark). System follows the operating-system preference. Add a note to a Relation's documentation field when changing type (off). When enabled, an automatically converted Association is prefixed with `(Changed from <type>)`. |
 | Model tree search | Name (on); Documentation, Property Value, Views, Show All Folders, Match Case, and Regular Expression (off). Query text and selected keys/types are intentionally not persisted. |
 | Automatic relationships | Use nested connections and prompt for palette creation, tree drop, and canvas movement (on); normal relationship candidates use Desktop defaults; reverse candidates default off; every relationship type is hidden while represented by nesting. |
+| Connections | Use orthogonal connection anchors (off). When enabled, automatic attachment points prefer horizontal or vertical approaches and otherwise use corners. |
 | Legends | New legends use 15 rows per column, Core colours, and Category sort. Custom labels and User colours are browser-local and never enter `.archimate` files. |
 | Canvas snapping | Grid visible (off); snap to grid and alignment guides (on); grid size (12 px) — also the `Shift`+arrow nudge step. |
 | Clipboard | Paste Special mode: Reference existing concepts. Duplicate concepts is the alternative. |
