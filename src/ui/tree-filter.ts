@@ -72,6 +72,11 @@ export interface TreeSearchCatalog {
   specializations: readonly TreeSearchProfile[];
 }
 
+const EMPTY_TREE_SEARCH_CATALOG: TreeSearchCatalog = Object.freeze({
+  propertyKeys: Object.freeze([]),
+  specializations: Object.freeze([]),
+});
+
 export const DEFAULT_TREE_SEARCH_CRITERIA: TreeSearchCriteria = {
   query: '',
   searchName: true,
@@ -367,6 +372,13 @@ export function collectTreeSearchCatalog(models: readonly ModelState[]): TreeSea
       || compareCaseInsensitive(left.name, right.name)
       || (left.conceptType < right.conceptType ? -1 : Number(left.conceptType > right.conceptType))),
   };
+}
+
+export function collectTreeSearchCatalogWhenNeeded(
+  models: readonly ModelState[],
+  enabled: boolean,
+): TreeSearchCatalog {
+  return enabled ? collectTreeSearchCatalog(models) : EMPTY_TREE_SEARCH_CATALOG;
 }
 
 export function treeSearchCatalogSignature(catalog: TreeSearchCatalog): string {

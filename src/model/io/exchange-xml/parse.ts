@@ -481,6 +481,7 @@ export function parseExchange(xml: string, options: ExchangeImportOptions = {}):
         const endpoints = createConnectionRouteResolver(
           state,
           absBoundsByNode,
+          { prewarmViewId: connection.viewId },
         ).endpointPoints(connectionId);
         if (!endpoints) {
           throw new ExchangeParseError(`Connection route cannot be resolved: ${connectionId}`);

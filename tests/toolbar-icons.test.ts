@@ -1,6 +1,7 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 import { Toolbar } from '../src/ui/Toolbar';
 
 const BUILT_IN_ACTIONS = [
@@ -24,6 +25,10 @@ const BUILT_IN_ACTIONS = [
 ] as const;
 
 describe('toolbar built-in icons', () => {
+  beforeEach(() => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     document.body.replaceChildren();
@@ -85,6 +90,36 @@ describe('toolbar built-in icons', () => {
       newModel.focus();
     });
     expect(help.textContent).toContain('Create a blank ArchiMate model.');
+
+    await act(async () => root.unmount());
+  });
+
+  it('hides contextual help persistently without leaving dangling descriptions', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(Toolbar)));
+
+    const newModel = host.querySelector<HTMLButtonElement>(
+      'button[aria-label="New model (Ctrl+Alt+N)"]',
+    )!;
+    expect(host.querySelector('#toolbar-context-help')).not.toBeNull();
+    expect(newModel.getAttribute('aria-describedby')).toBe('toolbar-context-description');
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[aria-label="Hide toolbar help"]')!.click();
+    });
+
+    expect(useSettingsStore.getState().settings.showToolbarContextHelp).toBe(false);
+    expect(host.querySelector('#toolbar-context-help')).toBeNull();
+    expect(newModel.hasAttribute('aria-describedby')).toBe(false);
+
+    await act(async () => {
+      useSettingsStore.getState().setSetting('showToolbarContextHelp', true);
+    });
+
+    expect(host.querySelector('#toolbar-context-help')).not.toBeNull();
+    expect(newModel.getAttribute('aria-describedby')).toBe('toolbar-context-description');
 
     await act(async () => root.unmount());
   });

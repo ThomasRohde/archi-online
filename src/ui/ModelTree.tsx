@@ -48,7 +48,7 @@ import { requestGenerateViewFor } from './GenerateViewDialog';
 import { onRevealRequest } from './tree-bus';
 import {
   DEFAULT_TREE_SEARCH_CRITERIA,
-  collectTreeSearchCatalog,
+  collectTreeSearchCatalogWhenNeeded,
   compileTreeSearch,
   resetTreeSearchCriteria,
   searchModelTree,
@@ -230,21 +230,36 @@ export function ModelTree() {
   const sessions = useWorkspaceStore((s) => s.sessions);
   const activeSessionId = useWorkspaceStore((s) => s.activeSessionId);
   const modelRevision = useWorkspaceStore((s) => s.modelRevision);
-  const settings = useSettingsStore((s) => s.settings);
+  const treeSearchName = useSettingsStore((s) => s.settings.treeSearchName);
+  const treeSearchDocumentation = useSettingsStore(
+    (s) => s.settings.treeSearchDocumentation,
+  );
+  const treeSearchPropertyValue = useSettingsStore(
+    (s) => s.settings.treeSearchPropertyValue,
+  );
+  const treeSearchViews = useSettingsStore((s) => s.settings.treeSearchViews);
+  const treeSearchShowAllFolders = useSettingsStore(
+    (s) => s.settings.treeSearchShowAllFolders,
+  );
+  const treeSearchMatchCase = useSettingsStore(
+    (s) => s.settings.treeSearchMatchCase,
+  );
+  const treeSearchRegex = useSettingsStore((s) => s.settings.treeSearchRegex);
   const setSetting = useSettingsStore((s) => s.setSetting);
   const treeContainerRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [legacyRenamingId, setLegacyRenamingId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [searchOptionsOpen, setSearchOptionsOpen] = useState(false);
   const [criteria, setCriteria] = useState<TreeSearchCriteria>(() => ({
     ...DEFAULT_TREE_SEARCH_CRITERIA,
-    searchName: settings.treeSearchName,
-    searchDocumentation: settings.treeSearchDocumentation,
-    searchPropertyValues: settings.treeSearchPropertyValue,
-    includeViews: settings.treeSearchViews,
-    showAllFolders: settings.treeSearchShowAllFolders,
-    matchCase: settings.treeSearchMatchCase,
-    useRegex: settings.treeSearchRegex,
+    searchName: treeSearchName,
+    searchDocumentation: treeSearchDocumentation,
+    searchPropertyValues: treeSearchPropertyValue,
+    includeViews: treeSearchViews,
+    showAllFolders: treeSearchShowAllFolders,
+    matchCase: treeSearchMatchCase,
+    useRegex: treeSearchRegex,
   }));
   const searchableModels = useMemo(() => {
     void modelRevision;
@@ -255,11 +270,15 @@ export function ModelTree() {
         })
       : model ? [model] : [];
   }, [model, modelRevision, order, sessions]);
-  const catalog = useMemo(() => collectTreeSearchCatalog(searchableModels), [searchableModels]);
-  const catalogSignature = treeSearchCatalogSignature(catalog);
-  const previousCatalogSignature = useRef<string | null>(null);
   const deferredCriteria = useDeferredValue(criteria);
   const compiled = useMemo(() => compileTreeSearch(deferredCriteria), [deferredCriteria]);
+  const catalogEnabled = compiled.active || searchOptionsOpen;
+  const catalog = useMemo(
+    () => collectTreeSearchCatalogWhenNeeded(searchableModels, catalogEnabled),
+    [catalogEnabled, searchableModels],
+  );
+  const catalogSignature = catalogEnabled ? treeSearchCatalogSignature(catalog) : null;
+  const previousCatalogSignature = useRef<string | null>(null);
   const results = useMemo(() => {
     void modelRevision;
     void refreshToken;
@@ -285,25 +304,26 @@ export function ModelTree() {
   useEffect(() => {
     setCriteria((current) => ({
       ...current,
-      searchName: settings.treeSearchName,
-      searchDocumentation: settings.treeSearchDocumentation,
-      searchPropertyValues: settings.treeSearchPropertyValue,
-      includeViews: settings.treeSearchViews,
-      showAllFolders: settings.treeSearchShowAllFolders,
-      matchCase: settings.treeSearchMatchCase,
-      useRegex: settings.treeSearchRegex,
+      searchName: treeSearchName,
+      searchDocumentation: treeSearchDocumentation,
+      searchPropertyValues: treeSearchPropertyValue,
+      includeViews: treeSearchViews,
+      showAllFolders: treeSearchShowAllFolders,
+      matchCase: treeSearchMatchCase,
+      useRegex: treeSearchRegex,
     }));
   }, [
-    settings.treeSearchDocumentation,
-    settings.treeSearchMatchCase,
-    settings.treeSearchName,
-    settings.treeSearchPropertyValue,
-    settings.treeSearchRegex,
-    settings.treeSearchShowAllFolders,
-    settings.treeSearchViews,
+    treeSearchDocumentation,
+    treeSearchMatchCase,
+    treeSearchName,
+    treeSearchPropertyValue,
+    treeSearchRegex,
+    treeSearchShowAllFolders,
+    treeSearchViews,
   ]);
 
   useEffect(() => {
+    if (catalogSignature === null) return;
     const previous = previousCatalogSignature.current;
     previousCatalogSignature.current = catalogSignature;
     if (previous !== null && previous !== catalogSignature) {
@@ -399,6 +419,8 @@ export function ModelTree() {
       filtering={compiled.active}
       onExpandAll={() => setCollapsed(new Set())}
       onCollapseAll={() => setCollapsed(new Set(allFolderKeys))}
+      optionsOpen={searchOptionsOpen}
+      onOptionsOpenChange={setSearchOptionsOpen}
     />
   ) : null;
 
@@ -548,7 +570,9 @@ function ModelTreeInner({
   const modelStore = useModelStoreApi();
   const treeRef = useRef<HTMLDivElement>(null);
   const readOnly = useStore((s) => s.readOnly);
-  const settings = useSettingsStore((s) => s.settings);
+  const addDocumentationNoteOnRelationChange = useSettingsStore(
+    (s) => s.settings.addDocumentationNoteOnRelationChange,
+  );
   const visible = searchResult.visibleIds;
   const filtering = searchResult.active;
   const rows = useMemo(
@@ -675,7 +699,7 @@ function ModelTreeInner({
       model,
       ids,
       modelStore,
-      settings,
+      { addDocumentationNoteOnRelationChange },
     );
     if (transformationItems.length > 0) {
       items.push(SEPARATOR, ...transformationItems);

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
 import {
   createNodeInteractionVersions,
+  pruneStableRoutes,
   stableRoutePoints,
 } from '../src/canvas/view-editor/live-render';
 import { evaluateCachedLabelExpression } from '../src/canvas/view-editor/label-cache';
@@ -57,6 +58,7 @@ describe('live view render projections', () => {
       dropParentId: null,
       connectSourceId: null,
       connectHover: null,
+      reconnectIntent: null,
     });
 
     expect(versions.get('child')).toContain('move:12:8');
@@ -68,6 +70,19 @@ describe('live view render projections', () => {
     const previous = [{ x: 1, y: 2 }, { x: 3, y: 4 }];
     expect(stableRoutePoints(previous, [{ x: 1, y: 2 }, { x: 3, y: 4 }])).toBe(previous);
     expect(stableRoutePoints(previous, [{ x: 1, y: 2 }, { x: 4, y: 4 }])).not.toBe(previous);
+  });
+
+  it('prunes deleted and foreign-view routes from the stable cache', () => {
+    const base = [{ x: 1, y: 2 }, { x: 3, y: 4 }];
+    const routes = new Map([
+      ['base', base],
+      ['deleted', [{ x: 0, y: 0 }]],
+      ['foreign', [{ x: 9, y: 9 }]],
+    ]);
+
+    pruneStableRoutes(routes, new Set(['base']));
+
+    expect(routes).toEqual(new Map([['base', base]]));
   });
 });
 

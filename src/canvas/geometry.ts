@@ -34,6 +34,8 @@ export interface ConnectionRouteResolverOptions {
   isVisible?: (connectionId: string) => boolean;
   /** Prefer horizontal or vertical node attachment points, falling back to corners. */
   orthogonalAnchors?: boolean;
+  /** Prewarm only this view's connections; other IDs still resolve on demand. */
+  prewarmViewId?: string;
 }
 
 export interface ConnectionRouteResolver {
@@ -154,7 +156,11 @@ export function createConnectionRouteResolver(
   // Draw2D owns one Manhattan router per connection layer. Pre-warming in a
   // stable dependency-first order makes row/column reservations independent
   // of which projection asks for a route first.
-  for (const connectionId of Object.keys(model.connections)) resolve(connectionId);
+  for (const connection of Object.values(model.connections)) {
+    if (options.prewarmViewId === undefined || connection.viewId === options.prewarmViewId) {
+      resolve(connection.id);
+    }
+  }
   return resolve;
 }
 

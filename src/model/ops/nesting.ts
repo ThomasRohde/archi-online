@@ -178,7 +178,10 @@ export function isAutomaticRelationshipTriggerEnabled(
 export function isConnectionHiddenByNesting(
   model: ModelState,
   connectionId: string,
-  settings: AutomaticRelationshipSettings = DEFAULT_AUTOMATIC_RELATIONSHIP_SETTINGS,
+  settings: Pick<
+    AutomaticRelationshipSettings,
+    'useNestedConnections' | 'hiddenRelationsTypes'
+  > = DEFAULT_AUTOMATIC_RELATIONSHIP_SETTINGS,
 ): boolean {
   if (!settings.useNestedConnections) return false;
   const connection = model.connections[connectionId];
@@ -199,7 +202,10 @@ export function isConnectionHiddenByNesting(
 
 export function createNestedConnectionVisibilityResolver(
   model: ModelState,
-  settings: AutomaticRelationshipSettings = DEFAULT_AUTOMATIC_RELATIONSHIP_SETTINGS,
+  settings: Pick<
+    AutomaticRelationshipSettings,
+    'useNestedConnections' | 'hiddenRelationsTypes'
+  > = DEFAULT_AUTOMATIC_RELATIONSHIP_SETTINGS,
 ): (connectionId: string) => boolean {
   return createConnectionVisibilityResolver(
     model,

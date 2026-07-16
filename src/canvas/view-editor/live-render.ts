@@ -1,5 +1,6 @@
 import type { Bounds, ModelState } from '../../model/types';
 import type { Point } from '../geometry';
+import type { ReconnectIntent } from './reconnect-intent';
 
 export interface NodeInteractionInput {
   moveDelta: Map<string, Point>;
@@ -7,6 +8,7 @@ export interface NodeInteractionInput {
   dropParentId: string | null;
   connectSourceId: string | null;
   connectHover: { id: string; valid: boolean } | null;
+  reconnectIntent: ReconnectIntent | null;
 }
 
 function appendVersion(
@@ -52,6 +54,12 @@ export function createNodeInteractionVersions(
     input.connectHover?.id ?? null,
     input.connectHover?.valid ? 'connect-valid' : 'connect-invalid',
   );
+  appendVersion(
+    model,
+    versions,
+    input.reconnectIntent?.targetId ?? null,
+    input.reconnectIntent ? `reconnect-${input.reconnectIntent.kind}` : 'reconnect-none',
+  );
   return new Map([...versions].map(([id, values]) => [id, values.sort().join('|')]));
 }
 
@@ -63,4 +71,13 @@ export function stableRoutePoints(previous: Point[] | undefined, next: Point[]):
     return previous;
   }
   return next;
+}
+
+export function pruneStableRoutes(
+  routes: Map<string, Point[]>,
+  validConnectionIds: ReadonlySet<string>,
+): void {
+  for (const connectionId of routes.keys()) {
+    if (!validConnectionIds.has(connectionId)) routes.delete(connectionId);
+  }
 }

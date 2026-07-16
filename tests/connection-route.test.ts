@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { computeAbsBounds } from '../src/canvas/view-editor/bounds';
 import * as geometry from '../src/canvas/geometry';
 import * as operations from '../src/model/ops';
+import { attachConnection } from '../src/model/ops/draft';
 import { createModelStore } from '../src/model/store';
 import type { ModelState } from '../src/model/types';
-import { connectionEndpointModel } from './helpers/connection-endpoints';
+import {
+  connectionEndpointModel,
+  endpointConnection,
+} from './helpers/connection-endpoints';
 
 type RouteResolver = (connectionId: string) => geometry.Point[] | undefined;
 type RouteFactory = (
@@ -17,6 +21,65 @@ type VisibilityFactory = (
 ) => (connectionId: string) => boolean;
 
 describe('shared connection route resolver', () => {
+  it('prewarms only the requested view and resolves foreign views on demand', () => {
+    const model = connectionEndpointModel();
+    model.views.other = {
+      id: 'other',
+      kind: 'view',
+      name: 'Other',
+      documentation: '',
+      properties: [],
+      folderId: model.views.view.folderId,
+      childIds: ['other-a', 'other-b'],
+    };
+    model.nodes['other-a'] = {
+      id: 'other-a',
+      viewId: 'other',
+      parentId: 'other',
+      nodeType: 'note',
+      content: 'Other A',
+      bounds: { x: 0, y: 0, width: 100, height: 40 },
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      properties: [],
+    };
+    model.nodes['other-b'] = {
+      id: 'other-b',
+      viewId: 'other',
+      parentId: 'other',
+      nodeType: 'note',
+      content: 'Other B',
+      bounds: { x: 200, y: 0, width: 100, height: 40 },
+      childIds: [],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      properties: [],
+    };
+    attachConnection(model, endpointConnection('foreign', 'other-a', 'other-b', {
+      viewId: 'other',
+    }));
+    const bounds = new Map([
+      ...computeAbsBounds(model, 'view'),
+      ...computeAbsBounds(model, 'other'),
+    ]);
+    const reads: string[] = [];
+    const resolve = geometry.createConnectionRouteResolver(model, bounds, {
+      connection: (connectionId) => {
+        reads.push(connectionId);
+        return model.connections[connectionId];
+      },
+      prewarmViewId: 'view',
+    });
+
+    expect(reads).not.toContain('foreign');
+    expect(resolve('foreign')).toEqual([
+      { x: 100, y: 20 },
+      { x: 200, y: 20 },
+    ]);
+    expect(reads).toContain('foreign');
+  });
+
   it('recursively routes connection endpoints from routed polyline midpoints', () => {
     const model = connectionEndpointModel();
     const factory = (geometry as typeof geometry & {

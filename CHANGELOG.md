@@ -5,6 +5,32 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-07-16
+
+### Added
+
+- Zoom-independent resize, bendpoint, and connection-endpoint handles with
+  larger endpoint hit targets
+- Distinct anchor, valid reconnect, invalid reconnect, and cancellation
+  feedback in the canvas and status bar
+- A persistent setting to hide or restore the toolbar context-help strip
+
+### Changed
+
+- Scoped canvas status to the active model session and view so zoom and cursor
+  coordinates remain correct in multi-model workspaces
+- Limited route prewarming to the current view, memoized route resolution,
+  pruned stale route entries, and narrowed per-node settings subscriptions
+- Deferred model-tree search catalog construction until search or its options
+  are active
+
+### Fixed
+
+- Restored clean state when undo returns to the saved revision, while preserving
+  dirty state for edits made during an in-progress save
+- Preferred anchor movement for near-miss endpoint drops instead of silently
+  reconnecting to an enclosing element
+
 ## [1.7.0] - 2026-07-16
 
 ### Added

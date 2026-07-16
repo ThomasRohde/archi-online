@@ -19,6 +19,7 @@ import {
   Share2,
   Tags,
   Undo2,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { autoListedExtensionCommands } from '../extensions/command-visibility';
@@ -82,6 +83,7 @@ import { TemplateGallery } from './TemplateGallery';
 import { StaticReportExportDialog } from './StaticReportExportDialog';
 import { ModalSurface } from './ModalSurface';
 import { SHORTCUTS } from './shortcuts';
+import { useSettingsStore } from '../settings/app-settings';
 
 /** Published documentation site (GitHub Pages). */
 const DOCS_URL = 'https://thomasrohde.github.io/archi-online/';
@@ -347,6 +349,10 @@ function toolbarMenuAnchor(button: HTMLButtonElement): { x: number; y: number } 
 export function Toolbar() {
   const [activeTip, setActiveTip] = useState<ToolbarTip | null>(null);
   const tipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToolbarContextHelp = useSettingsStore(
+    (state) => state.settings.showToolbarContextHelp,
+  );
+  const setSetting = useSettingsStore((state) => state.setSetting);
   const [showHelp, setShowHelp] = useState(false);
   const [showExportImage, setShowExportImage] = useState(false);
   const [showExportCsv, setShowExportCsv] = useState(false);
@@ -374,7 +380,7 @@ export function Toolbar() {
   const tip = (value: ToolbarTip) => ({
     'aria-label': value.accessibleName
       ?? (value.shortcut ? `${value.label} (${value.shortcut})` : value.label),
-    'aria-describedby': 'toolbar-context-description',
+    'aria-describedby': showToolbarContextHelp ? 'toolbar-context-description' : undefined,
     onMouseEnter: () => {
       clearTipTimer();
       tipTimer.current = setTimeout(() => {
@@ -760,16 +766,28 @@ export function Toolbar() {
         <TbIcon name="help" />
       </button>
       </div>
-      <div id="toolbar-context-help" className="toolbar-context-help" role="status" aria-live="polite">
-        <span className="toolbar-context-icon"><TbIcon name={shownTip.icon} /></span>
-        <span className="toolbar-context-label">{shownTip.label}</span>
-        <span id="toolbar-context-description" className="toolbar-context-description">
-          {shownTip.description}
-        </span>
-        {shownTip.shortcut && (
-          <kbd className="toolbar-context-shortcut">{shownTip.shortcut}</kbd>
-        )}
-      </div>
+      {showToolbarContextHelp && (
+        <div id="toolbar-context-help" className="toolbar-context-help">
+          <div className="toolbar-context-content" role="status" aria-live="polite">
+            <span className="toolbar-context-icon"><TbIcon name={shownTip.icon} /></span>
+            <span className="toolbar-context-label">{shownTip.label}</span>
+            <span id="toolbar-context-description" className="toolbar-context-description">
+              {shownTip.description}
+            </span>
+            {shownTip.shortcut && (
+              <kbd className="toolbar-context-shortcut">{shownTip.shortcut}</kbd>
+            )}
+          </div>
+          <button
+            type="button"
+            className="toolbar-context-hide"
+            aria-label="Hide toolbar help"
+            onClick={() => setSetting('showToolbarContextHelp', false)}
+          >
+            <X size={16} strokeWidth={1.8} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       {showExportImage && <ExportImageDialog onClose={() => setShowExportImage(false)} />}
       {showExportCsv && <ExportCsvDialog onClose={() => setShowExportCsv(false)} />}
       {showExportExchange && <ExportExchangeDialog onClose={() => setShowExportExchange(false)} />}

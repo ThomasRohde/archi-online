@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
+import { transact } from '../src/model/store';
 import { getModelSession, addModelSession, resetWorkspaceForTests } from '../src/model/workspace';
 import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
@@ -161,6 +162,52 @@ describe('file persistence', () => {
     expect(new TextDecoder().decode(writes[0])).toContain('First');
     expect(getModelSession(firstId)?.store.getState().dirty).toBe(false);
     expect(getModelSession(secondId)?.store.getState().dirty).toBe(true);
+  });
+
+  it('does not clear edits made while an asynchronous save is in progress', async () => {
+    let releaseWrite!: () => void;
+    let writeStarted!: () => void;
+    const writeStartedPromise = new Promise<void>((resolve) => {
+      writeStarted = resolve;
+    });
+    const writeGate = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const handle = {
+      name: 'async.archimate',
+      createWritable: async () => ({
+        write: async () => {
+          writeStarted();
+          await writeGate;
+        },
+        close: async () => {},
+      }),
+    } as unknown as FileSystemFileHandle;
+    const sessionId = addModelSession({
+      model: createEmptyModel('Async save'),
+      fileName: handle.name,
+      fileHandle: handle,
+    });
+    const session = getModelSession(sessionId)!;
+    transact('Before save', (draft) => {
+      draft.info.documentation = 'Included in save';
+    }, session.store);
+    const savingRevision = session.store.getState().historyRevision;
+
+    const saving = saveModelToDisk(sessionId);
+    await writeStartedPromise;
+    transact('During save', (draft) => {
+      draft.info.documentation = 'Still unsaved';
+    }, session.store);
+    releaseWrite();
+    await saving;
+
+    expect(session.store.getState()).toMatchObject({
+      savedRevision: savingRevision,
+      dirty: true,
+      fileName: handle.name,
+    });
+    expect(session.store.getState().historyRevision).not.toBe(savingRevision);
   });
 
   it('activates an already-open handle instead of opening it twice', async () => {

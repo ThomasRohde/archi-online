@@ -9,6 +9,10 @@ import { assetDataUrl } from '../../model/assets';
 import { evaluateLabelExpression } from '../../model/label-expression';
 import { useSettingsStore } from '../../settings/app-settings';
 import { evaluateCachedLabelExpression } from './label-cache';
+import {
+  reconnectIntentTone,
+  type ReconnectIntent,
+} from './reconnect-intent';
 
 interface NodeViewProps {
   model: ModelState;
@@ -18,6 +22,7 @@ interface NodeViewProps {
   dropParentId: string | null;
   connectSource: string | null;
   connectHover: { id: string; valid: boolean } | null;
+  reconnectIntent?: ReconnectIntent | null;
   interactionVersions?: Map<string, string>;
   anchorId?: string | null;
   c4ViewType?: C4ViewType;
@@ -34,13 +39,17 @@ function NodeViewComponent({
   dropParentId,
   connectSource,
   connectHover,
+  reconnectIntent = null,
   interactionVersions = EMPTY_INTERACTION_VERSIONS,
   anchorId,
   c4ViewType,
   viewpoint,
 }: NodeViewProps) {
   const node = model.nodes[nodeId];
-  const settings = useSettingsStore((state) => state.settings);
+  const legendLabels = useSettingsStore((state) => state.settings.legendLabels);
+  const legendUserColors = useSettingsStore(
+    (state) => state.settings.legendUserColors,
+  );
   const selected = useStore(
     (s) => s.selection.source === 'view' && s.selection.ids.includes(nodeId),
   );
@@ -62,7 +71,14 @@ function NodeViewComponent({
     dropParentId === nodeId ||
     connectSource === nodeId ||
     (connectHover?.id === nodeId && connectHover.valid);
-  const invalid = connectHover?.id === nodeId && !connectHover.valid;
+  const reconnectTone =
+    reconnectIntent?.targetId === nodeId
+      ? reconnectIntentTone(reconnectIntent)
+      : null;
+  const invalid =
+    (connectHover?.id === nodeId && !connectHover.valid) ||
+    reconnectTone === 'invalid';
+  const positive = highlight || reconnectTone === 'valid' || reconnectTone === 'anchor';
   // The align/match anchor (key object) gets a distinct amber outline plus
   // filled corner handles so it is clear which element the rest snaps to.
   const anchorCue = selected && anchorId === nodeId && !highlight && !invalid;
@@ -93,20 +109,30 @@ function NodeViewComponent({
           displayLabel={displayLabel}
           model={model}
           legendPreferences={{
-            labels: settings.legendLabels,
-            userColors: settings.legendUserColors,
+            labels: legendLabels,
+            userColors: legendUserColors,
           }}
         />
       </g>
-      {(selected || highlight || invalid) && (
+      {(selected || positive || invalid) && (
         <rect
           x={-1.5}
           y={-1.5}
           width={width + 3}
           height={height + 3}
           fill="none"
-          stroke={invalid ? 'var(--canvas-invalid)' : highlight ? 'var(--canvas-valid)' : anchorCue ? 'var(--canvas-anchor)' : 'var(--canvas-selection)'}
-          strokeWidth={highlight || invalid ? 2 : anchorCue ? 1.8 : 1.2}
+          stroke={
+            invalid
+              ? 'var(--canvas-invalid)'
+              : reconnectTone === 'anchor'
+                ? 'var(--canvas-anchor)'
+                : positive
+                  ? 'var(--canvas-valid)'
+                  : anchorCue
+                    ? 'var(--canvas-anchor)'
+                    : 'var(--canvas-selection)'
+          }
+          strokeWidth={positive || invalid ? 2 : anchorCue ? 1.8 : 1.2}
           pointerEvents="none"
         />
       )}
@@ -137,6 +163,7 @@ function NodeViewComponent({
           dropParentId={dropParentId}
           connectSource={connectSource}
           connectHover={connectHover}
+          reconnectIntent={reconnectIntent}
           interactionVersions={interactionVersions}
           anchorId={anchorId}
           c4ViewType={c4ViewType}

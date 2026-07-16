@@ -56,6 +56,10 @@ Extensions can contribute additional dockable panels; they appear in the
 | **Views ▾** | Reopen panels (open ones are check-marked) and reset the layout. |
 | **?** | Keyboard shortcut reference. |
 
+The context-help strip beneath the toolbar describes the command currently
+under the pointer or keyboard focus. Use its **Hide toolbar help** button to
+remove it; **Settings → General → Show toolbar context help** restores it.
+
 **Static HTML Report (.zip)…** exports the complete active model as an offline
 stakeholder report. Extract the ZIP and open `index.html` to use its model tree,
 literal search, deep links, object details, analysis links, and diagram zoom
@@ -225,7 +229,8 @@ The view editor is a custom SVG canvas. It supports:
   and blue edge/centre alignment guides apply by default; hold `Alt` to bypass
   both for one drag. Right-click empty canvas → **Grid and Guides** to show or
   hide the editor-only grid and toggle either snapping system. Arrow keys
-  nudge the selection by 1 px, `Shift`+arrows by one grid step.
+  nudge the selection by 1 px, `Shift`+arrows by one grid step. Resize handles
+  remain 7 screen pixels across zoom levels.
 - **Nesting and automatic relationships** — drop an element inside a group or
   another element to nest it; child bounds stay relative to the parent. When
   Automatic Relationships are enabled, an element container offers the valid
@@ -278,21 +283,30 @@ The view editor is a custom SVG canvas. It supports:
   palette; view references are created by dragging a view from the tree.
 - **Connection endpoints** — semantic and plain connections can terminate on
   nodes or other connections. Select a connection and drag its source/target
-  handle onto another connectable to reconnect it; invalid, cross-view, or
-  cyclic results are rejected. In a Manual view, drop the handle back onto its
-  current element to reposition the visual anchor where the line touches the
-  element. Anchor positions are stored as native bendpoints and survive
+  handle onto another connectable to reconnect it. Endpoint handles remain
+  8 screen pixels across zoom levels and have a transparent 12-pixel hit area.
+  The preview and hovered target are amber for **Move anchor**, green for a
+  valid **Reconnect to _target_**, and red for an invalid, cross-view, cyclic,
+  or router-restricted target; the status bar shows the same intent instead of
+  cursor coordinates while dragging. In a Manual view, drop the handle back
+  onto its current element to reposition the visual anchor where the line
+  touches the element. A near-miss within 6 screen pixels of that element's
+  boundary remains an anchor move rather than reconnecting to an enclosing
+  container. Anchor positions are stored as native bendpoints and survive
   `.archimate` save and reload. Connection-to-connection endpoints remain
-  reconnectable but do not have a border anchor.
+  reconnectable but do not have a border anchor. Press `Escape`, cancel the
+  pointer, or lose pointer capture to abandon the drag without mutation;
+  dropping on empty canvas also changes nothing and briefly reports
+  **Reconnect cancelled**.
 - **Routers and bendpoints** — choose **Manual** or **Manhattan** on the view's
   Properties. Manual mode renders and edits bendpoints; Manhattan mode derives
   an orthogonal route while preserving dormant manual bendpoints for a later
   switch back. Drag a manual connection to add a bendpoint and double-click a
-  bendpoint to remove it. **Settings → Connections → Use orthogonal connection
-  anchors** changes automatic attachment points to horizontal or vertical
-  approaches, using corners when alignment is not possible. This browser-local
-  preference applies to both routers, but direct anchor positioning is Manual
-  only.
+  bendpoint to remove it. Bendpoint handles remain 7 screen pixels across zoom
+  levels. **Settings → Connections → Use orthogonal connection anchors**
+  changes automatic attachment points to horizontal or vertical approaches,
+  using corners when alignment is not possible. This browser-local preference
+  applies to both routers, but direct anchor positioning is Manual only.
 - **Zoom** — `Ctrl+wheel`, `Ctrl+=` / `Ctrl+-`, `Ctrl+0` for 100%, `Home` to
   fit the diagram to the window. Zoom is per view.
 - **Pan / scroll** — middle-drag or `Space`+drag to pan; wheel and
@@ -458,7 +472,7 @@ button, and **Reset all** restores the defaults.
 
 | Section | Settings (defaults) |
 | --- | --- |
-| General | Theme (System, the default; Light; or Dark). System follows the operating-system preference. Add a note to a Relation's documentation field when changing type (off). When enabled, an automatically converted Association is prefixed with `(Changed from <type>)`. |
+| General | Theme (System, the default; Light; or Dark). System follows the operating-system preference. Show toolbar context help (on). Add a note to a Relation's documentation field when changing type (off). When enabled, an automatically converted Association is prefixed with `(Changed from <type>)`. |
 | Model tree search | Name (on); Documentation, Property Value, Views, Show All Folders, Match Case, and Regular Expression (off). Query text and selected keys/types are intentionally not persisted. |
 | Automatic relationships | Use nested connections and prompt for palette creation, tree drop, and canvas movement (on); normal relationship candidates use Desktop defaults; reverse candidates default off; every relationship type is hidden while represented by nesting. |
 | Connections | Use orthogonal connection anchors (off). When enabled, automatic attachment points prefer horizontal or vertical approaches and otherwise use corners. |
@@ -482,6 +496,13 @@ are imported as new, unsaved models, so the next save writes a native
 
 Saving prefers a native browser file handle (write-in-place) and falls back
 to a download when the browser or organization policy blocks file handles.
+The dirty marker is based on the model's saved revision, not merely the number
+of undo entries: undoing exactly to the last completed save clears the marker,
+and redoing away from it marks the model dirty again. A save captures one
+revision before serialization; edits made while that save is still running
+remain unsaved when it completes. Newly opened native files and new models
+start with a save point, while imported models and autosave-restored dirty
+models intentionally do not invent one.
 See [[Getting Started|Getting-Started]] for the storage overview and
 [[Archi Compatibility|Archi-Compatibility]] for exchange details.
 

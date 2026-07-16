@@ -239,7 +239,9 @@ function writeViews(state: ModelState, out: string[], propertyDefs: Map<string, 
   for (const viewId of viewIds) {
     const view = state.views[viewId];
     const absBounds = absoluteBounds(state, viewId);
-    const routes = createConnectionRouteResolver(state, absBounds);
+    const routes = createConnectionRouteResolver(state, absBounds, {
+      prewarmViewId: viewId,
+    });
     const offset = negativeOffset(state, viewId, routes);
 
     const attrs: Attr[] = [

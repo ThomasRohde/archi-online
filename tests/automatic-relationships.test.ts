@@ -1977,6 +1977,7 @@ describe('automatic relationship apply', () => {
       readOnly: true,
       undoStack: [],
       redoStack: [],
+      savedRevision: editable.getState().historyRevision,
       dirty: false,
     });
     const before = readOnly.getState().model;

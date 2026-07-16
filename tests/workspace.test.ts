@@ -91,7 +91,13 @@ describe('multi-model workspace', () => {
 
   it('fully resets the shared empty store when the workspace is cleared', () => {
     const emptyStore = getActiveModelStore();
-    const transaction = { label: 'Leaked', patches: [], inverse: [] };
+    const transaction = {
+      label: 'Leaked',
+      patches: [],
+      inverse: [],
+      beforeRevision: 0,
+      afterRevision: 1,
+    };
     emptyStore.setState({
       model: createEmptyModel('Leaked model'),
       fileName: 'leaked.archimate',
@@ -114,6 +120,8 @@ describe('multi-model workspace', () => {
       model: null,
       fileName: null,
       dirty: false,
+      historyRevision: 0,
+      savedRevision: 0,
       readOnly: false,
       undoStack: [],
       redoStack: [],

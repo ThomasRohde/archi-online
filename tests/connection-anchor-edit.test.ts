@@ -4,12 +4,50 @@ import {
   createConnectionRouteResolver,
   toRelativeBendpoint,
 } from '../src/canvas/geometry';
-import { planConnectionAnchorBendpoints } from '../src/canvas/view-editor/connection-anchor-edit';
+import {
+  planConnectionAnchorBendpoints,
+  shouldPreferConnectionAnchor,
+} from '../src/canvas/view-editor/connection-anchor-edit';
 import { computeAbsBounds } from '../src/canvas/view-editor/bounds';
 import { parseArchimate, serializeArchimate } from '../src/model/io/archimate-xml';
 import { connectionEndpointModel } from './helpers/connection-endpoints';
 
 describe('connection anchor bendpoint planning', () => {
+  it('uses a six-screen-pixel boundary tolerance at every zoom', () => {
+    const model = connectionEndpointModel();
+    const connection = model.connections.base;
+    const bounds = computeAbsBounds(model, 'view');
+
+    expect(shouldPreferConnectionAnchor({
+      connection,
+      end: 'target',
+      dropPoint: { x: 305.9, y: 20 },
+      nodeBounds: bounds,
+      zoom: 1,
+    })).toBe(true);
+    expect(shouldPreferConnectionAnchor({
+      connection,
+      end: 'target',
+      dropPoint: { x: 306.1, y: 20 },
+      nodeBounds: bounds,
+      zoom: 1,
+    })).toBe(false);
+    expect(shouldPreferConnectionAnchor({
+      connection,
+      end: 'target',
+      dropPoint: { x: 302.9, y: 20 },
+      nodeBounds: bounds,
+      zoom: 2,
+    })).toBe(true);
+    expect(shouldPreferConnectionAnchor({
+      connection,
+      end: 'target',
+      dropPoint: { x: 303.1, y: 20 },
+      nodeBounds: bounds,
+      zoom: 2,
+    })).toBe(false);
+  });
+
   it('repositions one end of a straight connection without moving the opposite anchor', () => {
     const model = connectionEndpointModel();
     const bounds = computeAbsBounds(model, 'view');

@@ -23,7 +23,7 @@ export function conceptTransformationMenuItems(
   model: ModelState,
   selectedIds: string[],
   store: ModelStore,
-  settings: AppSettings,
+  settings: Pick<AppSettings, 'addDocumentationNoteOnRelationChange'>,
 ): MenuItem[] {
   const conceptIds = semanticConceptIds(model, selectedIds);
   const elementIds = conceptIds.filter((id) => Boolean(model.elements[id]));
@@ -64,7 +64,7 @@ function conceptTypeChildren(
   elementIds: string[],
   relationshipIds: string[],
   store: ModelStore,
-  settings: AppSettings,
+  settings: Pick<AppSettings, 'addDocumentationNoteOnRelationChange'>,
 ): MenuItem[] {
   const typeChildren: MenuItem[] = [];
   if (elementIds.length > 0) {
@@ -123,7 +123,7 @@ async function performConceptTypeChange(
   conceptIds: string[],
   targetType: ConceptType,
   store: ModelStore,
-  settings: AppSettings,
+  settings: Pick<AppSettings, 'addDocumentationNoteOnRelationChange'>,
 ): Promise<void> {
   const model = store.getState().model;
   if (!model || store.getState().readOnly) return;

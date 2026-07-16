@@ -90,6 +90,30 @@ function distanceToBounds(point: Point, bounds: Bounds): number {
   return Math.hypot(dx, dy);
 }
 
+export function shouldPreferConnectionAnchor({
+  connection,
+  end,
+  dropPoint,
+  nodeBounds,
+  zoom,
+  tolerance = 6,
+}: {
+  connection: DiagramConnection;
+  end: 'source' | 'target';
+  dropPoint: Point;
+  nodeBounds: ReadonlyMap<string, Bounds>;
+  zoom: number;
+  tolerance?: number;
+}): boolean {
+  const endpointId = end === 'source' ? connection.sourceId : connection.targetId;
+  const endpointBounds = nodeBounds.get(endpointId);
+  return Boolean(
+    endpointBounds &&
+    zoom > 0 &&
+    distanceToBounds(dropPoint, endpointBounds) * zoom <= tolerance,
+  );
+}
+
 export function planConnectionAnchorBendpoints({
   connection,
   end,

@@ -201,6 +201,26 @@ describe('editable view pointer cancellation', () => {
     expect(useStore.getState().undoStack.at(-1)?.label).toBe('Reconnect Connection');
   });
 
+  it('cancels a reconnect with Escape without mutating the model', async () => {
+    setSelection('view', ['base']);
+    const svg = await renderEditor();
+    emulatePointerCapture(svg);
+    const before = structuredClone(currentModel());
+    hit = host.querySelector('[data-connection-endpoint-handle="target"]')!;
+
+    await act(async () => svg.dispatchEvent(pointer('pointerdown', 300, 20, 44)));
+    hit = host.querySelector('[data-node-id="node-c"]')!;
+    await act(async () => svg.dispatchEvent(pointer('pointermove', 150, 180, 44)));
+    expect(host.querySelector('[data-reconnection-preview="target"]')).not.toBeNull();
+    await act(async () => svg.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }),
+    ));
+
+    expect(currentModel()).toEqual(before);
+    expect(useStore.getState().undoStack).toEqual([]);
+    expect(host.querySelector('[data-reconnection-preview]')).toBeNull();
+  });
+
   it('cancels a bendpoint drag without mutation and accepts the next bendpoint drag', async () => {
     const model = connectionEndpointModel();
     model.connections.base.bendpoints = [

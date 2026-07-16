@@ -17,6 +17,8 @@ export interface Transaction {
   label: string;
   patches: Patch[];
   inverse: Patch[];
+  beforeRevision: number;
+  afterRevision: number;
   selectionBefore?: SelectionState;
   selectionAfter?: SelectionState;
 }
@@ -72,6 +74,8 @@ export interface AppState {
   model: ModelState | null;
   fileName: string | null;
   dirty: boolean;
+  historyRevision: number;
+  savedRevision: number | null;
   readOnly: boolean;
   undoStack: Transaction[];
   redoStack: Transaction[];
@@ -102,10 +106,17 @@ export interface ModelStore extends StoreApi<AppState> {
 const MAX_UNDO = 200;
 
 function initialState(overrides: Partial<AppState> = {}): AppState {
-  return {
+  const historyRevision = overrides.historyRevision ?? 0;
+  const savedRevision =
+    overrides.savedRevision !== undefined
+      ? overrides.savedRevision
+      : overrides.dirty === true
+        ? null
+        : historyRevision;
+  const state: AppState = {
     model: null,
     fileName: null,
-    dirty: false,
+    dirty: revisionIsDirty(historyRevision, savedRevision),
     readOnly: false,
     undoStack: [],
     redoStack: [],
@@ -117,19 +128,33 @@ function initialState(overrides: Partial<AppState> = {}): AppState {
     modelEpoch: 0,
     booted: false,
     ...overrides,
+    historyRevision,
+    savedRevision,
   };
+  state.dirty = revisionIsDirty(state.historyRevision, state.savedRevision);
+  return state;
 }
 
 export function createModelStore(overrides: Partial<AppState> = {}): ModelStore {
   const api = createStore<AppState>()(() => initialState(overrides));
+  let revisionCounter = Math.max(
+    0,
+    overrides.historyRevision ?? 0,
+    overrides.savedRevision ?? 0,
+  );
   let batchDepth = 0;
   let batchLabel = '';
   let batchPatches: Patch[] = [];
   let batchInverse: Patch[] = [];
+  let batchBeforeRevision = 0;
   let batchSelectionBefore: SelectionState | undefined;
   let batchSelectionAfter: SelectionState | undefined;
 
   const modelStore = api as ModelStore;
+  const allocateRevision = () => {
+    revisionCounter += 1;
+    return revisionCounter;
+  };
 
   modelStore.transact = (label, recipe, options = {}) => {
     const state = api.getState();
@@ -153,9 +178,12 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
         ...(selectionAfter ? { selection: selectionAfter } : {}),
       });
     } else {
+      const beforeRevision = state.historyRevision;
+      const afterRevision = allocateRevision();
       api.setState((current) => ({
         model: next,
-        dirty: true,
+        historyRevision: afterRevision,
+        dirty: revisionIsDirty(afterRevision, current.savedRevision),
         ...(selectionAfter ? { selection: selectionAfter } : {}),
         undoStack: [
           ...current.undoStack,
@@ -163,6 +191,8 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
             label,
             patches,
             inverse,
+            beforeRevision,
+            afterRevision,
             ...(selectionAfter
               ? { selectionBefore, selectionAfter }
               : {}),
@@ -184,6 +214,7 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
       batchLabel = label;
       batchPatches = [];
       batchInverse = [];
+      batchBeforeRevision = api.getState().historyRevision;
       batchSelectionBefore = undefined;
       batchSelectionAfter = undefined;
     }
@@ -194,10 +225,13 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
       finished = true;
       batchDepth--;
       if (batchDepth === 0 && batchPatches.length > 0) {
+        const afterRevision = allocateRevision();
         const tx: Transaction = {
           label: batchLabel,
           patches: batchPatches,
           inverse: batchInverse,
+          beforeRevision: batchBeforeRevision,
+          afterRevision,
           ...(batchSelectionBefore && batchSelectionAfter
             ? {
                 selectionBefore: batchSelectionBefore,
@@ -212,6 +246,8 @@ export function createModelStore(overrides: Partial<AppState> = {}): ModelStore 
         api.setState((current) => ({
           undoStack: [...current.undoStack, tx].slice(-MAX_UNDO),
           redoStack: [],
+          historyRevision: afterRevision,
+          dirty: revisionIsDirty(afterRevision, current.savedRevision),
         }));
       }
     };
@@ -291,7 +327,8 @@ export function undo(store?: ModelStore): void {
   if (!tx || !state.model) return;
   target.setState({
     model: applyPatches(state.model, tx.inverse),
-    dirty: true,
+    historyRevision: tx.beforeRevision,
+    dirty: revisionIsDirty(tx.beforeRevision, state.savedRevision),
     undoStack: state.undoStack.slice(0, -1),
     redoStack: [...state.redoStack, tx],
     ...(tx.selectionBefore
@@ -309,7 +346,8 @@ export function redo(store?: ModelStore): void {
   if (!tx || !state.model) return;
   target.setState({
     model: applyPatches(state.model, tx.patches),
-    dirty: true,
+    historyRevision: tx.afterRevision,
+    dirty: revisionIsDirty(tx.afterRevision, state.savedRevision),
     undoStack: [...state.undoStack, tx],
     redoStack: state.redoStack.slice(0, -1),
     ...(tx.selectionAfter
@@ -321,6 +359,26 @@ export function redo(store?: ModelStore): void {
 
 function cloneSelection(selection: SelectionState): SelectionState {
   return { source: selection.source, ids: [...selection.ids] };
+}
+
+function revisionIsDirty(
+  historyRevision: number,
+  savedRevision: number | null,
+): boolean {
+  return savedRevision === null || historyRevision !== savedRevision;
+}
+
+export function markModelSaved(
+  revision: number,
+  fileName: string,
+  store?: ModelStore,
+): void {
+  const target = targetStore(store);
+  target.setState((state) => ({
+    fileName,
+    savedRevision: revision,
+    dirty: revisionIsDirty(state.historyRevision, revision),
+  }));
 }
 
 function pruneSelection(store: ModelStore): void {
@@ -361,6 +419,8 @@ export function replaceModel(
     model,
     fileName,
     dirty,
+    historyRevision: 0,
+    savedRevision: dirty ? null : 0,
     readOnly: options.readOnly ?? false,
     undoStack: [],
     redoStack: [],

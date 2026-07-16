@@ -1,5 +1,6 @@
 import type { Bounds } from '../../model/types';
 import type { Point } from '../geometry';
+import type { ReconnectIntent } from './reconnect-intent';
 
 export interface Viewport {
   zoom: number;
@@ -44,7 +45,7 @@ export type Interaction =
       connId: string;
       end: 'source' | 'target';
       current: Point;
-      hoverConnectableId: string | null;
+      intent: ReconnectIntent;
     }
   | { kind: 'bend'; connId: string; index: number; start: Point; current: Point; isNew: boolean };
 

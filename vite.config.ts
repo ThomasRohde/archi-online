@@ -45,6 +45,20 @@ export default defineConfig({
   // (Chrome/Edge 89+, Safari 15+). Preserve that syntax in the application bundle.
   build: {
     target: 'esnext',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const moduleId = id.replaceAll('\\', '/');
+          if (/\/node_modules\/(?:react|react-dom|scheduler)\//.test(moduleId)) {
+            return 'react-vendor';
+          }
+          if (/\/node_modules\/(?:dockview|dockview-react)\//.test(moduleId)) {
+            return 'dockview-vendor';
+          }
+          return undefined;
+        },
+      },
+    },
   },
   test: {
     environment: 'jsdom',

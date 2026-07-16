@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   DragEvent as ReactDragEvent,
   KeyboardEvent as ReactKeyboardEvent,
@@ -16,7 +16,6 @@ import {
   addLegendToView,
   addNoteToView,
   applyFormatPainterSnapshot,
-  analyzeConnectionReconnection,
   analyzeMagicConnectionTarget,
   analyzeMagicTargetCreation,
   canCreatePlainConnection,
@@ -60,6 +59,10 @@ import { showContextMenu } from '../../ui/ContextMenu';
 import { requestNestingChange } from '../../ui/automatic-relationships';
 import { requestConnectionReconnection } from '../../ui/connection-reconnection';
 import { matchesShortcut } from '../../ui/shortcuts';
+import {
+  clearCanvasStatusMessage,
+  flashCanvasStatus,
+} from '../../ui/canvas-status';
 import { copyNodes, cutNodes, pasteNodes } from '../clipboard';
 import {
   closestSegment,
@@ -78,12 +81,22 @@ import {
 } from './bounds';
 import { showEmptyCanvasContextMenu, showViewObjectContextMenu } from './contextMenu';
 import { addDroppedItemsToView, planDroppedItemsToView } from './drop';
-import { planConnectionAnchorBendpoints } from './connection-anchor-edit';
+import {
+  planConnectionAnchorBendpoints,
+  shouldPreferConnectionAnchor,
+} from './connection-anchor-edit';
 import {
   buildMagicConnectionMenuItems,
   buildMagicTargetMenuItems,
 } from './magic-connector-menu';
 import type { EditState, Interaction, Viewport } from './types';
+import {
+  cancelledReconnectIntent,
+  classifyReconnectIntent,
+  reconnectIntentMessage,
+  reconnectIntentTone,
+  type ReconnectIntent,
+} from './reconnect-intent';
 
 export {
   buildMagicConnectionMenuItems,
@@ -140,20 +153,69 @@ export function useViewEditorInteractions({
   } | null>(null);
   const interactionContextRef = useRef({ model, viewId });
   interRef.current = inter;
-  const isConnectionVisible = model
-    ? createNestedConnectionVisibilityResolver(model, settings)
-    : () => false;
-  const connectionRoutes = model
-    ? createConnectionRouteResolver(model, absBounds, {
-        isVisible: isConnectionVisible,
-        orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
-      })
-    : undefined;
+  const isConnectionVisible = useMemo(
+    () =>
+      model
+        ? createNestedConnectionVisibilityResolver(model, {
+            hiddenRelationsTypes: settings.hiddenRelationsTypes,
+            useNestedConnections: settings.useNestedConnections,
+          })
+        : () => false,
+    [model, settings.hiddenRelationsTypes, settings.useNestedConnections],
+  );
+  const connectionRoutes = useMemo(
+    () =>
+      model
+        ? createConnectionRouteResolver(model, absBounds, {
+            isVisible: isConnectionVisible,
+            orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
+            prewarmViewId: viewId,
+          })
+        : undefined,
+    [
+      absBounds,
+      isConnectionVisible,
+      model,
+      settings.useOrthogonalConnectionAnchors,
+      viewId,
+    ],
+  );
 
   const snap = (v: number, disable?: boolean) =>
     disable || !settings.snapToGrid
       ? Math.round(v)
       : Math.round(v / settings.gridSize) * settings.gridSize;
+
+  const reconnectIntentAtPoint = (
+    currentModel: ModelState,
+    connectionId: string,
+    end: 'source' | 'target',
+    rawTargetId: string | null,
+    point: Point,
+  ): ReconnectIntent => {
+    const connection = currentModel.connections[connectionId];
+    const allowAnchorMove = view?.connectionRouterType !== 2;
+    let targetId = rawTargetId;
+    if (
+      connection &&
+      allowAnchorMove &&
+      shouldPreferConnectionAnchor({
+        connection,
+        end,
+        dropPoint: point,
+        nodeBounds: absBounds,
+        zoom: viewport.zoom,
+      })
+    ) {
+      targetId = end === 'source' ? connection.sourceId : connection.targetId;
+    }
+    return classifyReconnectIntent(currentModel, {
+      connectionId,
+      end,
+      targetId,
+      allowAnchorMove,
+    });
+  };
 
   const hitFromEvent = (
     e: { clientX: number; clientY: number },
@@ -233,6 +295,9 @@ export function useViewEditorInteractions({
   };
 
   const clearInteraction = () => {
+    if (interRef.current.kind === 'reconnect') {
+      clearCanvasStatusMessage(sessionId, viewId);
+    }
     interactionModelRef.current = null;
     setInter({ kind: 'none' });
   };
@@ -654,13 +719,24 @@ export function useViewEditorInteractions({
       return;
     }
     if (hit.connectionEnd && hit.connId) {
+      const connection = model.connections[hit.connId];
+      const currentEndpointId = connection
+        ? hit.connectionEnd === 'source'
+          ? connection.sourceId
+          : connection.targetId
+        : null;
       setSelection('view', [hit.connId]);
       setInter({
         kind: 'reconnect',
         connId: hit.connId,
         end: hit.connectionEnd,
         current: p,
-        hoverConnectableId: null,
+        intent: classifyReconnectIntent(model, {
+          connectionId: hit.connId,
+          end: hit.connectionEnd,
+          targetId: currentEndpointId,
+          allowAnchorMove: view.connectionRouterType !== 2,
+        }),
       });
       return;
     }
@@ -862,8 +938,14 @@ export function useViewEditorInteractions({
       }
       case 'reconnect': {
         const hit = hitFromEvent(e);
-        const hoverConnectableId = hit.nodeId ?? hit.connId ?? null;
-        setInter({ ...cur, current: p, hoverConnectableId });
+        const intent = reconnectIntentAtPoint(
+          model,
+          cur.connId,
+          cur.end,
+          hit.nodeId ?? hit.connId ?? null,
+          p,
+        );
+        setInter({ ...cur, current: p, intent });
         break;
       }
       case 'bend':
@@ -1049,19 +1131,17 @@ export function useViewEditorInteractions({
       }
       case 'reconnect': {
         const hit = hitFromEvent(e);
-        const endpointId = hit.nodeId ?? hit.connId;
-        setInter({ kind: 'none' });
+        const rawTargetId = hit.nodeId ?? hit.connId ?? null;
+        const intent = reconnectIntentAtPoint(
+          currentModel,
+          cur.connId,
+          cur.end,
+          rawTargetId,
+          p,
+        );
+        clearInteraction();
         const connection = currentModel.connections[cur.connId];
-        const currentEndpointId = connection
-          ? cur.end === 'source' ? connection.sourceId : connection.targetId
-          : undefined;
-        if (
-          connection &&
-          endpointId !== undefined &&
-          endpointId === currentEndpointId &&
-          view?.connectionRouterType !== 2 &&
-          Boolean(currentModel.nodes[endpointId])
-        ) {
+        if (connection && intent.kind === 'anchor') {
           const endpoints = connectionRoutes?.endpointPoints(connection.id);
           const route = connectionRoutes?.(connection.id);
           if (!endpoints || !route) break;
@@ -1075,12 +1155,23 @@ export function useViewEditorInteractions({
             orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
           });
           if (bendpoints) setConnectionBendpoints(connection.id, bendpoints, modelStore);
-        } else if (endpointId && endpointId !== currentEndpointId) {
+        } else if (intent.kind === 'valid') {
           void requestConnectionReconnection({
             connectionId: cur.connId,
             end: cur.end,
-            endpointId,
+            endpointId: intent.targetId,
           }, modelStore);
+        } else if (!rawTargetId) {
+          const cancelled = cancelledReconnectIntent();
+          flashCanvasStatus(
+            sessionId,
+            viewId,
+            {
+              message: reconnectIntentMessage(cancelled),
+              tone: reconnectIntentTone(cancelled),
+            },
+            1500,
+          );
         }
         break;
       }
@@ -1381,25 +1472,7 @@ export function useViewEditorInteractions({
     return { id: inter.hoverConnectableId, valid };
   })();
 
-  const reconnectHover: { id: string; valid: boolean } | null = (() => {
-    if (!model || inter.kind !== 'reconnect' || !inter.hoverConnectableId) return null;
-    const connection = model.connections[inter.connId];
-    const currentEndpointId = connection
-      ? inter.end === 'source' ? connection.sourceId : connection.targetId
-      : undefined;
-    if (inter.hoverConnectableId === currentEndpointId) {
-      return {
-        id: inter.hoverConnectableId,
-        valid: view?.connectionRouterType !== 2 && Boolean(model.nodes[currentEndpointId]),
-      };
-    }
-    const plan = analyzeConnectionReconnection(model, {
-      connectionId: inter.connId,
-      end: inter.end,
-      endpointId: inter.hoverConnectableId,
-    });
-    return { id: inter.hoverConnectableId, valid: plan.valid };
-  })();
+  const reconnectIntent = inter.kind === 'reconnect' ? inter.intent : null;
 
   const cursor =
     inter.kind === 'pan'
@@ -1420,7 +1493,7 @@ export function useViewEditorInteractions({
     inter,
     edit,
     connectHover,
-    reconnectHover,
+    reconnectIntent,
     commitEdit,
     commitEditAndRestoreFocus,
     cancelEditAndSelect,

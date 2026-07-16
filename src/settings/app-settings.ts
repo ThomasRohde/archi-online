@@ -21,6 +21,7 @@ export const SETTINGS_STORAGE_KEY = 'archi-online.settings.v1';
 
 export interface AppSettings {
   themeMode: ThemeMode;
+  showToolbarContextHelp: boolean;
   addDocumentationNoteOnRelationChange: boolean;
   treeSearchName: boolean;
   treeSearchDocumentation: boolean;
@@ -128,6 +129,7 @@ export interface SettingSection {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   themeMode: 'system',
+  showToolbarContextHelp: true,
   addDocumentationNoteOnRelationChange: false,
   treeSearchName: true,
   treeSearchDocumentation: false,
@@ -195,6 +197,12 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
           { value: 'light', label: 'Light' },
           { value: 'dark', label: 'Dark' },
         ],
+      },
+      {
+        key: 'showToolbarContextHelp',
+        kind: 'boolean',
+        label: 'Show toolbar context help',
+        description: 'Show brief guidance beneath the toolbar for the focused or hovered command.',
       },
       {
         key: 'addDocumentationNoteOnRelationChange',

@@ -2,6 +2,10 @@ import type { Bounds, DiagramConnection } from '../../model/types';
 import { useSettingsStore } from '../../settings/app-settings';
 import { bendpointPositions, toRelativeBendpoint } from '../geometry';
 import type { EditState, Interaction, Viewport } from './types';
+import {
+  reconnectIntentTone,
+  type ReconnectIntent,
+} from './reconnect-intent';
 
 const HANDLES: { dir: string; fx: number; fy: number; cursor: string }[] = [
   { dir: 'nw', fx: 0, fy: 0, cursor: 'nwse-resize' },
@@ -17,11 +21,14 @@ const HANDLES: { dir: string; fx: number; fy: number; cursor: string }[] = [
 export function ResizeHandles({
   nodeId,
   bounds,
+  zoom,
 }: {
   nodeId: string | null;
   bounds: Bounds | undefined;
+  zoom: number;
 }) {
   if (!nodeId || !bounds) return null;
+  const size = 7 / zoom;
   return (
     <>
       {HANDLES.map((h) => (
@@ -29,13 +36,14 @@ export function ResizeHandles({
           key={h.dir}
           data-handle={h.dir}
           data-handle-node={nodeId}
-          x={bounds.x + bounds.width * h.fx - 3.5}
-          y={bounds.y + bounds.height * h.fy - 3.5}
-          width={7}
-          height={7}
+          x={bounds.x + bounds.width * h.fx - size / 2}
+          y={bounds.y + bounds.height * h.fy - size / 2}
+          width={size}
+          height={size}
           fill="#ffffff"
           stroke="var(--canvas-selection)"
           strokeWidth={1.2}
+          vectorEffect="non-scaling-stroke"
           style={{ cursor: h.cursor }}
         />
       ))}
@@ -47,25 +55,29 @@ export function BendpointHandles({
   conn,
   sourcePoint,
   targetPoint,
+  zoom,
 }: {
   conn: DiagramConnection | undefined;
   sourcePoint: import('../geometry').Point | undefined;
   targetPoint: import('../geometry').Point | undefined;
+  zoom: number;
 }) {
   if (!conn || !sourcePoint || !targetPoint) return null;
+  const size = 7 / zoom;
   return (
     <>
       {bendpointPositions(conn.bendpoints, sourcePoint, targetPoint).map((bp, i) => (
         <rect
           key={i}
           data-bendpoint={`${conn.id}@${i}`}
-          x={bp.x - 3.5}
-          y={bp.y - 3.5}
-          width={7}
-          height={7}
+          x={bp.x - size / 2}
+          y={bp.y - size / 2}
+          width={size}
+          height={size}
           fill="#ffffff"
           stroke="var(--canvas-selection)"
           strokeWidth={1.2}
+          vectorEffect="non-scaling-stroke"
           style={{ cursor: 'move' }}
         />
       ))}
@@ -76,9 +88,11 @@ export function BendpointHandles({
 export function ConnectionEndpointHandles({
   conn,
   points,
+  zoom,
 }: {
   conn: DiagramConnection | undefined;
   points: import('../geometry').Point[] | undefined;
+  zoom: number;
 }) {
   if (!conn || !points || points.length < 2) return null;
   const handles = [
@@ -88,19 +102,31 @@ export function ConnectionEndpointHandles({
   return (
     <>
       {handles.map(({ end, point }) => (
-        <circle
-          key={end}
-          data-connection-endpoint-handle={end}
-          data-connection-endpoint-id={conn.id}
-          aria-label={`Reconnect ${end}`}
-          cx={point.x}
-          cy={point.y}
-          r={4}
-          fill="#ffffff"
-          stroke="var(--canvas-selection)"
-          strokeWidth={1.4}
-          style={{ cursor: 'crosshair' }}
-        />
+        <g key={end}>
+          <circle
+            data-connection-endpoint-handle={end}
+            data-connection-endpoint-id={conn.id}
+            aria-label={`Reconnect ${end}`}
+            cx={point.x}
+            cy={point.y}
+            r={6 / zoom}
+            fill="transparent"
+            stroke="none"
+            style={{ cursor: 'crosshair' }}
+          />
+          <circle
+            data-connection-endpoint-visual={end}
+            aria-hidden="true"
+            cx={point.x}
+            cy={point.y}
+            r={4 / zoom}
+            fill="#ffffff"
+            stroke="var(--canvas-selection)"
+            strokeWidth={1.4}
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        </g>
       ))}
     </>
   );
@@ -148,14 +174,21 @@ export function PendingConnectionOverlay({
 export function PendingReconnectionOverlay({
   inter,
   points,
-  valid,
+  intent,
 }: {
   inter: Interaction;
   points: import('../geometry').Point[] | undefined;
-  valid: boolean | undefined;
+  intent: ReconnectIntent | null;
 }) {
   if (inter.kind !== 'reconnect' || !points || points.length < 2) return null;
   const fixed = inter.end === 'source' ? points[points.length - 1] : points[0];
+  const tone = intent ? reconnectIntentTone(intent) : 'invalid';
+  const stroke =
+    tone === 'anchor'
+      ? 'var(--canvas-anchor)'
+      : tone === 'valid'
+        ? 'var(--canvas-valid)'
+        : 'var(--canvas-invalid)';
   return (
     <line
       data-reconnection-preview={inter.end}
@@ -163,7 +196,7 @@ export function PendingReconnectionOverlay({
       y1={fixed.y}
       x2={inter.current.x}
       y2={inter.current.y}
-      stroke={valid === false ? 'var(--canvas-invalid)' : valid === true ? 'var(--canvas-valid)' : 'var(--canvas-selection)'}
+      stroke={stroke}
       strokeWidth={1.4}
       strokeDasharray="5 3"
       pointerEvents="none"

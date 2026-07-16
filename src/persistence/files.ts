@@ -6,7 +6,7 @@ import {
 } from '../model/io/archimate-xml';
 import { isExchangeXml } from '../model/io/exchange-xml/detect';
 import { viewsInTreeOrder } from '../model/tree-order';
-import { openView } from '../model/store';
+import { markModelSaved, openView } from '../model/store';
 import {
   activateModelSession,
   addModelSession,
@@ -162,8 +162,10 @@ export async function saveModelToDisk(sessionId: ModelSessionId, saveAs = false)
   if (!session) return;
   const s = session.store.getState();
   if (!s.model) return;
-  const document = await serializeArchimateDocument(s.model);
-  const suggested = s.fileName ?? sanitizeFileName(s.model.info.name) + '.archimate';
+  const revision = s.historyRevision;
+  const model = s.model;
+  const document = await serializeArchimateDocument(model);
+  const suggested = s.fileName ?? sanitizeFileName(model.info.name) + '.archimate';
 
   if (session.fileHandle || supportsSaveFsAccess()) {
     let handle = session.fileHandle;
@@ -177,7 +179,7 @@ export async function saveModelToDisk(sessionId: ModelSessionId, saveAs = false)
         if (isUserCancelledFileDialog(error)) return;
         if (shouldDownloadAfterSaveError(error)) {
           setModelSessionFileHandle(sessionId, null);
-          downloadModel(sessionId, document, suggested);
+          downloadModel(sessionId, revision, document, suggested);
           return;
         }
         throw error;
@@ -188,18 +190,18 @@ export async function saveModelToDisk(sessionId: ModelSessionId, saveAs = false)
       const writable = await handle.createWritable();
       await writable.write(document.slice().buffer as ArrayBuffer);
       await writable.close();
-      session.store.setState({ dirty: false, fileName: handle.name });
+      markModelSaved(revision, handle.name, session.store);
       emitModelSaved(sessionId);
     } catch (error) {
       if (shouldDownloadAfterSaveError(error)) {
         setModelSessionFileHandle(sessionId, null);
-        downloadModel(sessionId, document, suggested);
+        downloadModel(sessionId, revision, document, suggested);
         return;
       }
       throw error;
     }
   } else {
-    downloadModel(sessionId, document, suggested);
+    downloadModel(sessionId, revision, document, suggested);
   }
 }
 
@@ -276,7 +278,12 @@ function downloadBlob(blob: Blob, fileName: string): void {
   URL.revokeObjectURL(url);
 }
 
-function downloadModel(sessionId: ModelSessionId, documentBytes: Uint8Array, fileName: string): void {
+function downloadModel(
+  sessionId: ModelSessionId,
+  revision: number,
+  documentBytes: Uint8Array,
+  fileName: string,
+): void {
   const blob = new Blob([documentBytes.slice().buffer as ArrayBuffer], {
     type: 'application/octet-stream',
   });
@@ -286,7 +293,8 @@ function downloadModel(sessionId: ModelSessionId, documentBytes: Uint8Array, fil
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
-  getModelSession(sessionId)?.store.setState({ dirty: false, fileName });
+  const session = getModelSession(sessionId);
+  if (session) markModelSaved(revision, fileName, session.store);
   emitModelSaved(sessionId);
 }
 

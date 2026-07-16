@@ -592,18 +592,21 @@ describe('shared native legend projections', () => {
 
   it('updates rendered labels and user colors directly from local settings', async () => {
     const { viewId } = fixture();
-    useSettingsStore.setState({
-      settings: {
-        ...DEFAULT_SETTINGS,
-        legendLabels: { BusinessActor: 'Person' },
-        legendUserColors: { BusinessActor: '#123456' },
-      },
-    });
     const legendId = Object.values(useStore.getState().model!.nodes).find(
       (node) => node.nodeType === 'note' && node.legendOptions,
     )!.id;
     await act(async () => setLegendOptions(legendId, { colorScheme: 2 }));
     const { host, root } = await render(createElement(ViewEditor, { viewId }));
+    expect(host.querySelector('[data-legend-entry="BusinessActor"]')?.textContent)
+      .toContain('Business Actor');
+
+    await act(async () => useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        legendLabels: { BusinessActor: 'Person' },
+        legendUserColors: { BusinessActor: '#123456' },
+      },
+    }));
     const entry = host.querySelector('[data-legend-entry="BusinessActor"]')!;
     expect(entry.textContent).toContain('Person');
     expect(entry.querySelector('[data-legend-background-shape]')?.getAttribute('fill'))

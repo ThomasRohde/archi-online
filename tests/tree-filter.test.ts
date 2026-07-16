@@ -19,6 +19,7 @@ import {
   JAVA21_SIMPLE_CASE_FOLD_DATA,
   collectModelTreeSearchCatalog,
   collectTreeSearchCatalog,
+  collectTreeSearchCatalogWhenNeeded,
   compileTreeSearch,
   javaCaseInsensitiveCanonical,
   javaStringEqualsIgnoreCase,
@@ -116,6 +117,17 @@ describe('structured model-tree search', () => {
     const model = createEmptyModel('Catalog cache');
     expect(collectModelTreeSearchCatalog(model)).toBe(collectModelTreeSearchCatalog(model));
     expect(collectModelTreeSearchCatalog({ ...model })).not.toBe(collectModelTreeSearchCatalog(model));
+  });
+
+  it('skips cross-model catalog collection until filtering or options need it', () => {
+    const model = createEmptyModel('Lazy catalog');
+    model.info.properties = [{ key: 'Owner', value: 'Alice' }];
+
+    const inactive = collectTreeSearchCatalogWhenNeeded([model], false);
+    const active = collectTreeSearchCatalogWhenNeeded([model], true);
+
+    expect(inactive).toEqual({ propertyKeys: [], specializations: [] });
+    expect(active.propertyKeys).toEqual(['Owner']);
   });
 
   it('is inactive until a query-backed field or a typed/dynamic filter is selected', () => {

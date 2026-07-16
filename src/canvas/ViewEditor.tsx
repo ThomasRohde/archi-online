@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { c4ViewType } from '../model/c4';
 import {
   alignableNodeIds,
@@ -10,7 +10,10 @@ import { getActiveModelStore, setSelection } from '../model/store';
 import { useModelStoreApi, useStore } from '../ui/store-hooks';
 import { getActiveModelSession, getModelSessionForStore } from '../model/workspace';
 import type { Bounds } from '../model/types';
-import { setCanvasStatus } from '../ui/canvas-status';
+import {
+  clearCanvasStatus,
+  setCanvasStatus,
+} from '../ui/canvas-status';
 import { matchesShortcut } from '../ui/shortcuts';
 import { createFrameThrottle } from '../ui/frame-throttle';
 import { useSettingsStore } from '../settings/app-settings';
@@ -41,12 +44,17 @@ import { copyNodes, cutNodes } from './clipboard';
 import { evaluateCachedLabelExpression } from './view-editor/label-cache';
 import {
   createNodeInteractionVersions,
+  pruneStableRoutes,
   stableRoutePoints,
 } from './view-editor/live-render';
 import {
   showEmptyCanvasContextMenu,
   showViewObjectContextMenu,
 } from './view-editor/contextMenu';
+import {
+  reconnectIntentMessage,
+  reconnectIntentTone,
+} from './view-editor/reconnect-intent';
 
 export type { Viewport } from './view-editor/types';
 
@@ -121,8 +129,13 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const gridPatternId = `view-grid-${useId().replace(/:/g, '')}`;
   const stableRoutesRef = useRef(new Map<string, Point[]>());
-  const cursorPublisherRef = useRef(
-    createFrameThrottle((point: Point) => setCanvasStatus({ x: point.x, y: point.y })),
+  const sessionId =
+    getModelSessionForStore(modelStore)?.id ?? 'legacy-single-model';
+  const cursorPublisher = useMemo(
+    () =>
+      createFrameThrottle((point: Point) =>
+        setCanvasStatus(sessionId, viewId, { x: point.x, y: point.y })),
+    [sessionId, viewId],
   );
 
   const view = model?.views[viewId];
@@ -134,11 +147,19 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     () => (model ? Object.values(model.connections).filter((c) => c.viewId === viewId) : []),
     [model, viewId],
   );
+  const connectionIds = useMemo(
+    () => new Set(connections.map((connection) => connection.id)),
+    [connections],
+  );
+  pruneStableRoutes(stableRoutesRef.current, connectionIds);
   const isConnectionVisible = useMemo(
     () => model
-      ? createNestedConnectionVisibilityResolver(model, settings)
+      ? createNestedConnectionVisibilityResolver(model, {
+          hiddenRelationsTypes: settings.hiddenRelationsTypes,
+          useNestedConnections: settings.useNestedConnections,
+        })
       : () => false,
-    [model, settings],
+    [model, settings.hiddenRelationsTypes, settings.useNestedConnections],
   );
 
   const viewportApi = useCanvasViewport(viewId, svgRef, absBounds, modelStore);
@@ -148,7 +169,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     inter,
     edit,
     connectHover,
-    reconnectHover,
+    reconnectIntent,
     commitEdit,
     commitEditAndRestoreFocus,
     cancelEditAndSelect,
@@ -175,10 +196,24 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
   // Publish the active view's zoom to the status bar (see canvas-status.ts).
   const isActive = useStore((s) => s.activeViewId === viewId);
   useEffect(() => {
-    if (isActive) setCanvasStatus({ zoom: viewport.zoom });
-  }, [isActive, viewport.zoom]);
+    if (isActive) setCanvasStatus(sessionId, viewId, { zoom: viewport.zoom });
+  }, [isActive, sessionId, viewId, viewport.zoom]);
 
-  useEffect(() => () => cursorPublisherRef.current.cancel(), []);
+  useEffect(
+    () => () => {
+      cursorPublisher.cancel();
+      clearCanvasStatus(sessionId, viewId);
+    },
+    [cursorPublisher, sessionId, viewId],
+  );
+
+  useEffect(() => {
+    if (!reconnectIntent) return;
+    setCanvasStatus(sessionId, viewId, {
+      message: reconnectIntentMessage(reconnectIntent),
+      tone: reconnectIntentTone(reconnectIntent),
+    });
+  }, [reconnectIntent, sessionId, viewId]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -225,7 +260,70 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     return () => window.removeEventListener('keydown', onWindowKeyDown);
   }, [isActive, modelStore, pasteOffset, viewId]);
 
-  if (!model || !view) return null;
+  const liveViewState = useMemo(
+    () => model ? deriveLiveViewState(model, viewId, absBounds, inter) : null,
+    [absBounds, inter, model, viewId],
+  );
+  const storedRoutes = useMemo(
+    () =>
+      model && liveViewState && inter.kind === 'bend'
+        ? createConnectionRouteResolver(model, liveViewState.liveAbs, {
+            isVisible: isConnectionVisible,
+            orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
+            prewarmViewId: viewId,
+          })
+        : null,
+    [
+      inter.kind,
+      isConnectionVisible,
+      liveViewState,
+      model,
+      settings.useOrthogonalConnectionAnchors,
+      viewId,
+    ],
+  );
+  const previewConnection = useMemo(() => {
+    if (!model || inter.kind !== 'bend' || !storedRoutes) return undefined;
+    const connection = model.connections[inter.connId];
+    const endpoints = storedRoutes.endpointPoints(inter.connId);
+    return connection && endpoints
+      ? {
+        ...connection,
+        bendpoints: bendpointPreview(
+          connection,
+          endpoints.source,
+          endpoints.target,
+          inter,
+        ),
+      }
+      : undefined;
+  }, [inter, model, storedRoutes]);
+  const previewConnectionForId = useCallback(
+    (connectionId: string) =>
+      previewConnection?.id === connectionId ? previewConnection : undefined,
+    [previewConnection],
+  );
+  const routes = useMemo(
+    () =>
+      model && liveViewState
+        ? createConnectionRouteResolver(model, liveViewState.liveAbs, {
+            connection: previewConnectionForId,
+            isVisible: isConnectionVisible,
+            orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
+            prewarmViewId: viewId,
+          })
+        : null,
+    [
+      isConnectionVisible,
+      liveViewState,
+      model,
+      previewConnectionForId,
+      settings.useOrthogonalConnectionAnchors,
+      viewId,
+    ],
+  );
+
+  if (!model || !view || !liveViewState || !routes) return null;
 
   // Wrap the interaction move handler to also report the cursor position (in
   // view coordinates) to the status bar; clear it when the pointer leaves.
@@ -233,23 +331,18 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     handlers.onPointerMove(e);
     if (isActive) {
       const p = toView(e.clientX, e.clientY);
-      cursorPublisherRef.current.push(p);
+      cursorPublisher.push(p);
     }
   };
   const onCanvasPointerLeave = () => {
     handlers.onPointerLeave();
-    cursorPublisherRef.current.cancel();
-    setCanvasStatus({ x: null, y: null });
+    cursorPublisher.cancel();
+    setCanvasStatus(sessionId, viewId, { x: null, y: null });
   };
 
   const activeC4ViewType = c4ViewType(view);
   const alignmentGuides = inter.kind === 'move' || inter.kind === 'resize' ? inter.guides : [];
-  const { moveDelta, dropParentId, resizeOverride, liveAbs } = deriveLiveViewState(
-    model,
-    viewId,
-    absBounds,
-    inter,
-  );
+  const { moveDelta, dropParentId, resizeOverride, liveAbs } = liveViewState;
   const interactionVersions = createNodeInteractionVersions(model, {
     moveDelta,
     resize: resizeOverride,
@@ -257,6 +350,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     connectSourceId:
       inter.kind === 'connect' && model.nodes[inter.sourceId] ? inter.sourceId : null,
     connectHover,
+    reconnectIntent,
   });
   const viewSelected = selection.source === 'view' ? new Set(selection.ids) : new Set<string>();
   // The element Align / Match Size snap the rest of the selection to. Only
@@ -276,31 +370,6 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
     selectedConnectionCandidate && isConnectionVisible(selectedConnectionCandidate.id)
       ? selectedConnectionCandidate
       : undefined;
-  const storedRoutes = createConnectionRouteResolver(model, liveAbs, {
-    isVisible: isConnectionVisible,
-    orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
-  });
-  const previewConnections = new Map<string, typeof selectedConnection>();
-  if (inter.kind === 'bend') {
-    const connection = model.connections[inter.connId];
-    const endpoints = storedRoutes.endpointPoints(inter.connId);
-    if (connection && endpoints) {
-      previewConnections.set(inter.connId, {
-        ...connection,
-        bendpoints: bendpointPreview(
-          connection,
-          endpoints.source,
-          endpoints.target,
-          inter,
-        ),
-      });
-    }
-  }
-  const routes = createConnectionRouteResolver(model, liveAbs, {
-    connection: (connectionId) => previewConnections.get(connectionId),
-    isVisible: isConnectionVisible,
-    orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
-  });
   const pendingConnectionSourcePoint = (() => {
     if (inter.kind !== 'connect') return undefined;
     const bounds = liveAbs.get(inter.sourceId);
@@ -346,6 +415,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
                 inter.kind === 'connect' && model.nodes[inter.sourceId] ? inter.sourceId : null
               }
               connectHover={connectHover}
+              reconnectIntent={reconnectIntent}
               interactionVersions={interactionVersions}
               anchorId={anchorId}
               c4ViewType={activeC4ViewType}
@@ -358,7 +428,8 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
               if (!nextPoints) return null;
               const points = stableRoutePoints(stableRoutesRef.current.get(conn.id), nextPoints);
               stableRoutesRef.current.set(conn.id, points);
-              const displayConnection = previewConnections.get(conn.id) ?? conn;
+              const displayConnection =
+                previewConnection?.id === conn.id ? previewConnection : conn;
               return (
                 <ConnectionView
                   key={conn.id}
@@ -378,6 +449,11 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
                         evaluateLabelExpression,
                       ).text
                     : undefined}
+                  interactionTone={
+                    reconnectIntent?.targetId === conn.id
+                      ? reconnectIntent.kind
+                      : undefined
+                  }
                 />
               );
             })}
@@ -385,6 +461,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
           <ConnectionEndpointHandles
             conn={selectedConnection}
             points={selectedConnection ? routes(selectedConnection.id) : undefined}
+            zoom={viewport.zoom}
           />
           <g className="alignment-guides" pointerEvents="none">
             {alignmentGuides.map((guide, index) => (
@@ -403,10 +480,12 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
             conn={view.connectionRouterType === 2 ? undefined : selectedConnection}
             sourcePoint={selectedConnection ? routes.endpointPoints(selectedConnection.id)?.source : undefined}
             targetPoint={selectedConnection ? routes.endpointPoints(selectedConnection.id)?.target : undefined}
+            zoom={viewport.zoom}
           />
           <ResizeHandles
             nodeId={selectedNodeForHandles}
             bounds={selectedNodeForHandles ? liveAbs.get(selectedNodeForHandles) : undefined}
+            zoom={viewport.zoom}
           />
           <MarqueeOverlay inter={inter} />
           <PendingConnectionOverlay
@@ -416,7 +495,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
           <PendingReconnectionOverlay
             inter={inter}
             points={inter.kind === 'reconnect' ? routes(inter.connId) : undefined}
-            valid={reconnectHover?.valid}
+            intent={reconnectIntent}
           />
         </g>
       </svg>
@@ -456,6 +535,14 @@ function ReadOnlyViewEditor({
   const emptyMoveDelta = useMemo(() => new Map<string, Point>(), []);
   const emptyInteractionVersions = useMemo(() => new Map<string, string>(), []);
   const stableRoutesRef = useRef(new Map<string, Point[]>());
+  const sessionId =
+    getModelSessionForStore(modelStore)?.id ?? 'legacy-single-model';
+  const cursorPublisher = useMemo(
+    () =>
+      createFrameThrottle((point: Point) =>
+        setCanvasStatus(sessionId, viewId, { x: point.x, y: point.y })),
+    [sessionId, viewId],
+  );
 
   const view = model?.views[viewId];
   const absBounds = useMemo(
@@ -466,26 +553,52 @@ function ReadOnlyViewEditor({
     () => (model ? Object.values(model.connections).filter((c) => c.viewId === viewId) : []),
     [model, viewId],
   );
+  const connectionIds = useMemo(
+    () => new Set(connections.map((connection) => connection.id)),
+    [connections],
+  );
+  pruneStableRoutes(stableRoutesRef.current, connectionIds);
   const isConnectionVisible = useMemo(
     () => model
-      ? createNestedConnectionVisibilityResolver(model, settings)
+      ? createNestedConnectionVisibilityResolver(model, {
+          hiddenRelationsTypes: settings.hiddenRelationsTypes,
+          useNestedConnections: settings.useNestedConnections,
+        })
       : () => false,
-    [model, settings],
+    [model, settings.hiddenRelationsTypes, settings.useNestedConnections],
   );
   const routes = useMemo(
     () => model
       ? createConnectionRouteResolver(model, absBounds, {
           isVisible: isConnectionVisible,
           orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
+          prewarmViewId: viewId,
         })
       : null,
-    [absBounds, isConnectionVisible, model, settings.useOrthogonalConnectionAnchors],
+    [
+      absBounds,
+      isConnectionVisible,
+      model,
+      settings.useOrthogonalConnectionAnchors,
+      viewId,
+    ],
   );
   const { viewport, setViewport, toView, zoomTo, zoomBy, fitToView } = useCanvasViewport(
     viewId,
     svgRef,
     absBounds,
     modelStore,
+  );
+  const isActive = useStore((s) => s.activeViewId === viewId);
+  useEffect(() => {
+    if (isActive) setCanvasStatus(sessionId, viewId, { zoom: viewport.zoom });
+  }, [isActive, sessionId, viewId, viewport.zoom]);
+  useEffect(
+    () => () => {
+      cursorPublisher.cancel();
+      clearCanvasStatus(sessionId, viewId);
+    },
+    [cursorPublisher, sessionId, viewId],
   );
 
   if (!model || !view || !routes) return null;
@@ -526,6 +639,7 @@ function ReadOnlyViewEditor({
           };
         }}
         onPointerMove={(event) => {
+          if (isActive) cursorPublisher.push(toView(event.clientX, event.clientY));
           const pan = panRef.current;
           if (!pan || pan.pointerId !== event.pointerId) return;
           setViewport({
@@ -537,6 +651,10 @@ function ReadOnlyViewEditor({
         onPointerUp={(event) => stopPan(event.pointerId, event.currentTarget)}
         onPointerCancel={(event) => stopPan(event.pointerId, event.currentTarget)}
         onLostPointerCapture={(event) => stopPan(event.pointerId, event.currentTarget)}
+        onPointerLeave={() => {
+          cursorPublisher.cancel();
+          setCanvasStatus(sessionId, viewId, { x: null, y: null });
+        }}
         onContextMenu={(event) => {
           event.preventDefault();
           const hit = readOnlyHitTarget(event.target, event.currentTarget);
@@ -602,6 +720,7 @@ function ReadOnlyViewEditor({
               dropParentId={null}
               connectSource={null}
               connectHover={null}
+              reconnectIntent={null}
               interactionVersions={emptyInteractionVersions}
               c4ViewType={activeC4ViewType}
               viewpoint={view.viewpoint}

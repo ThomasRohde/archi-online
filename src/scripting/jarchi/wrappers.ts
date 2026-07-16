@@ -305,6 +305,7 @@ function connectionEndpointCenters(
   const endpoints = createConnectionRouteResolver(m, bounds, {
     connection: connectionOverride,
     isVisible: visible,
+    prewarmViewId: conn.viewId,
   }).endpointPoints(conn.id);
   if (!endpoints) throw new Error(`Connection ${conn.id} has a missing endpoint`);
   return endpoints;
@@ -333,6 +334,7 @@ function renderedRouteForConnection(m: ModelState, conn: DiagramConnection): JPo
       settings,
     ),
     orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
+    prewarmViewId: conn.viewId,
   })(conn.id);
   if (!route) throw new Error(`Connection ${conn.id} has a missing endpoint`);
   return route.map((point) => ({ ...point }));

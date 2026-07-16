@@ -237,7 +237,6 @@ body {
 .toolbar-context-help {
   display: flex;
   align-items: center;
-  gap: 10px;
   height: 36px;
   flex: 0 0 36px;
   min-width: 0;
@@ -247,6 +246,14 @@ body {
   background: var(--context-bg);
   border-bottom: 1px solid var(--border);
   user-select: none;
+}
+
+.toolbar-context-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .toolbar-context-icon {
@@ -289,6 +296,33 @@ body {
   font: inherit;
   font-size: 11px;
   white-space: nowrap;
+}
+
+.toolbar-context-hide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  margin-left: 8px;
+  padding: 0;
+  color: var(--text-mid);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.toolbar-context-hide:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: var(--border);
+}
+
+.toolbar-context-hide:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 @media (max-width: 620px) {
@@ -371,6 +405,22 @@ body {
 
 .status-unsaved {
   color: var(--warn);
+}
+
+.status-canvas-message {
+  font-weight: 600;
+}
+
+.status-canvas-message-anchor {
+  color: var(--canvas-anchor);
+}
+
+.status-canvas-message-valid {
+  color: var(--canvas-valid);
+}
+
+.status-canvas-message-invalid {
+  color: var(--canvas-invalid);
 }
 
 .status-file {

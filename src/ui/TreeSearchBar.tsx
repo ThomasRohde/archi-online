@@ -28,6 +28,8 @@ export function TreeSearchBar({
   filtering,
   onExpandAll,
   onCollapseAll,
+  optionsOpen,
+  onOptionsOpenChange,
 }: {
   criteria: TreeSearchCriteria;
   setCriteria: Dispatch<SetStateAction<TreeSearchCriteria>>;
@@ -44,6 +46,8 @@ export function TreeSearchBar({
   filtering: boolean;
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  optionsOpen: boolean;
+  onOptionsOpenChange: (open: boolean) => void;
 }) {
   const selectedProfiles = new Set(criteria.specializations.map(treeSearchProfileKey));
   const setMultiSelect = (event: ChangeEvent<HTMLSelectElement>, kind: 'keys' | 'profiles') => {
@@ -81,11 +85,19 @@ export function TreeSearchBar({
           }
         }}
       />
-      <details className="tree-search-options">
+      <details
+        className="tree-search-options"
+        open={optionsOpen}
+        onToggle={(event) => onOptionsOpenChange(event.currentTarget.open)}
+      >
         <summary
           className="tree-filter-btn tree-search-options-button"
           aria-label="Search options"
           title="Search options"
+          onClick={(event) => {
+            event.preventDefault();
+            onOptionsOpenChange(!optionsOpen);
+          }}
         >
           <span aria-hidden="true">⌕</span>
         </summary>

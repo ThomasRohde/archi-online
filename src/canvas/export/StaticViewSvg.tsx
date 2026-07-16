@@ -76,6 +76,7 @@ export function StaticViewContent({
   const route = createConnectionRouteResolver(model, absBounds, {
     isVisible: isConnectionVisible,
     orthogonalAnchors: settings.useOrthogonalConnectionAnchors,
+    prewarmViewId: viewId,
   });
   return (
     <>

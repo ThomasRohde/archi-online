@@ -13,6 +13,7 @@ import {
 import {
   createModelStore,
   getActiveModelStore,
+  markModelSaved,
   redo,
   replaceModel,
   runBatch,
@@ -30,6 +31,120 @@ beforeEach(() => {
 });
 
 describe('model ops + undo/redo', () => {
+  it('derives dirty state from the saved history revision across undo and redo', () => {
+    const store = getActiveModelStore();
+    expect(store.getState()).toMatchObject({
+      historyRevision: 0,
+      savedRevision: 0,
+      dirty: false,
+    });
+
+    addElement('BusinessActor', 'Actor');
+    const edited = store.getState();
+    expect(edited.historyRevision).not.toBe(edited.savedRevision);
+    expect(edited.dirty).toBe(true);
+
+    undo();
+    expect(store.getState()).toMatchObject({
+      historyRevision: 0,
+      savedRevision: 0,
+      dirty: false,
+    });
+
+    redo();
+    expect(store.getState().dirty).toBe(true);
+  });
+
+  it('restores a save point when redo returns to the saved revision', () => {
+    const store = getActiveModelStore();
+    addElement('BusinessActor', 'Saved actor');
+    const savedRevision = store.getState().historyRevision;
+    markModelSaved(savedRevision, 'saved.archimate', store);
+
+    expect(store.getState()).toMatchObject({
+      historyRevision: savedRevision,
+      savedRevision,
+      fileName: 'saved.archimate',
+      dirty: false,
+    });
+
+    undo(store);
+    expect(store.getState().dirty).toBe(true);
+    redo(store);
+    expect(store.getState()).toMatchObject({
+      historyRevision: savedRevision,
+      savedRevision,
+      dirty: false,
+    });
+  });
+
+  it('keeps divergent same-depth edits dirty with unique transaction revisions', () => {
+    const store = getActiveModelStore();
+    addElement('BusinessActor', 'Saved branch');
+    const savedRevision = store.getState().historyRevision;
+    markModelSaved(savedRevision, 'saved.archimate', store);
+
+    undo(store);
+    addElement('BusinessRole', 'Divergent branch');
+
+    const state = store.getState();
+    expect(state.undoStack).toHaveLength(1);
+    expect(state.historyRevision).not.toBe(savedRevision);
+    expect(state.savedRevision).toBe(savedRevision);
+    expect(state.dirty).toBe(true);
+  });
+
+  it('allocates one revision for a completed batch', () => {
+    const store = getActiveModelStore();
+
+    runBatch('script', () => {
+      addElement('BusinessActor');
+      addElement('BusinessRole');
+      addElement('BusinessProcess');
+    });
+
+    const state = store.getState();
+    expect(state.undoStack).toHaveLength(1);
+    expect(state.undoStack[0]).toMatchObject({
+      beforeRevision: 0,
+      afterRevision: state.historyRevision,
+    });
+    expect(state.historyRevision).toBeGreaterThan(0);
+  });
+
+  it('always derives dirty state from explicit revision overrides', () => {
+    const store = createModelStore({
+      model: createEmptyModel('Explicit revisions'),
+      historyRevision: 4,
+      savedRevision: 4,
+      dirty: true,
+    });
+
+    expect(store.getState().dirty).toBe(false);
+  });
+
+  it('initializes imported dirty models without a save point', () => {
+    const dirtyStore = createModelStore({
+      model: createEmptyModel('Imported'),
+      dirty: true,
+    });
+    const cleanStore = createModelStore({
+      model: createEmptyModel('Opened'),
+      dirty: false,
+    });
+
+    expect(dirtyStore.getState()).toMatchObject({
+      historyRevision: 0,
+      savedRevision: null,
+      dirty: true,
+    });
+    expect(cleanStore.getState()).toMatchObject({
+      historyRevision: 0,
+      savedRevision: 0,
+      dirty: false,
+    });
+  });
+
   it('creates elements in the right default folder', () => {
     const id = addElement('BusinessActor');
     const m = model();

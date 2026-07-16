@@ -1,7 +1,8 @@
 import { useStore } from './store-hooks';
 import { APP_VERSION } from '../version';
-import { useCanvasStatus } from './canvas-status';
+import { canvasStatusKey, useCanvasStatus } from './canvas-status';
 import { resolveTarget } from './properties/target';
+import { useWorkspaceStore } from './store-hooks';
 
 function plural(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
@@ -12,8 +13,16 @@ export function StatusBar() {
   const selection = useStore((s) => s.selection);
   const fileName = useStore((s) => s.fileName);
   const dirty = useStore((s) => s.dirty);
-  const hasActiveView = useStore((s) => s.activeViewId !== null);
-  const { zoom, x, y } = useCanvasStatus();
+  const activeViewId = useStore((s) => s.activeViewId);
+  const activeSessionId = useWorkspaceStore((s) => s.activeSessionId);
+  const canvasStatus = useCanvasStatus((state) =>
+    activeSessionId && activeViewId
+      ? state.entries[canvasStatusKey(activeSessionId, activeViewId)]
+      : undefined,
+  );
+  const canvasZoom = canvasStatus?.zoom ?? null;
+  const canvasX = canvasStatus?.x ?? null;
+  const canvasY = canvasStatus?.y ?? null;
 
   if (!model) {
     return (
@@ -34,7 +43,9 @@ export function StatusBar() {
 
   const elementCount = Object.keys(model.elements).length;
   const relationshipCount = Object.keys(model.relationships).length;
-  const showCanvas = hasActiveView && zoom !== null;
+  const showCanvas = Boolean(
+    activeViewId !== null && canvasStatus && canvasZoom !== null,
+  );
 
   return (
     <div className="status-bar">
@@ -61,11 +72,20 @@ export function StatusBar() {
       {showCanvas && (
         <>
           <span className="status-sep" />
-          <span>
-            {x !== null && y !== null ? `x ${Math.round(x)} y ${Math.round(y)}` : '—'}
+          <span
+            className={
+              canvasStatus?.message
+                ? `status-canvas-message status-canvas-message-${canvasStatus.tone}`
+                : undefined
+            }
+          >
+            {canvasStatus?.message ??
+              (canvasX !== null && canvasY !== null
+                ? `x ${Math.round(canvasX)} y ${Math.round(canvasY)}`
+                : '—')}
           </span>
           <span className="status-sep" />
-          <span>{Math.round((zoom as number) * 100)}%</span>
+          <span>{Math.round((canvasZoom as number) * 100)}%</span>
         </>
       )}
       <span className="status-sep" />

@@ -9,6 +9,7 @@ import type { ArchimateRelationship, DiagramConnection } from '../model/types';
 import { PLAIN_CONNECTION_TYPE } from '../model/types';
 import { parseFont, pointAlong, type Point } from './geometry';
 import { GHOST_OPACITY } from './view-editor/viewpoint-ghost';
+import type { ReconnectFeedbackTone } from './view-editor/reconnect-intent';
 
 const DEFAULT_LINE = '#5c5c5c';
 
@@ -262,9 +263,19 @@ export interface ConnectionViewProps {
   /** Dim the connection because an endpoint element is outside the viewpoint. */
   ghosted?: boolean;
   displayLabel?: string;
+  interactionTone?: ReconnectFeedbackTone;
 }
 
-function ConnectionViewComponent({ conn, rel, points, selected, c4ViewType, ghosted, displayLabel }: ConnectionViewProps) {
+function ConnectionViewComponent({
+  conn,
+  rel,
+  points,
+  selected,
+  c4ViewType,
+  ghosted,
+  displayLabel,
+  interactionTone,
+}: ConnectionViewProps) {
   if (points.length < 2) return null;
   const isC4Relationship = !!c4ViewType && !!rel;
   const color = conn.lineColor ?? (isC4Relationship ? C4_VISUAL_DEFAULTS.relationshipLine : DEFAULT_LINE);
@@ -307,6 +318,16 @@ function ConnectionViewComponent({ conn, rel, points, selected, c4ViewType, ghos
   const t = conn.textPosition === 0 ? 0.15 : conn.textPosition === 2 ? 0.85 : 0.5;
   const mid = pointAlong(points, t).point;
   const labelColor = conn.fontColor ?? (isC4Relationship ? C4_VISUAL_DEFAULTS.relationshipText : '#000000');
+  const interactionColor =
+    interactionTone === 'anchor'
+      ? 'var(--canvas-anchor)'
+      : interactionTone === 'valid'
+        ? 'var(--canvas-valid)'
+        : interactionTone === 'invalid'
+          ? 'var(--canvas-invalid)'
+          : undefined;
+  const displayColor = interactionColor ?? (selected ? 'var(--canvas-selection)' : color);
+  const showLine = conn.lineStyle !== 3 || interactionTone !== undefined;
 
   return (
     <g
@@ -320,11 +341,11 @@ function ConnectionViewComponent({ conn, rel, points, selected, c4ViewType, ghos
         d={d}
         data-c4-relationship={isC4Relationship ? 'true' : undefined}
         fill="none"
-        stroke={conn.lineStyle === 3 ? 'none' : selected ? 'var(--canvas-selection)' : color}
-        strokeWidth={(conn.lineWidth ?? 1) * (selected ? 1.6 : 1)}
+        stroke={showLine ? displayColor : 'none'}
+        strokeWidth={(conn.lineWidth ?? 1) * (selected || interactionTone ? 1.6 : 1)}
         strokeDasharray={style.dash}
       />
-      {conn.lineStyle !== 3 && style.decorations(points, selected ? 'var(--canvas-selection)' : color)}
+      {showLine && style.decorations(points, displayColor)}
       {labelLines.length > 0 && (
         <text
           x={mid.x}

@@ -26,8 +26,26 @@ describe('app settings', () => {
       snapToAlignmentGuides: true,
       pasteSpecialMode: 'reference',
       themeMode: 'system',
+      showToolbarContextHelp: true,
       useOrthogonalConnectionAnchors: false,
     });
+  });
+
+  it('persists and exposes the toolbar context-help preference under General settings', async () => {
+    const general = SETTING_SECTIONS.find((section) => section.id === 'general');
+    expect(general?.rows).toContainEqual(expect.objectContaining({
+      key: 'showToolbarContextHelp',
+      kind: 'boolean',
+      label: 'Show toolbar context help',
+    }));
+
+    const loaded = await loadSettings(memoryKeyValueStore([[
+      SETTINGS_STORAGE_KEY,
+      { showToolbarContextHelp: false },
+    ]]));
+
+    expect(loaded.showToolbarContextHelp).toBe(false);
+    expect(resetSetting(loaded, 'showToolbarContextHelp').showToolbarContextHelp).toBe(true);
   });
 
   it('persists the opt-in orthogonal connection anchor preference', async () => {
