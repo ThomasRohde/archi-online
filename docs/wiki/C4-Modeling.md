@@ -23,9 +23,16 @@ and choose **New C4 View**. The built-in templates cover:
 - Dynamic
 
 When a C4 view is active, the palette shows C4 shortcuts for Person, Software
-System, Container, Component, Deployment Node, Infrastructure Node, and Database.
-The Database shortcut is still a C4 Container; it adds the `c4.tags=database`
-property.
+System, Container, Component, Deployment Node, Infrastructure Node, Database,
+Web Browser, Folder, and Bucket. Database, Web Browser, Folder, and Bucket are
+all C4 Containers backed by `ApplicationComponent`; their shortcuts add the
+`database`, `browser`, `folder`, or `bucket` value to `c4.tags`.
+
+For any selected C4 Container, use the **Shape** dropdown in the C4 section of
+the Properties panel to choose Default, Database, Web Browser, Folder, Bucket,
+or Terminal. Changing the shape replaces only a recognized shape tag. Choosing
+Default removes that shape tag, while `external` and any custom tags remain
+untouched.
 
 The C4 toolbar menu also provides:
 
@@ -41,16 +48,19 @@ C4 views use a Structurizr-style visual mode. The underlying model remains
 ArchiMate, but C4-tagged nodes in views with `c4.viewType` render with C4
 figures instead of ArchiMate corner icons:
 
-- Dark blue boxes are people.
-- Blue boxes are internal software systems, containers, and components.
-- Grey boxes are external elements, detected from `c4.external=true` or an
-  `external` tag in `c4.tags`.
-- Containers tagged with `database` in `c4.tags` render as database cylinders.
-- Parent software systems, containers, and deployment nodes render as pale
-  dashed boundaries labeled `Software System: Name`, `Container: Name`, or
-  `Deployment Node: Name`.
-- Relationships render as plain directed arrows with intent labels and optional
-  `[technology/protocol]` lines.
+- All modern C4 figures use white fills with colored outlines and text.
+- People use a green head-on-box figure.
+- In-scope software systems, containers, and components use blue outlines and
+  text.
+- External elements use grey outlines and text; they are detected from
+  `c4.external=true` or an `external` tag in `c4.tags`.
+- Containers can render as a database cylinder, browser window, folder, bucket,
+  or terminal when `c4.tags` contains the matching shape tag.
+- Parent software systems, containers, and deployment nodes render as solid
+  rounded boundaries with their label at the bottom-left, for example
+  `Software System: Name`, `Container: Name`, or `Deployment Node: Name`.
+- Relationships render as dashed grey directed arrows with intent labels and
+  optional `[technology/protocol]` lines.
 
 New C4 templates and palette-created C4 elements persist the default fill,
 line, and font colors so exported `.archimate` files look close to C4 in other
@@ -65,7 +75,11 @@ or connection takes precedence.
 | Person | `BusinessActor` | `c4.kind=person` |
 | Software System | `ApplicationComponent` | `c4.kind=software-system` |
 | Container | `ApplicationComponent` | `c4.kind=container` |
-| Data store | `ApplicationComponent` | `c4.kind=container`, `c4.tags=database`, `c4.technology=...` |
+| Database | `ApplicationComponent` | `c4.kind=container`, `c4.tags=database`, `c4.technology=...` |
+| Web Browser | `ApplicationComponent` | `c4.kind=container`, `c4.tags=browser`, `c4.technology=...` |
+| Folder | `ApplicationComponent` | `c4.kind=container`, `c4.tags=folder`, `c4.technology=...` |
+| Bucket | `ApplicationComponent` | `c4.kind=container`, `c4.tags=bucket`, `c4.technology=...` |
+| Terminal | `ApplicationComponent` | `c4.kind=container`, `c4.tags=terminal`, `c4.technology=...` |
 | Component | `ApplicationFunction` | `c4.kind=component` |
 | Deployment node | `Node` | `c4.kind=deployment-node` |
 | Infrastructure node | `Node` | `c4.kind=infrastructure-node` |
@@ -99,13 +113,16 @@ Archi Online uses these stable profile keys:
 | `c4.viewType` | C4 view type on an ArchiMate view. |
 | `c4.scopeId` | Optional id or name of the scoped element. |
 | `c4.technology` | Technology, protocol, or runtime label. |
-| `c4.tags` | Comma-separated tags such as `database` or `external`. |
+| `c4.tags` | Comma-separated tags. `database`, `browser`, `folder`, `bucket`, and `terminal` select a Container shape; `external` selects external styling. Custom tags are preserved. |
 | `c4.external` | `true` for externally owned systems or services. |
 | `c4.instanceOf` | Source element for deployment instances. |
 | `c4.order` | Sequence number for dynamic relationships. |
 
 The Properties panel exposes these fields on C4 elements, relationships, and
-views. The raw values remain visible in the normal **Properties** tab.
+views. The raw values remain visible in the normal **Properties** tab. Shape
+tags change the figure only: the displayed kind stays `Container` for browser,
+folder, bucket, and terminal shapes. Only `database` changes the displayed kind
+label to `Database`.
 
 ## Labels
 

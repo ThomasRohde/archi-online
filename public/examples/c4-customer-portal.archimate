@@ -24,6 +24,9 @@
       <property key="c4.technology">
         <value>React, TypeScript</value>
       </property>
+      <property key="c4.tags">
+        <value>browser</value>
+      </property>
     </element>
     <element xsi:type="archimate:ApplicationComponent" name="API Application" id="id-c4-api-application">
       <documentation>Handles customer journeys, order orchestration, and integrations.</documentation>
@@ -87,37 +90,37 @@
       <child xsi:type="archimate:Note" id="id-c4-note-title" fillColor="#FFFFFF" lineColor="#FFFFFF" fontColor="#253149" borderType="2" textAlignment="1" textPosition="0">
         <bounds x="60" y="30" width="1300" height="64"/>
         <content>Customer Portal - C4 Container View
-Browser, API, database, and external payment provider shown with C4 visuals on an ArchiMate model.</content>
+Browser, API, database, and external payment provider shown as modern outline C4 figures on an ArchiMate model.</content>
       </child>
-      <child xsi:type="archimate:DiagramObject" id="id-c4-node-customer" fillColor="#08427B" lineColor="#052E56" fontColor="#FFFFFF" archimateElement="id-c4-customer">
-        <bounds x="70" y="250" width="190" height="92"/>
-        <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-customer-web" source="id-c4-node-customer" target="id-c4-node-web" lineColor="#4A5568" fontColor="#253149" archimateRelationship="id-c4-rel-customer-web"/>
+      <child xsi:type="archimate:DiagramObject" id="id-c4-node-customer" fillColor="#FFFFFF" lineColor="#287E06" fontColor="#287E06" archimateElement="id-c4-customer">
+        <bounds x="70" y="230" width="190" height="150"/>
+        <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-customer-web" source="id-c4-node-customer" target="id-c4-node-web" lineColor="#444444" fontColor="#444444" archimateRelationship="id-c4-rel-customer-web"/>
       </child>
-      <child xsi:type="archimate:DiagramObject" id="id-c4-node-portal" fillColor="#F7FBFF" lineColor="#8DB9DD" fontColor="#253149" archimateElement="id-c4-customer-portal">
+      <child xsi:type="archimate:DiagramObject" id="id-c4-node-portal" fillColor="#FFFFFF" lineColor="#1168BD" fontColor="#1168BD" archimateElement="id-c4-customer-portal">
         <bounds x="330" y="125" width="720" height="390"/>
-        <child xsi:type="archimate:DiagramObject" id="id-c4-node-web" targetConnections="id-c4-conn-customer-web" fillColor="#1168BD" lineColor="#0D4F91" fontColor="#FFFFFF" archimateElement="id-c4-web-application">
+        <child xsi:type="archimate:DiagramObject" id="id-c4-node-web" targetConnections="id-c4-conn-customer-web" fillColor="#FFFFFF" lineColor="#1168BD" fontColor="#1168BD" archimateElement="id-c4-web-application">
           <bounds x="60" y="115" width="230" height="112"/>
-          <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-web-api" source="id-c4-node-web" target="id-c4-node-api" lineColor="#4A5568" fontColor="#253149" archimateRelationship="id-c4-rel-web-api"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-web-api" source="id-c4-node-web" target="id-c4-node-api" lineColor="#444444" fontColor="#444444" archimateRelationship="id-c4-rel-web-api"/>
         </child>
-        <child xsi:type="archimate:DiagramObject" id="id-c4-node-api" targetConnections="id-c4-conn-web-api" fillColor="#1168BD" lineColor="#0D4F91" fontColor="#FFFFFF" archimateElement="id-c4-api-application">
+        <child xsi:type="archimate:DiagramObject" id="id-c4-node-api" targetConnections="id-c4-conn-web-api" fillColor="#FFFFFF" lineColor="#1168BD" fontColor="#1168BD" archimateElement="id-c4-api-application">
           <bounds x="430" y="115" width="230" height="112"/>
-          <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-api-db" source="id-c4-node-api" target="id-c4-node-db" lineColor="#4A5568" fontColor="#253149" archimateRelationship="id-c4-rel-api-db"/>
-          <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-api-payment" source="id-c4-node-api" target="id-c4-node-payment" lineColor="#4A5568" fontColor="#253149" archimateRelationship="id-c4-rel-api-payment"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-api-db" source="id-c4-node-api" target="id-c4-node-db" lineColor="#444444" fontColor="#444444" archimateRelationship="id-c4-rel-api-db"/>
+          <sourceConnection xsi:type="archimate:Connection" id="id-c4-conn-api-payment" source="id-c4-node-api" target="id-c4-node-payment" lineColor="#444444" fontColor="#444444" archimateRelationship="id-c4-rel-api-payment"/>
         </child>
-        <child xsi:type="archimate:DiagramObject" id="id-c4-node-db" targetConnections="id-c4-conn-api-db" fillColor="#1168BD" lineColor="#0D4F91" fontColor="#FFFFFF" archimateElement="id-c4-customer-database">
+        <child xsi:type="archimate:DiagramObject" id="id-c4-node-db" targetConnections="id-c4-conn-api-db" fillColor="#FFFFFF" lineColor="#1168BD" fontColor="#1168BD" archimateElement="id-c4-customer-database">
           <bounds x="430" y="265" width="230" height="112"/>
         </child>
       </child>
-      <child xsi:type="archimate:DiagramObject" id="id-c4-node-payment" targetConnections="id-c4-conn-api-payment" fillColor="#999999" lineColor="#6B7280" fontColor="#FFFFFF" archimateElement="id-c4-payment-gateway">
+      <child xsi:type="archimate:DiagramObject" id="id-c4-node-payment" targetConnections="id-c4-conn-api-payment" fillColor="#FFFFFF" lineColor="#777777" fontColor="#777777" archimateElement="id-c4-payment-gateway">
         <bounds x="1130" y="240" width="230" height="112"/>
       </child>
       <child xsi:type="archimate:Note" id="id-c4-note-legend" fillColor="#FFFFFF" lineColor="#CBD5E1" fontColor="#253149">
-        <bounds x="60" y="560" width="520" height="130"/>
+        <bounds x="60" y="560" width="1300" height="130"/>
         <content>C4 Container View
-Blue elements are internal; grey elements are external.
-Database containers render as cylinders.
-Dashed boxes are parent boundaries.
-Relationships are directed and labeled with intent plus optional [technology/protocol].</content>
+Elements are white boxes with coloured borders and text: green = people, blue = in scope, grey = external.
+Container shapes via c4.tags: database cylinder, browser window, folder, bucket, terminal.
+Solid rounded rectangles with a bottom-left label are boundaries.
+Relationships are dashed grey arrows labeled with intent plus optional [technology/protocol].</content>
         <property key="c4.legend">
           <value>true</value>
         </property>

@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { C4_PROPERTY_KEYS, c4KindForConcept, c4PropertyValue, c4ViewType } from '../src/model/c4';
+import {
+  C4_PROPERTY_KEYS,
+  c4KindForConcept,
+  c4LegendText,
+  c4PropertyValue,
+  c4ViewType,
+} from '../src/model/c4';
 import { parseArchimate, serializeArchimate } from '../src/model/io/archimate-xml';
 import { createEmptyModel } from '../src/model/ops';
 import type { ModelState } from '../src/model/types';
@@ -137,6 +143,44 @@ describe('C4 customer portal example', () => {
 
   it('has no dangling references', () => {
     expectReferencesResolve(m);
+  });
+
+  it('persists the modern C4 shapes, colors, and legend', () => {
+    const web = m.elements['id-c4-web-application'];
+    expect(c4PropertyValue(web.properties, C4_PROPERTY_KEYS.tags)).toBe('browser');
+
+    expect(m.nodes['id-c4-node-customer']).toMatchObject({
+      fillColor: '#FFFFFF',
+      lineColor: '#287E06',
+      fontColor: '#287E06',
+      bounds: { x: 70, y: 230, width: 190, height: 150 },
+    });
+
+    for (const id of [
+      'id-c4-node-portal',
+      'id-c4-node-web',
+      'id-c4-node-api',
+      'id-c4-node-db',
+    ]) {
+      expect(m.nodes[id]).toMatchObject({
+        fillColor: '#FFFFFF',
+        lineColor: '#1168BD',
+        fontColor: '#1168BD',
+      });
+    }
+
+    expect(m.nodes['id-c4-node-payment']).toMatchObject({
+      fillColor: '#FFFFFF',
+      lineColor: '#777777',
+      fontColor: '#777777',
+    });
+    for (const connection of Object.values(m.connections)) {
+      expect(connection).toMatchObject({ lineColor: '#444444', fontColor: '#444444' });
+    }
+    expect(m.nodes['id-c4-note-legend']).toMatchObject({
+      nodeType: 'note',
+      content: c4LegendText('container'),
+    });
   });
 });
 
