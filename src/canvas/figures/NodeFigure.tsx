@@ -410,22 +410,31 @@ export function NodeFigure({
   }
 
   function c4BoundaryLabel(parts: C4ElementLabelParts, color: string) {
+    const nameSize = Math.max(11, font.sizePx);
+    const kindSize = Math.max(9, font.sizePx - 2);
     return (
-      <text
-        x={12}
-        y={22}
+      <g
         fontFamily={font.family + ', sans-serif'}
-        fontSize={Math.max(11, font.sizePx)}
-        fontWeight={700}
         fill={color}
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
-        {parts.kindLabel}: {parts.name}
-      </text>
+        <text x={12} y={h - 12 - kindSize - 4} fontSize={nameSize} fontWeight={700}>
+          {parts.name}
+        </text>
+        <text x={12} y={h - 12} fontSize={kindSize}>
+          [{parts.kindLabel}]
+        </text>
+      </g>
     );
   }
 
-  function c4DatabaseBody(fill: string, fillOpacity: number, lineColor: string, visual: C4VisualStyle) {
+  function c4DatabaseBody(
+    fill: string,
+    fillOpacity: number,
+    c4Stroke: string,
+    c4StrokeWidth: number,
+    visual: C4VisualStyle,
+  ) {
     const capH = Math.min(24, Math.max(14, h * 0.24));
     return (
       <g>
@@ -434,9 +443,9 @@ export function NodeFigure({
           d={`M0,${capH / 2} V${h - capH / 2} C0,${h + capH / 2} ${w},${h + capH / 2} ${w},${h - capH / 2} V${capH / 2} C${w},${capH * 1.5} 0,${capH * 1.5} 0,${capH / 2} Z`}
           fill={fill}
           fillOpacity={fillOpacity}
-          stroke={node.lineStyle === 3 ? 'none' : lineColor}
+          stroke={c4Stroke}
           strokeOpacity={lineAlpha}
-          strokeWidth={strokeWidth}
+          strokeWidth={c4StrokeWidth}
           strokeDasharray={strokeDasharray}
         />
         <ellipse
@@ -446,10 +455,210 @@ export function NodeFigure({
           ry={capH / 2}
           fill={fill}
           fillOpacity={fillOpacity}
-          stroke={node.lineStyle === 3 ? 'none' : lineColor}
+          stroke={c4Stroke}
           strokeOpacity={lineAlpha}
-          strokeWidth={strokeWidth}
+          strokeWidth={c4StrokeWidth}
           strokeDasharray={strokeDasharray}
+        />
+      </g>
+    );
+  }
+
+  function c4PersonBody(
+    fill: string,
+    fillOpacity: number,
+    c4Stroke: string,
+    c4StrokeWidth: number,
+  ): { body: ReactNode; labelTop: number } {
+    const headR = Math.max(10, Math.min(w * 0.16, h * 0.22, 30));
+    const boxY = headR * 1.2;
+    const rx = Math.min(22, (h - boxY) / 3, w / 4);
+    return {
+      body: (
+        <g>
+          <rect
+            data-c4-shape="person"
+            x={0}
+            y={boxY}
+            width={w}
+            height={h - boxY}
+            rx={rx}
+            ry={rx}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={c4Stroke}
+            strokeOpacity={lineAlpha}
+            strokeWidth={c4StrokeWidth}
+            strokeDasharray={strokeDasharray}
+          />
+          <circle
+            data-c4-shape-part="head"
+            cx={w / 2}
+            cy={headR}
+            r={headR}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={c4Stroke}
+            strokeOpacity={lineAlpha}
+            strokeWidth={c4StrokeWidth}
+            strokeDasharray={strokeDasharray}
+          />
+        </g>
+      ),
+      labelTop: headR * 2,
+    };
+  }
+
+  function c4BrowserBody(
+    fill: string,
+    fillOpacity: number,
+    lineColor: string,
+    c4Stroke: string,
+    c4StrokeWidth: number,
+  ): { body: ReactNode; labelTop: number } {
+    const barH = Math.max(14, Math.min(22, h * 0.2));
+    const dotR = Math.min(3, barH * 0.16);
+    const dotY = barH / 2;
+    const dotX = (index: number) => 8 + dotR + index * (dotR * 3);
+    const addrX = dotX(2) + dotR * 3;
+    const addrH = Math.min(8, barH * 0.4);
+    const detailColor = c4Stroke === 'none' ? 'none' : lineColor;
+    return {
+      body: (
+        <g>
+          <rect
+            data-c4-shape="browser"
+            width={w}
+            height={h}
+            rx={5}
+            ry={5}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={c4Stroke}
+            strokeOpacity={lineAlpha}
+            strokeWidth={c4StrokeWidth}
+            strokeDasharray={strokeDasharray}
+          />
+          <line x1={0} y1={barH} x2={w} y2={barH} stroke={detailColor} strokeOpacity={lineAlpha} strokeWidth={1} />
+          {[0, 1, 2].map((index) => (
+            <circle key={index} cx={dotX(index)} cy={dotY} r={dotR} fill={detailColor} fillOpacity={lineAlpha} />
+          ))}
+          <rect
+            x={addrX}
+            y={dotY - addrH / 2}
+            width={Math.max(0, w - addrX - 8)}
+            height={addrH}
+            rx={addrH / 2}
+            fill="none"
+            stroke={detailColor}
+            strokeOpacity={lineAlpha}
+            strokeWidth={1}
+          />
+        </g>
+      ),
+      labelTop: barH,
+    };
+  }
+
+  function c4FolderBody(
+    fill: string,
+    fillOpacity: number,
+    c4Stroke: string,
+    c4StrokeWidth: number,
+  ): { body: ReactNode; labelTop: number } {
+    const tabW = Math.min(w * 0.35, 90);
+    const tabH = Math.max(10, Math.min(18, h * 0.16));
+    const slant = Math.min(12, tabH);
+    return {
+      body: (
+        <path
+          data-c4-shape="folder"
+          d={`M0,${h} L0,0 H${tabW} L${tabW + slant},${tabH} H${w} V${h} Z`}
+          fill={fill}
+          fillOpacity={fillOpacity}
+          stroke={c4Stroke}
+          strokeOpacity={lineAlpha}
+          strokeWidth={c4StrokeWidth}
+          strokeDasharray={strokeDasharray}
+          strokeLinejoin="round"
+        />
+      ),
+      labelTop: tabH,
+    };
+  }
+
+  function c4BucketBody(
+    fill: string,
+    fillOpacity: number,
+    c4Stroke: string,
+    c4StrokeWidth: number,
+  ): { body: ReactNode; labelTop: number } {
+    const topRy = Math.max(8, Math.min(14, h * 0.12));
+    const inset = Math.min(w * 0.14, 34);
+    const botRy = topRy * 0.8;
+    const d = `M0,${topRy} L${inset},${h - botRy} C${inset},${h + botRy} ${w - inset},${h + botRy} ${w - inset},${h - botRy} L${w},${topRy} C${w},${topRy * 3} 0,${topRy * 3} 0,${topRy} Z`;
+    return {
+      body: (
+        <g>
+          <path
+            data-c4-shape="bucket"
+            d={d}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={c4Stroke}
+            strokeOpacity={lineAlpha}
+            strokeWidth={c4StrokeWidth}
+            strokeDasharray={strokeDasharray}
+          />
+          <ellipse
+            cx={w / 2}
+            cy={topRy}
+            rx={w / 2}
+            ry={topRy}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={c4Stroke}
+            strokeOpacity={lineAlpha}
+            strokeWidth={c4StrokeWidth}
+            strokeDasharray={strokeDasharray}
+          />
+        </g>
+      ),
+      labelTop: topRy * 2,
+    };
+  }
+
+  function c4TerminalBody(
+    fill: string,
+    fillOpacity: number,
+    lineColor: string,
+    c4Stroke: string,
+    c4StrokeWidth: number,
+  ): ReactNode {
+    const detailColor = c4Stroke === 'none' ? 'none' : lineColor;
+    return (
+      <g>
+        <rect
+          data-c4-shape="terminal"
+          width={w}
+          height={h}
+          rx={5}
+          ry={5}
+          fill={fill}
+          fillOpacity={fillOpacity}
+          stroke={c4Stroke}
+          strokeOpacity={lineAlpha}
+          strokeWidth={c4StrokeWidth}
+          strokeDasharray={strokeDasharray}
+        />
+        <path
+          d="M10,10 L15,14 L10,18 M18,18 H25"
+          fill="none"
+          stroke={detailColor}
+          strokeOpacity={lineAlpha}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
       </g>
     );
@@ -462,6 +671,8 @@ export function NodeFigure({
     const lineColor = node.lineColor ?? visual.lineColor;
     const textColor = node.fontColor ?? visual.fontColor;
     const paint = gradientPaint(fill);
+    const c4StrokeWidth = node.lineWidth ?? 2;
+    const c4Stroke = node.lineStyle === 3 ? 'none' : lineColor;
 
     if (visual.shape === 'boundary') {
       return (
@@ -471,44 +682,64 @@ export function NodeFigure({
             data-c4-shape={visual.shape}
             width={w}
             height={h}
-            rx={6}
-            ry={6}
+            rx={8}
+            ry={8}
             fill={paint.fill}
             fillOpacity={paint.opacity}
-            stroke={node.lineStyle === 3 ? 'none' : lineColor}
+            stroke={c4Stroke}
             strokeOpacity={lineAlpha}
-            strokeWidth={strokeWidth}
-            strokeDasharray={strokeDasharray ?? '8 5'}
+            strokeWidth={node.lineWidth ?? 1}
+            strokeDasharray={strokeDasharray}
           />
-          {displayLabel !== undefined ? label(displayLabel, { align: 'left', vert: 'top', inset: 8 }) : c4BoundaryLabel(parts, textColor)}
+          {displayLabel !== undefined ? label(displayLabel, { align: 'left', vert: 'bottom', inset: 8 }) : c4BoundaryLabel(parts, textColor)}
         </g>
       );
     }
 
-    const body =
-      visual.shape === 'database' ? (
-        c4DatabaseBody(paint.fill, paint.opacity, lineColor, visual)
-      ) : (
+    let body: ReactNode;
+    let labelTop = 0;
+    switch (visual.shape) {
+      case 'person':
+        ({ body, labelTop } = c4PersonBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
+        break;
+      case 'database':
+        body = c4DatabaseBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth, visual);
+        break;
+      case 'browser':
+        ({ body, labelTop } = c4BrowserBody(paint.fill, paint.opacity, lineColor, c4Stroke, c4StrokeWidth));
+        break;
+      case 'folder':
+        ({ body, labelTop } = c4FolderBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
+        break;
+      case 'bucket':
+        ({ body, labelTop } = c4BucketBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
+        break;
+      case 'terminal':
+        body = c4TerminalBody(paint.fill, paint.opacity, lineColor, c4Stroke, c4StrokeWidth);
+        break;
+      default:
+        body = (
         <rect
           data-c4-shape={visual.shape}
           width={w}
           height={h}
-          rx={4}
-          ry={4}
+          rx={5}
+          ry={5}
           fill={paint.fill}
           fillOpacity={paint.opacity}
-          stroke={node.lineStyle === 3 ? 'none' : lineColor}
+          stroke={c4Stroke}
           strokeOpacity={lineAlpha}
-          strokeWidth={strokeWidth}
+          strokeWidth={c4StrokeWidth}
           strokeDasharray={strokeDasharray}
         />
-      );
+        );
+    }
 
     return (
       <g>
         {paint.definition}
         {body}
-        {displayLabel !== undefined ? label(displayLabel, { inset: 10 }) : c4StructuredLabel(parts, textColor, 10)}
+        {displayLabel !== undefined ? label(displayLabel, { inset: 10 }) : c4StructuredLabel(parts, textColor, 10, labelTop)}
       </g>
     );
   }

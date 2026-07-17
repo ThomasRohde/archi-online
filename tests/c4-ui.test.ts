@@ -215,10 +215,11 @@ describe('C4 UI affordances', () => {
     expect(host.querySelector('[data-c4-shape="box"]')?.getAttribute('stroke')).toBe(
       C4_VISUAL_DEFAULTS.elementLine,
     );
+    expect(host.querySelector('[data-c4-shape="box"]')?.getAttribute('stroke-width')).toBe('2');
     expect(host.querySelector('g[color]')).toBeNull();
-    expect(host.querySelector('[data-c4-relationship="true"]')?.getAttribute('stroke')).toBe(
-      C4_VISUAL_DEFAULTS.relationshipLine,
-    );
+    const relationshipPath = host.querySelector('[data-c4-relationship="true"]');
+    expect(relationshipPath?.getAttribute('stroke')).toBe(C4_VISUAL_DEFAULTS.relationshipLine);
+    expect(relationshipPath?.getAttribute('stroke-dasharray')).toBe('6 4');
     expect(Array.from(host.querySelectorAll('tspan')).map((tspan) => tspan.textContent)).toEqual([
       '1. Submits order',
       '[HTTPS]',
@@ -227,6 +228,108 @@ describe('C4 UI affordances', () => {
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it('renders internal and external people as outlined person figures', async () => {
+    const viewId = addView('People');
+    const { elementId, nodeId } = createC4ElementOnView(
+      'person',
+      viewId,
+      viewId,
+      { x: 0, y: 0, width: 160, height: 150 },
+      'Customer',
+    );
+    const person = model().elements[elementId];
+    const node = model().nodes[nodeId];
+    const externalPerson = {
+      ...person,
+      id: 'external-person',
+      name: 'External Customer',
+      properties: [
+        ...person.properties,
+        { key: C4_PROPERTY_KEYS.external, value: 'true' },
+      ],
+    };
+    const externalNode = {
+      ...node,
+      id: 'external-person-node',
+      elementId: externalPerson.id,
+      fillColor: undefined,
+      lineColor: undefined,
+      fontColor: undefined,
+    };
+    const { host, root } = await render(
+      createElement(
+        'svg',
+        null,
+        createElement(NodeFigure, {
+          node,
+          element: person,
+          width: 160,
+          height: 150,
+          c4ViewType: 'system-context',
+        }),
+        createElement(NodeFigure, {
+          node: externalNode,
+          element: externalPerson,
+          width: 160,
+          height: 150,
+          c4ViewType: 'system-context',
+        }),
+      ),
+    );
+
+    const bodies = host.querySelectorAll('[data-c4-shape="person"]');
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].tagName.toLowerCase()).toBe('rect');
+    expect(bodies[0].getAttribute('fill')).toBe(C4_VISUAL_DEFAULTS.personFill);
+    expect(bodies[0].getAttribute('stroke')).toBe(C4_VISUAL_DEFAULTS.personLine);
+    expect(bodies[1].getAttribute('stroke')).toBe(C4_VISUAL_DEFAULTS.externalLine);
+    expect(host.querySelectorAll('[data-c4-shape-part="head"]')).toHaveLength(2);
+
+    await act(async () => root.unmount());
+  });
+
+  it('renders each C4 container variant with a shape hook and structured label', async () => {
+    const viewId = addView('Shapes');
+    const shapes = ['browser', 'folder', 'bucket', 'terminal', 'database'] as const;
+    const figures = shapes.map((shape) => {
+      const { elementId, nodeId } = createC4ElementOnView(
+        'container',
+        viewId,
+        viewId,
+        { x: 0, y: 0, width: 190, height: 92 },
+        `${shape} service`,
+        { [C4_PROPERTY_KEYS.tags]: shape },
+      );
+      return { shape, element: model().elements[elementId], node: model().nodes[nodeId] };
+    });
+    const { host, root } = await render(
+      createElement(
+        'svg',
+        null,
+        ...figures.map(({ shape, element, node }) => createElement(
+          'g',
+          { key: shape },
+          createElement(NodeFigure, {
+            node,
+            element,
+            width: 190,
+            height: 92,
+            c4ViewType: 'container',
+          }),
+        )),
+      ),
+    );
+
+    for (const shape of shapes) {
+      expect(host.querySelector(`[data-c4-shape="${shape}"]`), shape).not.toBeNull();
+      expect(host.textContent).toContain(`${shape} service`);
+    }
+    expect(host.textContent).toContain('[Container]');
+    expect(host.textContent).toContain('[Database]');
+
+    await act(async () => root.unmount());
   });
 
   it('renders database containers and parent nodes with dedicated C4 shapes in C4 views', async () => {
@@ -262,12 +365,58 @@ describe('C4 UI affordances', () => {
     );
 
     expect(host.querySelector('[data-c4-shape="database"]')).not.toBeNull();
-    expect(host.querySelector('[data-c4-shape="boundary"]')?.getAttribute('stroke-dasharray')).toBe('8 5');
-    expect(host.textContent).toContain('Software System: Customer Portal');
+    const boundary = host.querySelector('[data-c4-shape="boundary"]');
+    expect(boundary?.getAttribute('stroke-dasharray')).toBeNull();
+    expect(boundary?.getAttribute('rx')).toBe('8');
+    expect(Array.from(host.querySelectorAll('text')).map((text) => text.textContent)).toEqual([
+      'Customer Portal',
+      '[Software System]',
+    ]);
 
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it('keeps explicit C4 appearance overrides authoritative', async () => {
+    const viewId = addView('Overrides');
+    const { elementId, nodeId } = createC4ElementOnView(
+      'container',
+      viewId,
+      viewId,
+      { x: 0, y: 0, width: 190, height: 92 },
+    );
+    const node = {
+      ...model().nodes[nodeId],
+      fillColor: '#fff4d6',
+      lineColor: '#c0121c',
+      fontColor: '#ec870c',
+      derivedLineColor: false,
+      lineWidth: 3 as const,
+      lineStyle: 2 as const,
+    };
+    const { host, root } = await render(createElement(
+      'svg',
+      null,
+      createElement(NodeFigure, {
+        node,
+        element: model().elements[elementId],
+        width: 190,
+        height: 92,
+        c4ViewType: 'container',
+      }),
+    ));
+
+    const body = host.querySelector('[data-c4-shape="box"]');
+    expect(body?.getAttribute('fill')).toBe('#fff4d6');
+    expect(body?.getAttribute('stroke')).toBe('#c0121c');
+    expect(body?.getAttribute('stroke-width')).toBe('3');
+    expect(body?.getAttribute('stroke-dasharray')).toBe('2 3');
+    expect(host.querySelector('foreignObject div')?.getAttribute('style')).toContain(
+      'color: rgb(236, 135, 12)',
+    );
+
+    await act(async () => root.unmount());
   });
 
   it('keeps C4-tagged elements in non-C4 views on normal ArchiMate rendering', async () => {
@@ -315,7 +464,7 @@ describe('C4 UI affordances', () => {
     expect(model().nodes[nodeId]).toMatchObject({
       fillColor: C4_VISUAL_DEFAULTS.elementFill,
       lineColor: C4_VISUAL_DEFAULTS.elementLine,
-      fontColor: C4_VISUAL_DEFAULTS.textOnDark,
+      fontColor: C4_VISUAL_DEFAULTS.elementText,
     });
   });
 

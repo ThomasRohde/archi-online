@@ -243,6 +243,7 @@ function appearanceDash(lineStyle: DiagramConnection['lineStyle'], nativeDash: s
 
 function c4StyleFor(): ConnStyle {
   return {
+    dash: '6 4',
     decorations: (pts, c) => {
       const { end, endAngle } = endAngles(pts);
       return <Triangle p={end} angle={endAngle} color={c} size={9} />;
