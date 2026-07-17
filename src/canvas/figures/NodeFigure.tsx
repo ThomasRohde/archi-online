@@ -370,7 +370,7 @@ export function NodeFigure({
     extraTop = 0,
   ) {
     const availableHeight = Math.max(0, h - inset * 2 - extraTop);
-    const showDescription = parts.description && availableHeight >= 72;
+    const showDescription = parts.description && h >= 92;
     return (
       <foreignObject
         x={inset}
@@ -397,12 +397,12 @@ export function NodeFigure({
             boxSizing: 'border-box',
           }}
         >
-          <div style={{ fontWeight: 700, maxWidth: '100%' }}>{parts.name}</div>
-          <div style={{ fontSize: Math.max(10, font.sizePx - 1), marginTop: 3, maxWidth: '100%' }}>
+          <div style={{ fontWeight: 700, maxWidth: '100%', flexShrink: 0 }}>{parts.name}</div>
+          <div style={{ fontSize: Math.max(10, font.sizePx - 1), marginTop: 3, maxWidth: '100%', flexShrink: 0 }}>
             {c4ElementTypeLine(parts)}
           </div>
           {showDescription && (
-            <div style={{ fontSize: Math.max(10, font.sizePx - 2), marginTop: 6, maxWidth: '100%' }}>
+            <div style={{ fontSize: Math.max(10, font.sizePx - 2), marginTop: 6, maxWidth: '100%', minHeight: 0, overflow: 'hidden' }}>
               {parts.description}
             </div>
           )}

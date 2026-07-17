@@ -375,7 +375,7 @@ describe('C4 UI affordances', () => {
     });
   });
 
-  it('preserves mandatory C4 label lines when a node is resized small', async () => {
+  it('keeps structured C4 labels readable across standard shapes and small boxes', async () => {
     const viewId = addView('Responsive labels');
     const { elementId, nodeId } = createC4ElementOnView(
       'container',
@@ -388,6 +388,27 @@ describe('C4 UI affordances', () => {
     const description = 'Handles customer journeys, order orchestration, and integrations.';
     const element = { ...model().elements[elementId], documentation: description };
     const node = model().nodes[nodeId];
+    const standardShapes = ['browser', 'folder', 'bucket'] as const;
+    const shapedElements = standardShapes.map((shape) => ({
+      shape,
+      element: {
+        ...element,
+        id: `${element.id}-${shape}`,
+        properties: [
+          ...element.properties,
+          { key: C4_PROPERTY_KEYS.tags, value: shape },
+        ],
+      },
+    }));
+    const { elementId: personId, nodeId: personNodeId } = createC4ElementOnView(
+      'person',
+      viewId,
+      viewId,
+      { x: 0, y: 0, width: 160, height: 150 },
+      'Customer',
+    );
+    const person = { ...model().elements[personId], documentation: description };
+    const personNode = model().nodes[personNodeId];
     const { host, root } = await render(createElement(
       'svg',
       null,
@@ -413,13 +434,50 @@ describe('C4 UI affordances', () => {
           c4ViewType: 'container',
         }),
       ),
+      ...shapedElements.map(({ shape, element: shapedElement }) => createElement(
+        'g',
+        { key: shape, 'data-label-size': shape },
+        createElement(NodeFigure, {
+          node,
+          element: shapedElement,
+          width: 190,
+          height: 92,
+          c4ViewType: 'container',
+        }),
+      )),
+      createElement(
+        'g',
+        { 'data-label-size': 'person' },
+        createElement(NodeFigure, {
+          node: personNode,
+          element: person,
+          width: 160,
+          height: 150,
+          c4ViewType: 'system-context',
+        }),
+      ),
     ));
 
     const smallLabel = host.querySelector('[data-label-size="small"]')!;
     expect(smallLabel.textContent).toContain('API Application');
     expect(smallLabel.textContent).toContain('[Container: Node.js, Express]');
     expect(smallLabel.textContent).not.toContain(description);
-    expect(host.querySelector('[data-label-size="default"]')?.textContent).toContain(description);
+    for (const labelCase of ['default', ...standardShapes, 'person']) {
+      expect(host.querySelector(`[data-label-size="${labelCase}"]`)?.textContent).toContain(
+        description,
+      );
+    }
+    const mandatoryItems = Array.from(smallLabel.querySelectorAll<HTMLDivElement>('foreignObject div'))
+      .filter((item) => [
+        'API Application',
+        '[Container: Node.js, Express]',
+      ].includes(item.textContent ?? ''));
+    expect(mandatoryItems).toHaveLength(2);
+    expect(mandatoryItems.every((item) => item.style.flexShrink === '0')).toBe(true);
+    const descriptionItem = Array.from(
+      host.querySelectorAll<HTMLDivElement>('[data-label-size="default"] foreignObject div'),
+    ).find((item) => item.textContent === description);
+    expect(descriptionItem?.style.overflow).toBe('hidden');
 
     await act(async () => root.unmount());
   });
