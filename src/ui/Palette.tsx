@@ -40,7 +40,7 @@ interface C4PaletteEntry {
   properties?: Record<string, string>;
 }
 
-type C4PaletteIcon = C4ElementKind | 'database';
+type C4PaletteIcon = C4ElementKind | 'database' | 'browser' | 'folder' | 'bucket';
 
 const C4_TOOLBOX: C4PaletteEntry[] = [
   ...C4_PALETTE_KINDS.map((kind) => ({
@@ -52,71 +52,107 @@ const C4_TOOLBOX: C4PaletteEntry[] = [
     title: 'C4 Database',
     properties: { [C4_PROPERTY_KEYS.tags]: 'database' },
   },
+  {
+    kind: 'container',
+    title: 'C4 Web Browser',
+    properties: { [C4_PROPERTY_KEYS.tags]: 'browser' },
+  },
+  {
+    kind: 'container',
+    title: 'C4 Folder',
+    properties: { [C4_PROPERTY_KEYS.tags]: 'folder' },
+  },
+  {
+    kind: 'container',
+    title: 'C4 Bucket',
+    properties: { [C4_PROPERTY_KEYS.tags]: 'bucket' },
+  },
 ];
 
-function isDatabaseEntry(entry: C4PaletteEntry): boolean {
-  return entry.properties?.[C4_PROPERTY_KEYS.tags]?.toLowerCase().split(/[,\s]+/).includes('database') ?? false;
-}
-
 function c4PaletteIcon(entry: C4PaletteEntry): C4PaletteIcon {
-  return isDatabaseEntry(entry) ? 'database' : entry.kind;
+  const shape = entry.properties?.[C4_PROPERTY_KEYS.tags];
+  return shape === 'database' || shape === 'browser' || shape === 'folder' || shape === 'bucket'
+    ? shape
+    : entry.kind;
 }
 
 function C4PaletteGlyph({ icon }: { icon: C4PaletteIcon }) {
-  const fill = icon === 'person' ? '#08427B' : '#1168BD';
-  const stroke = icon === 'person' ? '#052E56' : '#0D4F91';
-  const white = '#fff';
+  const stroke = icon === 'person' ? '#287E06' : '#1168BD';
+  const fill = '#FFFFFF';
   switch (icon) {
     case 'person':
       return (
         <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
-          <circle cx="9" cy="4.2" r="2.4" fill={fill} stroke={stroke} strokeWidth="1.1" />
-          <path d="M9 6.8 V12.2 M5.2 9 H12.8 M9 12.2 L5.8 16 M9 12.2 L12.2 16" fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" />
+          <rect x="3" y="7" width="12" height="9" rx="1.4" fill={fill} stroke={stroke} strokeWidth="1.3" />
+          <circle cx="9" cy="4.2" r="2.5" fill={fill} stroke={stroke} strokeWidth="1.3" />
         </svg>
       );
     case 'software-system':
       return (
         <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
           <rect x="2.2" y="3.2" width="13.6" height="11.6" rx="1.8" fill={fill} stroke={stroke} strokeWidth="1.2" />
-          <path d="M5 6.2 H13 M5 9 H10.8" stroke={white} strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M5 6.2 H13 M5 9 H10.8" stroke={stroke} strokeWidth="1.2" strokeLinecap="round" />
         </svg>
       );
     case 'container':
       return (
         <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
           <rect x="2.4" y="4" width="13.2" height="10" rx="1.8" fill={fill} stroke={stroke} strokeWidth="1.2" />
-          <path d="M2.8 7 H15.2" stroke={white} strokeWidth="1.2" />
-          <rect x="5" y="9.2" width="3.2" height="2.8" rx="0.5" fill={white} opacity="0.9" />
+          <path d="M2.8 7 H15.2" stroke={stroke} strokeWidth="1.2" />
+          <rect x="5" y="9.2" width="3.2" height="2.8" rx="0.5" fill={fill} stroke={stroke} strokeWidth="1" />
         </svg>
       );
     case 'component':
       return (
         <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
           <rect x="5.2" y="3" width="10" height="12" rx="1.6" fill={fill} stroke={stroke} strokeWidth="1.2" />
-          <rect x="2.6" y="5.2" width="4.6" height="2.8" rx="0.5" fill={white} stroke={stroke} strokeWidth="1" />
-          <rect x="2.6" y="10" width="4.6" height="2.8" rx="0.5" fill={white} stroke={stroke} strokeWidth="1" />
+          <rect x="2.6" y="5.2" width="4.6" height="2.8" rx="0.5" fill={fill} stroke={stroke} strokeWidth="1" />
+          <rect x="2.6" y="10" width="4.6" height="2.8" rx="0.5" fill={fill} stroke={stroke} strokeWidth="1" />
         </svg>
       );
     case 'deployment-node':
       return (
         <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
           <path d="M4 5.5 L7 2.8 H14 V12.5 L11 15.2 H4 Z" fill={fill} stroke={stroke} strokeWidth="1.2" />
-          <path d="M4 5.5 H11 V15.2 M11 5.5 L14 2.8 M11 5.5 V15.2" fill="none" stroke={white} strokeWidth="1.1" opacity="0.95" />
+          <path d="M4 5.5 H11 V15.2 M11 5.5 L14 2.8" fill="none" stroke={stroke} strokeWidth="1.1" />
         </svg>
       );
     case 'infrastructure-node':
       return (
         <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
           <path d="M6.2 13.8 H13.1 C15 13.8 16 12.7 16 11.2 C16 9.7 14.8 8.6 13.3 8.7 C12.7 6.1 10.8 4.2 8.2 4.2 C5.6 4.2 3.7 6 3.5 8.4 C2.1 8.8 1.4 9.8 1.4 11.1 C1.4 12.8 2.7 13.8 4.5 13.8 Z" fill={fill} stroke={stroke} strokeWidth="1.2" />
-          <path d="M6 10.8 H11.8" stroke={white} strokeWidth="1.2" strokeLinecap="round" />
+          <path d="M6 10.8 H11.8" stroke={stroke} strokeWidth="1.2" strokeLinecap="round" />
         </svg>
       );
     case 'database':
       return (
         <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
           <path d="M4 5.2 C4 3.7 14 3.7 14 5.2 V13 C14 14.5 4 14.5 4 13 Z" fill={fill} stroke={stroke} strokeWidth="1.2" />
-          <ellipse cx="9" cy="5.2" rx="5" ry="1.8" fill={white} stroke={stroke} strokeWidth="1.1" />
-          <path d="M4 9 C4 10.5 14 10.5 14 9" fill="none" stroke={white} strokeWidth="1.1" opacity="0.95" />
+          <ellipse cx="9" cy="5.2" rx="5" ry="1.8" fill={fill} stroke={stroke} strokeWidth="1.1" />
+          <path d="M4 9 C4 10.5 14 10.5 14 9" fill="none" stroke={stroke} strokeWidth="1.1" />
+        </svg>
+      );
+    case 'browser':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <rect x="2" y="2.5" width="14" height="13" rx="1.8" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <path d="M2.4 6 H15.6" stroke={stroke} strokeWidth="1.1" />
+          <circle cx="4.5" cy="4.3" r="0.6" fill={stroke} />
+          <circle cx="6.5" cy="4.3" r="0.6" fill={stroke} />
+        </svg>
+      );
+    case 'folder':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <path d="M2 5 H7 L8.5 3.2 H16 V14.8 H2 Z" fill={fill} stroke={stroke} strokeWidth="1.2" strokeLinejoin="round" />
+          <path d="M2.4 7 H15.6" stroke={stroke} strokeWidth="1.1" />
+        </svg>
+      );
+    case 'bucket':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <path d="M3.5 5.2 L5 14.2 C5.3 15.7 12.7 15.7 13 14.2 L14.5 5.2 Z" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <ellipse cx="9" cy="5.2" rx="5.5" ry="1.8" fill={fill} stroke={stroke} strokeWidth="1.2" />
         </svg>
       );
     case 'software-system-instance':

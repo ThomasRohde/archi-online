@@ -7,8 +7,11 @@ import {
   C4_VIEW_TYPES,
   c4KindForConcept,
   c4PropertyValue,
+  c4ShapeTagOf,
   c4ViewType,
   setC4PropertyValue,
+  setC4ShapeTag,
+  type C4ShapeTag,
 } from '../model/c4';
 import { VIEWPOINTS } from '../model/data/viewpoints';
 import {
@@ -190,6 +193,7 @@ function C4Fields({
   };
   const technology = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.technology) ?? '';
   const tags = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.tags) ?? '';
+  const elementKind = c4KindForConcept(element);
   const external = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.external) === 'true';
   const instanceOf = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.instanceOf) ?? '';
   const order = c4PropertyValue(target.properties, C4_PROPERTY_KEYS.order) ?? '';
@@ -233,6 +237,26 @@ function C4Fields({
               onCommit={(v) => commit(C4_PROPERTY_KEYS.tags, v)}
             />
           </div>
+          {(elementKind === 'container' || elementKind === 'container-instance') && (
+            <div className="prop-row">
+              <label>Shape</label>
+              <select
+                value={c4ShapeTagOf(tags) ?? ''}
+                disabled={readOnly}
+                onChange={(e) => commit(
+                  C4_PROPERTY_KEYS.tags,
+                  setC4ShapeTag(tags, (e.target.value || undefined) as C4ShapeTag | undefined),
+                )}
+              >
+                <option value="">Default</option>
+                <option value="database">Database</option>
+                <option value="browser">Web Browser</option>
+                <option value="folder">Folder</option>
+                <option value="bucket">Bucket</option>
+                <option value="terminal">Terminal</option>
+              </select>
+            </div>
+          )}
           <div className="prop-row">
             <label>Instance of</label>
             <CommitInput

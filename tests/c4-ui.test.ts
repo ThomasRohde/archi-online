@@ -1,6 +1,6 @@
 import { act, createElement, Fragment } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   C4_PROPERTY_KEYS,
   C4_VISUAL_DEFAULTS,
@@ -11,18 +11,21 @@ import {
 import {
   addElementNodeToView,
   addView,
+  c4DefaultNodeSize,
   createC4ElementOnView,
   createC4TemplateView,
   createEmptyModel,
 } from '../src/model/ops';
-import { openView, replaceModel, setSelection } from '../src/model/store';
+import { openView, replaceModel, setActiveTool, setSelection } from '../src/model/store';
 import { useStore } from '../src/ui/store-hooks';
+import { ViewEditor } from '../src/canvas/ViewEditor';
 import { ConnectionView } from '../src/canvas/ConnectionView';
 import { NodeFigure } from '../src/canvas/figures/NodeFigure';
 import { Palette } from '../src/ui/Palette';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
 import { ContextMenuHost } from '../src/ui/ContextMenu';
 import { Toolbar } from '../src/ui/Toolbar';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../src/settings/app-settings';
 
 function model() {
   return useStore.getState().model!;
@@ -55,10 +58,12 @@ function propertyRow(host: HTMLElement, label: string): HTMLElement {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   replaceModel(createEmptyModel('C4 UI Test'), null);
+  useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
 });
 
 afterEach(() => {
   delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+  Reflect.deleteProperty(document, 'elementFromPoint');
   document.body.innerHTML = '';
 });
 
@@ -136,6 +141,9 @@ describe('C4 UI affordances', () => {
       ['C4 Deployment Node', 'deployment-node'],
       ['C4 Infrastructure Node', 'infrastructure-node'],
       ['C4 Database', 'database'],
+      ['C4 Web Browser', 'browser'],
+      ['C4 Folder', 'folder'],
+      ['C4 Bucket', 'bucket'],
     ] as const;
     for (const [title, icon] of expectedIcons) {
       const button = host.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
@@ -155,20 +163,157 @@ describe('C4 UI affordances', () => {
       c4Kind: 'container',
     });
 
-    const databaseButton = host.querySelector<HTMLButtonElement>('button[title="C4 Database"]');
-    await act(async () => {
-      databaseButton!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    });
+    for (const [title, tag] of [
+      ['C4 Database', 'database'],
+      ['C4 Web Browser', 'browser'],
+      ['C4 Folder', 'folder'],
+      ['C4 Bucket', 'bucket'],
+    ] as const) {
+      const button = host.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+      await act(async () => {
+        button!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      });
 
-    expect(useStore.getState().activeTool).toEqual({
-      kind: 'create-c4-element',
-      c4Kind: 'container',
-      c4Properties: { [C4_PROPERTY_KEYS.tags]: 'database' },
-    });
+      expect(useStore.getState().activeTool).toEqual({
+        kind: 'create-c4-element',
+        c4Kind: 'container',
+        c4Properties: { [C4_PROPERTY_KEYS.tags]: tag },
+      });
+    }
+    expect(host.querySelector('button[title="C4 Terminal"]')).toBeNull();
 
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it('shows Shape only for containers and disables it in read-only mode', async () => {
+    const viewId = addView('Shapes');
+    const container = createC4ElementOnView(
+      'container', viewId, viewId, { x: 0, y: 0, width: 150, height: 72 },
+    );
+    const instance = createC4ElementOnView(
+      'container-instance', viewId, viewId, { x: 180, y: 0, width: 150, height: 72 },
+    );
+    const person = createC4ElementOnView(
+      'person', viewId, viewId, { x: 360, y: 0, width: 160, height: 150 },
+    );
+    setSelection('tree', [container.elementId]);
+    const { host, root } = await render(createElement(PropertiesPanel));
+
+    expect(propertyRow(host, 'Shape').querySelector('select')?.disabled).toBe(false);
+
+    await act(async () => setSelection('tree', [instance.elementId]));
+    expect(propertyRow(host, 'Shape').querySelector('select')).not.toBeNull();
+
+    await act(async () => setSelection('tree', [person.elementId]));
+    expect(Array.from(host.querySelectorAll('.prop-row label')).some(
+      (label) => label.textContent === 'Shape',
+    )).toBe(false);
+
+    await act(async () => {
+      setSelection('tree', [container.elementId]);
+      useStore.setState({ readOnly: true });
+    });
+    expect(propertyRow(host, 'Shape').querySelector('select')?.disabled).toBe(true);
+
+    await act(async () => root.unmount());
+  });
+
+  it('preserves external tags while selecting and clearing a container shape', async () => {
+    const viewId = addView('Shapes');
+    const { elementId } = createC4ElementOnView(
+      'container',
+      viewId,
+      viewId,
+      { x: 0, y: 0, width: 150, height: 72 },
+      undefined,
+      { [C4_PROPERTY_KEYS.tags]: 'external' },
+    );
+    setSelection('tree', [elementId]);
+    const { host, root } = await render(createElement(PropertiesPanel));
+    const shape = propertyRow(host, 'Shape').querySelector('select')!;
+
+    await changeSelect(shape, 'bucket');
+    expect(c4PropertyValue(model().elements[elementId].properties, C4_PROPERTY_KEYS.tags)).toBe(
+      'external, bucket',
+    );
+
+    await changeSelect(shape, '');
+    expect(c4PropertyValue(model().elements[elementId].properties, C4_PROPERTY_KEYS.tags)).toBe(
+      'external',
+    );
+
+    await act(async () => root.unmount());
+  });
+
+  it('preserves custom tags through the container shape round trip', async () => {
+    const viewId = addView('Shapes');
+    const { elementId } = createC4ElementOnView(
+      'container',
+      viewId,
+      viewId,
+      { x: 0, y: 0, width: 150, height: 72 },
+      undefined,
+      { [C4_PROPERTY_KEYS.tags]: 'external, custom' },
+    );
+    setSelection('tree', [elementId]);
+    const { host, root } = await render(createElement(PropertiesPanel));
+    const shape = propertyRow(host, 'Shape').querySelector('select')!;
+
+    await changeSelect(shape, 'folder');
+    expect(c4PropertyValue(model().elements[elementId].properties, C4_PROPERTY_KEYS.tags)).toBe(
+      'external, custom, folder',
+    );
+
+    await changeSelect(shape, '');
+    expect(c4PropertyValue(model().elements[elementId].properties, C4_PROPERTY_KEYS.tags)).toBe(
+      'external, custom',
+    );
+
+    await act(async () => root.unmount());
+  });
+
+  it('uses configured and C4 minimum sizes when centering palette-created people', async () => {
+    const viewId = createC4TemplateView('system-context');
+    openView(viewId);
+    useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        elementWidth: 180,
+        elementHeight: 100,
+        snapToGrid: false,
+      },
+    });
+    setActiveTool({ kind: 'create-c4-element', c4Kind: 'person' });
+    const { host, root } = await render(createElement(ViewEditor, { viewId }));
+    const svg = host.querySelector<SVGSVGElement>('svg.view-svg')!;
+    Object.defineProperty(svg, 'setPointerCapture', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: vi.fn(() => svg),
+    });
+    const pointer = new MouseEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 300,
+      clientY: 300,
+    });
+    Object.defineProperty(pointer, 'pointerId', { value: 1 });
+
+    await act(async () => svg.dispatchEvent(pointer));
+
+    const created = Object.values(model().elements).find((element) => element.name === 'Person')!;
+    const node = Object.values(model().nodes).find(
+      (candidate) => candidate.nodeType === 'element' && candidate.elementId === created.id,
+    );
+    expect(node?.bounds).toEqual({ x: 190, y: 205, width: 180, height: 150 });
+
+    await act(async () => root.unmount());
   });
 
   it('renders C4 node and relationship labels on the canvas', async () => {
@@ -489,5 +634,33 @@ describe('C4 UI affordances', () => {
     expect(c4PropertyValue(element.properties, C4_PROPERTY_KEYS.tags)).toBe('database');
     expect(element.name).toBe('Database');
     expect(c4ElementLabelParts(element)?.kindLabel).toBe('Database');
+  });
+
+  it('uses shape-aware names for every palette-created C4 container shape', () => {
+    const viewId = addView('Shapes');
+    const expectedNames = {
+      database: 'Database',
+      browser: 'Web Browser',
+      folder: 'Folder',
+      bucket: 'Bucket',
+      terminal: 'Terminal',
+    } as const;
+
+    for (const [tag, name] of Object.entries(expectedNames)) {
+      const { elementId } = createC4ElementOnView(
+        'container',
+        viewId,
+        viewId,
+        { x: 0, y: 0, width: 150, height: 72 },
+        undefined,
+        { [C4_PROPERTY_KEYS.tags]: tag },
+      );
+      expect(model().elements[elementId].name).toBe(name);
+    }
+  });
+
+  it('provides modern C4 default node sizes', () => {
+    expect(c4DefaultNodeSize('person')).toEqual({ width: 160, height: 150 });
+    expect(c4DefaultNodeSize('container')).toEqual({ width: 150, height: 72 });
   });
 });

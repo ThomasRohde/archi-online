@@ -260,6 +260,37 @@ describe('C4 profile helpers', () => {
 });
 
 describe('C4 template generation and validation', () => {
+  it('uses person-sized bounds in every built-in person template', () => {
+    const expectedBounds = {
+      'system-landscape': { x: 80, y: 70, width: 170, height: 150 },
+      'system-context': { x: 70, y: 80, width: 170, height: 150 },
+      container: { x: 60, y: 110, width: 170, height: 150 },
+      dynamic: { x: 70, y: 75, width: 170, height: 150 },
+    } as const;
+
+    for (const [viewType, bounds] of Object.entries(expectedBounds)) {
+      replaceModel(createEmptyModel('C4 Test'), null);
+      const viewId = createC4TemplateView(viewType as keyof typeof expectedBounds);
+      const person = Object.values(model().elements).find(
+        (element) => c4KindForConcept(element) === 'person',
+      )!;
+      const node = Object.values(model().nodes).find(
+        (candidate) => candidate.viewId === viewId &&
+          candidate.nodeType === 'element' && candidate.elementId === person.id,
+      );
+      expect(node?.bounds).toEqual(bounds);
+    }
+  });
+
+  it('tags the container template Web Application as a browser', () => {
+    createC4TemplateView('container');
+    const web = Object.values(model().elements).find(
+      (element) => element.name === 'Web Application',
+    )!;
+
+    expect(c4PropertyValue(web.properties, C4_PROPERTY_KEYS.tags)).toBe('browser');
+  });
+
   it('creates a container view template as one undoable ArchiMate model change', () => {
     const viewId = createC4TemplateView('container');
     const m = model();

@@ -6,6 +6,7 @@ import {
   C4_VIEW_TYPE_LABELS,
   c4LegendText,
   c4PropertyValue,
+  c4ShapeTagOf,
   c4VisualStyleForElement,
   setC4PropertyValue,
   type C4ElementKind,
@@ -52,6 +53,10 @@ interface C4NodeInput {
   bounds: Bounds;
   parentId?: string;
   defaults?: DiagramNodeDefaults;
+}
+
+export function c4DefaultNodeSize(kind: C4ElementKind): { width: number; height: number } {
+  return kind === 'person' ? { width: 160, height: 150 } : { width: 150, height: 72 };
 }
 
 export function createC4TemplateView(
@@ -198,7 +203,7 @@ function addSystemLandscapeTemplate(draft: ModelState, viewId: string): void {
     external: true,
   });
 
-  createC4Node(draft, viewId, { elementId: customer.id, bounds: { x: 80, y: 120, width: 170, height: 80 } });
+  createC4Node(draft, viewId, { elementId: customer.id, bounds: { x: 80, y: 70, width: 170, height: 150 } });
   createC4Node(draft, viewId, { elementId: portal.id, bounds: { x: 360, y: 100, width: 210, height: 95 } });
   createC4Node(draft, viewId, { elementId: payments.id, bounds: { x: 680, y: 100, width: 210, height: 95 } });
   createC4RelationshipWithConnection(draft, viewId, {
@@ -239,7 +244,7 @@ function addSystemContextTemplate(draft: ModelState, viewId: string): void {
     external: true,
   });
 
-  createC4Node(draft, viewId, { elementId: customer.id, bounds: { x: 70, y: 130, width: 170, height: 80 } });
+  createC4Node(draft, viewId, { elementId: customer.id, bounds: { x: 70, y: 80, width: 170, height: 150 } });
   createC4Node(draft, viewId, { elementId: portal.id, bounds: { x: 350, y: 100, width: 230, height: 100 } });
   createC4Node(draft, viewId, { elementId: erp.id, bounds: { x: 690, y: 70, width: 210, height: 92 } });
   createC4Node(draft, viewId, { elementId: email.id, bounds: { x: 690, y: 220, width: 210, height: 92 } });
@@ -279,6 +284,7 @@ function addContainerTemplate(draft: ModelState, viewId: string): void {
     name: 'Web Application',
     documentation: 'Delivers the browser experience for customers.',
     technology: 'React, TypeScript',
+    tags: 'browser',
   });
   const api = createC4Element(draft, {
     kind: 'container',
@@ -294,7 +300,7 @@ function addContainerTemplate(draft: ModelState, viewId: string): void {
     tags: 'database',
   });
 
-  createC4Node(draft, viewId, { elementId: customer.id, bounds: { x: 60, y: 150, width: 170, height: 80 } });
+  createC4Node(draft, viewId, { elementId: customer.id, bounds: { x: 60, y: 110, width: 170, height: 150 } });
   createC4Node(draft, viewId, { elementId: portal.id, bounds: { x: 310, y: 45, width: 640, height: 285 } });
   createC4Node(draft, viewId, {
     elementId: web.id,
@@ -441,7 +447,7 @@ function addDynamicTemplate(draft: ModelState, viewId: string): void {
     technology: 'Node.js, Express',
   });
 
-  createC4Node(draft, viewId, { elementId: customer.id, bounds: { x: 70, y: 120, width: 170, height: 80 } });
+  createC4Node(draft, viewId, { elementId: customer.id, bounds: { x: 70, y: 75, width: 170, height: 150 } });
   createC4Node(draft, viewId, { elementId: web.id, bounds: { x: 340, y: 105, width: 190, height: 92 } });
   createC4Node(draft, viewId, { elementId: api.id, bounds: { x: 640, y: 105, width: 190, height: 92 } });
   createC4RelationshipWithConnection(draft, viewId, {
@@ -654,10 +660,16 @@ function nodeIdForElement(draft: ModelState, viewId: string, elementId: string):
 }
 
 function defaultC4ElementName(kind: C4ElementKind, properties: Record<string, string> = {}): string {
-  if (kind === 'container' && hasTagValue(properties[C4_PROPERTY_KEYS.tags], 'database')) return 'Database';
+  if (kind === 'container') {
+    const shapeNames = {
+      database: 'Database',
+      browser: 'Web Browser',
+      folder: 'Folder',
+      bucket: 'Bucket',
+      terminal: 'Terminal',
+    } as const;
+    const shape = c4ShapeTagOf(properties[C4_PROPERTY_KEYS.tags]);
+    if (shape) return shapeNames[shape];
+  }
   return C4_ELEMENT_KIND_LABELS[kind];
-}
-
-function hasTagValue(tags: string | undefined, tag: string): boolean {
-  return tags?.toLowerCase().split(/[,\s]+/).includes(tag.toLowerCase()) ?? false;
 }

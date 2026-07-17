@@ -20,6 +20,7 @@ import {
   analyzeMagicTargetCreation,
   canCreatePlainConnection,
   captureDiagramStyleSnapshot,
+  c4DefaultNodeSize,
   createC4ElementOnView,
   commitMove,
   createElementOnView,
@@ -586,12 +587,15 @@ export function useViewEditorInteractions({
           setTimeout(() => startEdit(nodeId), 0);
         }
       } else if (tool.kind === 'create-c4-element') {
-        const def = defaultElementSize(C4_ELEMENT_TYPES[tool.c4Kind], settings);
+        const configuredSize = defaultElementSize(C4_ELEMENT_TYPES[tool.c4Kind], settings);
+        const c4Size = c4DefaultNodeSize(tool.c4Kind);
+        const width = Math.max(configuredSize.width, c4Size.width);
+        const height = Math.max(configuredSize.height, c4Size.height);
         const bounds = {
-          x: snap(p.x - parentAbs.x - def.width / 2, e.altKey),
-          y: snap(p.y - parentAbs.y - def.height / 2, e.altKey),
-          width: Math.max(def.width, 150),
-          height: Math.max(def.height, 72),
+          x: snap(p.x - parentAbs.x - width / 2, e.altKey),
+          y: snap(p.y - parentAbs.y - height / 2, e.altKey),
+          width,
+          height,
         };
         const { nodeId } = createC4ElementOnView(
           tool.c4Kind,

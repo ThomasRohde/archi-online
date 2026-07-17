@@ -2006,9 +2006,8 @@ body {
 }
 
 .c4-pal-el {
-  /* Model-rendering preview colour, independent of application chrome. */
-  background: #e7f4f5;
-  border-color: #8db9dd;
+  background: #ffffff;
+  border-color: #1168bd;
   color: #1168bd;
 }
 
