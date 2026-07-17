@@ -150,6 +150,9 @@ describe('C4 UI affordances', () => {
       expect(button, `Expected ${title} palette button`).not.toBeNull();
       expect(button?.querySelector(`[data-c4-palette-icon="${icon}"]`)).not.toBeNull();
     }
+    expect(
+      host.querySelector('[data-c4-palette-icon="folder"] path')?.getAttribute('d'),
+    ).toBe('M2,15 V3 H8 L9.5,5 H16 V15 Z');
 
     const containerButton = host.querySelector<HTMLButtonElement>('button[title="C4 Container"]');
     expect(containerButton).not.toBeNull();
@@ -501,8 +504,13 @@ describe('C4 UI affordances', () => {
     expect(smallLabel.textContent).toContain('API Application');
     expect(smallLabel.textContent).toContain('[Container: Node.js, Express]');
     expect(smallLabel.textContent).not.toContain(description);
-    for (const labelCase of ['default', ...standardShapes, 'person']) {
+    for (const labelCase of ['default', 'person']) {
       expect(host.querySelector(`[data-label-size="${labelCase}"]`)?.textContent).toContain(
+        description,
+      );
+    }
+    for (const labelCase of standardShapes) {
+      expect(host.querySelector(`[data-label-size="${labelCase}"]`)?.textContent).not.toContain(
         description,
       );
     }
@@ -517,6 +525,72 @@ describe('C4 UI affordances', () => {
       host.querySelectorAll<HTMLDivElement>('[data-label-size="default"] foreignObject div'),
     ).find((item) => item.textContent === description);
     expect(descriptionItem?.style.overflow).toBe('hidden');
+
+    await act(async () => root.unmount());
+  });
+
+  it('keeps database and bucket labels below their caps and inside tapered walls', async () => {
+    const viewId = addView('Shape label geometry');
+    const figures = (['database', 'bucket'] as const).map((shape) => {
+      const { elementId, nodeId } = createC4ElementOnView(
+        'container',
+        viewId,
+        viewId,
+        { x: 0, y: 0, width: 250, height: 100 },
+        `${shape} service`,
+        { [C4_PROPERTY_KEYS.tags]: shape },
+      );
+      return { shape, element: model().elements[elementId], node: model().nodes[nodeId] };
+    });
+    const { host, root } = await render(createElement(
+      'svg',
+      null,
+      ...figures.map(({ shape, element, node }) => createElement(
+        'g',
+        { key: shape, 'data-label-geometry': shape },
+        createElement(NodeFigure, {
+          node,
+          element,
+          width: 250,
+          height: 100,
+          c4ViewType: 'container',
+        }),
+      )),
+    ));
+
+    const databaseLabel = host.querySelector('[data-label-geometry="database"] foreignObject');
+    expect(databaseLabel?.getAttribute('y')).toBe('40');
+    const bucketLabel = host.querySelector('[data-label-geometry="bucket"] foreignObject');
+    expect(bucketLabel?.getAttribute('x')).toBe('27');
+    expect(bucketLabel?.getAttribute('width')).toBe('196');
+
+    await act(async () => root.unmount());
+  });
+
+  it('clamps the person body geometry at extreme imported sizes', async () => {
+    const viewId = addView('Extreme person');
+    const { elementId, nodeId } = createC4ElementOnView(
+      'person',
+      viewId,
+      viewId,
+      { x: 0, y: 0, width: 40, height: 8 },
+      'Tiny person',
+    );
+    const { host, root } = await render(createElement(
+      'svg',
+      null,
+      createElement(NodeFigure, {
+        node: model().nodes[nodeId],
+        element: model().elements[elementId],
+        width: 40,
+        height: 8,
+        c4ViewType: 'system-context',
+      }),
+    ));
+
+    const body = host.querySelector('[data-c4-shape="person"]');
+    expect(body?.getAttribute('height')).toBe('0');
+    expect(body?.getAttribute('rx')).toBe('0');
 
     await act(async () => root.unmount());
   });

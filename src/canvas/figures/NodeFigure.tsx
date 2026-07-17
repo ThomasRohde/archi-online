@@ -370,7 +370,7 @@ export function NodeFigure({
     extraTop = 0,
   ) {
     const availableHeight = Math.max(0, h - inset * 2 - extraTop);
-    const showDescription = parts.description && h >= 92;
+    const showDescription = parts.description && availableHeight >= 72;
     return (
       <foreignObject
         x={inset}
@@ -436,34 +436,37 @@ export function NodeFigure({
     c4Stroke: string,
     c4StrokeWidth: number,
     visual: C4VisualStyle,
-  ) {
+  ): { body: ReactNode; labelTop: number } {
     const capH = Math.min(24, Math.max(14, h * 0.24));
-    return (
-      <g>
-        <path
-          data-c4-shape={visual.shape}
-          d={`M0,${capH / 2} V${h - capH / 2} C0,${h + capH / 2} ${w},${h + capH / 2} ${w},${h - capH / 2} V${capH / 2} C${w},${capH * 1.5} 0,${capH * 1.5} 0,${capH / 2} Z`}
-          fill={fill}
-          fillOpacity={fillOpacity}
-          stroke={c4Stroke}
-          strokeOpacity={lineAlpha}
-          strokeWidth={c4StrokeWidth}
-          strokeDasharray={strokeDasharray}
-        />
-        <ellipse
-          cx={w / 2}
-          cy={capH / 2}
-          rx={w / 2}
-          ry={capH / 2}
-          fill={fill}
-          fillOpacity={fillOpacity}
-          stroke={c4Stroke}
-          strokeOpacity={lineAlpha}
-          strokeWidth={c4StrokeWidth}
-          strokeDasharray={strokeDasharray}
-        />
-      </g>
-    );
+    return {
+      body: (
+        <g>
+          <path
+            data-c4-shape={visual.shape}
+            d={`M0,${capH / 2} V${h - capH / 2} C0,${h + capH / 2} ${w},${h + capH / 2} ${w},${h - capH / 2} V${capH / 2} C${w},${capH * 1.5} 0,${capH * 1.5} 0,${capH / 2} Z`}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={c4Stroke}
+            strokeOpacity={lineAlpha}
+            strokeWidth={c4StrokeWidth}
+            strokeDasharray={strokeDasharray}
+          />
+          <ellipse
+            cx={w / 2}
+            cy={capH / 2}
+            rx={w / 2}
+            ry={capH / 2}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={c4Stroke}
+            strokeOpacity={lineAlpha}
+            strokeWidth={c4StrokeWidth}
+            strokeDasharray={strokeDasharray}
+          />
+        </g>
+      ),
+      labelTop: capH * 1.25,
+    };
   }
 
   function c4PersonBody(
@@ -474,7 +477,8 @@ export function NodeFigure({
   ): { body: ReactNode; labelTop: number } {
     const headR = Math.max(10, Math.min(w * 0.16, h * 0.22, 30));
     const boxY = headR * 1.2;
-    const rx = Math.min(22, (h - boxY) / 3, w / 4);
+    const bodyHeight = Math.max(0, h - boxY);
+    const rx = Math.max(0, Math.min(22, bodyHeight / 3, w / 4));
     return {
       body: (
         <g>
@@ -483,7 +487,7 @@ export function NodeFigure({
             x={0}
             y={boxY}
             width={w}
-            height={h - boxY}
+            height={bodyHeight}
             rx={rx}
             ry={rx}
             fill={fill}
@@ -594,7 +598,7 @@ export function NodeFigure({
     fillOpacity: number,
     c4Stroke: string,
     c4StrokeWidth: number,
-  ): { body: ReactNode; labelTop: number } {
+  ): { body: ReactNode; labelTop: number; labelInset: number } {
     const topRy = Math.max(8, Math.min(14, h * 0.12));
     const inset = Math.min(w * 0.14, 34);
     const botRy = topRy * 0.8;
@@ -627,6 +631,7 @@ export function NodeFigure({
         </g>
       ),
       labelTop: topRy * 2,
+      labelInset: 10 + inset / 2,
     };
   }
 
@@ -700,12 +705,13 @@ export function NodeFigure({
 
     let body: ReactNode;
     let labelTop = 0;
+    let labelInset = 10;
     switch (visual.shape) {
       case 'person':
         ({ body, labelTop } = c4PersonBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
         break;
       case 'database':
-        body = c4DatabaseBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth, visual);
+        ({ body, labelTop } = c4DatabaseBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth, visual));
         break;
       case 'browser':
         ({ body, labelTop } = c4BrowserBody(paint.fill, paint.opacity, lineColor, c4Stroke, c4StrokeWidth));
@@ -714,7 +720,7 @@ export function NodeFigure({
         ({ body, labelTop } = c4FolderBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
         break;
       case 'bucket':
-        ({ body, labelTop } = c4BucketBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
+        ({ body, labelTop, labelInset } = c4BucketBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
         break;
       case 'terminal':
         body = c4TerminalBody(paint.fill, paint.opacity, lineColor, c4Stroke, c4StrokeWidth);
@@ -741,7 +747,7 @@ export function NodeFigure({
       <g>
         {paint.definition}
         {body}
-        {displayLabel !== undefined ? label(displayLabel, { inset: 10 }) : c4StructuredLabel(parts, textColor, 10, labelTop)}
+        {displayLabel !== undefined ? label(displayLabel, { inset: labelInset }) : c4StructuredLabel(parts, textColor, labelInset, labelTop)}
       </g>
     );
   }

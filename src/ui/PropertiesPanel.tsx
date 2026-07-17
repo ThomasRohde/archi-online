@@ -207,7 +207,7 @@ function C4Fields({
           <div className="prop-row">
             <label>C4 type</label>
             <select
-              value={c4KindForConcept(element) ?? ''}
+              value={elementKind ?? ''}
               disabled={readOnly}
               onChange={(e) => commit(C4_PROPERTY_KEYS.kind, e.target.value)}
             >

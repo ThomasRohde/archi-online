@@ -5,6 +5,7 @@ import {
   C4_ELEMENT_KIND_LABELS,
   C4_PALETTE_KINDS,
   C4_PROPERTY_KEYS,
+  c4ShapeTagOf,
   c4ViewType,
   type C4ElementKind,
 } from '../model/c4';
@@ -70,10 +71,8 @@ const C4_TOOLBOX: C4PaletteEntry[] = [
 ];
 
 function c4PaletteIcon(entry: C4PaletteEntry): C4PaletteIcon {
-  const shape = entry.properties?.[C4_PROPERTY_KEYS.tags];
-  return shape === 'database' || shape === 'browser' || shape === 'folder' || shape === 'bucket'
-    ? shape
-    : entry.kind;
+  const shape = c4ShapeTagOf(entry.properties?.[C4_PROPERTY_KEYS.tags]);
+  return shape && shape !== 'terminal' ? shape : entry.kind;
 }
 
 function C4PaletteGlyph({ icon }: { icon: C4PaletteIcon }) {
@@ -144,7 +143,7 @@ function C4PaletteGlyph({ icon }: { icon: C4PaletteIcon }) {
     case 'folder':
       return (
         <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
-          <path d="M2 5 H7 L8.5 3.2 H16 V14.8 H2 Z" fill={fill} stroke={stroke} strokeWidth="1.2" strokeLinejoin="round" />
+          <path d="M2,15 V3 H8 L9.5,5 H16 V15 Z" fill={fill} stroke={stroke} strokeWidth="1.2" strokeLinejoin="round" />
           <path d="M2.4 7 H15.6" stroke={stroke} strokeWidth="1.1" />
         </svg>
       );
