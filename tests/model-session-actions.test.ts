@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEmptyModel } from '../src/model/ops';
+import { addView, createEmptyModel } from '../src/model/ops';
+import { createModelStore } from '../src/model/store';
 import { addModelSession, getModelSession, resetWorkspaceForTests } from '../src/model/workspace';
 import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
   closeModelSession,
   closeModelSessions,
+  createEditableModelCopySession,
   createNewModelSession,
 } from '../src/ui/model-session-actions';
 
@@ -19,6 +21,25 @@ describe('model session actions', () => {
     expect(useWorkspaceStore.getState().order).toEqual([existingId, newId]);
     expect(useWorkspaceStore.getState().activeSessionId).toBe(newId);
     expect(getModelSession(newId)?.store.getState().model?.info.name).toBe('New ArchiMate Model');
+  });
+
+  it('opens an editable shared-model copy on the viewer-selected view', () => {
+    const sourceStore = createModelStore({ model: createEmptyModel('Shared') });
+    const firstViewId = addView('First', undefined, sourceStore);
+    const selectedViewId = addView('Selected', undefined, sourceStore);
+    const source = sourceStore.getState().model!;
+
+    const sessionId = createEditableModelCopySession(source, selectedViewId);
+
+    const state = getModelSession(sessionId)!.store.getState();
+    expect(state.model).not.toBe(source);
+    expect(state.model?.info.name).toBe('Shared');
+    expect(state.readOnly).toBe(false);
+    expect(state.dirty).toBe(true);
+    expect(state.openViewIds).toEqual([selectedViewId]);
+    expect(state.activeViewId).toBe(selectedViewId);
+    expect(state.activeViewId).not.toBe(firstViewId);
+    expect(useWorkspaceStore.getState().activeSessionId).toBe(sessionId);
   });
 
   it('keeps a dirty model open when close is cancelled', async () => {

@@ -6,7 +6,6 @@ import { extensionRegistry } from './extensions/registry';
 import { reloadEnabledExtensions } from './extensions/runtime';
 import { duplicateItems } from './model/ops';
 import {
-  cloneModelForEditing,
   createModelStore,
   openView,
   replaceModel,
@@ -31,6 +30,7 @@ import { hydrateValidatorSettings } from './settings/validator-settings';
 import { hydrateTemplateCatalog } from './persistence/template-store';
 import { AppDialogHost, showAlertDialog, showConfirmDialog } from './ui/AppDialog';
 import { AppShell } from './ui/AppShell';
+import { createEditableModelCopySession } from './ui/model-session-actions';
 import { blocksReadOnlyShortcut } from './ui/shortcut-policy';
 import { matchesShortcut } from './ui/shortcuts';
 import { applyThemeMode } from './ui/theme';
@@ -319,14 +319,13 @@ export function App() {
   };
 
   const openCopyInEditor = async () => {
-    const model = viewerStore.getState().model;
+    const { model, activeViewId } = viewerStore.getState();
     if (!model) return;
-    const copy = cloneModelForEditing(model);
     clearViewerUrl();
-    setEditorBoot({ restoreWorkspace: true });
+    setEditorBoot({ restoreWorkspace: false });
     setMode({ kind: 'editor' });
-    await bootEditorRuntime(true);
-    addModelSession({ model: copy, fileName: null, dirty: true });
+    await bootEditorRuntime(false);
+    createEditableModelCopySession(model, activeViewId);
   };
 
   if (mode.kind === 'viewer-loading') {

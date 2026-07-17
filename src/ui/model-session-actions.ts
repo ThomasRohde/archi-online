@@ -1,4 +1,6 @@
 import { createEmptyModel } from '../model/ops';
+import { cloneModelForEditing } from '../model/store';
+import type { ModelState } from '../model/types';
 import {
   addModelSession,
   getModelSession,
@@ -59,6 +61,24 @@ export function createNewModelSession(): ModelSessionId {
     model: createEmptyModel('New ArchiMate Model'),
     fileName: null,
     dirty: false,
+  });
+}
+
+export function createEditableModelCopySession(
+  model: ModelState,
+  preferredViewId: string | null,
+): ModelSessionId {
+  const copy = cloneModelForEditing(model);
+  const activeViewId =
+    preferredViewId && copy.views[preferredViewId]
+      ? preferredViewId
+      : (Object.keys(copy.views)[0] ?? null);
+  return addModelSession({
+    model: copy,
+    fileName: null,
+    dirty: true,
+    openViewIds: activeViewId ? [activeViewId] : [],
+    activeViewId,
   });
 }
 
