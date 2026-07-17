@@ -1,7 +1,7 @@
 app.extension({
   id: 'examples.package-showcase',
   name: 'Package Showcase',
-  version: '1.9.0'
+  version: '1.9.1'
 });
 
 var manifest = app.manifest.get();
