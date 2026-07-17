@@ -375,6 +375,55 @@ describe('C4 UI affordances', () => {
     });
   });
 
+  it('preserves mandatory C4 label lines when a node is resized small', async () => {
+    const viewId = addView('Responsive labels');
+    const { elementId, nodeId } = createC4ElementOnView(
+      'container',
+      viewId,
+      viewId,
+      { x: 0, y: 0, width: 190, height: 92 },
+      'API Application',
+      { [C4_PROPERTY_KEYS.technology]: 'Node.js, Express' },
+    );
+    const description = 'Handles customer journeys, order orchestration, and integrations.';
+    const element = { ...model().elements[elementId], documentation: description };
+    const node = model().nodes[nodeId];
+    const { host, root } = await render(createElement(
+      'svg',
+      null,
+      createElement(
+        'g',
+        { 'data-label-size': 'small' },
+        createElement(NodeFigure, {
+          node,
+          element,
+          width: 132,
+          height: 84,
+          c4ViewType: 'container',
+        }),
+      ),
+      createElement(
+        'g',
+        { 'data-label-size': 'default' },
+        createElement(NodeFigure, {
+          node,
+          element,
+          width: 190,
+          height: 92,
+          c4ViewType: 'container',
+        }),
+      ),
+    ));
+
+    const smallLabel = host.querySelector('[data-label-size="small"]')!;
+    expect(smallLabel.textContent).toContain('API Application');
+    expect(smallLabel.textContent).toContain('[Container: Node.js, Express]');
+    expect(smallLabel.textContent).not.toContain(description);
+    expect(host.querySelector('[data-label-size="default"]')?.textContent).toContain(description);
+
+    await act(async () => root.unmount());
+  });
+
   it('renders internal and external people as outlined person figures', async () => {
     const viewId = addView('People');
     const { elementId, nodeId } = createC4ElementOnView(
