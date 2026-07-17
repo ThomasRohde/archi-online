@@ -556,6 +556,17 @@ describe('C4 UI affordances', () => {
           c4ViewType: 'container',
         }),
       )),
+      createElement(
+        'g',
+        { 'data-label-geometry': 'bucket-default' },
+        createElement(NodeFigure, {
+          node: figures[1].node,
+          element: figures[1].element,
+          width: 150,
+          height: 72,
+          c4ViewType: 'container',
+        }),
+      ),
     ));
 
     const databaseLabel = host.querySelector('[data-label-geometry="database"] foreignObject');
@@ -563,6 +574,12 @@ describe('C4 UI affordances', () => {
     const bucketLabel = host.querySelector('[data-label-geometry="bucket"] foreignObject');
     expect(bucketLabel?.getAttribute('x')).toBe('27');
     expect(bucketLabel?.getAttribute('width')).toBe('196');
+    const defaultBucketLabel = host.querySelector(
+      '[data-label-geometry="bucket-default"] foreignObject',
+    );
+    expect(defaultBucketLabel?.getAttribute('x')).toBe('20.5');
+    expect(defaultBucketLabel?.getAttribute('width')).toBe('109');
+    expect(defaultBucketLabel?.getAttribute('height')).toBe('34.72');
 
     await act(async () => root.unmount());
   });

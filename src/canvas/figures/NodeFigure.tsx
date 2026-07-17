@@ -338,11 +338,27 @@ export function NodeFigure({
           ? 'bottom'
           : def;
 
-  function label(text: string, opts?: { align?: 'left' | 'center' | 'right'; vert?: 'top' | 'center' | 'bottom'; inset?: number }) {
+  function label(
+    text: string,
+    opts?: {
+      align?: 'left' | 'center' | 'right';
+      vert?: 'top' | 'center' | 'bottom';
+      inset?: number;
+      horizontalInset?: number;
+      verticalInset?: number;
+    },
+  ) {
     if (!text) return null;
     const inset = opts?.inset ?? 0;
+    const horizontalInset = opts?.horizontalInset ?? inset;
+    const verticalInset = opts?.verticalInset ?? inset;
     return (
-      <foreignObject x={inset} y={inset} width={Math.max(0, w - inset * 2)} height={Math.max(0, h - inset * 2)}>
+      <foreignObject
+        x={horizontalInset}
+        y={verticalInset}
+        width={Math.max(0, w - horizontalInset * 2)}
+        height={Math.max(0, h - verticalInset * 2)}
+      >
         <div style={labelStyle(opts?.align ?? alignOf(), opts?.vert ?? vertOf())}>{text}</div>
       </foreignObject>
     );
@@ -366,16 +382,17 @@ export function NodeFigure({
   function c4StructuredLabel(
     parts: C4ElementLabelParts,
     color: string,
-    inset: number,
+    horizontalInset: number,
     extraTop = 0,
+    verticalInset = 10,
   ) {
-    const availableHeight = Math.max(0, h - inset * 2 - extraTop);
+    const availableHeight = Math.max(0, h - verticalInset * 2 - extraTop);
     const showDescription = parts.description && availableHeight >= 72;
     return (
       <foreignObject
-        x={inset}
-        y={inset + extraTop}
-        width={Math.max(0, w - inset * 2)}
+        x={horizontalInset}
+        y={verticalInset + extraTop}
+        width={Math.max(0, w - horizontalInset * 2)}
         height={availableHeight}
       >
         <div
@@ -747,7 +764,9 @@ export function NodeFigure({
       <g>
         {paint.definition}
         {body}
-        {displayLabel !== undefined ? label(displayLabel, { inset: labelInset }) : c4StructuredLabel(parts, textColor, labelInset, labelTop)}
+        {displayLabel !== undefined
+          ? label(displayLabel, { inset: 10, horizontalInset: labelInset })
+          : c4StructuredLabel(parts, textColor, labelInset, labelTop)}
       </g>
     );
   }
