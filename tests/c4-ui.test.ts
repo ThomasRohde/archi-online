@@ -375,6 +375,45 @@ describe('C4 UI affordances', () => {
     });
   });
 
+  it('lets explicit line styles override the dashed C4 relationship default', async () => {
+    createC4TemplateView('dynamic');
+    const relationship = Object.values(model().relationships).find(
+      (candidate) => c4PropertyValue(candidate.properties, C4_PROPERTY_KEYS.order) === '1',
+    )!;
+    const connection = Object.values(model().connections).find(
+      (candidate) => candidate.relationshipId === relationship.id,
+    )!;
+    const styles = [
+      { lineStyle: 0, dash: null },
+      { lineStyle: 1, dash: '6 4' },
+      { lineStyle: 2, dash: '2 3' },
+    ] as const;
+    const { host, root } = await render(createElement(
+      'svg',
+      null,
+      ...styles.map(({ lineStyle }, index) => createElement(ConnectionView, {
+        key: lineStyle,
+        conn: { ...connection, id: `${connection.id}-${lineStyle}`, lineStyle },
+        rel: relationship,
+        c4ViewType: 'dynamic',
+        points: [
+          { x: 0, y: index * 20 },
+          { x: 100, y: index * 20 },
+        ],
+        selected: false,
+      })),
+    ));
+
+    for (const { lineStyle, dash } of styles) {
+      const path = host.querySelector(
+        `[data-conn-id="${connection.id}-${lineStyle}"] [data-c4-relationship="true"]`,
+      );
+      expect(path?.getAttribute('stroke-dasharray')).toBe(dash);
+    }
+
+    await act(async () => root.unmount());
+  });
+
   it('keeps structured C4 labels readable across standard shapes and small boxes', async () => {
     const viewId = addView('Responsive labels');
     const { elementId, nodeId } = createC4ElementOnView(
@@ -580,6 +619,19 @@ describe('C4 UI affordances', () => {
     }
     expect(host.textContent).toContain('[Container]');
     expect(host.textContent).toContain('[Database]');
+    const browser = host.querySelector('[data-c4-shape="browser"]')!;
+    expect(browser.tagName.toLowerCase()).toBe('rect');
+    expect(browser.parentElement?.querySelectorAll('line')).toHaveLength(1);
+    expect(browser.parentElement?.querySelectorAll('circle')).toHaveLength(3);
+    const folder = host.querySelector('[data-c4-shape="folder"]')!;
+    expect(folder.tagName.toLowerCase()).toBe('path');
+    expect(folder.getAttribute('d')).toBeTruthy();
+    const bucket = host.querySelector('[data-c4-shape="bucket"]')!;
+    expect(bucket.tagName.toLowerCase()).toBe('path');
+    expect(bucket.parentElement?.querySelectorAll('ellipse')).toHaveLength(1);
+    const terminal = host.querySelector('[data-c4-shape="terminal"]')!;
+    expect(terminal.tagName.toLowerCase()).toBe('rect');
+    expect(terminal.parentElement?.querySelectorAll('path')).toHaveLength(1);
 
     await act(async () => root.unmount());
   });
@@ -620,10 +672,13 @@ describe('C4 UI affordances', () => {
     const boundary = host.querySelector('[data-c4-shape="boundary"]');
     expect(boundary?.getAttribute('stroke-dasharray')).toBeNull();
     expect(boundary?.getAttribute('rx')).toBe('8');
-    expect(Array.from(host.querySelectorAll('text')).map((text) => text.textContent)).toEqual([
+    const boundaryLabels = Array.from(host.querySelectorAll('text'));
+    expect(boundaryLabels.map((text) => text.textContent)).toEqual([
       'Customer Portal',
       '[Software System]',
     ]);
+    expect(boundaryLabels.map((text) => text.getAttribute('x'))).toEqual(['12', '12']);
+    expect(boundaryLabels.map((text) => text.getAttribute('y'))).toEqual(['259', '273']);
 
     await act(async () => {
       root.unmount();
@@ -716,7 +771,7 @@ describe('C4 UI affordances', () => {
     expect(model().nodes[nodeId]).toMatchObject({
       fillColor: C4_VISUAL_DEFAULTS.elementFill,
       lineColor: C4_VISUAL_DEFAULTS.elementLine,
-      fontColor: C4_VISUAL_DEFAULTS.elementText,
+      fontColor: C4_VISUAL_DEFAULTS.elementLine,
     });
   });
 

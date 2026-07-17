@@ -126,16 +126,12 @@ export const C4_PALETTE_KINDS: C4ElementKind[] = [
 export const C4_VISUAL_DEFAULTS = {
   personFill: '#FFFFFF',
   personLine: '#287E06',
-  personText: '#287E06',
   elementFill: '#FFFFFF',
   elementLine: '#1168BD',
-  elementText: '#1168BD',
   externalFill: '#FFFFFF',
   externalLine: '#777777',
-  externalText: '#777777',
   boundaryFill: '#FFFFFF',
   boundaryLine: '#1168BD',
-  boundaryText: '#1168BD',
   relationshipLine: '#444444',
   relationshipText: '#444444',
 } as const;
@@ -236,7 +232,7 @@ export function c4VisualStyleForElement(
     return {
       fillColor: C4_VISUAL_DEFAULTS.boundaryFill,
       lineColor: isExternal ? C4_VISUAL_DEFAULTS.externalLine : C4_VISUAL_DEFAULTS.boundaryLine,
-      fontColor: isExternal ? C4_VISUAL_DEFAULTS.externalText : C4_VISUAL_DEFAULTS.boundaryText,
+      fontColor: isExternal ? C4_VISUAL_DEFAULTS.externalLine : C4_VISUAL_DEFAULTS.boundaryLine,
       shape: 'boundary',
       boundary: true,
     };
@@ -249,7 +245,7 @@ export function c4VisualStyleForElement(
     return {
       fillColor: C4_VISUAL_DEFAULTS.externalFill,
       lineColor: C4_VISUAL_DEFAULTS.externalLine,
-      fontColor: C4_VISUAL_DEFAULTS.externalText,
+      fontColor: C4_VISUAL_DEFAULTS.externalLine,
       shape,
       boundary: false,
     };
@@ -258,7 +254,7 @@ export function c4VisualStyleForElement(
     return {
       fillColor: C4_VISUAL_DEFAULTS.personFill,
       lineColor: C4_VISUAL_DEFAULTS.personLine,
-      fontColor: C4_VISUAL_DEFAULTS.personText,
+      fontColor: C4_VISUAL_DEFAULTS.personLine,
       shape,
       boundary: false,
     };
@@ -266,7 +262,7 @@ export function c4VisualStyleForElement(
   return {
     fillColor: C4_VISUAL_DEFAULTS.elementFill,
     lineColor: C4_VISUAL_DEFAULTS.elementLine,
-    fontColor: C4_VISUAL_DEFAULTS.elementText,
+    fontColor: C4_VISUAL_DEFAULTS.elementLine,
     shape,
     boundary: false,
   };

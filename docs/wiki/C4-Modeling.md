@@ -57,8 +57,8 @@ figures instead of ArchiMate corner icons:
 - Containers can render as a database cylinder, browser window, folder, bucket,
   or terminal when `c4.tags` contains the matching shape tag.
 - Parent software systems, containers, and deployment nodes render as solid
-  rounded boundaries with their label at the bottom-left, for example
-  `Software System: Name`, `Container: Name`, or `Deployment Node: Name`.
+  rounded boundaries with their label at the bottom-left on two lines: `Name`
+  followed by `[Software System]`, `[Container]`, or `[Deployment Node]`.
 - Relationships render as dashed grey directed arrows with intent labels and
   optional `[technology/protocol]` lines.
 

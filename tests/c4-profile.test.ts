@@ -132,7 +132,7 @@ describe('C4 profile helpers', () => {
     expect(c4VisualStyleForElement(webContainer)).toMatchObject({
       fillColor: C4_VISUAL_DEFAULTS.elementFill,
       lineColor: C4_VISUAL_DEFAULTS.elementLine,
-      fontColor: C4_VISUAL_DEFAULTS.elementText,
+      fontColor: C4_VISUAL_DEFAULTS.elementLine,
       shape: 'box',
       boundary: false,
     });
@@ -158,10 +158,45 @@ describe('C4 profile helpers', () => {
     ).toMatchObject({
       fillColor: C4_VISUAL_DEFAULTS.boundaryFill,
       lineColor: C4_VISUAL_DEFAULTS.boundaryLine,
-      fontColor: C4_VISUAL_DEFAULTS.boundaryText,
+      fontColor: C4_VISUAL_DEFAULTS.boundaryLine,
       shape: 'boundary',
       boundary: true,
     });
+  });
+
+  it('reuses role line colours for C4 text without duplicate text constants', () => {
+    expect(C4_VISUAL_DEFAULTS).not.toHaveProperty('personText');
+    expect(C4_VISUAL_DEFAULTS).not.toHaveProperty('elementText');
+    expect(C4_VISUAL_DEFAULTS).not.toHaveProperty('externalText');
+    expect(C4_VISUAL_DEFAULTS).not.toHaveProperty('boundaryText');
+
+    const person: ArchimateElement = {
+      ...container(),
+      id: 'person',
+      properties: [{ key: C4_PROPERTY_KEYS.kind, value: 'person' }],
+    };
+    const boundaryNode = {
+      id: 'node',
+      viewId: 'view',
+      parentId: 'view',
+      bounds: { x: 0, y: 0, width: 200, height: 100 },
+      childIds: ['child'],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'element' as const,
+      elementId: 'container',
+    };
+
+    expect(c4VisualStyleForElement(person)?.fontColor).toBe(C4_VISUAL_DEFAULTS.personLine);
+    expect(c4VisualStyleForElement(container())?.fontColor).toBe(
+      C4_VISUAL_DEFAULTS.elementLine,
+    );
+    expect(c4VisualStyleForElement(container(undefined, true))?.fontColor).toBe(
+      C4_VISUAL_DEFAULTS.externalLine,
+    );
+    expect(c4VisualStyleForElement(container(), boundaryNode)?.fontColor).toBe(
+      C4_VISUAL_DEFAULTS.boundaryLine,
+    );
   });
 
   it('uses every supported shape tag and falls back to a box', () => {
