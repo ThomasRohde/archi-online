@@ -1,7 +1,7 @@
 {
   "name": "archi-online",
   "private": true,
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "Web-based ArchiMate modeler inspired by Archi, scriptable with a jArchi-compatible JavaScript API",
   "license": "MIT",
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && node tools/verify-license-distribution.mjs",
+    "build": "tsc -b && vite build && node tools/verify-seo-distribution.mjs && node tools/verify-license-distribution.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

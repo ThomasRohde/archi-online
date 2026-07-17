@@ -5,7 +5,7 @@ export const webManifest: Partial<ManifestOptions> = {
   name: 'Archi Online',
   short_name: 'Archi',
   description:
-    'Web-based ArchiMate modeler, scriptable with a jArchi-compatible JavaScript API.',
+    'Model, validate, and script ArchiMate 3.2 in your browser with local-first storage and desktop-compatible .archimate files.',
   id: '/',
   start_url: '/',
   scope: '/',

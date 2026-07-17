@@ -12,9 +12,10 @@ This is maintainer process documentation — it intentionally lives in the
 repository, not on the published site (VitePress excludes it via `srcExclude`).
 
 The **app itself** is not hosted here — it runs at
-**https://bitter-mill-c9qn.here.now/** (published separately via the `here-now`
-skill; see the root `CLAUDE.md`). GitHub Pages serves the docs only; the docs'
-"Open the app" links point at here.now.
+**https://archi-online.klok-rohde.dk/**, with
+**https://bitter-mill-c9qn.here.now/** retained as a fallback URL. It is published
+separately via the `here-now` skill; see the root `CLAUDE.md`. GitHub Pages serves
+the docs only; the docs' "Open the app" links point at the custom domain.
 
 ## What the site contains
 

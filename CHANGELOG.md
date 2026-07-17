@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2] - 2026-07-17
+
+### Added
+
+- A crawlable, responsive ArchiMate modeler product page with static
+  practitioner-focused content, visible FAQs, structured data, and accessible
+  calls to action
+- Canonical, Open Graph, and Twitter metadata for the editor and product page,
+  plus an XML sitemap, crawl policy, optimized product screenshot, and branded
+  social image
+- SEO contract tests and post-build distribution verification for metadata,
+  structured content, discovery files, internal links, and referenced assets
+
+### Changed
+
+- Made `archi-online.klok-rohde.dk` the canonical domain across application
+  metadata, documentation, publishing guidance, and viewer examples while
+  retaining the here.now slug as a fallback
+- Configured Vite to build the editor and static product page as separate HTML
+  entries without changing editor routing or PWA behavior
+
 ## [1.8.1] - 2026-07-17
 
 ### Changed
