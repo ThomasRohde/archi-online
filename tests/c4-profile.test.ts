@@ -1,15 +1,19 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
   C4_PROPERTY_KEYS,
+  C4_SHAPE_TAGS,
   C4_VISUAL_DEFAULTS,
   c4ElementLabelParts,
   c4KindForConcept,
   c4LabelForElement,
   c4LabelForRelationship,
+  c4LegendText,
   c4PropertyValue,
   c4RelationshipLabelParts,
+  c4ShapeTagOf,
   c4VisualStyleForElement,
   c4ViewType,
+  setC4ShapeTag,
   setC4PropertyValue,
   validateC4View,
 } from '../src/model/c4';
@@ -30,6 +34,21 @@ beforeEach(() => {
 });
 
 describe('C4 profile helpers', () => {
+  const container = (tags?: string, external = false): ArchimateElement => ({
+    id: 'container',
+    kind: 'element',
+    type: 'ApplicationComponent',
+    name: 'Container',
+    documentation: '',
+    folderId: 'app',
+    properties: [
+      { key: C4_PROPERTY_KEYS.kind, value: 'container' },
+      ...(tags ? [{ key: C4_PROPERTY_KEYS.tags, value: tags }] : []),
+      ...(external ? [{ key: C4_PROPERTY_KEYS.external, value: 'true' }] : []),
+    ],
+    profileIds: [],
+  });
+
   it('maps ArchiMate concepts to C4 metadata and labels', () => {
     const element: ArchimateElement = {
       id: 'web',
@@ -89,22 +108,10 @@ describe('C4 profile helpers', () => {
     expect(properties).toEqual([{ key: C4_PROPERTY_KEYS.kind, value: 'container' }]);
   });
 
-  it('derives Structurizr-style visual defaults from C4 metadata', () => {
-    const container: ArchimateElement = {
-      id: 'web',
-      kind: 'element',
-      type: 'ApplicationComponent',
-      name: 'Web Application',
-      documentation: '',
-      folderId: 'app',
-      properties: [
-        { key: C4_PROPERTY_KEYS.kind, value: 'container' },
-        { key: C4_PROPERTY_KEYS.technology, value: 'React' },
-      ],
-      profileIds: [],
-    };
+  it('derives modern visual defaults from C4 metadata', () => {
+    const webContainer = container();
     const externalSystem: ArchimateElement = {
-      ...container,
+      ...webContainer,
       id: 'payment',
       name: 'Payment Gateway',
       properties: [
@@ -113,7 +120,7 @@ describe('C4 profile helpers', () => {
       ],
     };
     const database: ArchimateElement = {
-      ...container,
+      ...webContainer,
       id: 'db',
       name: 'Customer Database',
       properties: [
@@ -122,10 +129,10 @@ describe('C4 profile helpers', () => {
       ],
     };
 
-    expect(c4VisualStyleForElement(container)).toMatchObject({
+    expect(c4VisualStyleForElement(webContainer)).toMatchObject({
       fillColor: C4_VISUAL_DEFAULTS.elementFill,
       lineColor: C4_VISUAL_DEFAULTS.elementLine,
-      fontColor: C4_VISUAL_DEFAULTS.textOnDark,
+      fontColor: C4_VISUAL_DEFAULTS.elementText,
       shape: 'box',
       boundary: false,
     });
@@ -137,7 +144,7 @@ describe('C4 profile helpers', () => {
       shape: 'database',
     });
     expect(
-      c4VisualStyleForElement(container, {
+      c4VisualStyleForElement(webContainer, {
         id: 'node',
         viewId: 'view',
         parentId: 'view',
@@ -146,15 +153,109 @@ describe('C4 profile helpers', () => {
         sourceConnectionIds: [],
         targetConnectionIds: [],
         nodeType: 'element',
-        elementId: 'web',
+        elementId: 'container',
       }),
     ).toMatchObject({
       fillColor: C4_VISUAL_DEFAULTS.boundaryFill,
       lineColor: C4_VISUAL_DEFAULTS.boundaryLine,
-      fontColor: C4_VISUAL_DEFAULTS.textOnLight,
+      fontColor: C4_VISUAL_DEFAULTS.boundaryText,
       shape: 'boundary',
       boundary: true,
     });
+  });
+
+  it('uses every supported shape tag and falls back to a box', () => {
+    expect(c4VisualStyleForElement(container())?.shape).toBe('box');
+    for (const shape of C4_SHAPE_TAGS) {
+      expect(c4VisualStyleForElement(container(shape))?.shape).toBe(shape);
+    }
+  });
+
+  it('gives people their person shape before tag selection and makes external people grey', () => {
+    const person: ArchimateElement = {
+      ...container('browser'),
+      id: 'person',
+      properties: [
+        { key: C4_PROPERTY_KEYS.kind, value: 'person' },
+        { key: C4_PROPERTY_KEYS.tags, value: 'browser' },
+      ],
+    };
+
+    expect(c4VisualStyleForElement(person)).toMatchObject({
+      shape: 'person',
+      lineColor: '#287E06',
+      fontColor: '#287E06',
+    });
+    expect(
+      c4VisualStyleForElement({
+        ...person,
+        properties: [...person.properties, { key: C4_PROPERTY_KEYS.external, value: 'true' }],
+      }),
+    ).toMatchObject({
+      shape: 'person',
+      lineColor: '#777777',
+      fontColor: '#777777',
+    });
+  });
+
+  it('keeps external browser containers browser-shaped and grey', () => {
+    expect(c4VisualStyleForElement(container('browser', true))).toMatchObject({
+      shape: 'browser',
+      fillColor: '#FFFFFF',
+      lineColor: '#777777',
+      fontColor: '#777777',
+    });
+  });
+
+  it('colours internal boundaries blue and external boundaries grey', () => {
+    const boundaryNode = {
+      id: 'node',
+      viewId: 'view',
+      parentId: 'view',
+      bounds: { x: 0, y: 0, width: 200, height: 100 },
+      childIds: ['child'],
+      sourceConnectionIds: [],
+      targetConnectionIds: [],
+      nodeType: 'element' as const,
+      elementId: 'container',
+    };
+
+    expect(c4VisualStyleForElement(container(), boundaryNode)).toMatchObject({
+      shape: 'boundary', lineColor: '#1168BD', fontColor: '#1168BD', boundary: true,
+    });
+    expect(c4VisualStyleForElement(container(undefined, true), boundaryNode)).toMatchObject({
+      shape: 'boundary', lineColor: '#777777', fontColor: '#777777', boundary: true,
+    });
+  });
+
+  it('uses the Database kind label only for database-tagged containers', () => {
+    expect(c4ElementLabelParts(container('database'))?.kindLabel).toBe('Database');
+    for (const shape of C4_SHAPE_TAGS.filter((shape) => shape !== 'database')) {
+      expect(c4ElementLabelParts(container(shape))?.kindLabel).toBe('Container');
+    }
+  });
+
+  it('selects, replaces, clears, and preserves C4 shape tags', () => {
+    expect(c4ShapeTagOf('custom browser, database')).toBe('browser');
+    expect(c4ShapeTagOf('CUSTOM\nTERMINAL')).toBe('terminal');
+    expect(c4ShapeTagOf('custom external')).toBeUndefined();
+    expect(setC4ShapeTag('external, custom DATABASE browser', 'folder')).toBe(
+      'external, custom, folder',
+    );
+    expect(setC4ShapeTag('EXTERNAL, Custom DATABASE browser', 'folder')).toBe(
+      'EXTERNAL, Custom, folder',
+    );
+    expect(setC4ShapeTag('external custom database', undefined)).toBe('external, custom');
+  });
+
+  it('describes the modern C4 visual language in its legend', () => {
+    expect(c4LegendText('container')).toBe([
+      'C4 Container View',
+      'Elements are white boxes with coloured borders and text: green = people, blue = in scope, grey = external.',
+      'Container shapes via c4.tags: database cylinder, browser window, folder, bucket, terminal.',
+      'Solid rounded rectangles with a bottom-left label are boundaries.',
+      'Relationships are dashed grey arrows labeled with intent plus optional [technology/protocol].',
+    ].join('\n'));
   });
 });
 
@@ -173,6 +274,7 @@ describe('C4 template generation and validation', () => {
     expect(Object.values(m.relationships).every((rel) => rel.name.trim().length > 0)).toBe(true);
     expect(validateC4View(m, viewId)).toEqual([]);
     expect(Object.values(m.nodes).some((node) => node.fillColor === C4_VISUAL_DEFAULTS.elementFill)).toBe(true);
+    expect(Object.values(m.nodes).some((node) => node.lineColor === C4_VISUAL_DEFAULTS.personLine)).toBe(true);
     expect(Object.values(m.nodes).some((node) => node.fillColor === C4_VISUAL_DEFAULTS.boundaryFill)).toBe(true);
     expect(Object.values(m.connections).every((conn) => conn.lineColor === C4_VISUAL_DEFAULTS.relationshipLine)).toBe(true);
     expect(useStore.getState().undoStack).toHaveLength(1);

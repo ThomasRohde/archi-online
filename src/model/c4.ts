@@ -33,7 +33,18 @@ export interface C4ValidationIssue {
   message: string;
 }
 
-export type C4VisualShape = 'box' | 'database' | 'boundary';
+export type C4VisualShape =
+  | 'box'
+  | 'database'
+  | 'boundary'
+  | 'person'
+  | 'browser'
+  | 'folder'
+  | 'bucket'
+  | 'terminal';
+
+export const C4_SHAPE_TAGS = ['database', 'browser', 'folder', 'bucket', 'terminal'] as const;
+export type C4ShapeTag = (typeof C4_SHAPE_TAGS)[number];
 
 export interface C4ElementLabelParts {
   name: string;
@@ -113,18 +124,20 @@ export const C4_PALETTE_KINDS: C4ElementKind[] = [
 ];
 
 export const C4_VISUAL_DEFAULTS = {
-  personFill: '#08427B',
-  personLine: '#052E56',
-  elementFill: '#1168BD',
-  elementLine: '#0D4F91',
-  externalFill: '#999999',
-  externalLine: '#6B7280',
-  boundaryFill: '#F7FBFF',
-  boundaryLine: '#8DB9DD',
-  textOnDark: '#FFFFFF',
-  textOnLight: '#253149',
-  relationshipLine: '#4A5568',
-  relationshipText: '#253149',
+  personFill: '#FFFFFF',
+  personLine: '#287E06',
+  personText: '#287E06',
+  elementFill: '#FFFFFF',
+  elementLine: '#1168BD',
+  elementText: '#1168BD',
+  externalFill: '#FFFFFF',
+  externalLine: '#777777',
+  externalText: '#777777',
+  boundaryFill: '#FFFFFF',
+  boundaryLine: '#1168BD',
+  boundaryText: '#1168BD',
+  relationshipLine: '#444444',
+  relationshipText: '#444444',
 } as const;
 
 const C4_ELEMENT_KIND_SET = new Set<C4ElementKind>(C4_ELEMENT_KINDS);
@@ -146,6 +159,19 @@ export function setC4PropertyValue(
   const next = properties.filter((property) => property.key !== key);
   const trimmed = value?.trim() ?? '';
   return trimmed ? [...next, { key, value: trimmed }] : next;
+}
+
+export function c4ShapeTagOf(tags: string | undefined): C4ShapeTag | undefined {
+  return c4TagNames(tags).find(
+    (tag): tag is C4ShapeTag => C4_SHAPE_TAGS.includes(tag as C4ShapeTag),
+  );
+}
+
+export function setC4ShapeTag(tags: string, shape: C4ShapeTag | undefined): string {
+  const unrelatedTags = tags.split(/[,\s]+/).map((tag) => tag.trim()).filter(
+    (tag) => tag && !C4_SHAPE_TAGS.includes(tag.toLowerCase() as C4ShapeTag),
+  );
+  return [...unrelatedTags, ...(shape ? [shape] : [])].join(', ');
 }
 
 export function c4KindForConcept(concept: Concept | undefined): C4ElementKind | undefined {
@@ -206,21 +232,24 @@ export function c4VisualStyleForElement(
   if (!kind) return undefined;
 
   if (isC4BoundaryNode(kind, node)) {
+    const isExternal = isExternalC4Element(element);
     return {
       fillColor: C4_VISUAL_DEFAULTS.boundaryFill,
-      lineColor: C4_VISUAL_DEFAULTS.boundaryLine,
-      fontColor: C4_VISUAL_DEFAULTS.textOnLight,
+      lineColor: isExternal ? C4_VISUAL_DEFAULTS.externalLine : C4_VISUAL_DEFAULTS.boundaryLine,
+      fontColor: isExternal ? C4_VISUAL_DEFAULTS.externalText : C4_VISUAL_DEFAULTS.boundaryText,
       shape: 'boundary',
       boundary: true,
     };
   }
 
-  const shape: C4VisualShape = hasC4Tag(element, 'database') ? 'database' : 'box';
+  const shape: C4VisualShape = kind === 'person'
+    ? 'person'
+    : c4ShapeTagOf(c4PropertyValue(element.properties, C4_PROPERTY_KEYS.tags)) ?? 'box';
   if (isExternalC4Element(element)) {
     return {
       fillColor: C4_VISUAL_DEFAULTS.externalFill,
       lineColor: C4_VISUAL_DEFAULTS.externalLine,
-      fontColor: C4_VISUAL_DEFAULTS.textOnDark,
+      fontColor: C4_VISUAL_DEFAULTS.externalText,
       shape,
       boundary: false,
     };
@@ -229,7 +258,7 @@ export function c4VisualStyleForElement(
     return {
       fillColor: C4_VISUAL_DEFAULTS.personFill,
       lineColor: C4_VISUAL_DEFAULTS.personLine,
-      fontColor: C4_VISUAL_DEFAULTS.textOnDark,
+      fontColor: C4_VISUAL_DEFAULTS.personText,
       shape,
       boundary: false,
     };
@@ -237,7 +266,7 @@ export function c4VisualStyleForElement(
   return {
     fillColor: C4_VISUAL_DEFAULTS.elementFill,
     lineColor: C4_VISUAL_DEFAULTS.elementLine,
-    fontColor: C4_VISUAL_DEFAULTS.textOnDark,
+    fontColor: C4_VISUAL_DEFAULTS.elementText,
     shape,
     boundary: false,
   };
@@ -258,10 +287,10 @@ export function c4LabelForRelationship(relationship: ArchimateRelationship): str
 export function c4LegendText(viewType: C4ViewType): string {
   return [
     `C4 ${C4_VIEW_TYPE_LABELS[viewType]} View`,
-    'Blue elements are internal; grey elements are external.',
-    'Database containers render as cylinders.',
-    'Dashed boxes are parent boundaries.',
-    'Relationships are directed and labeled with intent plus optional [technology/protocol].',
+    'Elements are white boxes with coloured borders and text: green = people, blue = in scope, grey = external.',
+    'Container shapes via c4.tags: database cylinder, browser window, folder, bucket, terminal.',
+    'Solid rounded rectangles with a bottom-left label are boundaries.',
+    'Relationships are dashed grey arrows labeled with intent plus optional [technology/protocol].',
   ].join('\n');
 }
 
@@ -362,12 +391,14 @@ function c4RelationshipTechnologyLine(parts: C4RelationshipLabelParts): string {
 
 function c4Tags(element: ArchimateElement): Set<string> {
   const tags = c4PropertyValue(element.properties, C4_PROPERTY_KEYS.tags);
-  return new Set(
-    (tags ?? '')
-      .split(/[,\s]+/)
-      .map((tag) => tag.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  return new Set(c4TagNames(tags));
+}
+
+function c4TagNames(tags: string | undefined): string[] {
+  return (tags ?? '')
+    .split(/[,\s]+/)
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 function c4ElementDisplayKindLabel(element: ArchimateElement, kind: C4ElementKind): string {
