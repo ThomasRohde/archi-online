@@ -206,6 +206,23 @@ describe('C4 profile helpers', () => {
     }
   });
 
+  it('uses component notation by default while keeping shape tags authoritative', () => {
+    const component: ArchimateElement = {
+      ...container(),
+      id: 'component',
+      properties: [{ key: C4_PROPERTY_KEYS.kind, value: 'component' }],
+    };
+
+    expect(c4VisualStyleForElement(component)?.shape).toBe('component');
+    expect(c4VisualStyleForElement({
+      ...component,
+      properties: [
+        ...component.properties,
+        { key: C4_PROPERTY_KEYS.tags, value: 'terminal' },
+      ],
+    })?.shape).toBe('terminal');
+  });
+
   it('gives people their person shape before tag selection and makes external people grey', () => {
     const person: ArchimateElement = {
       ...container('browser'),

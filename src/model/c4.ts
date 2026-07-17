@@ -38,6 +38,7 @@ export type C4VisualShape =
   | 'database'
   | 'boundary'
   | 'person'
+  | 'component'
   | 'browser'
   | 'folder'
   | 'bucket'
@@ -238,9 +239,10 @@ export function c4VisualStyleForElement(
     };
   }
 
+  const shapeTag = c4ShapeTagOf(c4PropertyValue(element.properties, C4_PROPERTY_KEYS.tags));
   const shape: C4VisualShape = kind === 'person'
     ? 'person'
-    : c4ShapeTagOf(c4PropertyValue(element.properties, C4_PROPERTY_KEYS.tags)) ?? 'box';
+    : shapeTag ?? (kind === 'component' ? 'component' : 'box');
   if (isExternalC4Element(element)) {
     return {
       fillColor: C4_VISUAL_DEFAULTS.externalFill,

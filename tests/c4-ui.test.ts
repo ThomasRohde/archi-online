@@ -144,6 +144,7 @@ describe('C4 UI affordances', () => {
       ['C4 Web Browser', 'browser'],
       ['C4 Folder', 'folder'],
       ['C4 Bucket', 'bucket'],
+      ['C4 Terminal', 'terminal'],
     ] as const;
     for (const [title, icon] of expectedIcons) {
       const button = host.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
@@ -171,6 +172,7 @@ describe('C4 UI affordances', () => {
       ['C4 Web Browser', 'browser'],
       ['C4 Folder', 'folder'],
       ['C4 Bucket', 'bucket'],
+      ['C4 Terminal', 'terminal'],
     ] as const) {
       const button = host.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
       await act(async () => {
@@ -183,8 +185,6 @@ describe('C4 UI affordances', () => {
         c4Properties: { [C4_PROPERTY_KEYS.tags]: tag },
       });
     }
-    expect(host.querySelector('button[title="C4 Terminal"]')).toBeNull();
-
     await act(async () => {
       root.unmount();
     });
@@ -723,6 +723,45 @@ describe('C4 UI affordances', () => {
     const terminal = host.querySelector('[data-c4-shape="terminal"]')!;
     expect(terminal.tagName.toLowerCase()).toBe('rect');
     expect(terminal.parentElement?.querySelectorAll('path')).toHaveLength(1);
+    const terminalPrompt = terminal.parentElement?.querySelector('[data-c4-shape-part="terminal-prompt"]');
+    const terminalCursor = terminal.parentElement?.querySelector('[data-c4-shape-part="terminal-cursor"]');
+    expect(terminalPrompt?.getAttribute('d')).toBe('M10,8 L19,14 L10,20');
+    expect(terminalPrompt?.getAttribute('stroke-width')).toBe('2.5');
+    expect(terminalCursor?.getAttribute('x2')).toBe('36');
+    expect(terminalCursor?.getAttribute('stroke-width')).toBe('2.5');
+
+    await act(async () => root.unmount());
+  });
+
+  it('renders C4 components with two left-side notation tabs', async () => {
+    const viewId = addView('Components');
+    const { elementId, nodeId } = createC4ElementOnView(
+      'component',
+      viewId,
+      viewId,
+      { x: 0, y: 0, width: 150, height: 72 },
+      'Order Controller',
+    );
+    const { host, root } = await render(createElement(
+      'svg',
+      null,
+      createElement(NodeFigure, {
+        node: model().nodes[nodeId],
+        element: model().elements[elementId],
+        width: 150,
+        height: 72,
+        c4ViewType: 'component',
+      }),
+    ));
+
+    const body = host.querySelector('[data-c4-shape="component"]');
+    const tabs = host.querySelectorAll('[data-c4-shape-part="component-tab"]');
+    expect(body?.tagName.toLowerCase()).toBe('rect');
+    expect(Number(body?.getAttribute('x'))).toBeGreaterThan(0);
+    expect(tabs).toHaveLength(2);
+    expect(Array.from(tabs).every((tab) => tab.tagName.toLowerCase() === 'rect')).toBe(true);
+    expect(host.textContent).toContain('Order Controller');
+    expect(host.textContent).toContain('[Component]');
 
     await act(async () => root.unmount());
   });

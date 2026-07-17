@@ -345,18 +345,20 @@ export function NodeFigure({
       vert?: 'top' | 'center' | 'bottom';
       inset?: number;
       horizontalInset?: number;
+      rightInset?: number;
       verticalInset?: number;
     },
   ) {
     if (!text) return null;
     const inset = opts?.inset ?? 0;
     const horizontalInset = opts?.horizontalInset ?? inset;
+    const rightInset = opts?.rightInset ?? horizontalInset;
     const verticalInset = opts?.verticalInset ?? inset;
     return (
       <foreignObject
         x={horizontalInset}
         y={verticalInset}
-        width={Math.max(0, w - horizontalInset * 2)}
+        width={Math.max(0, w - horizontalInset - rightInset)}
         height={Math.max(0, h - verticalInset * 2)}
       >
         <div style={labelStyle(opts?.align ?? alignOf(), opts?.vert ?? vertOf())}>{text}</div>
@@ -385,6 +387,7 @@ export function NodeFigure({
     horizontalInset: number,
     extraTop = 0,
     verticalInset = 10,
+    rightInset = horizontalInset,
   ) {
     const availableHeight = Math.max(0, h - verticalInset * 2 - extraTop);
     const showDescription = parts.description && availableHeight >= 72;
@@ -392,7 +395,7 @@ export function NodeFigure({
       <foreignObject
         x={horizontalInset}
         y={verticalInset + extraTop}
-        width={Math.max(0, w - horizontalInset * 2)}
+        width={Math.max(0, w - horizontalInset - rightInset)}
         height={availableHeight}
       >
         <div
@@ -658,34 +661,107 @@ export function NodeFigure({
     lineColor: string,
     c4Stroke: string,
     c4StrokeWidth: number,
-  ): ReactNode {
+  ): { body: ReactNode; labelTop: number } {
     const detailColor = c4Stroke === 'none' ? 'none' : lineColor;
-    return (
-      <g>
-        <rect
-          data-c4-shape="terminal"
-          width={w}
-          height={h}
-          rx={5}
-          ry={5}
-          fill={fill}
-          fillOpacity={fillOpacity}
-          stroke={c4Stroke}
-          strokeOpacity={lineAlpha}
-          strokeWidth={c4StrokeWidth}
-          strokeDasharray={strokeDasharray}
-        />
-        <path
-          d="M10,10 L15,14 L10,18 M18,18 H25"
-          fill="none"
-          stroke={detailColor}
-          strokeOpacity={lineAlpha}
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
-    );
+    return {
+      body: (
+        <g>
+          <rect
+            data-c4-shape="terminal"
+            width={w}
+            height={h}
+            rx={5}
+            ry={5}
+            fill={fill}
+            fillOpacity={fillOpacity}
+            stroke={c4Stroke}
+            strokeOpacity={lineAlpha}
+            strokeWidth={c4StrokeWidth}
+            strokeDasharray={strokeDasharray}
+          />
+          <path
+            data-c4-shape-part="terminal-prompt"
+            d="M10,8 L19,14 L10,20"
+            fill="none"
+            stroke={detailColor}
+            strokeOpacity={lineAlpha}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <line
+            data-c4-shape-part="terminal-cursor"
+            x1={23}
+            y1={21}
+            x2={36}
+            y2={21}
+            stroke={detailColor}
+            strokeOpacity={lineAlpha}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
+        </g>
+      ),
+      labelTop: 16,
+    };
+  }
+
+  function c4ComponentBody(
+    fill: string,
+    fillOpacity: number,
+    c4Stroke: string,
+    c4StrokeWidth: number,
+  ): { body: ReactNode; labelLeftInset: number; labelRightInset: number } {
+    const tabWidth = Math.max(20, Math.min(32, w * 0.18));
+    const tabHeight = Math.max(8, Math.min(12, h * 0.14));
+    const bodyX = tabWidth / 2;
+    const firstTabY = Math.max(8, Math.min(16, h * 0.16));
+    const tabGap = Math.max(4, Math.min(7, h * 0.07));
+    const common = {
+      fill,
+      fillOpacity,
+      stroke: c4Stroke,
+      strokeOpacity: lineAlpha,
+      strokeWidth: c4StrokeWidth,
+      strokeDasharray,
+    };
+    return {
+      body: (
+        <g>
+          <rect
+            data-c4-shape="component"
+            x={bodyX}
+            width={Math.max(0, w - bodyX)}
+            height={h}
+            rx={5}
+            ry={5}
+            {...common}
+          />
+          <rect
+            data-c4-shape-part="component-tab"
+            x={0}
+            y={firstTabY}
+            width={tabWidth}
+            height={tabHeight}
+            rx={2}
+            ry={2}
+            {...common}
+          />
+          <rect
+            data-c4-shape-part="component-tab"
+            x={0}
+            y={firstTabY + tabHeight + tabGap}
+            width={tabWidth}
+            height={tabHeight}
+            rx={2}
+            ry={2}
+            {...common}
+          />
+        </g>
+      ),
+      labelLeftInset: bodyX + 10,
+      labelRightInset: 10,
+    };
   }
 
   function c4Figure(element: ArchimateElement, visual: C4VisualStyle) {
@@ -722,7 +798,8 @@ export function NodeFigure({
 
     let body: ReactNode;
     let labelTop = 0;
-    let labelInset = 10;
+    let labelLeftInset = 10;
+    let labelRightInset = 10;
     switch (visual.shape) {
       case 'person':
         ({ body, labelTop } = c4PersonBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
@@ -737,10 +814,29 @@ export function NodeFigure({
         ({ body, labelTop } = c4FolderBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
         break;
       case 'bucket':
-        ({ body, labelTop, labelInset } = c4BucketBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth));
+        {
+          const bucket = c4BucketBody(paint.fill, paint.opacity, c4Stroke, c4StrokeWidth);
+          ({ body, labelTop } = bucket);
+          labelLeftInset = bucket.labelInset;
+          labelRightInset = bucket.labelInset;
+        }
+        break;
+      case 'component':
+        ({ body, labelLeftInset, labelRightInset } = c4ComponentBody(
+          paint.fill,
+          paint.opacity,
+          c4Stroke,
+          c4StrokeWidth,
+        ));
         break;
       case 'terminal':
-        body = c4TerminalBody(paint.fill, paint.opacity, lineColor, c4Stroke, c4StrokeWidth);
+        ({ body, labelTop } = c4TerminalBody(
+          paint.fill,
+          paint.opacity,
+          lineColor,
+          c4Stroke,
+          c4StrokeWidth,
+        ));
         break;
       default:
         body = (
@@ -765,8 +861,19 @@ export function NodeFigure({
         {paint.definition}
         {body}
         {displayLabel !== undefined
-          ? label(displayLabel, { inset: 10, horizontalInset: labelInset })
-          : c4StructuredLabel(parts, textColor, labelInset, labelTop)}
+          ? label(displayLabel, {
+              inset: 10,
+              horizontalInset: labelLeftInset,
+              rightInset: labelRightInset,
+            })
+          : c4StructuredLabel(
+              parts,
+              textColor,
+              labelLeftInset,
+              labelTop,
+              10,
+              labelRightInset,
+            )}
       </g>
     );
   }

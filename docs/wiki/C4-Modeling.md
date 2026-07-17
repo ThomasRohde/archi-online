@@ -24,9 +24,10 @@ and choose **New C4 View**. The built-in templates cover:
 
 When a C4 view is active, the palette shows C4 shortcuts for Person, Software
 System, Container, Component, Deployment Node, Infrastructure Node, Database,
-Web Browser, Folder, and Bucket. Database, Web Browser, Folder, and Bucket are
-all C4 Containers backed by `ApplicationComponent`; their shortcuts add the
-`database`, `browser`, `folder`, or `bucket` value to `c4.tags`.
+Web Browser, Folder, Bucket, and Terminal. Database, Web Browser, Folder, Bucket,
+and Terminal are all C4 Containers backed by `ApplicationComponent`; their
+shortcuts add the corresponding `database`, `browser`, `folder`, `bucket`, or
+`terminal` value to `c4.tags`.
 
 For any selected C4 Container, use the **Shape** dropdown in the C4 section of
 the Properties panel to choose Default, Database, Web Browser, Folder, Bucket,
@@ -52,10 +53,13 @@ figures instead of ArchiMate corner icons:
 - People use a green head-on-box figure.
 - In-scope software systems, containers, and components use blue outlines and
   text.
+- Components use the C4 component notation: a rounded box with two small tabs
+  projecting from the left edge.
 - External elements use grey outlines and text; they are detected from
   `c4.external=true` or an `external` tag in `c4.tags`.
 - Containers can render as a database cylinder, browser window, folder, bucket,
   or terminal when `c4.tags` contains the matching shape tag.
+- Terminal containers show a prominent `>_` prompt in the top-left corner.
 - Parent software systems, containers, and deployment nodes render as solid
   rounded boundaries with their label at the bottom-left on two lines: `Name`
   followed by `[Software System]`, `[Container]`, or `[Deployment Node]`.

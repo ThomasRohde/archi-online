@@ -41,7 +41,7 @@ interface C4PaletteEntry {
   properties?: Record<string, string>;
 }
 
-type C4PaletteIcon = C4ElementKind | 'database' | 'browser' | 'folder' | 'bucket';
+type C4PaletteIcon = C4ElementKind | 'database' | 'browser' | 'folder' | 'bucket' | 'terminal';
 
 const C4_TOOLBOX: C4PaletteEntry[] = [
   ...C4_PALETTE_KINDS.map((kind) => ({
@@ -68,11 +68,16 @@ const C4_TOOLBOX: C4PaletteEntry[] = [
     title: 'C4 Bucket',
     properties: { [C4_PROPERTY_KEYS.tags]: 'bucket' },
   },
+  {
+    kind: 'container',
+    title: 'C4 Terminal',
+    properties: { [C4_PROPERTY_KEYS.tags]: 'terminal' },
+  },
 ];
 
 function c4PaletteIcon(entry: C4PaletteEntry): C4PaletteIcon {
   const shape = c4ShapeTagOf(entry.properties?.[C4_PROPERTY_KEYS.tags]);
-  return shape && shape !== 'terminal' ? shape : entry.kind;
+  return shape ?? entry.kind;
 }
 
 function C4PaletteGlyph({ icon }: { icon: C4PaletteIcon }) {
@@ -152,6 +157,14 @@ function C4PaletteGlyph({ icon }: { icon: C4PaletteIcon }) {
         <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
           <path d="M3.5 5.2 L5 14.2 C5.3 15.7 12.7 15.7 13 14.2 L14.5 5.2 Z" fill={fill} stroke={stroke} strokeWidth="1.2" />
           <ellipse cx="9" cy="5.2" rx="5.5" ry="1.8" fill={fill} stroke={stroke} strokeWidth="1.2" />
+        </svg>
+      );
+    case 'terminal':
+      return (
+        <svg data-c4-palette-icon={icon} viewBox="0 0 18 18" width="16" height="16">
+          <rect x="2" y="2.5" width="14" height="13" rx="1.8" fill={fill} stroke={stroke} strokeWidth="1.2" />
+          <path d="M5 6 L8.5 8.5 L5 11" fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M9.5 11.5 H13" fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" />
         </svg>
       );
     case 'software-system-instance':
