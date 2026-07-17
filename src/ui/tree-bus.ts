@@ -3,22 +3,36 @@
 // Mirrors canvas/viewport-bus. The latest request is queued while the tree
 // isn't mounted (Models panel closed) and delivered once it subscribes.
 
-type RevealSubscriber = (conceptId: string, sessionId?: string | null) => void;
+export interface RevealOptions {
+  select?: boolean;
+  focus?: boolean;
+}
+
+type RevealSubscriber = (
+  conceptId: string,
+  sessionId?: string | null,
+  options?: RevealOptions,
+) => void;
 
 interface RevealRequest {
   conceptId: string;
   sessionId?: string | null;
+  options?: RevealOptions;
 }
 
 const subscribers = new Set<RevealSubscriber>();
 let pending: RevealRequest | null = null;
 
-export function requestReveal(conceptId: string, sessionId?: string | null): void {
+export function requestReveal(
+  conceptId: string,
+  sessionId?: string | null,
+  options?: RevealOptions,
+): void {
   if (subscribers.size === 0) {
-    pending = { conceptId, sessionId };
+    pending = { conceptId, sessionId, options };
     return;
   }
-  for (const subscriber of subscribers) subscriber(conceptId, sessionId);
+  for (const subscriber of subscribers) subscriber(conceptId, sessionId, options);
 }
 
 export function onRevealRequest(cb: RevealSubscriber): () => void {
@@ -26,7 +40,7 @@ export function onRevealRequest(cb: RevealSubscriber): () => void {
   if (pending !== null) {
     const request = pending;
     pending = null;
-    cb(request.conceptId, request.sessionId);
+    cb(request.conceptId, request.sessionId, request.options);
   }
   return () => {
     subscribers.delete(cb);

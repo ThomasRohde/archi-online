@@ -88,10 +88,34 @@ export function conceptsFromSelection(
     if (state.elements[id] || state.relationships[id]) conceptId = id;
     else if (selection.source === 'view') {
       const node = state.nodes[id];
-      if (node?.nodeType === 'element') conceptId = node.elementId;
-      else conceptId = state.connections[id]?.relationshipId;
+      if (node?.nodeType === 'element' && state.elements[node.elementId]) {
+        conceptId = node.elementId;
+      } else {
+        const relationshipId = state.connections[id]?.relationshipId;
+        if (relationshipId && state.relationships[relationshipId]) conceptId = relationshipId;
+      }
     }
     if (conceptId && !result.includes(conceptId)) result.push(conceptId);
   }
   return result;
+}
+
+function conceptIdForObject(state: ModelState, objectId: string): string | undefined {
+  if (state.elements[objectId] || state.relationships[objectId]) return objectId;
+  const node = state.nodes[objectId];
+  if (node?.nodeType === 'element' && state.elements[node.elementId]) return node.elementId;
+  const relationshipId = state.connections[objectId]?.relationshipId;
+  return relationshipId && state.relationships[relationshipId] ? relationshipId : undefined;
+}
+
+/** Whether an object is directly selected or represents the same semantic concept. */
+export function selectionMatchesObject(
+  state: ModelState | null,
+  selection: SelectionState,
+  objectId: string,
+): boolean {
+  if (!state) return false;
+  if (selection.ids.includes(objectId)) return true;
+  const conceptId = conceptIdForObject(state, objectId);
+  return conceptId !== undefined && conceptsFromSelection(state, selection).includes(conceptId);
 }

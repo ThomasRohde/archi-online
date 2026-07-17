@@ -9,6 +9,7 @@ import { assetDataUrl } from '../../model/assets';
 import { evaluateLabelExpression } from '../../model/label-expression';
 import { useSettingsStore } from '../../settings/app-settings';
 import { evaluateCachedLabelExpression } from './label-cache';
+import { selectionMatchesObject } from '../../model/analysis';
 import {
   reconnectIntentTone,
   type ReconnectIntent,
@@ -51,7 +52,7 @@ function NodeViewComponent({
     (state) => state.settings.legendUserColors,
   );
   const selected = useStore(
-    (s) => s.selection.source === 'view' && s.selection.ids.includes(nodeId),
+    (s) => selectionMatchesObject(model, s.selection, nodeId),
   );
   if (!node) return null;
   const element = node.nodeType === 'element' ? model.elements[node.elementId] : undefined;

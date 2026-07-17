@@ -1,7 +1,12 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { addElement, createEmptyModel } from '../src/model/ops';
+import {
+  addElement,
+  addElementNodeToView,
+  addView,
+  createEmptyModel,
+} from '../src/model/ops';
 import { setSelection } from '../src/model/store';
 import { useWorkspaceStore } from '../src/ui/store-hooks';
 import {
@@ -136,6 +141,49 @@ describe('multi-model tree', () => {
     await changeInput(input, '');
     expect(host.querySelector(`[data-tree-id="${elementId}"]`)).toBeNull();
     expect(session.store.getState().selection.ids).toEqual([elementId]);
+  });
+
+  it('passively reveals a canvas-selected concept without changing selection or focus', async () => {
+    const sessionId = addModelSession({ model: createEmptyModel('Model'), fileName: null });
+    const session = getModelSession(sessionId)!;
+    const elementId = addElement(
+      'BusinessActor',
+      'Reveal from canvas',
+      undefined,
+      session.store,
+    );
+    const viewId = addView('View', undefined, session.store);
+    const nodeId = addElementNodeToView(
+      viewId,
+      elementId,
+      viewId,
+      { x: 10, y: 10, width: 120, height: 55 },
+      false,
+      {},
+      session.store,
+    );
+    const folderId = session.store.getState().model!.elements[elementId].folderId;
+
+    await act(async () => root.render(createElement(ModelTree)));
+    await act(async () => host.querySelector<HTMLElement>(`[data-tree-id="${folderId}"]`)!.click());
+    expect(host.querySelector(`[data-tree-id="${elementId}"]`)).toBeNull();
+
+    const focusTarget = host.querySelector<HTMLInputElement>('input[aria-label="Search models"]')!;
+    focusTarget.focus();
+    expect(document.activeElement).toBe(focusTarget);
+
+    await act(async () => {
+      setSelection('view', [nodeId], session.store);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      }));
+    });
+
+    const row = host.querySelector<HTMLElement>(`[data-tree-id="${elementId}"]`);
+    expect(row).not.toBeNull();
+    expect(row?.getAttribute('aria-selected')).toBe('true');
+    expect(session.store.getState().selection).toEqual({ source: 'view', ids: [nodeId] });
+    expect(document.activeElement).toBe(focusTarget);
   });
 
   it('does not change saved folder or model-root expansion while filtering forces matches open', async () => {

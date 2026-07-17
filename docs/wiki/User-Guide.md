@@ -127,6 +127,12 @@ asterisk after a root name means that model has unsaved changes.
 - **Drag onto a view** — drop elements or relationships from the tree onto an
   open view to add them to the diagram. Dropping a *view* onto another view
   creates a view reference.
+- **Linked selection** — selecting elements or relationships in the Model
+  Browser highlights every matching occurrence in all open views. Selecting
+  element nodes or relationship connections in a view highlights the matching
+  Model Browser rows and occurrences in the other open views. This is always
+  active. Notes, groups, images, legends, view references, and plain
+  connections have no Model Browser counterpart and remain canvas-only.
 
 Extensions can add items to the tree's context menu.
 

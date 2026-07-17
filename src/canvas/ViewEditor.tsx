@@ -55,6 +55,7 @@ import {
   reconnectIntentMessage,
   reconnectIntentTone,
 } from './view-editor/reconnect-intent';
+import { selectionMatchesObject } from '../model/analysis';
 
 export type { Viewport } from './view-editor/types';
 
@@ -436,7 +437,7 @@ function EditableViewEditor({ viewId }: { viewId: string }) {
                   conn={displayConnection}
                   rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
                   points={points}
-                  selected={viewSelected.has(conn.id)}
+                  selected={selectionMatchesObject(model, selection, conn.id)}
                   c4ViewType={activeC4ViewType}
                   ghosted={
                     isConnectableGhosted(model, conn.id, view.viewpoint)
@@ -604,7 +605,6 @@ function ReadOnlyViewEditor({
   if (!model || !view || !routes) return null;
 
   const activeC4ViewType = c4ViewType(view);
-  const viewSelected = selection.source === 'view' ? new Set(selection.ids) : new Set<string>();
   const stopPan = (pointerId: number, target: SVGSVGElement) => {
     if (panRef.current?.pointerId !== pointerId) return;
     panRef.current = null;
@@ -738,7 +738,7 @@ function ReadOnlyViewEditor({
                   conn={conn}
                   rel={conn.relationshipId ? model.relationships[conn.relationshipId] : undefined}
                   points={points}
-                  selected={viewSelected.has(conn.id)}
+                  selected={selectionMatchesObject(model, selection, conn.id)}
                   c4ViewType={activeC4ViewType}
                   ghosted={
                     isConnectableGhosted(model, conn.id, view.viewpoint)

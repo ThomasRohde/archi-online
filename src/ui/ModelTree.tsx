@@ -45,7 +45,7 @@ import {
   type MenuItem,
 } from './ContextMenu';
 import { requestGenerateViewFor } from './GenerateViewDialog';
-import { onRevealRequest } from './tree-bus';
+import { onRevealRequest, requestReveal, type RevealOptions } from './tree-bus';
 import {
   DEFAULT_TREE_SEARCH_CRITERIA,
   collectTreeSearchCatalogWhenNeeded,
@@ -72,6 +72,10 @@ import {
   TREE_ROW_HEIGHT,
   type ProjectedTreeRow,
 } from './tree-row-projection';
+import {
+  conceptsFromSelection,
+  selectionMatchesObject,
+} from '../model/analysis';
 
 const FOLDER_LAYERS: Record<string, Layer[]> = {
   strategy: ['strategy'],
@@ -119,7 +123,7 @@ function TreeRow(props: RowProps) {
   const modelStore = useModelStoreApi();
   const activeModel = useContext(ModelTreeActiveContext);
   const selected = useStore(
-    (s) => activeModel && s.selection.source === 'tree' && s.selection.ids.includes(props.id),
+    (s) => activeModel && selectionMatchesObject(s.model, s.selection, props.id),
   );
   const [dragOver, setDragOver] = useState(false);
 
@@ -366,7 +370,7 @@ export function ModelTree() {
     }));
     setSetting('treeSearchViews', false);
   }, [setSetting]);
-  useEffect(() => onRevealRequest((id, requestedSessionId) => {
+  useEffect(() => onRevealRequest((id, requestedSessionId, options) => {
     const sessionId = order.length > 0 ? (requestedSessionId ?? activeSessionId) : 'legacy';
     if (!sessionId) return;
     const sessionModel = sessionId === 'legacy'
@@ -401,7 +405,11 @@ export function ModelTree() {
         ? container?.querySelector<HTMLElement>('.legacy-model-tree-session')
         : [...(container?.querySelectorAll<HTMLElement>('[data-model-session-id]') ?? [])]
             .find((candidate) => candidate.dataset.modelSessionId === sessionId);
-      if (owner) owner.dispatchEvent(new CustomEvent('archi-tree-reveal-row', { detail: { id } }));
+      if (owner) {
+        owner.dispatchEvent(new CustomEvent('archi-tree-reveal-row', {
+          detail: { id, options },
+        }));
+      }
       else if (attempt < 3) requestAnimationFrame(() => scroll(attempt + 1));
     };
     requestAnimationFrame(() => scroll(0));
@@ -568,8 +576,10 @@ function ModelTreeInner({
   embedded: boolean;
 }) {
   const modelStore = useModelStoreApi();
+  const activeModel = useContext(ModelTreeActiveContext);
   const treeRef = useRef<HTMLDivElement>(null);
   const readOnly = useStore((s) => s.readOnly);
+  const selection = useStore((s) => s.selection);
   const addDocumentationNoteOnRelationChange = useSettingsStore(
     (s) => s.settings.addDocumentationNoteOnRelationChange,
   );
@@ -589,6 +599,18 @@ function ModelTreeInner({
   const rowWindow = virtualized
     ? getTreeRowWindow(rows.length, scrollTop, viewportHeight)
     : { start: 0, end: rows.length, offset: 0, totalHeight: rows.length * TREE_ROW_HEIGHT };
+  const passiveRevealId = activeModel && selection.source === 'view'
+    ? conceptsFromSelection(model, selection).at(-1)
+    : undefined;
+
+  useEffect(() => {
+    if (!passiveRevealId) return;
+    requestReveal(
+      passiveRevealId,
+      collapsePrefix === 'legacy' ? null : collapsePrefix,
+      { select: false, focus: false },
+    );
+  }, [collapsePrefix, passiveRevealId]);
 
   useEffect(() => {
     const element = treeRef.current;
@@ -610,10 +632,12 @@ function ModelTreeInner({
     setCollapsed(next);
   };
 
-  const focusRowAt = (index: number, select = true) => {
+  const focusRowAt = (index: number, options: RevealOptions = {}) => {
     const row = rows[Math.max(0, Math.min(rows.length - 1, index))];
     if (!row) return;
-    setFocusedId(row.id);
+    const select = options.select ?? true;
+    const focus = options.focus ?? true;
+    if (focus) setFocusedId(row.id);
     if (select) setSelection('tree', [row.id], modelStore);
     if (virtualized && treeRef.current) {
       const top = index * TREE_ROW_HEIGHT;
@@ -626,9 +650,10 @@ function ModelTreeInner({
       }
     }
     requestAnimationFrame(() => {
-      [...(treeRef.current?.querySelectorAll<HTMLElement>('[data-tree-id]') ?? [])]
-        .find((candidate) => candidate.dataset.treeId === row.id)
-        ?.focus();
+      const element = [...(treeRef.current?.querySelectorAll<HTMLElement>('[data-tree-id]') ?? [])]
+        .find((candidate) => candidate.dataset.treeId === row.id);
+      if (focus) element?.focus();
+      else element?.scrollIntoView?.({ block: 'nearest' });
     });
   };
 
@@ -636,9 +661,13 @@ function ModelTreeInner({
     const element = treeRef.current;
     if (!element) return;
     const reveal = (event: Event) => {
-      const id = (event as CustomEvent<{ id?: string }>).detail?.id;
+      const detail = (event as CustomEvent<{
+        id?: string;
+        options?: RevealOptions;
+      }>).detail;
+      const id = detail?.id;
       const index = id ? rows.findIndex((row) => row.id === id) : -1;
-      if (index >= 0) focusRowAt(index);
+      if (index >= 0) focusRowAt(index, detail?.options);
     };
     element.addEventListener('archi-tree-reveal-row', reveal);
     return () => element.removeEventListener('archi-tree-reveal-row', reveal);
@@ -963,7 +992,7 @@ function ModelTreeInner({
               ? currentIndex - 1
               : e.key === 'Home'
                 ? 0
-                : rows.length - 1, selectOnMove);
+                : rows.length - 1, { select: selectOnMove });
           return;
         }
         if (e.key === 'ArrowRight') {
@@ -971,7 +1000,7 @@ function ModelTreeInner({
           const row = rows[currentIndex];
           if (row?.expandable && !row.expanded) toggle(row.id);
           else if (rows[currentIndex + 1]?.parentId === row?.id) {
-            focusRowAt(currentIndex + 1, selectOnMove);
+            focusRowAt(currentIndex + 1, { select: selectOnMove });
           }
           return;
         }
@@ -982,7 +1011,7 @@ function ModelTreeInner({
           else if (row?.parentId) {
             focusRowAt(
               rows.findIndex((candidate) => candidate.id === row.parentId),
-              selectOnMove,
+              { select: selectOnMove },
             );
           }
           return;

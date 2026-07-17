@@ -3,13 +3,20 @@ import {
   addConnectionToView,
   addElement,
   addElementNodeToView,
+  addNoteToView,
   addRelationship,
   addView,
   createEmptyModel,
 } from '../src/model/ops';
 import { replaceModel } from '../src/model/store';
 import { useStore } from '../src/ui/store-hooks';
-import { findInView, modelRelations, viewsUsing } from '../src/model/analysis';
+import {
+  conceptsFromSelection,
+  findInView,
+  modelRelations,
+  selectionMatchesObject,
+  viewsUsing,
+} from '../src/model/analysis';
 
 function model() {
   return useStore.getState().model!;
@@ -92,5 +99,91 @@ describe('analysis queries', () => {
     expect(findInView(model(), viewId, customer)).toBe(customerNodeId);
     expect(findInView(model(), viewId, relationshipId)).toBe(connectionId);
     expect(findInView(model(), viewId, addElement('BusinessActor', 'Absent'))).toBeUndefined();
+  });
+
+  it('matches semantic selections across tree concepts and every diagram occurrence', () => {
+    const customer = addElement('BusinessActor', 'Customer');
+    const role = addElement('BusinessRole', 'Role');
+    const relationshipId = addRelationship(
+      'AssignmentRelationship',
+      customer,
+      role,
+      'Assignment',
+    )!;
+    const firstView = addView('First view');
+    const secondView = addView('Second view');
+    const firstCustomerNode = addElementNodeToView(
+      firstView,
+      customer,
+      firstView,
+      { x: 10, y: 10, width: 120, height: 55 },
+      false,
+    );
+    const roleNode = addElementNodeToView(
+      firstView,
+      role,
+      firstView,
+      { x: 200, y: 10, width: 120, height: 55 },
+      false,
+    );
+    const secondCustomerNode = addElementNodeToView(
+      secondView,
+      customer,
+      secondView,
+      { x: 20, y: 20, width: 120, height: 55 },
+      false,
+    );
+    const connectionId = addConnectionToView(
+      firstView,
+      relationshipId,
+      firstCustomerNode,
+      roleNode,
+    );
+    const noteId = addNoteToView(
+      firstView,
+      firstView,
+      { x: 10, y: 100, width: 120, height: 55 },
+      'Canvas only',
+    );
+
+    expect(selectionMatchesObject(
+      model(),
+      { source: 'tree', ids: [customer] },
+      firstCustomerNode,
+    )).toBe(true);
+    expect(selectionMatchesObject(
+      model(),
+      { source: 'tree', ids: [customer] },
+      secondCustomerNode,
+    )).toBe(true);
+    expect(selectionMatchesObject(
+      model(),
+      { source: 'view', ids: [firstCustomerNode] },
+      customer,
+    )).toBe(true);
+    expect(selectionMatchesObject(
+      model(),
+      { source: 'view', ids: [firstCustomerNode] },
+      secondCustomerNode,
+    )).toBe(true);
+    expect(selectionMatchesObject(
+      model(),
+      { source: 'tree', ids: [relationshipId] },
+      connectionId,
+    )).toBe(true);
+    expect(selectionMatchesObject(
+      model(),
+      { source: 'view', ids: [connectionId] },
+      relationshipId,
+    )).toBe(true);
+    expect(selectionMatchesObject(
+      model(),
+      { source: 'view', ids: [noteId] },
+      customer,
+    )).toBe(false);
+    expect(conceptsFromSelection(model(), {
+      source: 'view',
+      ids: [firstCustomerNode, secondCustomerNode, connectionId, 'missing'],
+    })).toEqual([customer, relationshipId]);
   });
 });
