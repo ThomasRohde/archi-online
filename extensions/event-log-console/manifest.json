@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "examples.event-log-console",
   "name": "Event Log Console",
-  "version": "1.8.2",
+  "version": "1.9.0",
   "description": "Records app, model, view, tree, and selection events from the extension event bridge.",
   "main": "main.js",
   "contributes": {

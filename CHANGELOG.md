@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-07-17
+
+### Added
+
+- Modern outline C4 figures for people, browser windows, folders, buckets,
+  terminals, databases, and system boundaries
+- C4 palette shortcuts and container Shape controls that preserve external and
+  custom tags while switching visual variants
+
+### Changed
+
+- Replaced filled C4 notation with white figures, role-coloured outlines and
+  text, solid boundaries, and dashed grey relationships with filled arrows
+- Updated C4 templates, example model, modeling guidance, default person sizing,
+  legend text, and application screenshots for the modern notation
+
+### Fixed
+
+- Kept database and bucket labels clear of shape details and tapered walls,
+  hid descriptions when shape-specific label space is too small, and clamped
+  person geometry for extreme imported bounds
+- Matched the folder palette glyph to the canvas shape and made palette shape
+  resolution robust to combined or mixed-case C4 tags
+
 ## [1.8.2] - 2026-07-17
 
 ### Added
