@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.2] - 2026-07-18
+
+### Added
+
+- Note border controls for Dog Ear, Rectangle, and borderless figures
+
+### Fixed
+
+- Presented Note text as multiline Content without repeating it in the
+  Properties header
+- Applied explicit Note line colours immediately by switching off derived line
+  colour, while restoring derived colour when the explicit colour is reset
+- Displayed the `archi_online_architecture` example script as the human-readable
+  `Archi Online architecture` in the script dropdown
+
 ## [1.9.1] - 2026-07-17
 
 ### Fixed
