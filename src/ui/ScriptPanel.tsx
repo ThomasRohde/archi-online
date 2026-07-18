@@ -16,12 +16,25 @@ interface Script {
 
 const SCRIPTS_KEY = 'archi-online.scripts';
 
+function humanReadableScriptName(name: string): string {
+  return /^archi[ _-]+online[ _-]+architecture$/i.test(name)
+    ? 'Archi Online architecture'
+    : name;
+}
+
 async function loadScripts(): Promise<Script[]> {
-  const scripts = await defaultKeyValueStore().get<Script[]>(SCRIPTS_KEY);
-  if (scripts && scripts.length > 0) {
+  const storedScripts = await defaultKeyValueStore().get<Script[]>(SCRIPTS_KEY);
+  if (storedScripts && storedScripts.length > 0) {
+    const scripts = storedScripts.map((script) => ({
+      ...script,
+      name: humanReadableScriptName(script.name),
+    }));
+    const namesChanged = scripts.some(
+      (script, index) => script.name !== storedScripts[index].name,
+    );
     const existingNames = new Set(scripts.map((script) => script.name));
     const missingBuiltIns = BUILT_IN_SCRIPTS.filter((script) => !existingNames.has(script.name));
-    if (missingBuiltIns.length === 0) return scripts;
+    if (!namesChanged && missingBuiltIns.length === 0) return scripts;
     const merged = [...scripts, ...missingBuiltIns];
     await defaultKeyValueStore().set(SCRIPTS_KEY, merged);
     return merged;
@@ -127,7 +140,7 @@ export function ScriptPanel() {
       if (!file) return;
       const s: Script = {
         id: newId(),
-        name: file.name.replace(/\.(ajs|js)$/, ''),
+        name: humanReadableScriptName(file.name.replace(/\.(ajs|js)$/, '')),
         code: await file.text(),
       };
       persist([...scripts, s]);

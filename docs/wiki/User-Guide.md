@@ -383,13 +383,15 @@ the model, mark it dirty, or create an undo step.
 The **Properties** panel follows the current selection in the tree or on the
 canvas. Depending on what is selected it edits:
 
-- **Name** and **Documentation**.
+- **Name** and **Documentation**. Notes use a multiline **Content** field and
+  keep their content out of the Properties header.
 - **Properties** — the ArchiMate key-value property list.
 - **Appearance** (diagram objects) — fill/line/font color and opacity,
   gradients, solid/dashed/dotted/hidden outlines, normal/medium/heavy widths,
-  derived line color, icon color and visibility, text placement, and font
-  family, point size, bold, and italic. Local Font Access augments the editable
-  common-font list when the browser grants permission.
+  derived line color, Note borders (Dog Ear, Rectangle, or None), icon color
+  and visibility, text placement, and font family, point size, bold, and italic.
+  Local Font Access augments the editable common-font list when the browser
+  grants permission.
 - **Label** — a live Archi 5.9 label-expression editor with rendered preview and
   diagnostics. Explicit expressions override C4 and default labels.
 - **Image** — custom or specialization image source, shared gallery/chooser,

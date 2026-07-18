@@ -221,6 +221,9 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
       modelStore,
     );
   };
+  const updateLineColour = (value: string | undefined) => apply(node
+    ? { lineColor: value, derivedLineColor: value === undefined }
+    : { lineColor: value });
   if (target.styleIds.length === 0) {
     return <div className="empty-hint">Select objects on a view to edit their appearance.</div>;
   }
@@ -296,7 +299,7 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
             value={node?.lineColor ?? conn?.lineColor}
             fallback={DEFAULT_LINE}
             disabled={readOnly || (!node && !conn)}
-            onChange={(value) => apply({ lineColor: value })}
+            onChange={updateLineColour}
           />
         </AppearanceField>
         <AppearanceField label="Line Opacity">
@@ -360,6 +363,19 @@ export function AppearanceTab({ target, readOnly }: { target: Target; readOnly: 
             <option value={3}>Hidden</option>
           </select>
         </AppearanceField>
+        {node?.nodeType === 'note' && !isLegend && (
+          <AppearanceField label="Border">
+            <select
+              value={node.borderType ?? 0}
+              disabled={readOnly}
+              onChange={(event) => apply({ borderType: Number(event.target.value) })}
+            >
+              <option value={0}>Dog Ear</option>
+              <option value={1}>Rectangle</option>
+              <option value={2}>None</option>
+            </select>
+          </AppearanceField>
+        )}
         {!isLegend && (
           <AppearanceField label="Text Position">
             <SegmentedControl

@@ -1,10 +1,12 @@
 import { act, createElement } from 'react';
 import { readFileSync } from 'node:fs';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addElement,
   addElementNodeToView,
+  addNoteToView,
   addRelationship,
   addView,
   createEmptyModel,
@@ -12,6 +14,7 @@ import {
 import { replaceModel, setSelection } from '../src/model/store';
 import { useStore } from '../src/ui/store-hooks';
 import { PropertiesPanel } from '../src/ui/PropertiesPanel';
+import { NodeFigure } from '../src/canvas/figures/NodeFigure';
 
 function model() {
   return useStore.getState().model!;
@@ -188,6 +191,99 @@ describe('properties Appearance tab', () => {
       lineStyle: 2,
       lineWidth: 3,
     });
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it('presents Note text as content without echoing it in the Properties header', async () => {
+    const viewId = addView('View');
+    const noteId = addNoteToView(
+      viewId,
+      viewId,
+      { x: 10, y: 10, width: 180, height: 80 },
+      'First line\nSecond line',
+    );
+    setSelection('view', [noteId]);
+    const { host, root } = await renderPropertiesPanel();
+
+    expect(host.querySelector('.prop-type')?.textContent).toBe('Note');
+    const contentRow = Array.from(host.querySelectorAll<HTMLElement>('.prop-row')).find(
+      (row) => row.querySelector('label')?.textContent === 'Content',
+    );
+    expect(contentRow).toBeDefined();
+    expect(contentRow?.querySelector('textarea')?.value).toBe('First line\nSecond line');
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it('edits Note borders', async () => {
+    const viewId = addView('View');
+    const noteId = addNoteToView(
+      viewId,
+      viewId,
+      { x: 10, y: 10, width: 180, height: 80 },
+      'Note content',
+    );
+    setSelection('view', [noteId]);
+    const { host, root } = await renderPropertiesPanel();
+
+    await click(
+      Array.from(host.querySelectorAll('button')).find(
+        (button) => button.textContent === 'Appearance',
+      )!,
+    );
+
+    const border = field(host, 'Border').querySelector('select')!;
+    expect(Array.from(border.options).map((option) => option.textContent)).toEqual([
+      'Dog Ear',
+      'Rectangle',
+      'None',
+    ]);
+    await changeSelect(border, '1');
+
+    expect(model().nodes[noteId]).toMatchObject({ borderType: 1 });
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it('applies an explicit Note line colour immediately', async () => {
+    const viewId = addView('View');
+    const noteId = addNoteToView(
+      viewId,
+      viewId,
+      { x: 10, y: 10, width: 180, height: 80 },
+      'Note content',
+    );
+    setSelection('view', [noteId]);
+    const { host, root } = await renderPropertiesPanel();
+
+    await click(
+      Array.from(host.querySelectorAll('button')).find(
+        (button) => button.textContent === 'Appearance',
+      )!,
+    );
+
+    await changeInput(
+      field(host, 'Line Colour').querySelector('input[type="color"]')!,
+      '#112233',
+    );
+
+    const note = model().nodes[noteId];
+    expect(note).toMatchObject({
+      lineColor: '#112233',
+      derivedLineColor: false,
+    });
+    expect(renderToStaticMarkup(createElement(NodeFigure, {
+      node: note,
+      width: note.bounds.width,
+      height: note.bounds.height,
+    }))).toContain('stroke="#112233"');
 
     await act(async () => {
       root.unmount();

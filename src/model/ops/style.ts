@@ -27,6 +27,7 @@ export interface NodeStyle {
   iconVisible?: 0 | 1 | 2 | undefined;
   iconColor?: string | undefined;
   derivedLineColor?: boolean | undefined;
+  borderType?: number | undefined;
   fontStyle?: FontStyle | undefined;
   fontAlpha?: number | undefined;
 }

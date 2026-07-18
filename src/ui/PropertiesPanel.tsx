@@ -163,6 +163,7 @@ function PropertiesTable({
 
 function targetTitle(target: Target): string {
   if (target.typeLabel === 'Legend') return 'Legend';
+  if (target.typeLabel === 'Note') return 'Note';
   if (target.count === 1 && target.name) return `${target.name} (${target.typeLabel})`;
   return target.typeLabel;
 }
@@ -466,6 +467,9 @@ export function PropertiesPanel() {
     useState<PropertyManagerSessionCapture | null>(null);
   const target = model ? resolveTarget(model, selection.source, selection.ids) : null;
   const supportsLegend = Boolean(target?.count === 1 && isLegendNote(target.node));
+  const isNote = Boolean(
+    target?.count === 1 && target.node?.nodeType === 'note' && !supportsLegend,
+  );
   const supportsAnalysis = Boolean(
     model &&
       target?.count === 1 &&
@@ -530,8 +534,9 @@ export function PropertiesPanel() {
               {target.count === 1 && (
                 <>
                   <div className="prop-row">
-                    <label>Name</label>
+                    <label>{isNote ? 'Content' : 'Name'}</label>
                     <CommitInput
+                      multiline={isNote}
                       value={target.name ?? ''}
                       disabled={readOnly || !target.nameEditable}
                       onCommit={(v) =>
