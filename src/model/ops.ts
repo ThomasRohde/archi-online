@@ -24,3 +24,4 @@ export * from './ops/view';
 export * from './ops/find-replace';
 export * from './ops/property-manager';
 export * from './ops/generate-view';
+export * from './ops/capability-map';

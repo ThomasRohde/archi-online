@@ -10,6 +10,7 @@ import { memoryKeyValueStore, setDefaultKeyValueStoreForTests } from '../src/per
 
 const examplesRoot = join(process.cwd(), 'extensions');
 const exampleIds = [
+  'capability-map',
   'elk-layout',
   'model-audit-dashboard',
   'selection-workbench',

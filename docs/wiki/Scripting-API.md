@@ -391,6 +391,14 @@ visual.lineStyle;        // -1 default, 0 solid, 1 dashed, 2 dotted, 3 hidden
 visual.lineWidth;        // 1 normal, 2 medium, 3 heavy
 visual.imageSource;      // 0 specialization, 1 custom
 visual.imagePosition;    // 0 through 9, matching Desktop Archi
+visual.fontSize;         // points
+visual.fontName;
+visual.fontStyle;        // "normal", "bold", "italic", or "bolditalic"
+visual.textAlignment;    // 1 left, 2 center, 4 right
+visual.textPosition;     // 0 top, 1 center, 2 bottom
+visual.figureType;       // 0 default, 1 alternate (element visuals only)
+visual.borderType;       // group: 0 tabbed, 1 rectangle; note: 0 dog-ear, 1 rectangle, 2 none
+visual.iconVisible;      // 0 visible unless replaced by an image, 1 always, 2 hidden
 
 visual.add(element, x, y, width, height);  // nest a child (relative coordinates)
 visual.parent();          // JVisual or JView
@@ -497,6 +505,119 @@ For automatic layout, the bundled **ELK Layout** example extension wraps the
 app-hosted ELK engine — see [[Extension API|Extension-API]] (`app.layout.elk`)
 and [[Extension Packages|Extension-Packages]].
 
+## Packed capability maps
+
+Capability maps show a hierarchy as packed nested rectangles — children tiled
+inside their parents, no relationship lines. These are additive Archi Online
+APIs. The bundled **Capability Map** example extension exposes the same
+operations as menu commands and a settings panel — see
+[[Extension Packages|Extension-Packages]].
+
+### Generating a map
+
+`model.createPackedView()` derives the hierarchy from whole → part
+relationships (Composition, then Aggregation, by default), packs it, styles
+it by depth, and opens the new view:
+
+```js
+var root = $(".Enterprise").first();  // a root Capability
+var view = model.createPackedView({
+  roots: root,          // element, array of elements, or array of ids
+  name: "Capability Map",
+  depth: 2,             // optional level cut-off
+  layout: { sort: "name" }
+});
+```
+
+Options:
+
+- `roots` (required) — root element(s). Any element type works; children
+  default to the roots' own types (`elementTypes` widens the filter).
+- `relationshipTypes` — hierarchy sources in priority order; defaults to
+  `["composition-relationship", "aggregation-relationship"]`.
+- `depth` — levels below the roots (unlimited when omitted).
+- `direction` — `"source-is-parent"` (default) or `"target-is-parent"` for
+  models drawn part → whole.
+- `weightProperty` — element property parsed as a number for treemap weights.
+- `mode` — `"grid"` (uniform cells, default) or `"treemap"` (area ∝ weight).
+- `layout` — packing options: `leafWidth`/`leafHeight` (default 120×55),
+  `padding`/`gutter` (12), `titleBandHeight` (derived from the level-0 font),
+  `targetAspect` (1.6), `sort` (`"name"` | `"weight"` | `"none"`), `columns`
+  (fixed items per row), `algorithm` (`"auto"` | `"squarify"` | `"strip"`,
+  treemap only), and `minCellWidth`/`minCellHeight` (treemap floors).
+- `style` — per-depth styling: `levelFills` (explicit fills) or `baseFill`
+  (level 0; deeper levels fade toward white), `fontSizes` (points per depth),
+  text alignment/position for parents and leaves, `iconVisible`, and
+  `applyStyling: false` for geometry only.
+- `open: false` — create without opening the view.
+
+Multi-parent conflicts pick one parent (Composition beats Aggregation, then
+alphabetical) and cycles are broken safely; duplicates are reported in the
+result of the underlying operation.
+
+### Repacking
+
+`view.layoutPacked()` repacks the view's existing element-node nesting. The
+current sibling order is preserved (`sort: "none"`), so manual arrangement
+survives; top-level containers keep their position and only resize:
+
+```js
+view.layoutPacked();                          // whole view
+view.layoutPacked({ scope: $("selection").toArray() }); // chosen containers
+view.layoutPacked({ mode: "treemap", weightProperty: "headcount" });
+```
+
+Returns `{ nodeCount, size }`.
+
+### Syncing with the model
+
+`view.syncPacked()` reconciles an existing map after the model changes: new
+children are added at their name-sorted position, deleted or detached
+elements are removed, moved elements are reparented, and the map is
+repacked. Surviving nodes keep their styling and relative order:
+
+```js
+var result = view.syncPacked();
+console.log(result.added, result.removed, result.reparented);
+```
+
+Roots default to the view's top-level element nodes; pass `roots` to
+override. All `createPackedView` hierarchy options apply.
+
+### Heat maps
+
+`view.applyHeatmap()` colors element nodes from an element property and adds
+a legend built from value buckets (one colored note per bucket, grouped under
+a titled group; re-running replaces it):
+
+```js
+view.applyHeatmap({ property: "maturity" });          // numeric: red → green
+view.applyHeatmap({
+  property: "status",                                  // strings: categorical
+  missingColor: "#dddddd",                             // paint missing values
+  legend: { x: 40, y: 40, title: "Maturity" }          // or legend: false
+});
+```
+
+Numeric mode interpolates the palette across the value range (`min`/`max`
+override auto-detection); enum mode assigns one color per distinct value.
+`mode: "auto"` (default) picks numeric only when every present value parses
+as a number. Returns `{ painted, missing, buckets }`.
+
+### Example: build, weight, and color
+
+```js
+var root = model.createElement("capability", "Enterprise");
+["Claims", "Billing", "Servicing"].forEach(function (name) {
+  var child = model.createElement("capability", name);
+  model.createRelationship("composition-relationship", "", root, child);
+  child.prop("maturity", String(1 + Math.floor(Math.random() * 5)));
+});
+
+var view = model.createPackedView({ roots: root, name: "Capability Map" });
+view.applyHeatmap({ property: "maturity" });
+```
+
 ## Example: model audit
 
 ```js
@@ -550,7 +671,12 @@ exactly what is available.
 `view.createPlainConnection()` and writable plain-connection appearance
 fields are additive Archi Online APIs. They persist Archi's native diagram
 connection attributes but are not currently part of desktop jArchi's public
-API.
+API. The packed capability-map APIs (`model.createPackedView`,
+`view.layoutPacked`, `view.syncPacked`, `view.applyHeatmap`) and the
+`iconVisible` visual field are also Archi Online additions; the visual font
+and text fields (`fontSize`, `fontName`, `fontStyle`, `textAlignment`,
+`textPosition`, `figureType`, `borderType`) follow desktop jArchi's names and
+semantics.
 
 Related pages:
 

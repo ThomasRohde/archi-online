@@ -1,0 +1,34 @@
+{
+  "defaults": {
+    "mode": "grid",
+    "sort": "name",
+    "depth": 0,
+    "leafWidth": 120,
+    "leafHeight": 55,
+    "padding": 12,
+    "gutter": 12,
+    "targetAspect": 1.6,
+    "weightProperty": "",
+    "heatmapProperty": "",
+    "levelFills": ""
+  },
+  "options": {
+    "mode": [
+      { "value": "grid", "label": "Uniform grid" },
+      { "value": "treemap", "label": "Weighted treemap" }
+    ],
+    "sort": [
+      { "value": "name", "label": "Alphabetical" },
+      { "value": "weight", "label": "By weight" },
+      { "value": "none", "label": "Model order" }
+    ]
+  },
+  "limits": {
+    "depth": { "min": 0, "max": 20 },
+    "leafWidth": { "min": 40, "max": 600 },
+    "leafHeight": { "min": 30, "max": 400 },
+    "padding": { "min": 0, "max": 100 },
+    "gutter": { "min": 0, "max": 100 },
+    "targetAspect": { "min": 0.5, "max": 4 }
+  }
+}

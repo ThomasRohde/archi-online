@@ -19,6 +19,18 @@ describe('jArchi Monaco declarations', () => {
     expect(JARCHI_SCRIPT_DTS).toContain('invert(): JConcept;');
   });
 
+  it('declares the packed capability-map APIs', () => {
+    expect(JARCHI_SCRIPT_DTS).toContain('createPackedView(options: JPackedViewOptions): JView;');
+    expect(JARCHI_SCRIPT_DTS).toContain('layoutPacked(options?: JPackedLayoutOptions)');
+    expect(JARCHI_SCRIPT_DTS).toContain('syncPacked(options?: JPackedSyncOptions)');
+    expect(JARCHI_SCRIPT_DTS).toContain('applyHeatmap(options: JHeatmapOptions)');
+    expect(JARCHI_SCRIPT_DTS).toContain('fontSize: number;');
+    expect(JARCHI_SCRIPT_DTS).toContain("fontStyle: 'normal' | 'bold' | 'italic' | 'bolditalic';");
+    expect(JARCHI_SCRIPT_DTS).toContain('textAlignment: number;');
+    expect(JARCHI_SCRIPT_DTS).toContain('figureType: number;');
+    expect(JARCHI_SCRIPT_DTS).toContain('iconVisible: number;');
+  });
+
   it('keeps extension-only app declarations separate from script declarations', () => {
     expect(JARCHI_EXTENSION_DTS).toContain('declare const app');
     expect(JARCHI_EXTENSION_DTS).toContain('layout:');

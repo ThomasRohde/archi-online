@@ -21,7 +21,15 @@ import {
   analyzeRelationshipInversion,
   applyConceptTypeChange,
   applyConnectionReconnection,
+  applyHeatmapToView,
+  applyPackedMapLayout,
   applyRelationshipInversion,
+  buildPackedMapView,
+  syncPackedMapView,
+  type PackedMapHeatmapResult,
+  type PackedMapRelayoutResult,
+  type PackedMapStyle,
+  type PackedMapSyncResult,
   createNestedConnectionVisibilityResolver,
   createProfile,
   createPlainConnectionOnView,
@@ -46,6 +54,8 @@ import {
   updateProfile,
 } from '../../model/ops';
 import { getActiveModelStore, openView, type ModelStore } from '../../model/store';
+import { type PackedTreeOptions } from '../../model/layout/packed-tree';
+import { parseFontStyle } from '../../model/font-style';
 import {
   captureFindReplaceSession,
   previewFindReplace,
@@ -68,6 +78,7 @@ import {
   type Bounds,
   type Concept,
   type DiagramConnection,
+  type FontStyle,
   type ModelState,
   type ProfileDefinition,
   type Property,
@@ -118,6 +129,49 @@ export interface JFindReplaceOptions extends JFindReplaceSearchOptions {
 
 export type JFindReplaceRow = FindReplaceRow;
 export type JFindReplacePreview = FindReplacePreview;
+
+export interface JPackedLayoutOptions extends PackedTreeOptions {
+  weightProperty?: string;
+  scope?: JVisual[];
+}
+
+export type JPackedLayoutResult = PackedMapRelayoutResult;
+
+export interface JPackedMapOptions {
+  elementTypes?: readonly string[];
+  relationshipTypes?: readonly string[];
+  depth?: number;
+  direction?: 'source-is-parent' | 'target-is-parent';
+  weightProperty?: string;
+  mode?: 'grid' | 'treemap';
+  layout?: PackedTreeOptions;
+  style?: PackedMapStyle;
+}
+
+export interface JPackedSyncOptions extends JPackedMapOptions {
+  roots?: JConcept | readonly JConcept[] | readonly string[];
+}
+
+export type JPackedSyncResult = PackedMapSyncResult;
+
+export interface JPackedViewOptions extends JPackedMapOptions {
+  roots: JConcept | readonly JConcept[] | readonly string[];
+  name?: string;
+  open?: boolean;
+}
+
+export interface JHeatmapOptions {
+  property: string;
+  scope?: JVisual[];
+  mode?: 'auto' | 'numeric' | 'enum';
+  palette?: readonly string[];
+  min?: number;
+  max?: number;
+  missingColor?: string;
+  legend?: { x?: number; y?: number; title?: string } | false;
+}
+
+export type JHeatmapResult = PackedMapHeatmapResult;
 export type JPropertyOccurrence = PropertyOccurrence;
 export type JPropertyKeyUsage = PropertyKeyUsage;
 export type JPropertyMutationPreview = PropertyMutationPreview;
@@ -231,6 +285,84 @@ function propApi(target: { id: string }, bindingOwner: object = target) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function resolveElementTypes(
+  value: readonly string[] | undefined,
+): ElementType[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error('elementTypes must be an array of type names');
+  return value.map((entry) => {
+    const resolved = resolveType(String(entry));
+    if (!resolved || !isElementType(resolved)) {
+      throw new Error(`Unknown element type: ${String(entry)}`);
+    }
+    return resolved;
+  });
+}
+
+function resolveRelationshipTypes(
+  value: readonly string[] | undefined,
+): RelationshipType[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error('relationshipTypes must be an array of type names');
+  return value.map((entry) => {
+    const resolved = resolveType(String(entry));
+    if (!resolved || !isRelationshipType(resolved)) {
+      throw new Error(`Unknown relationship type: ${String(entry)}`);
+    }
+    return resolved;
+  });
+}
+
+function collectRootElementIds(value: unknown, owner: JObject): string[] {
+  const items = Array.isArray(value) ? value : [value];
+  if (items.length === 0) throw new Error('roots must not be empty');
+  const store = boundModelStore(owner);
+  const m = state(store);
+  return items.map((item) => {
+    let id: string;
+    if (item instanceof JConcept) {
+      assertSameModelStore(owner, item);
+      id = item.id;
+    } else if (typeof item === 'string') {
+      id = item;
+    } else {
+      throw new Error('roots must contain elements or element ids');
+    }
+    if (!m.elements[id]) throw new Error(`Unknown element: ${id}`);
+    return id;
+  });
+}
+
+function scopeToNodeIds(value: unknown, owner: JObject, label: string): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error(`${label} scope must be an array of visual objects`);
+  return value.map((item) => {
+    if (!(item instanceof JVisual)) {
+      throw new Error(`${label} scope must contain visual objects`);
+    }
+    assertSameModelStore(owner, item);
+    return item.id;
+  });
+}
+
+function packedMapOptionsFrom(options: JPackedMapOptions) {
+  const layout: PackedTreeOptions = {
+    ...(isRecord(options.layout) ? options.layout : {}),
+    ...(options.mode === 'grid' || options.mode === 'treemap' ? { mode: options.mode } : {}),
+  };
+  return {
+    elementTypes: resolveElementTypes(options.elementTypes),
+    relationshipTypes: resolveRelationshipTypes(options.relationshipTypes),
+    depth: typeof options.depth === 'number' ? options.depth : undefined,
+    direction: options.direction === 'target-is-parent' ? options.direction : undefined,
+    weightProperty: typeof options.weightProperty === 'string' && options.weightProperty
+      ? options.weightProperty
+      : undefined,
+    layout,
+    style: isRecord(options.style) ? options.style : undefined,
+  };
 }
 
 function finiteNumber(value: unknown, label: string): number {
@@ -975,6 +1107,52 @@ export class JView extends JObject {
     layoutView(nodeUpdates, connectionUpdates, boundModelStore(this));
   }
 
+  /**
+   * Repack this view's nested element nodes into a packed capability-map
+   * layout (additive Archi Online API). Sibling order is preserved unless a
+   * sort is requested; scope roots keep their position.
+   */
+  layoutPacked(options: JPackedLayoutOptions = {}): JPackedLayoutResult {
+    if (!isRecord(options)) throw new Error('view.layoutPacked options must be an object');
+    const { scope, weightProperty, ...layout } = options;
+    return applyPackedMapLayout(boundModelStore(this), this.id, {
+      scopeNodeIds: scopeToNodeIds(scope, this, 'view.layoutPacked'),
+      weightProperty: typeof weightProperty === 'string' && weightProperty
+        ? weightProperty
+        : undefined,
+      layout,
+    });
+  }
+
+  /**
+   * Reconcile this packed map with the model: add missing children, remove
+   * stale occurrences, reparent survivors, repack (additive Archi Online API).
+   */
+  syncPacked(options: JPackedSyncOptions = {}): JPackedSyncResult {
+    if (!isRecord(options)) throw new Error('view.syncPacked options must be an object');
+    return syncPackedMapView(boundModelStore(this), this.id, {
+      ...packedMapOptionsFrom(options),
+      rootIds: options.roots === undefined
+        ? undefined
+        : collectRootElementIds(options.roots, this),
+    });
+  }
+
+  /**
+   * Color element nodes from an element property and add a bucket legend
+   * (additive Archi Online API).
+   */
+  applyHeatmap(options: JHeatmapOptions): JHeatmapResult {
+    if (!isRecord(options) || typeof options.property !== 'string') {
+      throw new Error('view.applyHeatmap({property, ...}) requires a property name');
+    }
+    const { scope, ...rest } = options;
+    return applyHeatmapToView(boundModelStore(this), this.id, {
+      ...rest,
+      nodeIds: scopeToNodeIds(scope, this, 'view.applyHeatmap'),
+    });
+  }
+
   openInUI(): void {
     openView(this.id, boundModelStore(this));
   }
@@ -1197,6 +1375,117 @@ export class JVisual extends JObject {
       { imagePosition: Math.max(0, Math.min(9, value)) as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 },
       boundModelStore(this),
     );
+  }
+
+  private currentFontStyle(): FontStyle {
+    const n = this.node();
+    return n.fontStyle ?? parseFontStyle(n.font) ??
+      { family: 'Segoe UI', sizePt: 9, bold: false, italic: false };
+  }
+
+  get fontSize(): number { return this.currentFontStyle().sizePt; }
+  set fontSize(value: number) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      throw new Error('fontSize must be a positive number of points');
+    }
+    setNodeStyle(
+      [this.id],
+      { fontStyle: { ...this.currentFontStyle(), sizePt: Math.min(96, value) } },
+      boundModelStore(this),
+    );
+  }
+
+  get fontName(): string { return this.currentFontStyle().family; }
+  set fontName(value: string) {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new Error('fontName must be a non-empty string');
+    }
+    setNodeStyle(
+      [this.id],
+      { fontStyle: { ...this.currentFontStyle(), family: value.trim() } },
+      boundModelStore(this),
+    );
+  }
+
+  get fontStyle(): string {
+    const font = this.currentFontStyle();
+    if (font.bold && font.italic) return 'bolditalic';
+    if (font.bold) return 'bold';
+    if (font.italic) return 'italic';
+    return 'normal';
+  }
+
+  set fontStyle(value: string) {
+    const styles = ['normal', 'bold', 'italic', 'bolditalic'];
+    if (typeof value !== 'string' || !styles.includes(value)) {
+      throw new Error(`fontStyle must be one of ${styles.join(', ')}`);
+    }
+    setNodeStyle([this.id], {
+      fontStyle: {
+        ...this.currentFontStyle(),
+        bold: value.includes('bold'),
+        italic: value.includes('italic'),
+      },
+    }, boundModelStore(this));
+  }
+
+  /** SWT alignment: 1=left, 2=center, 4=right. */
+  get textAlignment(): number { return this.node().textAlignment ?? 2; }
+  set textAlignment(value: number) {
+    if (value !== 1 && value !== 2 && value !== 4) {
+      throw new Error('textAlignment must be 1 (left), 2 (center), or 4 (right)');
+    }
+    setNodeStyle([this.id], { textAlignment: value }, boundModelStore(this));
+  }
+
+  /** 0=top, 1=center, 2=bottom. */
+  get textPosition(): number { return this.node().textPosition ?? 0; }
+  set textPosition(value: number) {
+    if (value !== 0 && value !== 1 && value !== 2) {
+      throw new Error('textPosition must be 0 (top), 1 (center), or 2 (bottom)');
+    }
+    setNodeStyle([this.id], { textPosition: value }, boundModelStore(this));
+  }
+
+  /** 0=default figure, 1=alternate figure (element nodes only). */
+  get figureType(): number {
+    const n = this.node();
+    return n.nodeType === 'element' ? n.figureType ?? 0 : 0;
+  }
+
+  set figureType(value: number) {
+    if (this.node().nodeType !== 'element') {
+      throw new Error('figureType is only available on element visuals');
+    }
+    if (value !== 0 && value !== 1) throw new Error('figureType must be 0 or 1');
+    setNodeStyle([this.id], { figureType: value }, boundModelStore(this));
+  }
+
+  /** Group: 0=tabbed, 1=rectangle. Note: 0=dog-ear, 1=rectangle, 2=none. */
+  get borderType(): number {
+    const n = this.node();
+    return n.nodeType === 'group' || n.nodeType === 'note' ? n.borderType ?? 0 : 0;
+  }
+
+  set borderType(value: number) {
+    const n = this.node();
+    if (n.nodeType !== 'group' && n.nodeType !== 'note') {
+      throw new Error('borderType is only available on groups and notes');
+    }
+    const max = n.nodeType === 'note' ? 2 : 1;
+    if (!Number.isInteger(value) || value < 0 || value > max) {
+      throw new Error(`borderType must be an integer between 0 and ${max}`);
+    }
+    setNodeStyle([this.id], { borderType: value }, boundModelStore(this));
+  }
+
+  /** 0=visible unless an image replaces it, 1=always visible, 2=hidden. */
+  get iconVisible(): number { return this.node().iconVisible ?? 0; }
+  set iconVisible(value: number) {
+    if (value !== 0 && value !== 1 && value !== 2) {
+      throw new Error('iconVisible must be 0, 1, or 2');
+    }
+    setNodeStyle([this.id], { iconVisible: value }, boundModelStore(this));
   }
 
   /** Nested add (bounds relative to this container). */
@@ -1589,6 +1878,25 @@ export class JModel extends JObject {
       addView(name ?? 'New View', folder?.id, boundModelStore(this)),
       boundModelStore(this),
     );
+  }
+
+  /**
+   * Generate a packed capability-map style view from whole -> part
+   * relationships (additive Archi Online API). No relationship lines are
+   * drawn — nesting is the notation.
+   */
+  createPackedView(options: JPackedViewOptions): JView {
+    if (!isRecord(options)) {
+      throw new Error('model.createPackedView(options) expects an options object');
+    }
+    const store = boundModelStore(this);
+    const result = buildPackedMapView(store, {
+      ...packedMapOptionsFrom(options),
+      rootIds: collectRootElementIds(options.roots, this),
+      name: typeof options.name === 'string' ? options.name : undefined,
+      open: options.open !== false,
+    });
+    return new JView(result.viewId, store);
   }
 }
 

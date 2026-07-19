@@ -230,11 +230,220 @@ assert("visual delete", $(view).children().filter(function (o) {
 console.log("RESULT: PASS " + checks + " checks, " + optionalSkips + " optional skips, run " + runId);
 `;
 
+export const CAPABILITY_MAP_SCRIPT = `// Packed capability map - Ctrl+Enter to run
+// Builds a small capability hierarchy (if none exists), generates a packed
+// capability-map view (nested rectangles, no relationship lines), and colors
+// it by a "maturity" property. Re-running syncs the existing view instead of
+// creating a duplicate. See the wiki: Scripting API - Packed capability maps.
+
+var roots = $("capability").filter(function (cap) {
+  return $(cap).inRels("composition-relationship").isEmpty();
+});
+
+if (roots.isEmpty()) {
+  console.log("No capabilities found - creating a demo hierarchy.");
+  var enterprise = model.createElement("capability", "Enterprise");
+  ["Customer Management", "Claims", "Billing"].forEach(function (name, i) {
+    var child = model.createElement("capability", name);
+    model.createRelationship("composition-relationship", "", enterprise, child);
+    child.prop("maturity", String(2 + i));
+    ["Intake", "Handling"].forEach(function (sub) {
+      var leaf = model.createElement("capability", name + " " + sub);
+      model.createRelationship("composition-relationship", "", child, leaf);
+      leaf.prop("maturity", String(1 + ((i + sub.length) % 5)));
+    });
+  });
+  roots = $("#" + enterprise.id);
+}
+
+var rootIds = roots.map(function (cap) { return cap.id; });
+console.log("Roots:", roots.map(function (cap) { return cap.name; }).join(", "));
+
+var view = $("view").filter(function (v) {
+  return v.name === "Capability Map";
+}).first();
+if (view) {
+  var sync = view.syncPacked({ roots: rootIds });
+  console.log("Synced existing map:", sync.added, "added,", sync.removed,
+    "removed,", sync.reparented, "reparented.");
+  view.openInUI();
+} else {
+  view = model.createPackedView({
+    roots: rootIds,
+    name: "Capability Map",
+    layout: { sort: "name" }
+  });
+}
+
+var heat = view.applyHeatmap({ property: "maturity", missingColor: "#dddddd" });
+var capabilityCount = view.nodes({ recursive: true }).filter(function (visual) {
+  return visual.concept !== undefined;
+}).length;
+console.log("Capabilities:", capabilityCount);
+console.log("Heat map:", heat.painted, "painted,", heat.missing, "without a value");
+`;
+
+export const ARCHI_ONLINE_CAPABILITY_MAP_SCRIPT = `// Archi Online — extensive self-describing capability map
+//
+// Builds a 3-level capability model of the Archi Online product (50
+// capabilities), each carrying:
+//   - maturity   (1–5)  -> heat-map color
+//   - investment (1–4)  -> treemap cell area
+// then generates two views:
+//   1. "Archi Online — Capability Map":       packed grid, colored by maturity
+//   2. "Archi Online — Investment Treemap":   cell area = investment, colored by maturity
+//
+// Re-running is safe: the existing hierarchy is reused and both views are
+// synced in place instead of duplicated. One undo step reverts a run.
+
+function cap(parent, name, maturity, investment) {
+  var c = model.createElement("capability", name);
+  if (parent) model.createRelationship("composition-relationship", "", parent, c);
+  if (maturity !== null) c.prop("maturity", String(maturity));
+  if (investment !== null) c.prop("investment", String(investment));
+  return c;
+}
+
+// [name, maturity, investment, children]
+var TREE =
+  ["Archi Online", null, null, [
+    ["Model Authoring", 5, 3, [
+      ["Element Management", 5, 3, []],
+      ["Relationship Management", 5, 3, []],
+      ["Model Tree Navigation", 4, 2, []],
+      ["Multi-Model Workspaces", 4, 3, []],
+      ["Specialization Management", 4, 2, []],
+      ["Property Management", 4, 2, []]
+    ]],
+    ["Diagramming", 5, 4, [
+      ["View Editing", 5, 4, []],
+      ["Figure Rendering", 5, 3, []],
+      ["Connection Routing", 4, 3, []],
+      ["Nesting & Containers", 4, 2, []],
+      ["Alignment & Distribution", 4, 1, []],
+      ["Automatic Layout", 3, 2, [
+        ["Layered Graph Layout (ELK)", 4, 1, []],
+        ["Packed Capability Maps", 2, 2, []]
+      ]],
+      ["Presentation Mode", 3, 1, []]
+    ]],
+    ["Scripting & Automation", 4, 2, [
+      ["jArchi Compatibility", 4, 2, [
+        ["Selectors & Collections", 5, 1, []],
+        ["Model Mutation API", 4, 1, []],
+        ["Bulk Layout API", 4, 1, []]
+      ]],
+      ["Script Editor & IntelliSense", 4, 1, []],
+      ["Script Library", 3, 1, []]
+    ]],
+    ["Extensibility", 3, 2, [
+      ["Extension Packages", 3, 2, []],
+      ["Command & Menu Contributions", 3, 1, []],
+      ["Panel Contributions", 3, 1, []],
+      ["Event Bridge", 3, 1, []],
+      ["Extension Storage", 4, 1, []]
+    ]],
+    ["Persistence & Interoperability", 4, 3, [
+      ["ArchiMate File Round-Trip", 5, 3, []],
+      ["Browser Autosave & Recovery", 4, 2, []],
+      ["Open Exchange Import & Export", 3, 2, []],
+      ["CSV Import & Export", 3, 1, []],
+      ["Image Export", 4, 1, []],
+      ["Model Sharing & Links", 3, 2, []]
+    ]],
+    ["Standards Fidelity", 5, 2, [
+      ["Metamodel Enforcement", 5, 2, []],
+      ["Relationship Rules Matrix", 5, 2, []],
+      ["Viewpoint Filtering", 4, 1, []],
+      ["C4 Notation", 3, 1, []],
+      ["Archi Visual Parity", 5, 3, []]
+    ]],
+    ["Platform Services", 4, 2, [
+      ["Offline PWA Runtime", 4, 2, []],
+      ["Undo & Redo History", 5, 1, []],
+      ["Keyboard Shortcuts", 4, 1, []],
+      ["Theming", 3, 1, []],
+      ["Documentation & Help", 4, 1, []]
+    ]]
+  ]];
+
+function build(parent, spec) {
+  var node = cap(parent, spec[0], spec[1], spec[2]);
+  spec[3].forEach(function (childSpec) { build(node, childSpec); });
+  return node;
+}
+
+var root = $("capability").filter(function (c) { return c.name === "Archi Online"; }).first();
+if (root) {
+  console.log("Reusing the existing 'Archi Online' hierarchy.");
+} else {
+  root = build(null, TREE);
+  console.log("Created", $("capability").size(), "capabilities.");
+}
+
+function viewByName(name) {
+  return $("view").filter(function (v) { return v.name === name; }).first();
+}
+
+// Treemap first (kept in background), grid map last so it gets focus.
+var treemap = viewByName("Archi Online — Investment Treemap");
+if (treemap) {
+  treemap.syncPacked({
+    roots: root,
+    mode: "treemap",
+    weightProperty: "investment",
+    layout: { sort: "weight" }
+  });
+} else {
+  treemap = model.createPackedView({
+    roots: root,
+    name: "Archi Online — Investment Treemap",
+    mode: "treemap",
+    weightProperty: "investment",
+    layout: { sort: "weight" },
+    open: false
+  });
+}
+treemap.applyHeatmap({ property: "maturity", legend: false });
+
+var map = viewByName("Archi Online — Capability Map");
+if (map) {
+  var sync = map.syncPacked({ roots: root });
+  console.log("Synced existing map:", sync.added, "added,", sync.removed,
+    "removed,", sync.reparented, "reparented.");
+  map.openInUI();
+} else {
+  map = model.createPackedView({
+    roots: root,
+    name: "Archi Online — Capability Map",
+    layout: { sort: "name" }
+  });
+}
+// Root has no maturity on purpose: it keeps its strategy-layer band color.
+var heat = map.applyHeatmap({
+  property: "maturity",
+  legend: { title: "Maturity (1 = nascent, 5 = optimized)" }
+});
+
+console.log("Capability map:", heat.painted, "colored,", heat.buckets.length, "legend buckets.");
+console.log("Views: '" + map.name + "' (open) and '" + treemap.name + "'.");
+`;
+
 export const BUILT_IN_SCRIPTS: ScriptDefinition[] = [
   { id: 'builtin-example', name: 'example', code: EXAMPLE_SCRIPT },
   {
     id: 'builtin-jarchi-capability-test',
     name: 'jArchi capability test',
     code: JARCHI_CAPABILITY_TEST_SCRIPT,
+  },
+  {
+    id: 'builtin-capability-map',
+    name: 'capability map',
+    code: CAPABILITY_MAP_SCRIPT,
+  },
+  {
+    id: 'builtin-archi-online-capability-map',
+    name: 'Archi Online capability map',
+    code: ARCHI_ONLINE_CAPABILITY_MAP_SCRIPT,
   },
 ];

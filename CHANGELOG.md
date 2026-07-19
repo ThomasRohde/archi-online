@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-07-19
+
+### Added
+
+- Packed capability maps for scripting: `model.createPackedView`,
+  `view.layoutPacked`, `view.syncPacked`, and `view.applyHeatmap` derive a
+  hierarchy from Composition/Aggregation relationships and render it as
+  nested rectangles without relationship lines — uniform grid with balanced
+  rows or weighted treemap, per-level styling, property heat maps, and
+  value-bucket legends
+- Visual style scripting accessors: `fontSize`, `fontName`, `fontStyle`,
+  `textAlignment`, `textPosition`, `figureType`, `borderType`, and
+  `iconVisible`
+- Capability Map example extension with generate, repack, sync, and heat-map
+  commands on the model-tree and view context menus plus a settings panel
+- Built-in `capability map` and `Archi Online capability map` example
+  scripts that sync their views in place when re-run
+
 ## [1.9.2] - 2026-07-18
 
 ### Added

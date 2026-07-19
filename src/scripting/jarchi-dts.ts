@@ -47,6 +47,84 @@ declare interface JLegendOptions {
 
 type JConnectable = JVisual | JConnection;
 
+declare interface JPackedTreeOptions {
+  /** 'grid' tiles uniform cells (default); 'treemap' sizes leaves by weight. */
+  mode?: 'grid' | 'treemap';
+  /** Treemap tiling; 'auto' = squarify when sorting by weight, else order-preserving strip. */
+  algorithm?: 'auto' | 'squarify' | 'strip';
+  leafWidth?: number;
+  leafHeight?: number;
+  padding?: number;
+  gutter?: number;
+  /** Container label strip kept clear of children. */
+  titleBandHeight?: number;
+  /** Width/height goal for containers (default 1.6). */
+  targetAspect?: number;
+  /** Sorting is a pre-step; packing never permutes sibling order. */
+  sort?: 'name' | 'weight' | 'none';
+  /** Grid: fixed items per row. */
+  columns?: number;
+  aesthetics?: { aspect?: number; raggedness?: number; whitespace?: number };
+  minCellWidth?: number;
+  minCellHeight?: number;
+}
+
+declare interface JPackedMapStyle {
+  levelFills?: string[];
+  baseFill?: string;
+  /** Font size in points per depth; deeper levels clamp to the last entry. */
+  fontSizes?: number[];
+  parentTextAlignment?: number;
+  parentTextPosition?: number;
+  leafTextAlignment?: number;
+  leafTextPosition?: number;
+  iconVisible?: 0 | 1 | 2;
+  /** false = geometry only. */
+  applyStyling?: boolean;
+}
+
+declare interface JPackedMapOptions {
+  elementTypes?: string[];
+  relationshipTypes?: string[];
+  depth?: number;
+  direction?: 'source-is-parent' | 'target-is-parent';
+  /** Element property parsed as a number for treemap weights. */
+  weightProperty?: string;
+  mode?: 'grid' | 'treemap';
+  layout?: JPackedTreeOptions;
+  style?: JPackedMapStyle;
+}
+
+declare interface JPackedViewOptions extends JPackedMapOptions {
+  roots: JConcept | JConcept[] | string[];
+  name?: string;
+  open?: boolean;
+}
+
+declare interface JPackedSyncOptions extends JPackedMapOptions {
+  roots?: JConcept | JConcept[] | string[];
+}
+
+declare interface JPackedLayoutOptions extends JPackedTreeOptions {
+  weightProperty?: string;
+  scope?: JVisual[];
+}
+
+declare interface JHeatmapBucket { label: string; color: string }
+
+declare interface JHeatmapOptions {
+  /** Element property to color by. */
+  property: string;
+  scope?: JVisual[];
+  /** auto = numeric iff every present value parses as a finite number. */
+  mode?: 'auto' | 'numeric' | 'enum';
+  palette?: string[];
+  min?: number;
+  max?: number;
+  missingColor?: string;
+  legend?: { x?: number; y?: number; title?: string } | false;
+}
+
 declare interface JVisual extends JObject {
   readonly concept?: JConcept;
   readonly view: JView;
@@ -59,6 +137,20 @@ declare interface JVisual extends JObject {
   gradient: number;
   lineStyle: number;
   lineWidth: number;
+  /** Font size in points. */
+  fontSize: number;
+  fontName: string;
+  fontStyle: 'normal' | 'bold' | 'italic' | 'bolditalic';
+  /** SWT alignment: 1=left, 2=center, 4=right. */
+  textAlignment: number;
+  /** 0=top, 1=center, 2=bottom. */
+  textPosition: number;
+  /** 0=default figure, 1=alternate figure (element visuals only). */
+  figureType: number;
+  /** Group: 0=tabbed, 1=rectangle. Note: 0=dog-ear, 1=rectangle, 2=none. */
+  borderType: number;
+  /** 0=visible unless an image replaces it, 1=always visible, 2=hidden. */
+  iconVisible: number;
   /** 0 uses the specialization image; 1 uses a custom image. */
   imageSource: number;
   imagePosition: number;
@@ -111,6 +203,12 @@ declare interface JView extends JObject {
     nodes?: Record<string, Partial<JBounds>>;
     connections?: Record<string, { route?: JPoint[]; bendpoints?: JBendpoint[] }>;
   }): void;
+  /** Repack nested element nodes into a packed capability-map layout (Archi Online API). */
+  layoutPacked(options?: JPackedLayoutOptions): { nodeCount: number; size: { width: number; height: number } };
+  /** Reconcile a packed map with the model: add, remove, reparent, repack (Archi Online API). */
+  syncPacked(options?: JPackedSyncOptions): { added: number; removed: number; reparented: number };
+  /** Color element nodes from an element property and add a bucket legend (Archi Online API). */
+  applyHeatmap(options: JHeatmapOptions): { painted: number; missing: number; buckets: JHeatmapBucket[] };
   openInUI(): void;
 }
 
@@ -234,6 +332,8 @@ declare interface JModel {
   createElement(type: string, name?: string, folder?: JFolder): JConcept;
   createRelationship(type: string, name: string, source: JConcept, target: JConcept, folder?: JFolder): JConcept;
   createArchimateView(name?: string, folder?: JFolder): JView;
+  /** Generate a packed capability-map view from whole -> part relationships (Archi Online API). */
+  createPackedView(options: JPackedViewOptions): JView;
 }
 
 declare interface JProfile {

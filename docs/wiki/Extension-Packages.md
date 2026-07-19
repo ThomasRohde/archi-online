@@ -136,6 +136,7 @@ through the Extensions panel.
 
 | Package | Demonstrates |
 | --- | --- |
+| **Capability Map** (`examples.capability-map`) | The packed capability-map scripting APIs (`model.createPackedView`, `view.layoutPacked`, `view.syncPacked`, `view.applyHeatmap`) driven from tree/view context menus and a settings panel. |
 | **ELK Layout** (`examples.elk-layout`) | The `app.layout.elk` automatic-layout API, menu commands, a settings panel, packaged JSON defaults, and private storage. |
 | **Model Audit Dashboard** (`examples.model-audit-dashboard`) | Commands, toolbar button, menu item, a panel, packaged audit rules, dialogs, and private storage. |
 | **Selection Workbench** (`examples.selection-workbench`) | Selection and context-menu commands, event handling, and a storage-backed selection history panel. |
