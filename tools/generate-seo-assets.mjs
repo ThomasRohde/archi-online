@@ -44,7 +44,7 @@ const background = Buffer.from(`
     <text x="68" y="494" fill="#d8e5f7" font-family="Segoe UI, Arial, sans-serif" font-size="22">directly in your browser.</text>
     <rect x="492" y="94" width="660" height="416" fill="#dc6b35"/>
     <rect x="480" y="82" width="660" height="416" fill="#ffffff" stroke="#ffffff" stroke-width="2"/>
-    <text x="1076" y="554" fill="#b9d3fa" font-family="Cascadia Code, Consolas, monospace" font-size="14" text-anchor="end">archi-online.klok-rohde.dk</text>
+    <text x="1076" y="554" fill="#b9d3fa" font-family="Cascadia Code, Consolas, monospace" font-size="14" text-anchor="end">archi-online.com</text>
   </svg>
 `);
 

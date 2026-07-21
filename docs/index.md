@@ -14,7 +14,7 @@ hero:
       link: /wiki/Getting-Started
     - theme: alt
       text: Open the live app ↗
-      link: https://archi-online.klok-rohde.dk/
+      link: https://archi-online.com/
     - theme: alt
       text: View on GitHub ↗
       link: https://github.com/ThomasRohde/archi-online

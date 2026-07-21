@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://archi-online.klok-rohde.dk/sitemap.xml
+Sitemap: https://archi-online.com/sitemap.xml

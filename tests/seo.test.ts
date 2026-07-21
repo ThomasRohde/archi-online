@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 
 const rootDir = join(import.meta.dirname, '..');
-const canonicalOrigin = 'https://archi-online.klok-rohde.dk';
+const canonicalOrigin = 'https://archi-online.com';
 const slugOrigin = 'https://bitter-mill-c9qn.here.now';
 
 function readProjectFile(path: string): string {
@@ -197,5 +197,18 @@ describe('SEO metadata', () => {
     ]);
     expect(sitemapDocument.querySelector('lastmod')).toBeNull();
     expect(`${robots}\n${sitemap}`).not.toContain(slugOrigin);
+  });
+
+  it('does not reintroduce the retired production hostname in active metadata', () => {
+    const legacyOrigin = 'archi-online.klok-rohde.dk';
+
+    for (const path of [
+      'index.html',
+      'archimate-modeler/index.html',
+      'public/robots.txt',
+      'public/sitemap.xml',
+    ]) {
+      expect(readProjectFile(path)).not.toContain(legacyOrigin);
+    }
   });
 });

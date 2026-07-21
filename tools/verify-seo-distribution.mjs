@@ -2,7 +2,7 @@ import { access, readFile } from 'node:fs/promises';
 import { URL, fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
-const canonicalOrigin = 'https://archi-online.klok-rohde.dk';
+const canonicalOrigin = 'https://archi-online.com';
 const slugOrigin = 'https://bitter-mill-c9qn.here.now';
 const distUrl = new URL('../dist/', import.meta.url);
 

@@ -38,7 +38,7 @@ Gotchas when driving the browser:
 
 ## Publishing to here.now
 
-The built app is hosted at **https://archi-online.klok-rohde.dk/**, with
+The built app is hosted at **https://archi-online.com/**, with
 **https://bitter-mill-c9qn.here.now/** retained as the deployment fallback URL.
 Publishing is manual/on-request — it is **not** part of the build gate. The publish
 procedure is machine-specific and lives in `CLAUDE.local.md` (gitignored).

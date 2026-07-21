@@ -85,11 +85,11 @@ A public gist-hosted example model is available for testing the read-only
 viewer and share-link flow:
 
 - [Archi Online Capability Model gist](https://gist.github.com/ThomasRohde/d76393598cc8ee09c27f6e829581297e)
-- [Open the model in the hosted viewer](https://archi-online.klok-rohde.dk/?mode=viewer#gist=d76393598cc8ee09c27f6e829581297e)
+- [Open the model in the hosted viewer](https://archi-online.com/?mode=viewer#gist=d76393598cc8ee09c27f6e829581297e)
 
 ## Documentation
 
-The live app runs at **https://archi-online.klok-rohde.dk/**, with
+The live app runs at **https://archi-online.com/**, with
 **https://bitter-mill-c9qn.here.now/** retained as a fallback URL. The documentation
 site is published to GitHub Pages at **https://thomasrohde.github.io/archi-online/**,
 built with VitePress from the same `docs/wiki/` source and deployed by

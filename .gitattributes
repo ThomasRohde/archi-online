@@ -12,6 +12,7 @@
 *.yaml text eol=lf
 *.xml text eol=lf
 *.archimate text eol=lf
+public/robots.txt text eol=lf
 public/licenses/source/manhattan-router.ts.txt text eol=lf
 tests/fixtures/phase2/phase2-desktop.archimate binary
 
