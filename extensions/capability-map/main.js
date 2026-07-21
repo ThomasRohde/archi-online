@@ -1,7 +1,7 @@
 app.extension({
   id: 'examples.capability-map',
   name: 'Capability Map',
-  version: '1.10.0'
+  version: '1.11.0'
 });
 
 var config = app.assets.json('data/defaults.json');
