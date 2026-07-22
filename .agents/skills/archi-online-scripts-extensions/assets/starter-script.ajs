@@ -1,0 +1,26 @@
+// Archi Online .ajs starter: inspect the active model without changing it.
+// Replace this audit with the requested workflow and keep failure paths explicit.
+
+console.clear();
+
+var elements = $('element');
+var relationships = $('relationship');
+var views = $('view');
+
+console.log('Model:', model.name || '(unnamed)');
+console.log('Elements:', elements.size());
+console.log('Relationships:', relationships.size());
+console.log('Views:', views.size());
+
+var unnamed = elements.filter(function (item) {
+  return !item.name || item.name.trim().length === 0;
+});
+
+if (unnamed.isEmpty()) {
+  console.info('No unnamed elements found.');
+} else {
+  console.warn('Unnamed elements:', unnamed.size());
+  unnamed.each(function (item) {
+    console.warn(item.id, item.type);
+  });
+}

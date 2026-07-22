@@ -1,0 +1,4 @@
+interface:
+  display_name: "Archi Online Scripts & Extensions"
+  short_description: "Author Archi Online automation artifacts"
+  default_prompt: "Use $archi-online-scripts-extensions to create a tested Archi Online script or extension package."

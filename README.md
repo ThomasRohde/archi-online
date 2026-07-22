@@ -79,6 +79,41 @@ npm run build      # typecheck + production build (static site in dist/)
 `tools/generate-rules.mjs` regenerates `src/model/data/relations-matrix.ts` from
 Archi's relationship matrix (`tools/data/relationships.xml`).
 
+## Agent Skill: Scripts and Extensions
+
+This repository includes the reusable
+[Archi Online Scripts and Extensions skill](.agents/skills/archi-online-scripts-extensions/SKILL.md)
+for coding agents that create, package, review, or troubleshoot `.ajs` scripts
+and `.archi-ext` extensions.
+
+Install it from GitHub with [Vercel's Skills CLI](https://github.com/vercel-labs/skills):
+
+```bash
+npx skills add ThomasRohde/archi-online --skill archi-online-scripts-extensions
+```
+
+Or install it from a local clone:
+
+```bash
+npx skills add . --skill archi-online-scripts-extensions
+```
+
+The CLI detects supported agents automatically. To target Codex explicitly,
+add `--agent codex` to either command.
+
+Invoke the installed skill in your prompt, for example:
+
+```text
+Use $archi-online-scripts-extensions to create an .ajs script that reports every application component.
+Use $archi-online-scripts-extensions to build a portable .archi-ext package for a model-quality check.
+Use $archi-online-scripts-extensions to review this extension for API, undo, and packaging issues.
+```
+
+The skill includes portable starters, focused API references, and a helper for
+validating scripts and building extension packages. See the
+[skill instructions](.agents/skills/archi-online-scripts-extensions/SKILL.md)
+for the complete workflow and helper commands.
+
 ## Sharing Example
 
 A public gist-hosted example model is available for testing the read-only

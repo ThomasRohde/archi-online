@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "id": "local.example.archi-online-tool",
+  "name": "Archi Online Tool",
+  "version": "0.1.0",
+  "description": "A safe starter extension that summarizes the active model.",
+  "main": "main.js",
+  "contributes": {
+    "commands": [
+      {
+        "id": "local.example.archi-online-tool.summarize",
+        "title": "Summarize active model",
+        "description": "Count elements, relationships, and views."
+      }
+    ],
+    "menus": [
+      {
+        "id": "local.example.archi-online-tool.menu.summarize",
+        "label": "Summarize active model",
+        "command": "local.example.archi-online-tool.summarize",
+        "location": "extensions.menu"
+      }
+    ],
+    "panels": [
+      {
+        "id": "local.example.archi-online-tool.panel",
+        "title": "Model Summary"
+      }
+    ]
+  }
+}
