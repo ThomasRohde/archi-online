@@ -89,6 +89,7 @@ describe('SEO metadata', () => {
 
   it('declares the custom domain as the canonical editor URL', () => {
     const document = parseHtml('index.html');
+    const docsConfig = readProjectFile('docs/.vitepress/config.ts');
     const title = 'Archi Online | Browser-based ArchiMate Modeler';
     const description =
       'Model, validate, and script ArchiMate 3.2 in your browser with local-first storage and desktop-compatible .archimate files.';
@@ -96,6 +97,10 @@ describe('SEO metadata', () => {
     expect(canonicalHref(document)).toEqual([`${canonicalOrigin}/`]);
     expectSocialMetadata(document, { title, description, url: `${canonicalOrigin}/` });
     expect(readProjectFile('index.html')).not.toContain(slugOrigin);
+    expect(docsConfig).toContain(
+      `{ text: 'Open the app ↗', link: '${canonicalOrigin}/' }`,
+    );
+    expect(docsConfig).not.toContain(slugOrigin);
 
     const website = graphWithType(jsonLdGraphs(document), 'WebSite');
     expect(website).toMatchObject({
