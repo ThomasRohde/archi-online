@@ -95,6 +95,10 @@ describe('SEO metadata', () => {
       'Model, validate, and script ArchiMate 3.2 in your browser with local-first storage and desktop-compatible .archimate files.';
 
     expect(canonicalHref(document)).toEqual([`${canonicalOrigin}/`]);
+    expect(
+      document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+        ?.getAttribute('href'),
+    ).toBe('/icons/apple-touch-icon.png');
     expectSocialMetadata(document, { title, description, url: `${canonicalOrigin}/` });
     expect(readProjectFile('index.html')).not.toContain(slugOrigin);
     expect(docsConfig).toContain(
@@ -117,6 +121,10 @@ describe('SEO metadata', () => {
       'Create, edit, validate, and script ArchiMate 3.2 models in your browser. Work locally with desktop-compatible .archimate files.';
 
     expect(canonicalHref(document)).toEqual([`${canonicalOrigin}/archimate-modeler/`]);
+    expect(
+      document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+        ?.getAttribute('href'),
+    ).toBe('/icons/apple-touch-icon.png');
     expectSocialMetadata(document, {
       title,
       description,
@@ -174,6 +182,7 @@ describe('SEO metadata', () => {
 
     for (const asset of [
       'src/seo/archimate-modeler.css',
+      'public/icons/apple-touch-icon.png',
       'public/seo/archi-online-modeler.webp',
       'public/seo/archi-online-social.png',
     ]) {
