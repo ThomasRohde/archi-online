@@ -122,10 +122,10 @@ var iconUrl = app.assets.url("assets/icon.svg");
 Binary assets are stored base64-encoded and exposed as `data:` URLs through
 `app.assets.url()`.
 
-## Bundled examples
+## Bundled packages
 
-The repository ships five example packages under `extensions/`. Build the
-importable archives with:
+The repository ships two official end-user extensions and four developer
+examples under `extensions/`. Build all importable archives with:
 
 ```bash
 node extensions/build-archives.mjs
@@ -134,19 +134,22 @@ node extensions/build-archives.mjs
 The `.archi-ext` files land in `extensions/dist/` (git-ignored); import them
 through the Extensions panel.
 
-| Package | Demonstrates |
-| --- | --- |
-| **Capability Map** (`examples.capability-map`) | The packed capability-map scripting APIs (`model.createPackedView`, `view.layoutPacked`, `view.syncPacked`, `view.applyHeatmap`) driven from tree/view context menus and a settings panel. |
-| **ELK Layout** (`examples.elk-layout`) | The `app.layout.elk` automatic-layout API, menu commands, a settings panel, packaged JSON defaults, and private storage. |
-| **Model Audit Dashboard** (`examples.model-audit-dashboard`) | Commands, toolbar button, menu item, a panel, packaged audit rules, dialogs, and private storage. |
-| **Selection Workbench** (`examples.selection-workbench`) | Selection and context-menu commands, event handling, and a storage-backed selection history panel. |
-| **Package Showcase** (`examples.package-showcase`) | Manifest and package metadata access plus bundled README/JSON/SVG assets. |
-| **Event Log Console** (`examples.event-log-console`) | The full event bridge (app, model, view, tree, selection), a live log panel, and clear/open commands. |
+| Package | Status | Purpose |
+| --- | --- | --- |
+| **Capability Map** (`archi-online.capability-map`) | Official | The packed capability-map scripting APIs (`model.createPackedView`, `view.layoutPacked`, `view.syncPacked`, `view.applyHeatmap`) driven from tree/view context menus and a settings panel. |
+| **ELK Layout** (`archi-online.elk-layout`) | Official | The `app.layout.elk` automatic-layout API, menu commands, a settings panel, packaged JSON defaults, and private storage. |
+| **Model Audit Dashboard** (`examples.model-audit-dashboard`) | Example | Commands, toolbar button, menu item, a panel, packaged audit rules, dialogs, and private storage. |
+| **Selection Workbench** (`examples.selection-workbench`) | Example | Selection and context-menu commands, event handling, and a storage-backed selection history panel. |
+| **Package Showcase** (`examples.package-showcase`) | Example | Manifest and package metadata access plus bundled README/JSON/SVG assets. |
+| **Event Log Console** (`examples.event-log-console`) | Example | The full event bridge (app, model, view, tree, selection), a live log panel, and clear/open commands. |
 
-The example sources are small and readable — they double as templates for
-your own extensions.
+The last four rows are developer examples; their sources are small and readable
+so they double as templates for your own extensions. End users can download the
+two official packages directly from [[Extensions]] without using GitHub
+Releases.
 
 Related pages:
 
+- [[Extensions]] — official package downloads and installation.
 - [[Extension API|Extension-API]] — the `app` API reference.
 - [[Development]] — building the examples from the repository.

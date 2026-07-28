@@ -8,8 +8,8 @@ import { createExtensionRegistry } from '../src/extensions/registry';
 import { runInstalledPackage } from '../src/extensions/runtime';
 import { memoryKeyValueStore, setDefaultKeyValueStoreForTests } from '../src/persistence/keyval';
 
-const examplesRoot = join(process.cwd(), 'extensions');
-const exampleIds = [
+const packagesRoot = join(process.cwd(), 'extensions');
+const bundledPackageFolders = [
   'capability-map',
   'elk-layout',
   'model-audit-dashboard',
@@ -33,8 +33,8 @@ function archiveBytesFromFolder(folder: string): Uint8Array {
   return zipSync(files);
 }
 
-async function loadExample(folderName: string) {
-  const bytes = archiveBytesFromFolder(join(examplesRoot, folderName));
+async function loadPackage(folderName: string) {
+  const bytes = archiveBytesFromFolder(join(packagesRoot, folderName));
   const pkg = await readExtensionArchive(bytes, 100);
   const registry = createExtensionRegistry();
   const result = runInstalledPackage(pkg, registry);
@@ -48,36 +48,39 @@ async function flushPanelRender() {
   await new Promise((resolve) => window.setTimeout(resolve, 0));
 }
 
-describe('example extension packages', () => {
+describe('bundled extension packages', () => {
   beforeEach(() => {
     persistenceStore = memoryKeyValueStore();
     setDefaultKeyValueStoreForTests(persistenceStore);
   });
 
-  it('defines the expected example package folders', () => {
-    const folders = readdirSync(examplesRoot, { withFileTypes: true })
+  it('defines the expected bundled package folders', () => {
+    const folders = readdirSync(packagesRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .filter((name) => name !== 'dist')
       .sort();
 
-    expect(folders).toEqual([...exampleIds].sort());
+    expect(folders).toEqual([...bundledPackageFolders].sort());
   });
 
-  it.each(exampleIds)('imports and registers runtime contributions for %s', async (folderName) => {
-    const { pkg, registry } = await loadExample(folderName);
+  it.each(bundledPackageFolders)(
+    'imports and registers runtime contributions for %s',
+    async (folderName) => {
+      const { pkg, registry } = await loadPackage(folderName);
 
-    expect(pkg.manifest.main).toBe('main.js');
-    expect(pkg.files['manifest.json']).toBeDefined();
-    expect(pkg.files[pkg.manifest.main]).toBeDefined();
+      expect(pkg.manifest.main).toBe('main.js');
+      expect(pkg.files['manifest.json']).toBeDefined();
+      expect(pkg.files[pkg.manifest.main]).toBeDefined();
 
-    expect(registry.getSnapshot().commands.length).toBeGreaterThan(0);
-  });
+      expect(registry.getSnapshot().commands.length).toBeGreaterThan(0);
+    },
+  );
 
   it('renders stored ELK dropdown values after panel re-render', async () => {
-    const { registry } = await loadExample('elk-layout');
+    const { registry } = await loadPackage('elk-layout');
     await persistenceStore.set(
-      extensionStorageKey('examples.elk-layout'),
+      extensionStorageKey('archi-online.elk-layout'),
       {
         options: {
           scope: 'selection',
@@ -90,7 +93,7 @@ describe('example extension packages', () => {
     );
     const panel = registry
       .getSnapshot()
-      .panels.find((candidate) => candidate.id === 'examples.elk-layout.panel');
+      .panels.find((candidate) => candidate.id === 'archi-online.elk-layout.panel');
     const container = document.createElement('div');
 
     panel?.render(container);
@@ -104,10 +107,10 @@ describe('example extension packages', () => {
   });
 
   it('renders the ELK panel as a top-aligned form with intrinsic control heights', async () => {
-    const { registry } = await loadExample('elk-layout');
+    const { registry } = await loadPackage('elk-layout');
     const panel = registry
       .getSnapshot()
-      .panels.find((candidate) => candidate.id === 'examples.elk-layout.panel');
+      .panels.find((candidate) => candidate.id === 'archi-online.elk-layout.panel');
     const container = document.createElement('div');
 
     panel?.render(container);
@@ -122,13 +125,13 @@ describe('example extension packages', () => {
   });
 
   it('does not show undefined values for stale ELK result storage', async () => {
-    const { registry } = await loadExample('elk-layout');
-    await persistenceStore.set(extensionStorageKey('examples.elk-layout'), {
+    const { registry } = await loadPackage('elk-layout');
+    await persistenceStore.set(extensionStorageKey('archi-online.elk-layout'), {
       lastResult: {},
     });
     const panel = registry
       .getSnapshot()
-      .panels.find((candidate) => candidate.id === 'examples.elk-layout.panel');
+      .panels.find((candidate) => candidate.id === 'archi-online.elk-layout.panel');
     const container = document.createElement('div');
 
     panel?.render(container);
@@ -140,7 +143,7 @@ describe('example extension packages', () => {
   });
 
   it('renders event log payloads as text instead of HTML', async () => {
-    const { registry } = await loadExample('event-log-console');
+    const { registry } = await loadPackage('event-log-console');
     await registry.emitEvent('model.opened', {
       fileName: '<img src=x onerror="globalThis.__xss = true">',
     });
@@ -157,7 +160,7 @@ describe('example extension packages', () => {
   });
 
   it('renders selection history values as text instead of HTML', async () => {
-    const { registry } = await loadExample('selection-workbench');
+    const { registry } = await loadPackage('selection-workbench');
     await registry.emitEvent('selection.changed', {
       source: '<img src=x onerror="globalThis.__xss = true">',
       ids: ['<svg onload="globalThis.__xss = true">'],

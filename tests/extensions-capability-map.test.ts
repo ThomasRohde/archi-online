@@ -11,7 +11,7 @@ import { replaceModel } from '../src/model/store';
 import { memoryKeyValueStore, setDefaultKeyValueStoreForTests } from '../src/persistence/keyval';
 import { useStore } from '../src/ui/store-hooks';
 
-const exampleFolder = join(process.cwd(), 'extensions', 'capability-map');
+const extensionFolder = join(process.cwd(), 'extensions', 'capability-map');
 
 function archiveBytes(): Uint8Array {
   const files: Record<string, Uint8Array> = {};
@@ -23,7 +23,7 @@ function archiveBytes(): Uint8Array {
       else files[archivePath] = readFileSync(path);
     }
   };
-  visit(exampleFolder);
+  visit(extensionFolder);
   return zipSync(files);
 }
 
@@ -55,16 +55,16 @@ describe('capability-map extension', () => {
     const registry = await loadExtension();
     const snapshot = registry.getSnapshot();
     expect(snapshot.commands.map((command) => command.id).sort()).toEqual([
-      'examples.capability-map.generate',
-      'examples.capability-map.heatmap',
-      'examples.capability-map.open',
-      'examples.capability-map.repack',
-      'examples.capability-map.sync',
+      'archi-online.capability-map.generate',
+      'archi-online.capability-map.heatmap',
+      'archi-online.capability-map.open',
+      'archi-online.capability-map.repack',
+      'archi-online.capability-map.sync',
     ]);
     expect((snapshot.menus['model-tree.context'] ?? []).some((menu) =>
-      menu.command === 'examples.capability-map.generate')).toBe(true);
+      menu.command === 'archi-online.capability-map.generate')).toBe(true);
     expect(snapshot.panels.some((panel) =>
-      panel.id === 'examples.capability-map.panel')).toBe(true);
+      panel.id === 'archi-online.capability-map.panel')).toBe(true);
   });
 
   it('generates a packed capability map from a model-tree trigger', async () => {
@@ -78,7 +78,7 @@ describe('capability-map extension', () => {
     // The success dialog keeps the command promise pending in tests
     // (no dialog host is mounted), so observe the store instead of awaiting.
     void registry.runCommand(
-      'examples.capability-map.generate',
+      'archi-online.capability-map.generate',
       undefined,
       { targetId: root, selectionIds: [] },
     );
@@ -95,7 +95,7 @@ describe('capability-map extension', () => {
   it('ignores non-element ids in the generate trigger', async () => {
     const registry = await loadExtension();
     void registry.runCommand(
-      'examples.capability-map.generate',
+      'archi-online.capability-map.generate',
       undefined,
       { targetId: 'not-an-element', selectionIds: [] },
     );
@@ -105,7 +105,7 @@ describe('capability-map extension', () => {
 
   it('renders stored panel options after re-render', async () => {
     const registry = await loadExtension();
-    await persistenceStore.set(extensionStorageKey('examples.capability-map'), {
+    await persistenceStore.set(extensionStorageKey('archi-online.capability-map'), {
       options: {
         mode: 'treemap',
         sort: 'weight',
@@ -122,7 +122,7 @@ describe('capability-map extension', () => {
     });
     const panel = registry
       .getSnapshot()
-      .panels.find((candidate) => candidate.id === 'examples.capability-map.panel');
+      .panels.find((candidate) => candidate.id === 'archi-online.capability-map.panel');
     const container = document.createElement('div');
     panel?.render(container);
     await new Promise((resolve) => window.setTimeout(resolve, 0));

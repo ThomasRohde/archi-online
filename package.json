@@ -20,7 +20,7 @@
     "version": "node tools/sync-versions.mjs && git add extensions",
     "docs:check": "node tools/check-wiki-docs.mjs",
     "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
+    "docs:build": "node extensions/build-archives.mjs --docs-output docs/public/extensions && vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "docs:publish-wiki": "node tools/publish-wiki.mjs",
     "fixtures:phase1": "node tools/generate-phase1-fixtures.mjs",

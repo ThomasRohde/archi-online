@@ -10,6 +10,7 @@
 
 **Automation**
 
+* [[Extensions]]
 * [[Scripting API|Scripting-API]]
 * [[Extension API|Extension-API]]
 * [[Extension Packages|Extension-Packages]]

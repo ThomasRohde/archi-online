@@ -501,17 +501,17 @@ Rules:
 - layout coordinates are absolute view coordinates; stored nested bounds
   remain parent-relative.
 
-For automatic layout, the bundled **ELK Layout** example extension wraps the
+For automatic layout, the official **ELK Layout** extension wraps the
 app-hosted ELK engine — see [[Extension API|Extension-API]] (`app.layout.elk`)
-and [[Extension Packages|Extension-Packages]].
+and [[Extensions]].
 
 ## Packed capability maps
 
 Capability maps show a hierarchy as packed nested rectangles — children tiled
 inside their parents, no relationship lines. These are additive Archi Online
-APIs. The bundled **Capability Map** example extension exposes the same
+APIs. The official **Capability Map** extension exposes the same
 operations as menu commands and a settings panel — see
-[[Extension Packages|Extension-Packages]].
+[[Extensions]].
 
 ### Generating a map
 

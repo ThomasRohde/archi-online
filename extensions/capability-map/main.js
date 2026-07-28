@@ -1,5 +1,5 @@
 app.extension({
-  id: 'examples.capability-map',
+  id: 'archi-online.capability-map',
   name: 'Capability Map',
   version: '1.11.0'
 });
@@ -356,22 +356,22 @@ async function renderPanel() {
   buttons.style.alignItems = 'center';
   addButton(buttons, 'Generate from selection', function () {
     return writeOptions(options).then(function () {
-      return app.commands.run('examples.capability-map.generate');
+      return app.commands.run('archi-online.capability-map.generate');
     });
   });
   addButton(buttons, 'Repack view', function () {
     return writeOptions(options).then(function () {
-      return app.commands.run('examples.capability-map.repack');
+      return app.commands.run('archi-online.capability-map.repack');
     });
   });
   addButton(buttons, 'Sync view', function () {
     return writeOptions(options).then(function () {
-      return app.commands.run('examples.capability-map.sync');
+      return app.commands.run('archi-online.capability-map.sync');
     });
   });
   addButton(buttons, 'Heat map', function () {
     return writeOptions(options).then(function () {
-      return app.commands.run('examples.capability-map.heatmap');
+      return app.commands.run('archi-online.capability-map.heatmap');
     });
   });
   addButton(buttons, 'Reset', function () {
@@ -380,7 +380,7 @@ async function renderPanel() {
   panel.appendChild(buttons);
 }
 
-app.commands.register('examples.capability-map.generate', {
+app.commands.register('archi-online.capability-map.generate', {
   title: 'Generate capability map',
   description: 'Create a packed capability-map view from the selected root element(s).',
   run: function (context) {
@@ -388,7 +388,7 @@ app.commands.register('examples.capability-map.generate', {
   }
 });
 
-app.commands.register('examples.capability-map.repack', {
+app.commands.register('archi-online.capability-map.repack', {
   title: 'Repack capability map',
   description: 'Repack the active view (or selected containers) into a packed layout.',
   run: function () {
@@ -396,7 +396,7 @@ app.commands.register('examples.capability-map.repack', {
   }
 });
 
-app.commands.register('examples.capability-map.sync', {
+app.commands.register('archi-online.capability-map.sync', {
   title: 'Sync capability map with model',
   description: 'Add new children, remove stale ones, reparent, and repack the active view.',
   run: function () {
@@ -404,7 +404,7 @@ app.commands.register('examples.capability-map.sync', {
   }
 });
 
-app.commands.register('examples.capability-map.heatmap', {
+app.commands.register('archi-online.capability-map.heatmap', {
   title: 'Apply capability heat map',
   description: 'Color capabilities from an element property and add a bucket legend.',
   run: function () {
@@ -412,50 +412,50 @@ app.commands.register('examples.capability-map.heatmap', {
   }
 });
 
-app.commands.register('examples.capability-map.open', {
+app.commands.register('archi-online.capability-map.open', {
   title: 'Open capability map panel',
   run: function () {
-    app.panels.show('examples.capability-map.panel');
+    app.panels.show('archi-online.capability-map.panel');
   }
 });
 
 app.menus.addItem('extensions.menu', {
-  id: 'examples.capability-map.menu.open',
+  id: 'archi-online.capability-map.menu.open',
   label: 'Capability map...',
-  command: 'examples.capability-map.open'
+  command: 'archi-online.capability-map.open'
 });
 
 app.menus.addItem('model-tree.context', {
-  id: 'examples.capability-map.tree.generate',
+  id: 'archi-online.capability-map.tree.generate',
   label: 'Generate capability map',
-  command: 'examples.capability-map.generate'
+  command: 'archi-online.capability-map.generate'
 });
 
 app.menus.addItem('view.context', {
-  id: 'examples.capability-map.view.repack',
+  id: 'archi-online.capability-map.view.repack',
   label: 'Repack capability map',
-  command: 'examples.capability-map.repack'
+  command: 'archi-online.capability-map.repack'
 });
 
 app.menus.addItem('view.context', {
-  id: 'examples.capability-map.view.sync',
+  id: 'archi-online.capability-map.view.sync',
   label: 'Sync capability map with model',
-  command: 'examples.capability-map.sync'
+  command: 'archi-online.capability-map.sync'
 });
 
 app.menus.addItem('view.context', {
-  id: 'examples.capability-map.view.heatmap',
+  id: 'archi-online.capability-map.view.heatmap',
   label: 'Apply capability heat map',
-  command: 'examples.capability-map.heatmap'
+  command: 'archi-online.capability-map.heatmap'
 });
 
 app.menus.addItem('selection.context', {
-  id: 'examples.capability-map.selection.repack',
+  id: 'archi-online.capability-map.selection.repack',
   label: 'Repack selected capabilities',
-  command: 'examples.capability-map.repack'
+  command: 'archi-online.capability-map.repack'
 });
 
-app.panels.register('examples.capability-map.panel', {
+app.panels.register('archi-online.capability-map.panel', {
   title: 'Capability Map',
   render: function (container) {
     panel = container;

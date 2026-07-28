@@ -1,5 +1,8 @@
 # ELK Layout Extension
 
+ELK Layout is an official Archi Online extension with the stable package ID
+`archi-online.elk-layout`.
+
 Applies the bundled `app.layout.elk(...)` host API to the active view. By
 default it lays out selected root objects when two or more visuals are selected,
 otherwise it falls back to the whole active view.
@@ -15,6 +18,6 @@ storage:
 The extension contributes an Extensions menu item, active-view context menu item,
 selection context menu item, and a dockable panel.
 
-Version 0.1 lays out selected root visuals or top-level view visuals only.
-Connections whose endpoints are nested inside selected containers are not passed
-to ELK until recursive container layout is added.
+The current layout bridge handles selected root visuals or top-level view
+visuals only. Connections whose endpoints are nested inside selected containers
+are not passed to ELK until recursive container layout is added.

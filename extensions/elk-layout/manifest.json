@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "id": "examples.elk-layout",
+  "id": "archi-online.elk-layout",
   "name": "ELK Layout",
   "version": "1.11.0",
   "description": "Apply layered ELK automatic layout to the active view or selected diagram objects.",
@@ -8,37 +8,37 @@
   "contributes": {
     "commands": [
       {
-        "id": "examples.elk-layout.apply",
+        "id": "archi-online.elk-layout.apply",
         "title": "Apply ELK layout"
       },
       {
-        "id": "examples.elk-layout.open",
+        "id": "archi-online.elk-layout.open",
         "title": "Open ELK layout panel"
       }
     ],
     "menus": [
       {
-        "id": "examples.elk-layout.menu.open",
+        "id": "archi-online.elk-layout.menu.open",
         "label": "ELK layout...",
-        "command": "examples.elk-layout.open",
+        "command": "archi-online.elk-layout.open",
         "location": "extensions.menu"
       },
       {
-        "id": "examples.elk-layout.view.apply",
+        "id": "archi-online.elk-layout.view.apply",
         "label": "Layout view with ELK",
-        "command": "examples.elk-layout.apply",
+        "command": "archi-online.elk-layout.apply",
         "location": "view.context"
       },
       {
-        "id": "examples.elk-layout.selection.apply",
+        "id": "archi-online.elk-layout.selection.apply",
         "label": "Layout selection with ELK",
-        "command": "examples.elk-layout.apply",
+        "command": "archi-online.elk-layout.apply",
         "location": "selection.context"
       }
     ],
     "panels": [
       {
-        "id": "examples.elk-layout.panel",
+        "id": "archi-online.elk-layout.panel",
         "title": "ELK Layout"
       }
     ]

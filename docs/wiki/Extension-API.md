@@ -323,8 +323,8 @@ The result reports `scope`, `nodeCount`, `connectionCount`,
 `app.layout.elk()` is async because the ELK engine is lazy-loaded; the async
 command undo caveat from [Commands](#commands) applies. Recursive layout of
 nested containers is not supported yet (`recursive: true` throws). The
-bundled **ELK Layout** example package wraps this API with menu commands and
-a settings panel.
+official **ELK Layout** extension wraps this API with menu commands and a
+settings panel. Download it from [[Extensions]].
 
 ## Model snapshot escape hatch
 

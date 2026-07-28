@@ -20,7 +20,7 @@ src/persistence/  file open/save, IndexedDB autosave, key-value storage
 src/settings/     app settings model and store
 tests/            Vitest suites
 tools/            code generation and project utility scripts
-extensions/       example extension package sources
+extensions/       bundled official and example extension package sources
 docs/wiki/        source for these wiki pages
 ```
 
@@ -84,9 +84,9 @@ npm run build
 
 or simply `npm run ci:check` for the full gate.
 
-## Example extensions
+## Bundled extensions
 
-Build the example `.archi-ext` archives (see
+Build all bundled `.archi-ext` archives (see
 [[Extension Packages|Extension-Packages]]):
 
 ```bash

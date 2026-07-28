@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'docs/**'
+      - 'extensions/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/docs.yml'

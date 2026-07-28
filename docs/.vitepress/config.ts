@@ -35,6 +35,7 @@ export default defineConfig({
     siteTitle: 'Archi Online',
     nav: [
       { text: 'Guide', link: '/wiki/Getting-Started', activeMatch: '/wiki/' },
+      { text: 'Extensions', link: '/wiki/Extensions' },
       { text: 'Scripting', link: '/wiki/Scripting-API' },
       { text: 'Open the app ↗', link: 'https://archi-online.com/' },
     ],
@@ -52,6 +53,7 @@ export default defineConfig({
       {
         text: 'Automation',
         items: [
+          { text: 'Extensions', link: '/wiki/Extensions' },
           { text: 'Scripting API', link: '/wiki/Scripting-API' },
           { text: 'Extension API', link: '/wiki/Extension-API' },
           { text: 'Extension Packages', link: '/wiki/Extension-Packages' },

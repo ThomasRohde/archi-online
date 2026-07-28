@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "id": "examples.capability-map",
+  "id": "archi-online.capability-map",
   "name": "Capability Map",
   "version": "1.11.0",
   "description": "Generate, repack, sync, and heat-map packed capability maps (nested rectangles, no relationship lines).",
@@ -8,67 +8,67 @@
   "contributes": {
     "commands": [
       {
-        "id": "examples.capability-map.generate",
+        "id": "archi-online.capability-map.generate",
         "title": "Generate capability map"
       },
       {
-        "id": "examples.capability-map.repack",
+        "id": "archi-online.capability-map.repack",
         "title": "Repack capability map"
       },
       {
-        "id": "examples.capability-map.sync",
+        "id": "archi-online.capability-map.sync",
         "title": "Sync capability map with model"
       },
       {
-        "id": "examples.capability-map.heatmap",
+        "id": "archi-online.capability-map.heatmap",
         "title": "Apply capability heat map"
       },
       {
-        "id": "examples.capability-map.open",
+        "id": "archi-online.capability-map.open",
         "title": "Open capability map panel"
       }
     ],
     "menus": [
       {
-        "id": "examples.capability-map.menu.open",
+        "id": "archi-online.capability-map.menu.open",
         "label": "Capability map...",
-        "command": "examples.capability-map.open",
+        "command": "archi-online.capability-map.open",
         "location": "extensions.menu"
       },
       {
-        "id": "examples.capability-map.tree.generate",
+        "id": "archi-online.capability-map.tree.generate",
         "label": "Generate capability map",
-        "command": "examples.capability-map.generate",
+        "command": "archi-online.capability-map.generate",
         "location": "model-tree.context"
       },
       {
-        "id": "examples.capability-map.view.repack",
+        "id": "archi-online.capability-map.view.repack",
         "label": "Repack capability map",
-        "command": "examples.capability-map.repack",
+        "command": "archi-online.capability-map.repack",
         "location": "view.context"
       },
       {
-        "id": "examples.capability-map.view.sync",
+        "id": "archi-online.capability-map.view.sync",
         "label": "Sync capability map with model",
-        "command": "examples.capability-map.sync",
+        "command": "archi-online.capability-map.sync",
         "location": "view.context"
       },
       {
-        "id": "examples.capability-map.view.heatmap",
+        "id": "archi-online.capability-map.view.heatmap",
         "label": "Apply capability heat map",
-        "command": "examples.capability-map.heatmap",
+        "command": "archi-online.capability-map.heatmap",
         "location": "view.context"
       },
       {
-        "id": "examples.capability-map.selection.repack",
+        "id": "archi-online.capability-map.selection.repack",
         "label": "Repack selected capabilities",
-        "command": "examples.capability-map.repack",
+        "command": "archi-online.capability-map.repack",
         "location": "selection.context"
       }
     ],
     "panels": [
       {
-        "id": "examples.capability-map.panel",
+        "id": "archi-online.capability-map.panel",
         "title": "Capability Map"
       }
     ]

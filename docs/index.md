@@ -109,6 +109,7 @@ view.openInUI();
 | Model software architecture with C4 | [C4 Modeling](/wiki/C4-Modeling) |
 | Import, export, or present models | [Import & Export](/wiki/Import-and-Export) |
 | Exchange models with desktop Archi | [Archi Compatibility](/wiki/Archi-Compatibility) |
+| Download official extensions | [Extensions](/wiki/Extensions) |
 | Automate your model with JavaScript | [Scripting API](/wiki/Scripting-API) |
 | Build an extension | [Extension API](/wiki/Extension-API) |
 

@@ -244,7 +244,7 @@ function addElements() {
   el('extension-runtime', 'ApplicationComponent', 'Extension runtime', 'application', 'Loads extension packages, exposes commands, panels, context menus, and app events.');
   el('script-runner', 'ApplicationComponent', 'jArchi script runner', 'application', 'Executes scripts against the model API and reports console output.');
   el('monaco-editor', 'ApplicationComponent', 'Monaco script editor', 'application', 'Provides the browser code editor used by scripting and extension source editing.');
-  el('elk-extension', 'ApplicationComponent', 'ELK layout extension', 'application', 'Example extension applying ELK layout to model views.');
+  el('elk-extension', 'ApplicationComponent', 'ELK layout extension', 'application', 'Official extension applying ELK layout to model views.');
   el('model-editing-app-service', 'ApplicationService', 'Browser model editing', 'application', 'Application service exposed by the editor shell.');
   el('viewer-app-service', 'ApplicationService', 'Read-only model viewing', 'application', 'Application service exposed by the viewer shell.');
   el('share-app-service', 'ApplicationService', 'Share link generation', 'application', 'Application service that produces inline, gist-backed, or raw-source viewer links.');

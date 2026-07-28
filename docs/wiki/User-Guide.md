@@ -580,4 +580,6 @@ On macOS, `Cmd` works in place of `Ctrl` for save/open/undo/redo.
   model — one script run is one undo step. See [[Scripting API|Scripting-API]].
 - The **Extensions** panel manages browser-local extensions that add
   commands, menus, toolbar buttons, panels, and event handlers. See
-  [[Extension API|Extension-API]] and [[Extension Packages|Extension-Packages]].
+  [[Extensions]] for official downloads, [[Extension API|Extension-API]] for
+  development, and [[Extension Packages|Extension-Packages]] for the package
+  format.

@@ -5,8 +5,8 @@ The documentation website at
 [VitePress](https://vitepress.dev/) from the same Markdown that powers the
 GitHub Wiki (`docs/wiki/*.md`), and deployed by the
 [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) GitHub Actions
-workflow. A push to `main` that touches `docs/` (or the workflow) rebuilds and
-redeploys the site.
+workflow. A push to `main` that touches `docs/`, `extensions/`, the package
+version, or the workflow rebuilds and redeploys the site.
 
 This is maintainer process documentation — it intentionally lives in the
 repository, not on the published site (VitePress excludes it via `srcExclude`).
@@ -23,6 +23,12 @@ The docs pages reuse `docs/wiki/*.md`. A small markdown-it plugin
 (`docs/.vitepress/wikiLinks.ts`) rewrites GitHub-wiki `[[links]]` to normal
 links; `docs/index.md` is the VitePress hero landing page; and the
 wiki-only pages (`_Sidebar.md`, `_Footer.md`, `Home.md`) are excluded.
+
+The site also carries the official ELK Layout and Capability Map packages under
+`/extensions/`. `npm run docs:build` stages stable `.archi-ext` downloads plus
+`catalog.json` and `checksums.txt` before VitePress assembles the Pages
+artifact. These files are generated from `extensions/` source and are not
+committed.
 
 ## Local preview
 

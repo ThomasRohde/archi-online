@@ -33,9 +33,9 @@ where you left off.
   Monaco editor with API IntelliSense, and a script library with `.ajs`
   import/export. Each script run is a single undo step.
 - **Extensions** — browser-local plugins that add commands, menus, toolbar
-  buttons, dockable panels, and event handlers, including a bundled ELK
-  automatic-layout extension. Extensions ship as portable `.archi-ext`
-  packages.
+  buttons, dockable panels, and event handlers. Official ELK Layout and
+  Capability Map extensions ship as portable `.archi-ext` packages from the
+  [[documentation download page|Extensions]].
 - **Installable web app** — production builds are PWA-capable, precache the
   app shell for offline launch after first load, and expose app shortcuts,
   `.archimate` file handling, and a share target in browsers that support

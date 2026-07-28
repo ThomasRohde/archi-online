@@ -133,5 +133,5 @@ into `.archimate` files.
 - [[User Guide|User-Guide]] — every panel, tool, setting, and shortcut.
 - [[Scripting API|Scripting-API]] — automate the model from the **Scripting**
   panel.
-- [[Extension Packages|Extension-Packages]] — try the bundled example
-  extensions, including ELK automatic layout.
+- [[Extensions]] — download and install the official ELK Layout and Capability
+  Map extensions.

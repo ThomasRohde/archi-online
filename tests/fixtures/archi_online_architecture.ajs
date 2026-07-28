@@ -1677,7 +1677,7 @@
     "key": "tech_elk",
     "type": "artifact",
     "name": "ELK Layout Engine",
-    "documentation": "Layered layout engine exposed through extension APIs and example extension package.",
+    "documentation": "Layered layout engine exposed through extension APIs and the official ELK Layout extension.",
     "properties": {
       "Layer": "Technology",
       "Library": "elkjs"
@@ -1868,7 +1868,7 @@
     "key": "deliv_ext_examples",
     "type": "deliverable",
     "name": "Example .archi-ext Packages",
-    "documentation": "Importable example extension packages demonstrating layout, audit dashboard, selection workbench, package showcase, and event logging.",
+    "documentation": "Importable official and example extension packages for layout, capability maps, audit, selection, packaged assets, and event logging.",
     "properties": {
       "Layer": "Implementation & Migration",
       "Deliverable Type": "Extension artifacts"

@@ -1,5 +1,5 @@
 app.extension({
-  id: 'examples.elk-layout',
+  id: 'archi-online.elk-layout',
   name: 'ELK Layout',
   version: '1.11.0'
 });
@@ -231,7 +231,7 @@ async function renderPanel() {
   panel.appendChild(status);
 }
 
-app.commands.register('examples.elk-layout.apply', {
+app.commands.register('archi-online.elk-layout.apply', {
   title: 'Apply ELK layout',
   description: 'Run ELK layered layout on the active view or selected diagram objects.',
   run: async function () {
@@ -241,32 +241,32 @@ app.commands.register('examples.elk-layout.apply', {
   }
 });
 
-app.commands.register('examples.elk-layout.open', {
+app.commands.register('archi-online.elk-layout.open', {
   title: 'Open ELK layout panel',
   run: function () {
-    app.panels.show('examples.elk-layout.panel');
+    app.panels.show('archi-online.elk-layout.panel');
   }
 });
 
 app.menus.addItem('extensions.menu', {
-  id: 'examples.elk-layout.menu.open',
+  id: 'archi-online.elk-layout.menu.open',
   label: 'ELK layout...',
-  command: 'examples.elk-layout.open'
+  command: 'archi-online.elk-layout.open'
 });
 
 app.menus.addItem('view.context', {
-  id: 'examples.elk-layout.view.apply',
+  id: 'archi-online.elk-layout.view.apply',
   label: 'Layout view with ELK',
-  command: 'examples.elk-layout.apply'
+  command: 'archi-online.elk-layout.apply'
 });
 
 app.menus.addItem('selection.context', {
-  id: 'examples.elk-layout.selection.apply',
+  id: 'archi-online.elk-layout.selection.apply',
   label: 'Layout selection with ELK',
-  command: 'examples.elk-layout.apply'
+  command: 'archi-online.elk-layout.apply'
 });
 
-app.panels.register('examples.elk-layout.panel', {
+app.panels.register('archi-online.elk-layout.panel', {
   title: 'ELK Layout',
   render: function (container) {
     panel = container;
