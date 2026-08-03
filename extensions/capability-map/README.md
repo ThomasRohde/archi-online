@@ -12,7 +12,8 @@ Aggregation hierarchies. The extension can:
 - color capabilities from a numeric property and add a heat-map legend.
 
 The settings panel controls layout mode, sibling ordering, depth, sizing,
-padding, treemap weights, heat-map properties, and level fills. Preferences are
+padding, frontier versus legacy grid packing, fixed versus text-aware leaves,
+treemap weights, heat-map properties, and level fills. Preferences are
 stored in this extension's private browser storage.
 
 The extension contributes an Extensions menu item, model-tree/view/selection

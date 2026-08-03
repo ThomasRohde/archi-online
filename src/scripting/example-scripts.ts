@@ -257,13 +257,20 @@ if (roots.isEmpty()) {
 }
 
 var rootIds = roots.map(function (cap) { return cap.id; });
+var frontierLayout = {
+  mode: "grid",
+  gridAlgorithm: "frontier",
+  leafSizing: "text-aware",
+  targetAspect: 1.6,
+  sort: "name"
+};
 console.log("Roots:", roots.map(function (cap) { return cap.name; }).join(", "));
 
 var view = $("view").filter(function (v) {
   return v.name === "Capability Map";
 }).first();
 if (view) {
-  var sync = view.syncPacked({ roots: rootIds });
+  var sync = view.syncPacked({ roots: rootIds, layout: frontierLayout });
   console.log("Synced existing map:", sync.added, "added,", sync.removed,
     "removed,", sync.reparented, "reparented.");
   view.openInUI();
@@ -271,7 +278,7 @@ if (view) {
   view = model.createPackedView({
     roots: rootIds,
     name: "Capability Map",
-    layout: { sort: "name" }
+    layout: frontierLayout
   });
 }
 
@@ -385,7 +392,24 @@ function viewByName(name) {
   return $("view").filter(function (v) { return v.name === name; }).first();
 }
 
-// Treemap first (kept in background), grid map last so it gets focus.
+var frontierLayout = {
+  mode: "grid",
+  gridAlgorithm: "frontier",
+  leafSizing: "text-aware",
+  targetAspect: 1.6,
+  frontier: { maxCandidatesPerNode: 16, beamWidth: 20 },
+  aesthetics: {
+    aspect: 1,
+    raggedness: 2.5,
+    whitespace: 0.5,
+    orphan: 1.2,
+    alignment: 0.6,
+    movement: 1.5,
+    neighborhood: 0.8
+  }
+};
+
+// Treemap first (kept in background), frontier grid map last so it gets focus.
 var treemap = viewByName("Archi Online — Investment Treemap");
 if (treemap) {
   treemap.syncPacked({
@@ -408,7 +432,7 @@ treemap.applyHeatmap({ property: "maturity", legend: false });
 
 var map = viewByName("Archi Online — Capability Map");
 if (map) {
-  var sync = map.syncPacked({ roots: root });
+  var sync = map.syncPacked({ roots: root, layout: frontierLayout });
   console.log("Synced existing map:", sync.added, "added,", sync.removed,
     "removed,", sync.reparented, "reparented.");
   map.openInUI();
@@ -416,7 +440,7 @@ if (map) {
   map = model.createPackedView({
     roots: root,
     name: "Archi Online — Capability Map",
-    layout: { sort: "name" }
+    layout: frontierLayout
   });
 }
 // Root has no maturity on purpose: it keeps its strategy-layer band color.

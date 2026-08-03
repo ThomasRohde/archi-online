@@ -525,7 +525,13 @@ var view = model.createPackedView({
   roots: root,          // element, array of elements, or array of ids
   name: "Capability Map",
   depth: 2,             // optional level cut-off
-  layout: { sort: "name" }
+  layout: {
+    mode: "grid",
+    gridAlgorithm: "frontier",
+    leafSizing: "text-aware",
+    sort: "name",
+    targetAspect: 1.6
+  }
 });
 ```
 
@@ -545,6 +551,10 @@ Options:
   `targetAspect` (1.6), `sort` (`"name"` | `"weight"` | `"none"`), `columns`
   (fixed items per row), `algorithm` (`"auto"` | `"squarify"` | `"strip"`,
   treemap only), and `minCellWidth`/`minCellHeight` (treemap floors).
+  Grid calls may additionally set `gridAlgorithm` (`"balanced-rows"` or
+  `"frontier"`), `leafSizing` (`"fixed"` or `"text-aware"`), `frontier`,
+  `stability`, and `rootPlacement` (`"preserve"` or `"repack"`). Supplying
+  `columns` keeps the deterministic legacy fixed-column meaning.
 - `style` — per-depth styling: `levelFills` (explicit fills) or `baseFill`
   (level 0; deeper levels fade toward white), `fontSizes` (points per depth),
   text alignment/position for parents and leaves, `iconVisible`, and
@@ -555,16 +565,55 @@ Multi-parent conflicts pick one parent (Composition beats Aggregation, then
 alphabetical) and cycles are broken safely; duplicates are reported in the
 result of the underlying operation.
 
+### Frontier grid layout
+
+`gridAlgorithm: "frontier"` selects the deterministic GCHRP-2 grid engine.
+Unlike balanced rows, which commits to one rectangle at each subtree, the
+frontier engine keeps a bounded set of portrait, square and landscape forms
+until their parent and the complete root forest are known. It composes
+order-preserving shelves, columns and guillotine partitions, Pareto-prunes
+them across aspect buckets, and never uses randomness or elapsed time as a
+search cutoff. It is still a rectangular canonical capability map, not a
+weight-proportional treemap.
+
+`leafSizing: "text-aware"` makes label fit a geometry constraint. The engine
+chooses among a small vocabulary of roughly equal-area leaf shapes and expands
+deterministically when none fits. It uses a conservative glyph-class estimate
+that mirrors the canvas's whitespace and `break-word` rules with a safety
+margin. Exact browser font metrics can vary, so unusually styled fonts or
+scripts outside the estimator's Segoe UI-oriented classes should be visually
+checked; labels are never deliberately shrunk below the supplied font size.
+
+The bounded-search defaults are approximately 16 candidates per node, a beam
+width of 20, aspect buckets from portrait through wide landscape, and reduced
+deterministic grammars for very large sibling groups. Higher values can improve
+choice diversity but cost more CPU and allocation.
+
+The aesthetic terms are independently configurable through `aesthetics`:
+`aspect`, `raggedness`, `whitespace`, `orphan`, `alignment`, `movement`,
+`neighborhood`, and `overflow`. `frontier` accepts `maxCandidatesPerNode`,
+`beamWidth`, `epsilon`, `aspectBuckets`, and `largeSiblingThreshold`.
+`stability.switchThreshold` controls hysteresis (0.07 by default), while
+`stability.targetExtent` adds a viewport-overflow preference.
+
 ### Repacking
 
 `view.layoutPacked()` repacks the view's existing element-node nesting. The
 current sibling order is preserved (`sort: "none"`), so manual arrangement
-survives; top-level containers keep their position and only resize:
+survives. Frontier relayout defaults to `rootPlacement: "preserve"`: top-level
+anchors remain fixed when feasible and deterministic minimum displacement
+repairs a size-induced overlap. Pass `rootPlacement: "repack"` for a new
+complete-forest arrangement:
 
 ```js
 view.layoutPacked();                          // whole view
 view.layoutPacked({ scope: $("selection").toArray() }); // chosen containers
 view.layoutPacked({ mode: "treemap", weightProperty: "headcount" });
+view.layoutPacked({
+  gridAlgorithm: "frontier",
+  leafSizing: "text-aware",
+  rootPlacement: "repack"
+});
 ```
 
 Returns `{ nodeCount, size }`.
@@ -574,7 +623,10 @@ Returns `{ nodeCount, size }`.
 `view.syncPacked()` reconciles an existing map after the model changes: new
 children are added at their name-sorted position, deleted or detached
 elements are removed, moved elements are reparented, and the map is
-repacked. Surviving nodes keep their styling and relative order:
+repacked. Surviving nodes keep their styling and relative order. Frontier sync
+automatically derives parent-relative previous geometry from the view and uses
+movement, previous neighbors and hysteresis to avoid replacing a compatible
+form for a marginal aesthetic gain; scripts do not construct that context:
 
 ```js
 var result = view.syncPacked();

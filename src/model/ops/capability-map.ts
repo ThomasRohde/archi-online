@@ -4,6 +4,7 @@ import {
 } from '../composition-tree';
 import {
   layoutPackedTree,
+  type PackedLabelSpec,
   type PackedTreeNode,
   type PackedTreeOptions,
 } from '../layout/packed-tree';
@@ -102,6 +103,31 @@ export interface PackedMapSyncResult {
 const DEFAULT_FONT_SIZES: readonly number[] = [12, 11, 10, 9];
 const FONT_FAMILY = 'Segoe UI';
 
+function valueAtDepth<T>(values: readonly T[], depth: number): T {
+  return values[Math.min(depth, values.length - 1)];
+}
+
+function packedLabelSpec(
+  text: string,
+  depth: number,
+  isParent: boolean,
+  style: PackedMapStyle | undefined,
+  existingFont: FontStyle | undefined,
+): PackedLabelSpec {
+  const sizes = style?.fontSizes?.length ? style.fontSizes : DEFAULT_FONT_SIZES;
+  const sizePt = existingFont?.sizePt ?? valueAtDepth(sizes, depth);
+  const fontSizePx = (sizePt * 4) / 3;
+  return {
+    text,
+    fontSizePx,
+    lineHeightPx: fontSizePx * 1.25,
+    maxLines: isParent ? 2 : 3,
+    horizontalPadding: 8,
+    verticalPadding: isParent ? 4 : 6,
+    minFontSizePx: fontSizePx,
+  };
+}
+
 function requireModel(store: ModelStore): ModelState {
   const state = store.getState();
   if (!state.model) throw new Error('No model is open');
@@ -147,17 +173,15 @@ function createLevelStyler(
     ? style.levelFills
     : deriveLevelFills(baseFill, maxDepth + 1);
   const sizes = style?.fontSizes?.length ? style.fontSizes : DEFAULT_FONT_SIZES;
-  const at = <T>(values: readonly T[], depth: number) =>
-    values[Math.min(depth, values.length - 1)];
   return (depth, isParent) => {
     const fontStyle: FontStyle = {
       family: FONT_FAMILY,
-      sizePt: at(sizes, depth),
+      sizePt: valueAtDepth(sizes, depth),
       bold: depth <= 1,
       italic: false,
     };
     return {
-      fillColor: at(fills, depth),
+      fillColor: valueAtDepth(fills, depth),
       fontStyle,
       textAlignment: isParent
         ? style?.parentTextAlignment ?? 2
@@ -196,6 +220,7 @@ function toPackedNode(
   model: ModelState,
   node: CompositionTreeNode,
   weightProperty: string | undefined,
+  style: PackedMapStyle | undefined,
 ): PackedTreeNode {
   const weight = weightProperty
     ? propertyNumber(model, node.elementId, weightProperty)
@@ -203,9 +228,19 @@ function toPackedNode(
   return {
     id: node.elementId,
     name: model.elements[node.elementId]?.name ?? '',
+    label: packedLabelSpec(
+      model.elements[node.elementId]?.name ?? '',
+      node.depth,
+      node.children.length > 0,
+      style,
+      undefined,
+    ),
     ...(weight !== undefined ? { weight } : {}),
     ...(node.children.length > 0
-      ? { children: node.children.map((child) => toPackedNode(model, child, weightProperty)) }
+      ? {
+        children: node.children.map((child) =>
+          toPackedNode(model, child, weightProperty, style)),
+      }
       : {}),
   };
 }
@@ -214,8 +249,13 @@ function toPackedNode(
 function readingOrder(
   bounds: Record<string, Bounds>,
   idOf: (node: CompositionTreeNode) => string,
+  semanticOrder?: readonly string[],
 ) {
+  const order = new Map(semanticOrder?.map((id, index) => [id, index]));
   return (a: CompositionTreeNode, b: CompositionTreeNode) => {
+    const semantic = (order.get(idOf(a)) ?? Number.MAX_SAFE_INTEGER) -
+      (order.get(idOf(b)) ?? Number.MAX_SAFE_INTEGER);
+    if (semantic !== 0) return semantic;
     const left = bounds[idOf(a)];
     const right = bounds[idOf(b)];
     return left.y - right.y || left.x - right.x || compareStableText(idOf(a), idOf(b));
@@ -242,7 +282,7 @@ export function buildPackedMapView(
     throw new Error('Select at least one element to build a capability map');
   }
   const packedRoots = tree.roots.map((node) =>
-    toPackedNode(model, node, options.weightProperty));
+    toPackedNode(model, node, options.weightProperty, options.style));
   const packed = layoutPackedTree(
     packedRoots,
     withDerivedTitleBand(options.layout, options.style),
@@ -268,7 +308,7 @@ export function buildPackedMapView(
     childIds: [],
   };
   const nodes: ElementNode[] = [];
-  const order = readingOrder(packed.nodes, (node) => node.elementId);
+  const order = readingOrder(packed.nodes, (node) => node.elementId, packed.semanticOrder);
   const visit = (node: CompositionTreeNode, parentRef: string) => {
     const id = newId();
     nodes.push(createElementNode(
@@ -335,26 +375,33 @@ export function applyPackedMapLayout(
   }
   if (rootNodeIds.length === 0) return { nodeCount: 0, size: { width: 0, height: 0 } };
 
-  const toPacked = (nodeId: string): PackedTreeNode => {
+  const previousBounds: Record<string, Bounds> = {};
+  const toPacked = (nodeId: string, depth: number): PackedTreeNode => {
     const node = model.nodes[nodeId] as ElementNode;
+    previousBounds[nodeId] = { ...node.bounds };
     const weight = options.weightProperty
       ? propertyNumber(model, node.elementId, options.weightProperty)
       : undefined;
-    const children = node.childIds.filter(isElementNode).map(toPacked);
+    const children = node.childIds.filter(isElementNode).map((id) => toPacked(id, depth + 1));
+    const name = model.elements[node.elementId]?.name ?? '';
     return {
       id: nodeId,
-      name: model.elements[node.elementId]?.name ?? '',
+      name,
+      label: packedLabelSpec(name, depth, children.length > 0, undefined, node.fontStyle),
       ...(weight !== undefined ? { weight } : {}),
       ...(children.length > 0 ? { children } : {}),
     };
   };
   const packed = layoutPackedTree(
-    rootNodeIds.map(toPacked),
-    { sort: 'none', ...options.layout },
+    rootNodeIds.map((id) => toPacked(id, 0)),
+    { sort: 'none', rootPlacement: 'preserve', ...options.layout },
+    { previousBounds },
   );
   const rootSet = new Set(rootNodeIds);
+  const frontier = options.layout?.gridAlgorithm === 'frontier' &&
+    options.layout.mode !== 'treemap' && options.layout.columns === undefined;
   const updates: DiagramNodeLayoutUpdate[] = Object.entries(packed.nodes).map(
-    ([id, bounds]) => rootSet.has(id)
+    ([id, bounds]) => rootSet.has(id) && !frontier
       ? {
         id,
         bounds: {
@@ -483,24 +530,44 @@ export function syncPackedMapView(
       ? propertyNumber(model, entry.element.elementId, options.weightProperty)
       : undefined;
     const children = (plannedChildren.get(entry.nodeId) ?? []).map(toPacked);
+    const existing = entry.isNew ? undefined : nodeByElement.get(entry.element.elementId);
+    const name = elementName(entry.element.elementId);
     return {
       id: entry.nodeId,
-      name: elementName(entry.element.elementId),
+      name,
+      label: packedLabelSpec(
+        name,
+        entry.element.depth,
+        children.length > 0,
+        options.style,
+        existing?.fontStyle,
+      ),
       ...(weight !== undefined ? { weight } : {}),
       ...(children.length > 0 ? { children } : {}),
     };
   };
   const plannedRoots = plannedChildren.get(viewId) ?? [];
+  const previousBounds = Object.fromEntries(planned.flatMap((entry) => {
+    const existing = entry.isNew ? undefined : nodeByElement.get(entry.element.elementId);
+    return existing ? [[entry.nodeId, { ...existing.bounds }]] : [];
+  }));
   const packed = layoutPackedTree(
     plannedRoots.map(toPacked),
-    { sort: 'none', ...withDerivedTitleBand(options.layout, options.style) },
+    {
+      sort: 'none',
+      rootPlacement: 'preserve',
+      ...withDerivedTitleBand(options.layout, options.style),
+    },
+    { previousBounds },
   );
+  const frontier = options.layout?.gridAlgorithm === 'frontier' &&
+    options.layout.mode !== 'treemap' && options.layout.columns === undefined;
   const finalBounds = new Map<string, Bounds>();
   for (const entry of planned) {
     const bounds = packed.nodes[entry.nodeId];
     const isRoot = entry.parentNodeId === viewId;
     const existing = entry.isNew ? undefined : nodeByElement.get(entry.element.elementId);
-    finalBounds.set(entry.nodeId, isRoot && existing
+    finalBounds.set(entry.nodeId, isRoot && existing && !frontier
       ? {
         x: existing.bounds.x,
         y: existing.bounds.y,

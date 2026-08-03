@@ -76,6 +76,29 @@ describe('packed capability-map scripting', () => {
     ]);
   });
 
+  it('accepts and propagates frontier, text sizing, stability, and root-placement options', () => {
+    const { error, logs } = run(`
+      ${SEED}
+      var options = {
+        gridAlgorithm: "frontier",
+        leafSizing: "text-aware",
+        rootPlacement: "repack",
+        frontier: { maxCandidatesPerNode: 12, beamWidth: 16 },
+        stability: { switchThreshold: 0.08 },
+        aesthetics: { orphan: 1.2, alignment: 0.6, movement: 1.5 }
+      };
+      var view = model.createPackedView({ roots: root, open: false, layout: options });
+      var billingVisual = view.nodes({ recursive: true })
+        .filter(function (v) { return v.name === "Billing"; })[0];
+      console.log(billingVisual.bounds.width !== 120, billingVisual.bounds.height !== 55);
+      var packed = view.layoutPacked(options);
+      var sync = view.syncPacked({ roots: root, layout: options });
+      console.log(packed.nodeCount, sync.added, sync.removed, sync.reparented);
+    `);
+    expect(error).toBeUndefined();
+    expect(logs).toEqual(['log:true true', 'log:4 0 0 0']);
+  });
+
   it('round-trips the new style accessors and rejects invalid values', () => {
     const { error, logs } = run(`
       ${SEED}

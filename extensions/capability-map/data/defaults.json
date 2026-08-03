@@ -1,6 +1,8 @@
 {
   "defaults": {
     "mode": "grid",
+    "gridAlgorithm": "frontier",
+    "leafSizing": "text-aware",
     "sort": "name",
     "depth": 0,
     "leafWidth": 120,
@@ -16,6 +18,14 @@
     "mode": [
       { "value": "grid", "label": "Uniform grid" },
       { "value": "treemap", "label": "Weighted treemap" }
+    ],
+    "gridAlgorithm": [
+      { "value": "frontier", "label": "Frontier (text-aware, stable)" },
+      { "value": "balanced-rows", "label": "Balanced rows (legacy)" }
+    ],
+    "leafSizing": [
+      { "value": "text-aware", "label": "Text-aware shapes" },
+      { "value": "fixed", "label": "Fixed size" }
     ],
     "sort": [
       { "value": "name", "label": "Alphabetical" },

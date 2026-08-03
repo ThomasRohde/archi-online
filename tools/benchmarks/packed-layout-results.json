@@ -1,0 +1,138 @@
+{
+  "generatedAt": "2026-08-03T04:37:50.731Z",
+  "environment": {
+    "node": "v25.9.0",
+    "platform": "win32-x64",
+    "cpu": "Intel(R) Core(TM) Ultra 9 185H",
+    "note": "Timing is observational only and never influences layout decisions."
+  },
+  "representative": {
+    "balancedRows": {
+      "totalNodes": 50,
+      "width": 1188,
+      "height": 667,
+      "area": 792396,
+      "aspectDeviation": 0.10723282476123096,
+      "raggedness": 0.03112834891896754,
+      "whitespace": 0.396210580923712,
+      "orphanPenalty": 0,
+      "alignmentComplexity": 1.2142857142857144,
+      "movement": 0,
+      "neighborhoodChange": 0,
+      "viewportOverflow": 0,
+      "averageFrontierSize": 1,
+      "maximumFrontierSize": 1,
+      "candidateCompositionCount": 0,
+      "selectedGrammar": "balanced-rows",
+      "selectedGrammarCounts": {
+        "balanced-rows": 1
+      },
+      "rootGrammars": {
+        "archi-online": "balanced-rows"
+      },
+      "medianMs": 0.2776000000001204
+    },
+    "frontier": {
+      "totalNodes": 50,
+      "width": 1284,
+      "height": 806,
+      "area": 1034904,
+      "aspectDeviation": 0.004351887502457487,
+      "raggedness": 0.006802655036586192,
+      "whitespace": 0.37938360309235625,
+      "orphanPenalty": 0,
+      "alignmentComplexity": 1.391991341991342,
+      "movement": 0,
+      "neighborhoodChange": 0,
+      "viewportOverflow": 0,
+      "averageFrontierSize": 4.04,
+      "maximumFrontierSize": 16,
+      "candidateCompositionCount": 448,
+      "selectedGrammar": "ordered-columns",
+      "selectedGrammarCounts": {
+        "ordered-columns": 3,
+        "ordered-shelves": 5,
+        "ordered-guillotine-vertical": 2,
+        "leaf-wide": 3,
+        "leaf-landscape": 8,
+        "leaf-narrow": 29,
+        "dominant-block-horizontal-strip": 1
+      },
+      "rootGrammars": {
+        "archi-online": "ordered-shelves"
+      },
+      "medianMs": 38.07619999999997
+    },
+    "stableRerunMovement": 0
+  },
+  "synthetic1700": {
+    "balancedRows": {
+      "totalNodes": 1700,
+      "width": 6684,
+      "height": 3616,
+      "area": 24169344,
+      "aspectDeviation": 0.14434453895748167,
+      "raggedness": 0.021977439319477512,
+      "whitespace": 0.37239446949883215,
+      "orphanPenalty": 0,
+      "alignmentComplexity": 0.5285130718954254,
+      "movement": 0,
+      "neighborhoodChange": 0,
+      "viewportOverflow": 0,
+      "averageFrontierSize": 1,
+      "maximumFrontierSize": 1,
+      "candidateCompositionCount": 0,
+      "selectedGrammar": "balanced-rows",
+      "selectedGrammarCounts": {
+        "balanced-rows": 1
+      },
+      "rootGrammars": {
+        "synthetic-root-0": "balanced-rows",
+        "synthetic-root-1": "balanced-rows",
+        "synthetic-root-2": "balanced-rows",
+        "synthetic-root-3": "balanced-rows",
+        "synthetic-root-4": "balanced-rows",
+        "synthetic-root-5": "balanced-rows",
+        "synthetic-root-6": "balanced-rows",
+        "synthetic-root-7": "balanced-rows"
+      },
+      "medianMs": 4.7625000000000455
+    },
+    "frontier": {
+      "totalNodes": 1700,
+      "width": 7812,
+      "height": 4596,
+      "area": 35903952,
+      "aspectDeviation": 0.06047102378218761,
+      "raggedness": 0.005555931572355837,
+      "whitespace": 0.38150398235120764,
+      "orphanPenalty": 0,
+      "alignmentComplexity": 1.0546160130718951,
+      "movement": 0,
+      "neighborhoodChange": 0,
+      "viewportOverflow": 0,
+      "averageFrontierSize": 1.1970588235294117,
+      "maximumFrontierSize": 6,
+      "candidateCompositionCount": 2556,
+      "selectedGrammar": "ordered-columns",
+      "selectedGrammarCounts": {
+        "ordered-columns": 101,
+        "leaf-expanded": 958,
+        "leaf-landscape": 321,
+        "leaf-wide": 317,
+        "ordered-shelves": 4
+      },
+      "rootGrammars": {
+        "synthetic-root-0": "ordered-columns",
+        "synthetic-root-1": "ordered-shelves",
+        "synthetic-root-2": "ordered-columns",
+        "synthetic-root-3": "ordered-columns",
+        "synthetic-root-4": "ordered-columns",
+        "synthetic-root-5": "ordered-shelves",
+        "synthetic-root-6": "ordered-columns",
+        "synthetic-root-7": "ordered-columns"
+      },
+      "medianMs": 539.8499999999999
+    }
+  }
+}

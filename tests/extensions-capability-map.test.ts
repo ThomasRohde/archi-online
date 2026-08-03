@@ -128,7 +128,7 @@ describe('capability-map extension', () => {
     await new Promise((resolve) => window.setTimeout(resolve, 0));
 
     expect([...container.querySelectorAll('select')].map((select) => select.value))
-      .toEqual(['treemap', 'weight']);
+      .toEqual(['treemap', 'frontier', 'text-aware', 'weight']);
     expect([...container.querySelectorAll('input[type="text"]')].map(
       (input) => (input as HTMLInputElement).value,
     )).toEqual(['headcount', 'maturity', '']);

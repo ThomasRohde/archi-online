@@ -1,7 +1,7 @@
 app.extension({
   id: 'archi-online.capability-map',
   name: 'Capability Map',
-  version: '1.11.0'
+  version: '1.12.0'
 });
 
 var config = app.assets.json('data/defaults.json');
@@ -29,6 +29,16 @@ async function readOptions() {
   var stored = (await app.storage.get('options')) || {};
   return {
     mode: knownValue(config.options.mode, stored.mode, config.defaults.mode),
+    gridAlgorithm: knownValue(
+      config.options.gridAlgorithm,
+      stored.gridAlgorithm,
+      config.defaults.gridAlgorithm
+    ),
+    leafSizing: knownValue(
+      config.options.leafSizing,
+      stored.leafSizing,
+      config.defaults.leafSizing
+    ),
     sort: knownValue(config.options.sort, stored.sort, config.defaults.sort),
     depth: clamp(stored.depth, config.defaults.depth, config.limits.depth.min, config.limits.depth.max),
     leafWidth: clamp(stored.leafWidth, config.defaults.leafWidth, config.limits.leafWidth.min, config.limits.leafWidth.max),
@@ -49,6 +59,8 @@ async function writeOptions(options) {
 function layoutFrom(options) {
   return {
     mode: options.mode,
+    gridAlgorithm: options.gridAlgorithm,
+    leafSizing: options.leafSizing,
     sort: options.sort,
     leafWidth: options.leafWidth,
     leafHeight: options.leafHeight,
@@ -132,6 +144,8 @@ async function repack() {
   var scope = app.selection.visuals();
   var result = view.layoutPacked({
     mode: options.mode,
+    gridAlgorithm: options.gridAlgorithm,
+    leafSizing: options.leafSizing,
     sort: 'none',
     leafWidth: options.leafWidth,
     leafHeight: options.leafHeight,
@@ -306,6 +320,14 @@ async function renderPanel() {
 
   addSelect(panel, 'Layout mode', options.mode, config.options.mode, function (value) {
     options.mode = value;
+    void writeOptions(options);
+  });
+  addSelect(panel, 'Grid algorithm', options.gridAlgorithm, config.options.gridAlgorithm, function (value) {
+    options.gridAlgorithm = value;
+    void writeOptions(options);
+  });
+  addSelect(panel, 'Leaf sizing', options.leafSizing, config.options.leafSizing, function (value) {
+    options.leafSizing = value;
     void writeOptions(options);
   });
   addSelect(panel, 'Sort siblings', options.sort, config.options.sort, function (value) {

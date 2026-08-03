@@ -13,6 +13,7 @@ import {
   setNodeStyle,
   setProperties,
 } from '../src/model/ops';
+import { measurePackedLabel } from '../src/model/layout/packed-tree';
 import { layoutView } from '../src/model/ops/layout';
 import { createModelStore, redo, undo, type ModelStore } from '../src/model/store';
 import type { ElementNode, GroupNode, ModelState } from '../src/model/types';
@@ -136,6 +137,29 @@ describe('buildPackedMapView', () => {
     };
     expect(area(billing)).toBeGreaterThan(area(service) * 3);
   });
+
+  it('builds a text-aware frontier map whose labels constrain legal geometry', () => {
+    const { store, root, billing, service } = fixture();
+    const result = buildPackedMapView(store, {
+      rootIds: [root],
+      open: false,
+      layout: { gridAlgorithm: 'frontier', leafSizing: 'text-aware' },
+    });
+    for (const elementId of [billing, service]) {
+      const node = nodeFor(store, result.viewId, elementId);
+      expect([168, 132, 108]).toContain(node.bounds.width);
+      const name = model(store).elements[elementId].name;
+      const size = (node.fontStyle?.sizePt ?? 9) * (4 / 3);
+      expect(measurePackedLabel({
+        text: name,
+        fontSizePx: size,
+        lineHeightPx: size * 1.25,
+        maxLines: 3,
+        horizontalPadding: 8,
+        verticalPadding: 6,
+      }, node.bounds.width, node.bounds.height).fits).toBe(true);
+    }
+  });
 });
 
 describe('applyPackedMapLayout', () => {
@@ -212,6 +236,58 @@ describe('syncPackedMapView', () => {
       return model(store).elements[child.elementId].name;
     });
     expect(childNames[0]).toBe('Alpha');
+  });
+
+  it('keeps an unaffected root anchored during frontier sync and undoes as one action', () => {
+    const { store, root } = fixture();
+    const other = addElement('Capability', 'People', undefined, store);
+    const workforce = addElement('Capability', 'Workforce Planning', undefined, store);
+    addRelationship('CompositionRelationship', other, workforce, '', undefined, store);
+    const result = buildPackedMapView(store, {
+      rootIds: [root, other],
+      open: false,
+      layout: { gridAlgorithm: 'frontier', leafSizing: 'text-aware' },
+    });
+    const otherNode = nodeFor(store, result.viewId, other);
+    layoutView([{
+      id: otherNode.id,
+      bounds: { ...otherNode.bounds, x: otherNode.bounds.x + 1000 },
+    }], [], store);
+    const otherBefore = structuredClone(nodeFor(store, result.viewId, other).bounds);
+    const workforceBefore = structuredClone(nodeFor(store, result.viewId, workforce).bounds);
+    const analytics = addElement('Capability', 'Advanced Customer Analytics', undefined, store);
+    addRelationship('CompositionRelationship', root, analytics, '', undefined, store);
+
+    const before = store.getState().undoStack.length;
+    expect(syncPackedMapView(store, result.viewId, {
+      rootIds: [root, other],
+      layout: { gridAlgorithm: 'frontier', leafSizing: 'text-aware' },
+    }).added).toBe(1);
+    expect(store.getState().undoStack).toHaveLength(before + 1);
+    expect(nodeFor(store, result.viewId, other).bounds.x).toBe(otherBefore.x);
+    expect(nodeFor(store, result.viewId, other).bounds.y).toBe(otherBefore.y);
+    expect(nodeFor(store, result.viewId, workforce).bounds).toEqual(workforceBefore);
+    undo(store);
+    expect(Object.values(model(store).nodes).some((node) =>
+      node.nodeType === 'element' && node.elementId === analytics && node.viewId === result.viewId))
+      .toBe(false);
+  });
+
+  it('rejects frontier relayout and sync without mutating a read-only store', () => {
+    const { store, root } = fixture();
+    const result = buildPackedMapView(store, {
+      rootIds: [root], open: false,
+      layout: { gridAlgorithm: 'frontier', leafSizing: 'text-aware' },
+    });
+    const before = structuredClone(model(store));
+    store.setState({ readOnly: true });
+    expect(() => applyPackedMapLayout(store, result.viewId, {
+      layout: { gridAlgorithm: 'frontier', leafSizing: 'text-aware' },
+    })).toThrow(/read-only/i);
+    expect(() => syncPackedMapView(store, result.viewId, {
+      layout: { gridAlgorithm: 'frontier', leafSizing: 'text-aware' },
+    })).toThrow(/read-only/i);
+    expect(model(store)).toEqual(before);
   });
 });
 

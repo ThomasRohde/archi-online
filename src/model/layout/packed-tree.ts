@@ -1,5 +1,40 @@
 import type { Bounds } from '../types';
 import { compareStableText } from '../stable-order';
+import {
+  layoutPackedFrontier,
+  type PackedFrontierDiagnostics,
+  type PackedFrontierOptions,
+  type PackedGridAlgorithm,
+  type PackedLayoutContext,
+  type PackedLeafSizing,
+  type PackedRootPlacement,
+  type PackedStabilityOptions,
+} from './packed-frontier';
+import type { PackedLabelSpec } from './packed-text';
+
+export type {
+  PackedFrontierDiagnostics,
+  PackedFrontierOptions,
+  PackedGridAlgorithm,
+  PackedLabelSpec,
+  PackedLayoutContext,
+  PackedLeafSizing,
+  PackedRootPlacement,
+  PackedStabilityOptions,
+};
+export {
+  createPackedLeafShapes,
+  estimatePackedTextWidth,
+  measurePackedLabel,
+  minimumPackedLabelWidth,
+  wrapPackedText,
+} from './packed-text';
+export {
+  evaluatePackedTreeLayout,
+  measurePackedMetrics,
+  scorePackedMetrics,
+  type PackedLayoutMetrics,
+} from './packed-metrics';
 
 export type PackedTreeMode = 'grid' | 'treemap';
 export type PackedTreeAlgorithm = 'auto' | 'squarify' | 'strip';
@@ -8,6 +43,8 @@ export type PackedTreeSort = 'name' | 'weight' | 'none';
 export interface PackedTreeNode {
   id: string;
   name?: string;
+  /** Pure text constraints used by frontier/text-aware layout. */
+  label?: PackedLabelSpec;
   /** Treemap leaf weight; non-finite or <= 0 falls back to 1. */
   weight?: number;
   children?: readonly PackedTreeNode[];
@@ -18,6 +55,11 @@ export interface PackedAestheticWeights {
   aspect?: number;
   raggedness?: number;
   whitespace?: number;
+  orphan?: number;
+  alignment?: number;
+  movement?: number;
+  neighborhood?: number;
+  overflow?: number;
 }
 
 export interface PackedTreeOptions {
@@ -39,12 +81,23 @@ export interface PackedTreeOptions {
   aesthetics?: PackedAestheticWeights;
   minCellWidth?: number;
   minCellHeight?: number;
+  /** Grid-only engine. Omitted calls retain the exact legacy row layout. */
+  gridAlgorithm?: PackedGridAlgorithm;
+  /** Frontier-only leaf vocabulary. */
+  leafSizing?: PackedLeafSizing;
+  frontier?: PackedFrontierOptions;
+  stability?: PackedStabilityOptions;
+  rootPlacement?: PackedRootPlacement;
 }
 
 export interface PackedTreeLayout {
   /** Bounds are parent-relative; root entries are relative to (0, 0). */
   nodes: Record<string, Bounds>;
   size: { width: number; height: number };
+  /** Frontier-only stable pre-order, independent of the selected grammar. */
+  semanticOrder?: readonly string[];
+  /** Frontier-only transient diagnostics; never persisted in model files. */
+  diagnostics?: PackedFrontierDiagnostics;
 }
 
 interface ResolvedOptions {
@@ -562,9 +615,14 @@ function assertUniqueIds(roots: readonly PackedTreeNode[]): void {
 export function layoutPackedTree(
   roots: readonly PackedTreeNode[],
   options?: PackedTreeOptions,
+  context: PackedLayoutContext = {},
 ): PackedTreeLayout {
   if (roots.length === 0) return { nodes: {}, size: { width: 0, height: 0 } };
   assertUniqueIds(roots);
   const opts = resolveOptions(options);
-  return opts.mode === 'treemap' ? layoutTreemap(roots, opts) : layoutGrid(roots, opts);
+  if (opts.mode === 'treemap') return layoutTreemap(roots, opts);
+  if (options?.gridAlgorithm === 'frontier' && opts.columns === null) {
+    return layoutPackedFrontier(roots, options, context);
+  }
+  return layoutGrid(roots, opts);
 }

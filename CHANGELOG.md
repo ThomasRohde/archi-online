@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.12.0] - 2026-08-03
+
+### Added
+
+- Added the opt-in GCHRP-2 packed-grid engine (`gridAlgorithm: "frontier"`)
+  with bounded Pareto shape frontiers, deterministic text-aware leaf sizing,
+  complete-forest selection, stability scoring and preserved-root relayout.
+- Extended packed-view scripting options and diagnostics with frontier search,
+  aesthetic, hysteresis and root-placement controls while retaining exact
+  balanced-row and treemap compatibility.
+
 ## [1.11.0] - 2026-07-21
 
 ### Changed

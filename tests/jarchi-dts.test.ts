@@ -24,6 +24,11 @@ describe('jArchi Monaco declarations', () => {
     expect(JARCHI_SCRIPT_DTS).toContain('layoutPacked(options?: JPackedLayoutOptions)');
     expect(JARCHI_SCRIPT_DTS).toContain('syncPacked(options?: JPackedSyncOptions)');
     expect(JARCHI_SCRIPT_DTS).toContain('applyHeatmap(options: JHeatmapOptions)');
+    expect(JARCHI_SCRIPT_DTS).toContain("gridAlgorithm?: 'balanced-rows' | 'frontier';");
+    expect(JARCHI_SCRIPT_DTS).toContain("leafSizing?: 'fixed' | 'text-aware';");
+    expect(JARCHI_SCRIPT_DTS).toContain('frontier?: JPackedFrontierOptions;');
+    expect(JARCHI_SCRIPT_DTS).toContain('stability?: JPackedStabilityOptions;');
+    expect(JARCHI_SCRIPT_DTS).toContain("rootPlacement?: 'preserve' | 'repack';");
     expect(JARCHI_SCRIPT_DTS).toContain('fontSize: number;');
     expect(JARCHI_SCRIPT_DTS).toContain("fontStyle: 'normal' | 'bold' | 'italic' | 'bolditalic';");
     expect(JARCHI_SCRIPT_DTS).toContain('textAlignment: number;');

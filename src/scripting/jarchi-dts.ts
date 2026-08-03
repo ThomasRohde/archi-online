@@ -47,6 +47,31 @@ declare interface JLegendOptions {
 
 type JConnectable = JVisual | JConnection;
 
+declare interface JPackedAestheticWeights {
+  aspect?: number;
+  raggedness?: number;
+  whitespace?: number;
+  orphan?: number;
+  alignment?: number;
+  movement?: number;
+  neighborhood?: number;
+  overflow?: number;
+}
+
+declare interface JPackedFrontierOptions {
+  maxCandidatesPerNode?: number;
+  beamWidth?: number;
+  epsilon?: number;
+  aspectBuckets?: number[];
+  largeSiblingThreshold?: number;
+}
+
+declare interface JPackedStabilityOptions {
+  /** Relative aesthetic improvement required before a stable form is replaced (default 0.07). */
+  switchThreshold?: number;
+  targetExtent?: { width: number; height: number };
+}
+
 declare interface JPackedTreeOptions {
   /** 'grid' tiles uniform cells (default); 'treemap' sizes leaves by weight. */
   mode?: 'grid' | 'treemap';
@@ -64,9 +89,17 @@ declare interface JPackedTreeOptions {
   sort?: 'name' | 'weight' | 'none';
   /** Grid: fixed items per row. */
   columns?: number;
-  aesthetics?: { aspect?: number; raggedness?: number; whitespace?: number };
+  aesthetics?: JPackedAestheticWeights;
   minCellWidth?: number;
   minCellHeight?: number;
+  /** Grid engine. Omitted calls retain the exact balanced-row behavior. */
+  gridAlgorithm?: 'balanced-rows' | 'frontier';
+  /** Frontier leaf geometry: fixed base cells or deterministic text-fitting alternatives. */
+  leafSizing?: 'fixed' | 'text-aware';
+  frontier?: JPackedFrontierOptions;
+  stability?: JPackedStabilityOptions;
+  /** Existing maps preserve root anchors by default; creation repacks the complete forest. */
+  rootPlacement?: 'preserve' | 'repack';
 }
 
 declare interface JPackedMapStyle {
