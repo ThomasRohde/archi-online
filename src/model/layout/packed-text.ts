@@ -26,6 +26,7 @@ export interface PackedLeafShape {
 const WIDTH_SAFETY = 1.08;
 const DEFAULT_HORIZONTAL_PADDING = 8;
 const DEFAULT_VERTICAL_PADDING = 6;
+const GLYPH_FACTOR_CACHE = new Map<string, number>();
 
 function finite(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isFinite(value) ? value : fallback;
@@ -44,11 +45,22 @@ export function estimatePackedTextWidth(text: string, fontSizePx: number): numbe
 }
 
 function packedGlyphWidth(character: string, size: number): number {
-  if (character === ' ') return size * 0.32;
-  if (/[ilI1'.,:;|!]/.test(character)) return size * 0.28;
-  if (/[mMwW@#%&]/.test(character)) return size * 0.82;
-  if (/[A-Z0-9]/.test(character)) return size * 0.64;
-  return size * 0.54;
+  const cached = GLYPH_FACTOR_CACHE.get(character);
+  if (cached !== undefined) return size * cached;
+  let factor: number;
+  if (/\p{Mark}/u.test(character)) factor = 0;
+  else if (/\s/u.test(character)) factor = 0.32;
+  else if (/[ilI1'.,:;|!]/.test(character)) factor = 0.28;
+  else if (/[mMwW@#%&]/.test(character)) factor = 0.82;
+  else if (/\p{Uppercase_Letter}|\p{Number}/u.test(character)) factor = 0.64;
+  else if (/\p{Punctuation}/u.test(character)) factor = 0.38;
+  else if (/\p{Symbol}/u.test(character)) factor = 0.72;
+  else if (/\p{Letter}/u.test(character)) factor = 0.54;
+  // Unknown scripts stay conservative instead of inheriting a narrow ASCII
+  // fallback. This remains deterministic and DOM-independent.
+  else factor = 0.68;
+  GLYPH_FACTOR_CACHE.set(character, factor);
+  return size * factor;
 }
 
 interface TextChunk {

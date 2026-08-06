@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPackedLeafShapes,
+  estimatePackedTextWidth,
   evaluatePackedTreeLayout,
   layoutPackedTree,
+  measurePackedBandMetrics,
   measurePackedLabel,
+  measurePackedMetrics,
   minimumPackedLabelWidth,
   wrapPackedText,
   type PackedLabelSpec,
@@ -12,6 +15,10 @@ import {
   type PackedTreeOptions,
 } from '../src/model/layout/packed-tree';
 import type { Bounds } from '../src/model/types';
+import {
+  capabilityLayoutFixtures,
+  capabilityStressForest,
+} from '../tools/capability-layout-fixtures';
 
 const FRONTIER: PackedTreeOptions = {
   gridAlgorithm: 'frontier',
@@ -233,8 +240,8 @@ describe('GCHRP-2 bounded shape frontier', () => {
     expect(directNamed).toEqual(['alpha-a', 'alpha-b', 'bravo', 'echo', 'mike', 'tango', 'zeta']);
   });
 
-  it('avoids one-item final bands for seven and eleven equal leaves', () => {
-    for (const count of [7, 11]) {
+  it('avoids one-item final bands for seven, eleven, and thirteen equal leaves', () => {
+    for (const count of [7, 11, 13]) {
       const tree = [parent(`rhythm-${count}`, Array.from({ length: count }, (_, index) =>
         leaf(`rhythm-${count}-${index}`, 'Equal Capability')))];
       const layout = layoutPackedTree(tree, FRONTIER);
@@ -299,4 +306,196 @@ describe('GCHRP-2 bounded shape frontier', () => {
       rootPlacement: 'preserve',
     }, { previousBounds: baseline.nodes }));
   });
+});
+
+describe('shape-function-3 floorplanning regressions', () => {
+  it('retains geometry regions, composes mixed child forms, and prunes in two bounded stages', () => {
+    const fixture = capabilityLayoutFixtures().find((candidate) =>
+      candidate.id === 'mixed-form')!;
+    const layout = layoutPackedTree(fixture.roots, {
+      ...FRONTIER,
+      targetAspect: 8,
+      frontier: { maxCandidatesPerNode: 12, beamWidth: 16 },
+    });
+    expectValid(fixture.roots, layout);
+    const diagnostics = layout.diagnostics!;
+    expect(diagnostics.revision).toBe('shape-function-3');
+    expect(diagnostics.searchStrategy).toBe('bounded-mixed-form');
+    expect(diagnostics.qualityModel).toBe('tiered-significance-weighted');
+    expect(Object.values(diagnostics.aspectRegionCounts).filter((count) => count > 0).length)
+      .toBeGreaterThanOrEqual(3);
+    expect(diagnostics.mixedFormCompositionCount).toBeGreaterThan(0);
+    expect(diagnostics.intervalBaseAspectRegionCount).toBeGreaterThan(0);
+    expect(diagnostics.maximumIntervalFrontier).toBeLessThanOrEqual(8);
+    expect(diagnostics.geometryCandidatesBeforePruning)
+      .toBeGreaterThanOrEqual(diagnostics.geometryCandidatesAfterPruning);
+    expect(diagnostics.qualityVariantsBeforePruning)
+      .toBeGreaterThanOrEqual(diagnostics.qualityVariantsAfterPruning);
+    expect(diagnostics.maximumFrontierSize).toBeLessThanOrEqual(12);
+    const root = fixture.roots[0];
+    const childRegions = new Set(root.children!.map((child) => {
+      const bounds = layout.nodes[child.id];
+      const aspect = bounds.width / bounds.height;
+      return aspect < 0.85 ? 'portrait' : aspect > 1.3 ? 'landscape' : 'square';
+    }));
+    expect(childRegions.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it('orders band consistency and detects band and broad-region stability breaks', () => {
+    const good = [
+      { id: 'a', bounds: { x: 0, y: 0, width: 80, height: 40 } },
+      { id: 'b', bounds: { x: 90, y: 0, width: 80, height: 40 } },
+      { id: 'c', bounds: { x: 0, y: 50, width: 80, height: 40 } },
+      { id: 'd', bounds: { x: 90, y: 50, width: 80, height: 40 } },
+    ];
+    const inconsistent = good.map((placement) => placement.id === 'c' || placement.id === 'd'
+      ? { ...placement, bounds: { ...placement.bounds, height: 80 } }
+      : placement);
+    expect(measurePackedBandMetrics(good, 'row').bandConsistency).toBe(0);
+    expect(measurePackedBandMetrics(inconsistent, 'row').bandConsistency)
+      .toBeGreaterThan(0);
+
+    const previousBounds = Object.fromEntries(good.map((placement) =>
+      [placement.id, placement.bounds]));
+    const changed = [good[0], good[3], good[2], good[1]].map((placement, index) => ({
+      id: placement.id,
+      bounds: good[index].bounds,
+    }));
+    const metrics = measurePackedMetrics({
+      width: 170,
+      height: 90,
+      targetAspect: 1.6,
+      placements: changed,
+      contentArea: 4 * 80 * 40,
+      previousBounds,
+    });
+    expect(metrics.neighborhoodChange).toBeGreaterThan(0);
+    expect(metrics.bandChange).toBeGreaterThan(0);
+    expect(metrics.regionChange).toBeGreaterThan(0);
+  });
+
+  it('weights movement from a large subtree more than the same defect in a tiny subtree', () => {
+    const largeChildren = Array.from({ length: 8 }, (_, index) => ({ id: `large-${index}` }));
+    const roots = [{
+      id: 'root',
+      children: [
+        { id: 'large', children: largeChildren },
+        { id: 'small', children: [{ id: 'small-0' }, { id: 'small-1' }] },
+      ],
+    }];
+    const nodes: Record<string, Bounds> = {
+      root: { x: 0, y: 0, width: 800, height: 400 },
+      large: { x: 0, y: 0, width: 600, height: 300 },
+      small: { x: 610, y: 0, width: 180, height: 100 },
+      ...Object.fromEntries(largeChildren.map((child, index) => [child.id, {
+        x: (index % 4) * 120,
+        y: Math.floor(index / 4) * 60,
+        width: 100,
+        height: 40,
+      }])),
+      'small-0': { x: 0, y: 0, width: 70, height: 40 },
+      'small-1': { x: 80, y: 0, width: 70, height: 40 },
+    };
+    const previous = Object.fromEntries(Object.entries(nodes).map(([id, bounds]) =>
+      [id, { ...bounds }]));
+    const move = (ids: readonly string[]) => ({
+      ...nodes,
+      ...Object.fromEntries(ids.map((id) => [id, { ...nodes[id], x: nodes[id].x + 60 }])),
+    });
+    const largeMoved = evaluatePackedTreeLayout({
+      roots,
+      nodes: move(largeChildren.map((child) => child.id)),
+      size: { width: 800, height: 400 },
+      previousBounds: previous,
+    });
+    const smallMoved = evaluatePackedTreeLayout({
+      roots,
+      nodes: move(['small-0', 'small-1']),
+      size: { width: 800, height: 400 },
+      previousBounds: previous,
+    });
+    expect(largeMoved.movement).toBeGreaterThan(smallMoved.movement);
+  });
+
+  it('uses a bounded root beam that is no worse than legacy right/down repair', () => {
+    const fixture = capabilityLayoutFixtures().find((candidate) =>
+      candidate.id === 'preserved-collision')!;
+    const baseline = layoutPackedTree(fixture.previousRoots!, FRONTIER);
+    const rootIds = fixture.roots.map((root) => root.id);
+    const root1X = baseline.nodes[rootIds[0]].width + 12;
+    const root2X = root1X + baseline.nodes[rootIds[1]].width + 12;
+    const root3X = root2X + baseline.nodes[rootIds[2]].width + 12;
+    const previousBounds = {
+      ...baseline.nodes,
+      [rootIds[0]]: { ...baseline.nodes[rootIds[0]], x: 0, y: 0 },
+      [rootIds[1]]: { ...baseline.nodes[rootIds[1]], x: root1X, y: 0 },
+      [rootIds[2]]: { ...baseline.nodes[rootIds[2]], x: root2X, y: 0 },
+      [rootIds[3]]: { ...baseline.nodes[rootIds[3]], x: root3X, y: 0 },
+    };
+    const preserved = layoutPackedTree(fixture.roots, {
+      ...FRONTIER,
+      rootPlacement: 'preserve',
+    }, { previousBounds });
+    const greedy: Record<string, Bounds> = {};
+    const placed: Bounds[] = [];
+    for (const id of rootIds) {
+      const size = preserved.nodes[id];
+      let current = { ...previousBounds[id], width: size.width, height: size.height };
+      for (let iteration = 0; iteration <= placed.length * 2; iteration++) {
+        const conflicts = placed.filter((other) => overlaps(current, other));
+        if (conflicts.length === 0) break;
+        const right = Math.max(...conflicts.map((other) => other.x + other.width + 12));
+        const below = Math.max(...conflicts.map((other) => other.y + other.height + 12));
+        current = right - current.x <= below - current.y
+          ? { ...current, x: right }
+          : { ...current, y: below };
+      }
+      greedy[id] = current;
+      placed.push(current);
+    }
+    const displacement = (bounds: Readonly<Record<string, Bounds>>) => rootIds.reduce((sum, id) =>
+      sum + Math.hypot(
+        bounds[id].x - previousBounds[id].x,
+        bounds[id].y - previousBounds[id].y,
+      ), 0);
+    const frameArea = (bounds: Readonly<Record<string, Bounds>>) =>
+      Math.max(...rootIds.map((id) => bounds[id].x + bounds[id].width)) *
+      Math.max(...rootIds.map((id) => bounds[id].y + bounds[id].height));
+    expect(displacement(preserved.nodes) < displacement(greedy) ||
+      frameArea(preserved.nodes) < frameArea(greedy)).toBe(true);
+    expect(preserved.diagnostics?.selectedGrammar).toBe('preserved-root-beam');
+    expect(preserved.diagnostics?.rootRepairStatesExplored).toBeGreaterThan(0);
+    expect(preserved.diagnostics?.maximumRootRepairBeam).toBeLessThanOrEqual(24);
+    expectValid(fixture.roots, preserved);
+  });
+
+  it('handles representative Unicode labels and long tokens deterministically', () => {
+    const labels = [
+      'Økonomi & Likviditetsstyring',
+      'Kreditrisiko (IFRS 9)',
+      'KYC/CDD — Kundekendskab 360°',
+      'UnbrokenCapabilityIdentifierÆØÅ2026',
+    ];
+    for (const text of labels) {
+      expect(estimatePackedTextWidth(text, 13)).toBeGreaterThan(0);
+      const shapes = createPackedLeafShapes({ text, fontSizePx: 13, maxLines: 3 }, 120, 55);
+      expect(shapes.every((shape) => shape.text.fits)).toBe(true);
+      expect(shapes).toEqual(createPackedLeafShapes(
+        { text, fontSizePx: 13, maxLines: 3 }, 120, 55,
+      ));
+    }
+  });
+
+  it('completes the deterministic 1,700-node forest within structural bounds', () => {
+    const stress = capabilityStressForest();
+    const layout = layoutPackedTree(stress, {
+      ...FRONTIER,
+      frontier: { maxCandidatesPerNode: 16, beamWidth: 20, largeSiblingThreshold: 14 },
+    });
+    expect(Object.keys(layout.nodes)).toHaveLength(1700);
+    expect(layout.diagnostics?.maximumFrontierSize).toBeLessThanOrEqual(16);
+    expect(layout.diagnostics?.maximumIntervalFrontier).toBeLessThanOrEqual(8);
+    expect(layout.diagnostics?.largeNodeFallbackCount).toBeGreaterThan(0);
+    expectValid(stress, layout);
+  }, 20_000);
 });

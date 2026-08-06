@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createEmptyModel } from '../src/model/ops';
 import { replaceModel, undo } from '../src/model/store';
@@ -23,6 +25,11 @@ const SEED = `
   model.createRelationship("composition-relationship", "", root, billing);
   model.createRelationship("composition-relationship", "", claims, fraud);
 `;
+
+const STANDALONE_CAPABILITY_MAP_SCRIPT = readFileSync(
+  join(process.cwd(), 'archi-online-capability-map.ajs'),
+  'utf8',
+);
 
 beforeEach(() => replaceModel(createEmptyModel('Capability script'), null));
 
@@ -141,6 +148,22 @@ describe('packed capability-map scripting', () => {
     expect(first.error).toBeUndefined();
     expect(first.logs[0]).toBe('log:Created 50 capabilities.');
     const second = run(ARCHI_ONLINE_CAPABILITY_MAP_SCRIPT);
+    expect(second.error).toBeUndefined();
+    expect(second.logs[0]).toContain('Reusing the existing');
+    const model = useStore.getState().model!;
+    const viewNames = Object.values(model.views).map((view) => view.name).sort();
+    expect(viewNames).toEqual([
+      'Archi Online — Capability Map',
+      'Archi Online — Investment Treemap',
+    ]);
+    expect(Object.keys(model.elements)).toHaveLength(50);
+  });
+
+  it('runs the distributable Archi Online capability map script idempotently', () => {
+    const first = run(STANDALONE_CAPABILITY_MAP_SCRIPT);
+    expect(first.error).toBeUndefined();
+    expect(first.logs[0]).toBe('log:Created 50 capabilities.');
+    const second = run(STANDALONE_CAPABILITY_MAP_SCRIPT);
     expect(second.error).toBeUndefined();
     expect(second.logs[0]).toContain('Reusing the existing');
     const model = useStore.getState().model!;

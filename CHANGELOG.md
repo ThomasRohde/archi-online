@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Improved the existing `frontier` capability-map floorplanner with bounded
+  mixed-form composition, geometry-region retention, tiered quality selection,
+  significance-weighted descendant metrics, and text-aware Unicode estimates.
+- Strengthened preserve-mode stability with band, region, and neighbourhood
+  evidence plus bounded minimum-displacement root repair; the Capability Map
+  extension now keeps sync stable while its explicit Repack command permits a
+  fresh root composition. Balanced rows, fixed columns, and treemap behavior
+  remain compatible.
+
 ## [1.12.0] - 2026-08-03
 
 ### Added

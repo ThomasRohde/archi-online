@@ -152,6 +152,7 @@ async function repack() {
     padding: options.padding,
     gutter: options.gutter,
     targetAspect: options.targetAspect,
+    rootPlacement: 'repack',
     weightProperty: options.weightProperty || undefined,
     scope: scope.length > 0 ? scope : undefined
   });

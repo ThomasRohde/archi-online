@@ -10,9 +10,11 @@ import {
   addRelationship,
   createEmptyModel,
   deleteItems,
+  reorderNode,
   setNodeStyle,
   setProperties,
 } from '../src/model/ops';
+import { serializeArchimate } from '../src/model/io/archimate-xml';
 import { measurePackedLabel } from '../src/model/layout/packed-tree';
 import { layoutView } from '../src/model/ops/layout';
 import { createModelStore, redo, undo, type ModelStore } from '../src/model/store';
@@ -159,6 +161,9 @@ describe('buildPackedMapView', () => {
         verticalPadding: 6,
       }, node.bounds.width, node.bounds.height).fits).toBe(true);
     }
+
+    const xml = serializeArchimate(model(store));
+    expect(xml).not.toMatch(/shape-function|bounded-mixed-form|selectedQualityTier/);
   });
 });
 
@@ -185,6 +190,33 @@ describe('applyPackedMapLayout', () => {
     expect(repackedRoot.childIds).toEqual(orderBefore);
     expect(repackedBilling.bounds.width).toBe(120);
     expect(repackedBilling.bounds.height).toBe(55);
+  });
+
+  it('isolates selected-scope frontier repair by parent-relative coordinate space', () => {
+    const { store, root, claims } = fixture();
+    const other = addElement('Capability', 'People', undefined, store);
+    const workforce = addElement('Capability', 'Workforce Planning', undefined, store);
+    addRelationship('CompositionRelationship', other, workforce, '', undefined, store);
+    const result = buildPackedMapView(store, {
+      rootIds: [root, other],
+      open: false,
+      layout: { gridAlgorithm: 'frontier', leafSizing: 'text-aware' },
+    });
+    const claimsNode = nodeFor(store, result.viewId, claims);
+    const workforceNode = nodeFor(store, result.viewId, workforce);
+    const sharedPosition = { x: 48, y: 64 };
+    layoutView([
+      { id: claimsNode.id, bounds: { ...claimsNode.bounds, ...sharedPosition } },
+      { id: workforceNode.id, bounds: { ...workforceNode.bounds, ...sharedPosition } },
+    ], [], store);
+
+    applyPackedMapLayout(store, result.viewId, {
+      scopeNodeIds: [claimsNode.id, workforceNode.id],
+      layout: { gridAlgorithm: 'frontier', leafSizing: 'text-aware' },
+    });
+
+    expect(nodeFor(store, result.viewId, claims).bounds).toMatchObject(sharedPosition);
+    expect(nodeFor(store, result.viewId, workforce).bounds).toMatchObject(sharedPosition);
   });
 });
 
@@ -236,6 +268,27 @@ describe('syncPackedMapView', () => {
       return model(store).elements[child.elementId].name;
     });
     expect(childNames[0]).toBe('Alpha');
+  });
+
+  it('keeps survivor semantic order even when stored layout options request sorting', () => {
+    const { store, root, billing } = fixture();
+    const result = buildPackedMapView(store, {
+      rootIds: [root],
+      open: false,
+      layout: { gridAlgorithm: 'frontier', leafSizing: 'text-aware' },
+    });
+    reorderNode(nodeFor(store, result.viewId, billing).id, 'front', store);
+    const orderBefore = [...nodeFor(store, result.viewId, root).childIds];
+
+    syncPackedMapView(store, result.viewId, {
+      layout: {
+        gridAlgorithm: 'frontier',
+        leafSizing: 'text-aware',
+        sort: 'name',
+      },
+    });
+
+    expect(nodeFor(store, result.viewId, root).childIds).toEqual(orderBefore);
   });
 
   it('keeps an unaffected root anchored during frontier sync and undoes as one action', () => {

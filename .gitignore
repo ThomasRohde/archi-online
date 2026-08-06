@@ -22,5 +22,6 @@ docs/.vitepress/dist/
 CLAUDE.local.md
 .claude/settings.local.json
 docs/superpowers/
+.capability-layout-evidence/
 docs/brainstorms/
 /smoke-*.png

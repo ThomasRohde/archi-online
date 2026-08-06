@@ -571,9 +571,14 @@ result of the underlying operation.
 Unlike balanced rows, which commits to one rectangle at each subtree, the
 frontier engine keeps a bounded set of portrait, square and landscape forms
 until their parent and the complete root forest are known. It composes
-order-preserving shelves, columns and guillotine partitions, Pareto-prunes
-them across aspect buckets, and never uses randomness or elapsed time as a
-search cutoff. It is still a rectangular canonical capability map, not a
+order-preserving shelves, columns and guillotine partitions with independently
+chosen child forms, then prunes geometry regions and quality variants in two
+separate bounded stages. Final `targetAspect` and `targetExtent` pressure is
+applied to the complete forest rather than repeatedly forcing every subtree
+toward the same shape. The quality tiers put label legality, stability, visual
+rhythm, frame fit, and compactness in that order, with descendant effects
+weighted by subtree significance. The search never uses randomness or elapsed
+time as a cutoff. It is still a rectangular canonical capability map, not a
 weight-proportional treemap.
 
 `leafSizing: "text-aware"` makes label fit a geometry constraint. The engine
@@ -601,9 +606,11 @@ The aesthetic terms are independently configurable through `aesthetics`:
 `view.layoutPacked()` repacks the view's existing element-node nesting. The
 current sibling order is preserved (`sort: "none"`), so manual arrangement
 survives. Frontier relayout defaults to `rootPlacement: "preserve"`: top-level
-anchors remain fixed when feasible and deterministic minimum displacement
-repairs a size-induced overlap. Pass `rootPlacement: "repack"` for a new
-complete-forest arrangement:
+anchors, neighbours, bands, and broad regions remain stable when feasible, and
+a bounded deterministic repair minimises displacement and frame expansion when
+resizing introduces overlap. Pass `rootPlacement: "repack"` for a new
+complete-forest arrangement. Selected roots are repaired only against siblings
+in the same parent-relative coordinate space:
 
 ```js
 view.layoutPacked();                          // whole view
@@ -625,8 +632,10 @@ children are added at their name-sorted position, deleted or detached
 elements are removed, moved elements are reparented, and the map is
 repacked. Surviving nodes keep their styling and relative order. Frontier sync
 automatically derives parent-relative previous geometry from the view and uses
-movement, previous neighbors and hysteresis to avoid replacing a compatible
-form for a marginal aesthetic gain; scripts do not construct that context:
+movement, previous neighbours, band/region continuity, and tiered hysteresis to
+avoid replacing a compatible form for a marginal visual gain; scripts do not
+construct that context. A supplied `layout.sort` affects new view generation,
+but does not reorder established survivors during sync:
 
 ```js
 var result = view.syncPacked();

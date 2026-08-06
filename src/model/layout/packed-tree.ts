@@ -31,6 +31,7 @@ export {
 } from './packed-text';
 export {
   evaluatePackedTreeLayout,
+  measurePackedBandMetrics,
   measurePackedMetrics,
   scorePackedMetrics,
   type PackedLayoutMetrics,

@@ -340,8 +340,8 @@ export function buildPackedMapView(
 
 /**
  * Repack the view's existing element-node nesting. Sibling order follows the
- * current z-order (`sort: 'none'`), so manual arrangement survives repacks;
- * scope roots keep their position and only grow or shrink.
+ * current z-order (`sort: 'none'`), so manual arrangement survives repacks.
+ * Preserve is the default root policy; callers can explicitly request repack.
  */
 export function applyPackedMapLayout(
   store: ModelStore,
@@ -375,46 +375,67 @@ export function applyPackedMapLayout(
   }
   if (rootNodeIds.length === 0) return { nodeCount: 0, size: { width: 0, height: 0 } };
 
-  const previousBounds: Record<string, Bounds> = {};
-  const toPacked = (nodeId: string, depth: number): PackedTreeNode => {
-    const node = model.nodes[nodeId] as ElementNode;
-    previousBounds[nodeId] = { ...node.bounds };
-    const weight = options.weightProperty
-      ? propertyNumber(model, node.elementId, options.weightProperty)
-      : undefined;
-    const children = node.childIds.filter(isElementNode).map((id) => toPacked(id, depth + 1));
-    const name = model.elements[node.elementId]?.name ?? '';
-    return {
-      id: nodeId,
-      name,
-      label: packedLabelSpec(name, depth, children.length > 0, undefined, node.fontStyle),
-      ...(weight !== undefined ? { weight } : {}),
-      ...(children.length > 0 ? { children } : {}),
+  // Bounds are parent-relative. Lay out selected roots per owning parent so
+  // roots from unrelated containers never enter the same collision-repair run.
+  const rootsByParent = new Map<string, string[]>();
+  for (const rootId of rootNodeIds) {
+    const parentId = model.nodes[rootId].parentId;
+    const siblings = rootsByParent.get(parentId) ?? [];
+    siblings.push(rootId);
+    rootsByParent.set(parentId, siblings);
+  }
+
+  const updates: DiagramNodeLayoutUpdate[] = [];
+  let width = 0;
+  let height = 0;
+  for (const siblingRoots of rootsByParent.values()) {
+    const previousBounds: Record<string, Bounds> = {};
+    const toPacked = (nodeId: string, depth: number): PackedTreeNode => {
+      const node = model.nodes[nodeId] as ElementNode;
+      previousBounds[nodeId] = { ...node.bounds };
+      const weight = options.weightProperty
+        ? propertyNumber(model, node.elementId, options.weightProperty)
+        : undefined;
+      const children = node.childIds.filter(isElementNode).map((id) => toPacked(id, depth + 1));
+      const name = model.elements[node.elementId]?.name ?? '';
+      return {
+        id: nodeId,
+        name,
+        label: packedLabelSpec(name, depth, children.length > 0, undefined, node.fontStyle),
+        ...(weight !== undefined ? { weight } : {}),
+        ...(children.length > 0 ? { children } : {}),
+      };
     };
-  };
-  const packed = layoutPackedTree(
-    rootNodeIds.map((id) => toPacked(id, 0)),
-    { sort: 'none', rootPlacement: 'preserve', ...options.layout },
-    { previousBounds },
-  );
-  const rootSet = new Set(rootNodeIds);
-  const frontier = options.layout?.gridAlgorithm === 'frontier' &&
-    options.layout.mode !== 'treemap' && options.layout.columns === undefined;
-  const updates: DiagramNodeLayoutUpdate[] = Object.entries(packed.nodes).map(
-    ([id, bounds]) => rootSet.has(id) && !frontier
-      ? {
-        id,
-        bounds: {
-          x: model.nodes[id].bounds.x,
-          y: model.nodes[id].bounds.y,
-          width: bounds.width,
-          height: bounds.height,
-        },
-      }
-      : { id, bounds },
-  );
+    const requestedLayout = options.layout ?? {};
+    const packed = layoutPackedTree(
+      siblingRoots.map((id) => toPacked(id, 0)),
+      {
+        ...requestedLayout,
+        sort: 'none',
+        rootPlacement: requestedLayout.rootPlacement ?? 'preserve',
+      },
+      { previousBounds },
+    );
+    const rootSet = new Set(siblingRoots);
+    const frontier = packed.diagnostics !== undefined;
+    updates.push(...Object.entries(packed.nodes).map(
+      ([id, bounds]) => rootSet.has(id) && !frontier
+        ? {
+          id,
+          bounds: {
+            x: model.nodes[id].bounds.x,
+            y: model.nodes[id].bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+          },
+        }
+        : { id, bounds },
+    ));
+    width = Math.max(width, packed.size.width);
+    height = Math.max(height, packed.size.height);
+  }
   layoutView(updates, [], store);
-  return { nodeCount: updates.length, size: packed.size };
+  return { nodeCount: updates.length, size: { width, height } };
 }
 
 /**
@@ -551,17 +572,17 @@ export function syncPackedMapView(
     const existing = entry.isNew ? undefined : nodeByElement.get(entry.element.elementId);
     return existing ? [[entry.nodeId, { ...existing.bounds }]] : [];
   }));
+  const requestedLayout = withDerivedTitleBand(options.layout, options.style);
   const packed = layoutPackedTree(
     plannedRoots.map(toPacked),
     {
+      ...requestedLayout,
       sort: 'none',
-      rootPlacement: 'preserve',
-      ...withDerivedTitleBand(options.layout, options.style),
+      rootPlacement: requestedLayout.rootPlacement ?? 'preserve',
     },
     { previousBounds },
   );
-  const frontier = options.layout?.gridAlgorithm === 'frontier' &&
-    options.layout.mode !== 'treemap' && options.layout.columns === undefined;
+  const frontier = packed.diagnostics !== undefined;
   const finalBounds = new Map<string, Bounds>();
   for (const entry of planned) {
     const bounds = packed.nodes[entry.nodeId];
