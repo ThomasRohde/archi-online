@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-08-08
+
 ### Changed
 
 - Improved the existing `frontier` capability-map floorplanner with bounded
@@ -17,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extension now keeps sync stable while its explicit Repack command permits a
   fresh root composition. Balanced rows, fixed columns, and treemap behavior
   remain compatible.
+
+### Security
+
+- Updated the DOMPurify override to `3.4.13` to include the upstream fix for
+  unsafe detached subtrees created by element-removal hooks during in-place
+  sanitization.
 
 ## [1.12.0] - 2026-08-03
 

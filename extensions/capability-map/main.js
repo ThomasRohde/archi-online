@@ -1,7 +1,7 @@
 app.extension({
   id: 'archi-online.capability-map',
   name: 'Capability Map',
-  version: '1.12.0'
+  version: '1.13.0'
 });
 
 var config = app.assets.json('data/defaults.json');

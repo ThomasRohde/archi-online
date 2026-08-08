@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "archi-online.capability-map",
   "name": "Capability Map",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "Generate, repack, sync, and heat-map packed capability maps (nested rectangles, no relationship lines).",
   "main": "main.js",
   "contributes": {

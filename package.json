@@ -1,7 +1,7 @@
 {
   "name": "archi-online",
   "private": true,
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "Web-based ArchiMate modeler inspired by Archi, scriptable with a jArchi-compatible JavaScript API",
   "license": "MIT",
   "type": "module",
@@ -56,7 +56,7 @@
     "zustand": "^5.0.2"
   },
   "overrides": {
-    "dompurify": "3.4.12"
+    "dompurify": "3.4.13"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
